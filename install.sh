@@ -1,7 +1,7 @@
 #!/bin/sh
 # Pinned bootstrap for macOS/Linux. No sudo, Git, or global pip installation.
 set -eu
-version=0.2.1
+version=0.2.2
 python_bin=${BAD_PYTHON:-}
 if [ -z "$python_bin" ]; then
     for name in python3 python; do
