@@ -1,0 +1,76 @@
+name: Asset Director Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: asset-director-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  unit:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.11'
+          - os: ubuntu-latest
+            python: '3.13'
+          - os: windows-latest
+            python: '3.11'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit and policy tests (no network)
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -v
+      - name: Skill installation round trip
+        run: python tools/install_skill.py --self-test
+  blender:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        blender: ['4.5.3', '5.0.0']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Fetch checksum-verified official Blender
+        run: |
+          python tools/fetch_blender.py '${{ matrix.blender }}' "$RUNNER_TEMP/blender" > blender-path.txt
+          echo "BLENDER=$(tail -n 1 blender-path.txt)" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/src" >> "$GITHUB_ENV"
+      - name: Acquire pinned retarget backend
+        run: python -m asset_director --library "$RUNNER_TEMP/bad-library" backend-install
+      - name: Actual Blender import, retarget and NLA fixtures
+        run: |
+          mkdir -p evidence
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/headless_fixture.py -- "$RUNNER_TEMP/fixtures" "$RUNNER_TEMP/bad-library"
+          cp "$RUNNER_TEMP/fixtures/fixture_report.json" evidence/
+      - name: Live free asset acquisition and real-motion retarget
+        if: matrix.blender == '5.0.0'
+        run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence
+      - name: Collect diagnostic reports (no source assets or secrets)
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p evidence/worker-logs
+          find "$RUNNER_TEMP/bad-library/jobs" -name worker.log -exec sh -c 'cp "$1" "evidence/worker-logs/$(basename "$(dirname "$1")").log"' sh {} \; 2>/dev/null || true
+          rm -f evidence/*.blend evidence/*.blend1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blender-${{ matrix.blender }}-evidence
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 14

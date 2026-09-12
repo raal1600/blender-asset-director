@@ -1,0 +1,22 @@
+{
+  "status": "OFFLINE_TESTS_PASSED_RUNTIME_GATES_PENDING",
+  "python": "3.13.5",
+  "platform": "linux",
+  "unit_tests": {
+    "run": 65,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "installer": "PASS",
+  "blender_headless": "NOT_RUN",
+  "live_provider_acquisition": "NOT_RUN",
+  "windows": "NOT_RUN",
+  "user_scene": "NOT_RUN",
+  "github_publish": "BLOCKED_APP_REPOSITORY_SELECTION",
+  "repo": "raal1600/blender-asset-director",
+  "notes": [
+    "No source assets or user projects are included.",
+    "No successful GitHub write or CI run has occurred."
+  ]
+}

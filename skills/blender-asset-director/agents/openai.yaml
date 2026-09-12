@@ -1,0 +1,6 @@
+interface:
+  display_name: "Blender Asset Director"
+  short_description: "Find and adapt existing assets and motion"
+  default_prompt: "Use $blender-asset-director to inspect my scene, search existing assets and animations, then adapt the best compatible licensed candidates in a separate working copy."
+policy:
+  allow_implicit_invocation: true
