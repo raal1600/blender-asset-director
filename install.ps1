@@ -6,7 +6,7 @@ Requires Python 3.11+. Existing Codex/MCP/Blender settings are never rewritten.
 #>
 [CmdletBinding()]
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$')][string]$Version = '0.2.1',
+    [ValidatePattern('^\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$')][string]$Version = '0.2.2',
     [string]$PythonPath,
     [string]$BlenderPath,
     [string]$LibraryPath,
@@ -46,7 +46,6 @@ try {
     New-Item -ItemType Directory -Path $tempDir | Out-Null
     $bootstrap = Join-Path $tempDir 'install.py'
     if ($Archive) {
-        # Offline use requires the reviewed install.py from this same release beside this script.
         $localBootstrap = Join-Path $PSScriptRoot 'install.py'
         if (-not (Test-Path -LiteralPath $localBootstrap -PathType Leaf)) { throw 'Offline installation needs install.py beside install.ps1.' }
         Copy-Item -LiteralPath $localBootstrap -Destination $bootstrap
