@@ -33,14 +33,27 @@ class CanonicalDependencyPaths(unittest.TestCase):
 class PublicAddressFailover(unittest.TestCase):
     def test_unreachable_first_address_tries_next_validated_address(self):
         from unittest.mock import patch
-        import time
         from asset_director.acquire import connect_public
         sentinel = object()
-        with patch("asset_director.acquire.socket.create_connection", side_effect=[TimeoutError(), sentinel]) as connect:
-            result = connect_public(["1.1.1.1", "8.8.8.8"], 20, time.monotonic() + 30)
+        # Deterministic clock: avoid OS timer precision changing 15 to 15.000000000000007.
+        with patch("asset_director.acquire.time.monotonic", side_effect=[100.0, 101.0]), \
+             patch("asset_director.acquire.socket.create_connection", side_effect=[TimeoutError(), sentinel]) as connect:
+            result = connect_public(["1.1.1.1", "8.8.8.8"], 20, 130.0)
         self.assertIs(result, sentinel)
         self.assertEqual([call.args[0] for call in connect.call_args_list], [("1.1.1.1", 443), ("8.8.8.8", 443)])
-        self.assertLessEqual(connect.call_args_list[0].args[1], 15)
+        self.assertEqual(connect.call_args_list[0].args[1], 15.0)
+        self.assertEqual(connect.call_args_list[1].args[1], 20.0)
+
+    def test_expired_deadline_does_not_connect(self):
+        from unittest.mock import patch
+        from asset_director.acquire import connect_public
+        from asset_director.core import DirectorError
+        with patch("asset_director.acquire.time.monotonic", return_value=101.0), \
+             patch("asset_director.acquire.socket.create_connection") as connect:
+            with self.assertRaises(DirectorError) as error:
+                connect_public(["1.1.1.1"], 20, 100.0)
+            connect.assert_not_called()
+        self.assertEqual(error.exception.code, "DOWNLOAD_TIMEOUT")
 
     def test_all_addresses_unreachable_is_explicit_failure(self):
         from unittest.mock import patch
