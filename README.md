@@ -2,41 +2,60 @@
 
 **Give Codex a small Blender production team—not another Blender harness.**
 
-Use a prompt and an existing `.blend` to inspect the scene, reuse suitable assets, search for missing ones, plan shots, adapt existing animations, improve cameras/lighting, and review the result. One skill loads only the needed roles: director, production designer/scout, performance, cinematography, lighting/look development, finishing, and continuity/QA.
+Blender Asset Director is a scene-independent Codex skill that can inspect an existing `.blend`, reuse suitable assets, discover genuinely missing assets, plan shots, adapt animations, improve camera/lighting, and review technical evidence. It selectively loads seven responsibilities: director/producer, production design/scouting, performance, cinematography, lighting/look development, editorial/finishing, and continuity/QA.
 
-**Current preview: v0.2.1.** Installation is automated. Cinematic quality and compatibility with your specific scene still need a real test. No warrior, desert, fixed object names, camera lens, frame rate, or duration is assumed.
+**Current preview: v0.2.2.** This release fixes an installer test that could falsely fail on machines where Blender was already discoverable or where the installer was run with Blender's bundled Python. No warrior, desert, object name, lens, frame rate, duration, or scene type is hard-coded.
 
 ## Before you install
 
-You need **Python 3.11+**, **local Codex**, and **Blender with a working Blender MCP connection** for scene work. The teaching overlay is optional. Keep any existing setup—you do not need to reinstall it or change your model provider.
+You need:
 
-Starting from scratch? See [the three prerequisites](docs/INSTALL.md#starting-from-scratch). This installer adds **our skill**, not Blender, Python, Codex, API accounts, or an MCP server. It will identify missing pieces rather than claim they work. Use the installer in the **same operating-system environment as Codex**; native Windows and WSL have different home directories.
+- **Python 3.11+**
+- **local Codex**
+- **Blender**
+- a **working Blender MCP connection** for live scene work
 
-## Install — one copy/paste
+The Teaching Overlay is optional. Keep your current model provider and MCP setup—the installer does not replace or rewrite them.
 
-No Git clone, `pip install`, administrator account, or API key is needed for this installation. The bootstrap downloads **v0.2.1**, verifies the release ZIP's SHA256, runs offline checks, installs the complete skill/runtime, and remembers your local paths.
+## Install on Windows — one copy/paste
 
-### Windows: PowerShell 5.1 or newer
+Open PowerShell and paste:
 
 ```powershell
 $installer = Join-Path $env:TEMP ("bad-install-" + [guid]::NewGuid().ToString("N") + ".ps1")
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.2.1/install.ps1" -OutFile $installer
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.2.2/install.ps1" -OutFile $installer
 powershell -NoProfile -ExecutionPolicy Bypass -File $installer
 ```
 
-`Bypass` applies only to this installer process. It does not change the machine's execution policy. The script is readable: [review install.ps1](install.ps1) and [install.py](install.py) before running. SHA256 protects package integrity; it is not an independent publisher signature or a security audit.
+No Git clone, `pip install`, administrator account, or extra API key is required. `ExecutionPolicy Bypass` applies only to that installer process; it does not change the machine-wide policy.
 
-### macOS / Linux
+The bootstrap downloads the **pinned v0.2.2 release**, verifies its SHA256, runs the offline checks, installs the complete managed skill/runtime, detects Blender from conventional locations, creates the separate asset library, and saves local paths.
+
+If Python is installed in a non-standard place:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $installer -PythonPath "C:\Path\To\python.exe"
+```
+
+If Blender is portable/custom:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $installer -BlenderPath "D:\Apps\Blender\blender.exe"
+```
+
+## macOS / Linux
 
 ```sh
 installer=$(mktemp)
-curl --fail --silent --show-error --location --proto '=https' https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.2.1/install.sh -o "$installer"
+curl --fail --silent --show-error --location --proto '=https' \
+  https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.2.2/install.sh \
+  -o "$installer"
 sh "$installer"
 ```
 
-The installer selects Python 3.11+ from your environment. Set `BAD_PYTHON` to an explicit interpreter when needed. [Review install.sh](install.sh).
+Set `BAD_PYTHON` if you want to select an explicit Python 3.11+ interpreter.
 
-### Then: open a new local Codex session
+## Then open a new Codex session
 
 Paste this into **Codex**, not PowerShell:
 
@@ -46,82 +65,95 @@ Run the first-run check. Verify the existing Blender MCP read-only.
 Do not modify my scene. Tell me exactly what is ready or missing.
 ```
 
-The check verifies the installed files, saved paths, available MCP tools, and an actual read-only scene query. Installer output such as `CONFIGURED_LIVE_TEST_PENDING` is **not** proof of a live connection. Codex may discover the skill immediately; start a fresh session if it is not listed.
+This is the local acceptance step. The installer can prove the skill files, paths, Python and Blender executable are available, but only the fresh Codex session can prove that Codex discovers the skill and can actually query your live Blender MCP.
 
-## Try a scene
+## First safe scene test
 
-Once the first-run check passes, open any project in Blender and ask:
-
-```text
-$blender-asset-director
-Improve the currently open scene into a cinematic showcase.
-Inspect it first and preserve my original file. Work on a separate copy.
-Reuse existing assets and search only for genuinely missing elements.
-Explain the shot plan, use small CPU previews, and show what changed.
-Do not render a full animation or use paid services.
-```
-
-For a narrower test:
+With Blender open, try:
 
 ```text
 $blender-asset-director
-Improve the lighting and framing of my selected object. Do not change its
-geometry or replace its materials. Save a working copy and render one small preview.
+Improve the lighting and framing of my selected object.
+Inspect the scene first. Preserve the original .blend and work on a separate copy.
+Do not change geometry or replace existing materials.
+Render one small CPU preview and report exactly what changed.
 ```
 
-The **host model** interprets your request. The skill supplies role guidance, validated production contracts, asset tools, and Blender helpers—not a hidden extra model. A text-only model cannot visually critique a render; it must leave visual acceptance pending for you or an explicitly selected image-capable model.
+For a broader test:
+
+```text
+$blender-asset-director
+Turn the currently open Blender project into a cinematic showcase.
+Inspect the actual scene first. Reuse suitable existing assets and search only for genuinely missing elements.
+Preserve the original file, use a working copy, keep previews small, and do not use paid services.
+```
 
 ## What installation changes
 
 | Location | Purpose |
 |---|---|
-| `~/.agents/skills/blender-asset-director` | Managed Codex skill, all role references, bundled runtime, license notices |
-| `~/CGI-Library` by default | Separate asset catalog, downloads, animations, previews, working jobs |
-| OS-local `runtime.json` | Only library, Blender, Python, and skill paths; [exact locations](docs/INSTALL.md#paths-and-overrides) |
+| `~/.agents/skills/blender-asset-director` | Managed Codex skill, role references, bundled runtime, notices |
+| `~/CGI-Library` by default | Asset catalog, downloads, animations, previews and working jobs |
+| OS-local `runtime.json` | Library, Blender, Python and skill paths only |
 
-Codex configuration, DeepSeek/OpenAI/other provider settings, MCP declarations, Blender preferences, existing `.blend` projects, and credentials are **not changed**. No assets are bulk-downloaded. Retarget-backend installation and provider authentication happen only when an authorized task needs them.
+The installer **does not modify** Codex provider settings, DeepSeek/OpenAI configuration, MCP declarations, Blender preferences, existing `.blend` projects, credentials, or API keys. It does not bulk-download assets or start rendering user scenes during setup.
 
-Blender is detected from PATH or conventional installation directories. Portable/custom installs can be selected explicitly. Job commands use saved paths so you normally do not need to repeat `--library` or `--blender`.
+## How the studio works
 
-## Update, diagnose, remove
+```text
+prompt
+  ↓
+director / producer
+  ↓
+actual scene audit
+  ↓
+reuse / adapt / missing / uncertain
+  ↓
+only the required specialist roles
+  ├─ production design / scout
+  ├─ performance
+  ├─ cinematography
+  ├─ lighting / look development
+  ├─ editorial / finishing
+  └─ continuity / QA
+  ↓
+one controlled Blender execution path
+  ↓
+small previews + evidence review
+```
 
-Download/review the bootstrap for the version you intend to install, then run it with `-Update` (Windows) or `--update` (macOS/Linux). Re-running the same version is safe; upgrading a different managed version requires that explicit flag. Edited or unowned skill folders are never overwritten. Updates back up the previous managed installation.
+The host model interprets creative meaning. The deterministic runtime validates object references, production contracts, source licenses, job identity, resource budgets, and evidence. Technical validation is not a beauty score, and a text-only model cannot claim visual acceptance of rendered frames.
 
-Windows examples, using the `$installer` downloaded above:
+## Asset and animation support
+
+The current toolkit supports local catalog search, Poly Haven, ambientCG, Sketchfab search/authenticated acquisition, and a verified Quaternius animation-pack route. Mixamo, BlenderKit and Poly Pizza remain host-tool/manual acquisition paths where appropriate; private APIs are not scraped.
+
+Animation tooling includes source indexing, rig inspection, pinned retargeting backend support, NLA assembly, root-motion handling and numerical QA. Root-height terrain following is **not** full foot IK, and arbitrary production rigs still require local visual acceptance.
+
+## Update / verify / remove
+
+Re-run the v0.2.2 installer with `-Update` when updating a different managed installation:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File $installer -Update
-powershell -NoProfile -ExecutionPolicy Bypass -File $installer -BlenderPath "D:\Apps\Blender\blender.exe" -LibraryPath "D:\CGI-Library"
 ```
 
-From Python 3.11+ (use `py -3` on Windows or `python3` on macOS/Linux where appropriate):
+Managed updates back up the prior version and refuse to overwrite edited or unowned skill directories.
+
+Useful installed commands:
 
 ```text
 python <installed-skill>/scripts/director.py doctor
-python <installed-skill>/scripts/director.py configure --blender <absolute-executable>
 python <installed-skill>/scripts/manage_install.py --dest <installed-skill> --verify
 python <installed-skill>/scripts/manage_install.py --dest <installed-skill> --uninstall
 ```
 
-Uninstall is offline and preserves your library and local path settings. [Troubleshooting, custom paths, offline installation, and source-development setup](docs/INSTALL.md).
-
-## What is implemented
-
-The asset services search the local catalog, Poly Haven, ambientCG, and Sketchfab (authenticated downloads need your token). A Quaternius starter-pack route indexes actual source actions. Mixamo, BlenderKit, and Poly Pizza use a discovered approved host integration or manual download/intake—not invented private APIs.
-
-The studio layer validates requirements against an actual scene audit; generates gap queries; routes role-specific work; and offers subject-relative camera fitting/checks, additive light plans, bounded CPU previews, motion indexing, retargeting, and NLA assembly. Original inputs are hashed, separate working results are saved, and stale jobs are rejected.
-
-These are technical tools and guidance. Camera bounds are not a beauty score; terrain root-height following is not foot IK. Finishing/sound planning is not a complete audio mixing or final-video delivery backend. Default production budget: eight CPU preview frames and two repair passes, tracked across jobs by the host. No paid generation or local AI inference is required; normal Codex/model usage charges still apply.
+Uninstall preserves the external asset library and local path settings.
 
 ## Tests and evidence
 
-[CI](https://github.com/raal1600/blender-asset-director/actions/workflows/ci.yml) separates unit/policy tests, managed installation, platform bootstrap tests, real Blender 4.5.3/5.0.0 fixtures, and live asset/source-motion checks. Release publication waits for that workflow; separate post-publication tests exercise the real anonymous download route. See [setup acceptance](docs/SETUP_ACCEPTANCE.md) and [studio acceptance](docs/ACCEPTANCE.md) for exact executed results and limitations.
+The release pipeline separately verifies unit/policy/studio/setup tests, Windows PowerShell 5.1 and 7 bootstraps, macOS/Linux bootstraps, Blender 4.5.3 and 5.0.0 fixtures, live asset/source-motion checks, release publication, and anonymous public installation from the published release.
 
-To develop from a source checkout:
+The v0.2.2 release specifically fixes the environment-dependent `test_job_missing_blender_actionable` failure reported by a real Windows installation using Blender-bundled Python. The corrected test now mocks Blender discovery **before** local configuration is created, so it tests the missing-Blender branch independently of the host machine.
 
-```sh
-python tools/run_checks.py --offline
-python tools/install_skill.py --configure
-```
-
-Use the managed installer rather than copying only `skills/blender-asset-director` with a generic skill installer: the executable runtime must be bundled too. [Design](docs/DESIGN.md) · [studio contracts](skills/blender-asset-director/references/studio-contracts.md) · [provider contracts](skills/blender-asset-director/references/providers.md) · [security](SECURITY.md) · [third-party notices](THIRD_PARTY_NOTICES.md).
+See [setup acceptance](docs/SETUP_ACCEPTANCE.md), [studio acceptance](docs/ACCEPTANCE.md), [installation details](docs/INSTALL.md), [design](docs/DESIGN.md), [security](SECURITY.md), and [third-party notices](THIRD_PARTY_NOTICES.md).
