@@ -235,6 +235,10 @@ def extract_zip(lib: Library, record: dict) -> list[dict]:
 
 def gltf_dependencies(path: Path, package_root: Path) -> list[str]:
     """Check every URI before invoking Blender's importer; includes nested extension URIs."""
+    # Use one canonical root for BOTH containment and relative-path conversion.
+    # Windows may expand an 8.3 temp path (RUNNER~1) while resolving the resource.
+    path = Path(path).resolve()
+    package_root = Path(package_root).resolve()
     if path.suffix.lower() == ".glb":
         with path.open("rb") as f:
             header = f.read(20)
