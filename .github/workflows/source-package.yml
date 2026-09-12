@@ -1,0 +1,28 @@
+name: Source package
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive only tracked source at this commit
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/source-package"
+          git archive --format=zip --output="$RUNNER_TEMP/source-package/source.zip" HEAD
+          cd "$RUNNER_TEMP/source-package"
+          sha256sum source.zip > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-${{ github.sha }}
+          path: ${{ runner.temp }}/source-package/
+          retention-days: 7
+          if-no-files-found: error
