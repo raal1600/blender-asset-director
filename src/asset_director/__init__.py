@@ -1,2 +1,2 @@
-"""Reuse-first Blender asset and motion workflows. No extra model/API calls."""
-__version__ = "0.1.0"
+"""Blender Asset Director: portable asset services and scene-independent studio coordination."""
+__version__ = "0.2.0"

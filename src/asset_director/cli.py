@@ -23,6 +23,9 @@ def parser():
     s = p.add_subparsers(dest="command", required=True)
     s.add_parser("doctor"); s.add_parser("providers"); s.add_parser("report"); s.add_parser("rebuild-catalog")
     q=s.add_parser("plan"); q.add_argument("brief")
+    q=s.add_parser("studio-plan"); q.add_argument("--brief",required=True); q.add_argument("--audit",required=True)
+    q=s.add_parser("studio-handoff"); q.add_argument("--plan",required=True); q.add_argument("--proposal",required=True); q.add_argument("--audit",required=True)
+    q=s.add_parser("studio-review"); q.add_argument("--review",required=True); q.add_argument("--audit",required=True); q.add_argument("--vision-available",action="store_true")
     q=s.add_parser("search"); q.add_argument("query"); q.add_argument("--provider", default="local", choices=list(capabilities())); q.add_argument("--kind", choices=["model","material","hdri","pack","animation"]); q.add_argument("--limit",type=int,default=5); q.add_argument("--refresh",action="store_true")
     q=s.add_parser("show"); q.add_argument("asset_id"); q.add_argument("--full",action="store_true")
     q=s.add_parser("acquire"); q.add_argument("asset_id"); q.add_argument("--resolution",choices=["1k","2k"],default="1k")
@@ -52,6 +55,15 @@ def main(argv=None):
                         "mcp_connection":"Host must verify its existing Blender MCP; this CLI does not replace or configure it"}
             elif command == "providers": result=capabilities()
             elif command == "plan": result=plan(args.brief)
+            elif command == "studio-plan":
+                from .studio import compile_plan
+                result=compile_plan(load_json(Path(args.brief)),load_json(Path(args.audit)))
+            elif command == "studio-handoff":
+                from .studio import validate_handoff
+                result=validate_handoff(load_json(Path(args.plan)),load_json(Path(args.proposal)),load_json(Path(args.audit)))
+            elif command == "studio-review":
+                from .studio import validate_review
+                result=validate_review(load_json(Path(args.review)),load_json(Path(args.audit)),vision_available=args.vision_available)
             elif command == "search":
                 result=Providers(lib).search(args.provider,args.query,args.kind,args.limit,args.refresh)
                 for r in result["results"]: r["asset"]=compact_asset(r["asset"])

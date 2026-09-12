@@ -1,95 +1,89 @@
 # Blender Asset Director
 
-A reuse-first agent skill and Python toolkit for finding existing assets, indexing real animation clips, transferring motion to compatible Blender rigs, and checking the result. Keep the existing Codex/DeepSeek/Blender MCP setup; do not add another competing harness.
+A reuse-first asset toolkit and scene-independent Blender studio skill for Codex or another compatible host. Interpret a prompt, inspect the existing project, reuse what is suitable, scout actual gaps, adapt assets/motion, and review evidence. No default warrior, desert, armature, sunset or ten-second shot is assumed.
 
-**Status: published implementation candidate.** 69 unit tests and installer checks pass on Windows and Linux. Real headless Blender fixtures pass on 4.5.3 and 5.0.0; live Poly Haven and ambientCG acquisition/import also pass. Quaternius acquisition is blocked by a hosted-runner connection failure, so the actual retrieved-motion gate remains unvalidated and CI correctly remains failed. See [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) for exact evidence. The user scene still requires local acceptance.
+**0.2.0 candidate:** the studio layer extends the asset/motion foundation. Read [studio scope](docs/STUDIO_UPGRADE.md), [production contracts](skills/blender-asset-director/references/studio-contracts.md) and [baseline acceptance](docs/ACCEPTANCE.md). Technical tests do not establish cinematic quality or compatibility with every supplied rig. No claim of a completely validated release is made while required acceptance gates remain open.
 
-## Workflow
+## Architecture
+
+One discoverable `blender-asset-director` skill selectively loads seven internal responsibilities: director/producer, production-design/scouting, performance, camera/focus, lighting/look development, editorial/finishing and continuity/QA. They share the existing Python toolkit, external library and controlled working-file jobs. They are not seven autonomous writers or seven extra model subscriptions.
+
+The host interprets creative meaning. Deterministic code validates contracts, actual object references, resource limits and evidence. It does not pretend keyword matches are semantic understanding or a beauty score. Existing Blender MCP remains the live inspection/handoff connection. Bounded background Blender jobs run mutations on separate working copies.
+
+## Preserve your workstation
+
+Keep the existing Codex/DeepSeek provider, Blender MCP and teaching overlay. Never reinstall them for this skill. Preserve live unsaved work and original .blend files. Assets and credentials stay outside this public repository. No paid calls/assets, local AI inference or heavy GPU renders are required. Host/model API charges still apply.
+
+Default previews are limited Cycles CPU jobs, not full animation rendering. The default production budget is eight preview frames and two repairs; the host tracks the total across jobs. Script auto-execution remains disabled. Separate workers are defense in depth, not OS sandboxes.
+
+## Install after reviewing the candidate
+
+Requires system Python 3.11+, a supported installed Blender executable for Blender jobs, and an already working host/MCP connection for live handoff. The Python core uses the standard library.
+
+```powershell
+git clone https://github.com/raal1600/blender-asset-director.git
+cd blender-asset-director
+python tools/run_checks.py --offline
+python tools/install_skill.py --dest "$HOME\.agents\skills\blender-asset-director"
+```
+
+Discover the actual host skills directory rather than assuming it when customized. Restart the host if skill discovery is cached and verify the skill is available. The installer bundles the runtime and notices, records ownership/hashes, refuses to overwrite edited installations, and does not change Codex or MCP configuration.
+
+For a reviewed update, use `--update`; old managed files are backed up. For explicit removal use `--uninstall`. Uninstall does not remove the independent asset library.
+
+## Start with an audit, not a recipe
 
 ```text
-User brief -> inspect existing scene -> local catalog -> supported provider search
-  -> license/format checks -> acquire shortlist -> index actual clips
-  -> inspect source and target -> retarget on flat ground -> numerical QA
-  -> assemble NLA and one root-motion owner -> gentle terrain -> human review
+python <installed-skill>/scripts/director.py --library <library> doctor
+python <installed-skill>/scripts/director.py --library <library> plan "<actual request>"
 ```
 
-This is not an AI motion-generation service. It calls no extra LLM, performs no local AI inference, and does not spend Higgsfield credits. Host/model usage is still billed under the user's existing arrangement. Render jobs explicitly use modest Cycles CPU settings.
-
-## Implemented components
-
-- A discoverable `blender-asset-director` skill, on-demand reference files and a bundled-runtime installer.
-- Standard-library Python CLI; no runtime pip dependencies for the portable core.
-- Rebuildable SQLite catalog backed by durable per-asset manifests and hashed library-relative files.
-- Local search, transparent lexical ranking, rights gates and provenance reports.
-- Direct provider code for Poly Haven, ambientCG, Sketchfab, and the creator-posted free Quaternius Standard pack. Network behavior must pass live tests; other marketplaces are honest host-tool/manual-intake routes.
-- Bounded HTTPS acquisition, validated redirects, credential separation, safe ZIP extraction and glTF dependency checks.
-- Versioned background Blender jobs with stale-input detection, separate output files, deadlines, clean child environments and explicit failed-job retry.
-- Scene/skinning/rig inspection; actual action-slot indexing; pinned Mwni transfer adapter; NLA timing; in-place controller travel; gentle root-height terrain following; CPU previews and numerical diagnostics.
-
-**Not implemented:** universal automatic rigging, arbitrary control-rig retargeting, a full foot-IK/contact solver, automatic weapon-grip or cloth repair, browser account scraping, guaranteed cinematic animation, or an Unreal adapter. Missing prerequisites produce explicit review gates rather than fake replacements.
-
-## Prerequisites
-
-System Python 3.11+, a Blender installation, and an agent host that supports filesystem skills. Existing Blender MCP is used by the agent for live project discovery; the CLI itself does not change MCP configuration or connect to its socket.
-
-Headless fixtures have passed on Blender 4.5.3 and 5.0.0. These are tested versions, not a claim about the latest Blender release or arbitrary-rig compatibility. The actual installed Blender version and user scene must still pass local acceptance.
-
-## Install the skill
-
-From a checked-out copy of this repository:
-
-```powershell
-python tools/install_skill.py --self-test
-python tools/install_skill.py
-```
-
-Default destination: `~/.agents/skills/blender-asset-director`. Verify that this is a supported skills root for the installed host/version. Use `--dest <full-skill-directory>` for an explicitly selected alternative. The installer does not inspect credentials or alter Codex provider, trust, approval, or MCP settings.
-
-The installed copy includes `scripts/runtime/asset_director`; it does not require the development repository to remain in its original location. Start a fresh agent session if skill discovery is cached, then verify `$blender-asset-director` is actually listed.
-
-Update explicitly with `python tools/install_skill.py --update`. Changes to receipt-owned files or unowned additions block overwrite. Uninstall with `--uninstall`; the asset library is preserved.
-
-## Use the CLI
-
-From the source checkout, PowerShell:
-
-```powershell
-$env:PYTHONPATH = "$PWD\src"
-python -m asset_director --library "$HOME\CGI-Library" doctor
-python -m asset_director --library "$HOME\CGI-Library" plan "warrior walks over a dune and stops"
-python -m asset_director --library "$HOME\CGI-Library" search walk --provider local --kind animation
-```
-
-From the installed skill, call `python <skill>/scripts/director.py ...`. `BAD_LIBRARY` can define the library path. No database, models, textures, secrets or `.blend` files are stored inside the code repository.
-
-Explicitly acquire the free starter package:
+`plan` returns an unfilled intake, not generated scene instructions. This is a deliberate change from the 0.1 keyword hints. Use `scene-audit` against a saved working copy and `inspect` when detailed rigs/actions are relevant. The host fills a brief and runs:
 
 ```text
-asset-director seed --download
-asset-director job-prepare index --asset RETURNED_ASSET_ID
-asset-director job-run RETURNED_JOB_ID --blender ACTUAL_BLENDER_EXECUTABLE --timeout 900
-asset-director index-collect RETURNED_ASSET_ID RETURNED_JOB_ID
-asset-director search walk --provider local --kind animation
+director studio-plan --brief brief.json --audit scene_audit.json
 ```
 
-Here `asset-director` abbreviates the launcher above; it is also an entry point after an optional normal Python package installation. Placeholder IDs are not real assets. Indexing reports the actual clip names, slots, owners and duration, not an assumed animation inventory.
+Here `director` abbreviates the installed script invocation with an explicit library path. Follow the [contract reference](skills/blender-asset-director/references/studio-contracts.md) for targets, requirements, shots, budgets, handoffs and reviews. No helper automatically knows whether an existing material is visually suitable; observations, inferred suitability and uncertainty remain distinct.
 
-For retargeting, run `backend-install` to acquire the reviewed upstream commit. Read [job examples](skills/blender-asset-director/references/jobs.md) and [motion boundaries](skills/blender-asset-director/references/motion.md) before preparing an operation. Every mutation produces a new `jobs/<id>/result.blend`, not an overwrite of the original.
+## Asset and motion services
 
-## Test before using a valuable scene
+Search the actual scene, then the local SQLite catalog, then supported external providers. Poly Haven supports models/materials/HDRIs; ambientCG primarily materials. Sketchfab has a search adapter and authenticated download route. Quaternius supplies one verified starter-pack route, not a catalog of imagined clip names. Mixamo, BlenderKit and Poly Pizza use a discovered approved host tool or manual acquisition/intake; no private API scraping is claimed.
 
-```powershell
+```text
+director providers
+director search "<gap query>" --provider local --kind model
+director search "<gap query>" --provider polyhaven --kind hdri
+director acquire <asset-id>
+director seed
+director seed --download
+director job-prepare index --asset <acquired-asset-id>
+director job-run <job-id> --blender <executable>
+director index-collect <asset-id> <job-id>
+```
+
+Only execute acquisition for a justified shortlist. Records retain source/author/license, file hashes, sidecar dependencies and actual animation slots. License policy is conservative, not complete legal clearance. Do not commit assets, tokens, temporary signed URLs or user projects. See [provider contracts](skills/blender-asset-director/references/providers.md).
+
+For skeletal motion, inspect source/target, install the pinned reviewed backend with `backend-install`, retarget on flat ground and then assemble. Preserve root ownership and equipment. Root-height terrain following is not foot IK. Unrigged/unsupported characters require further work, not stand-ins. Object/mechanical motion is a separate capability and does not need humanoid retargeting.
+
+## Scene-independent Blender helpers
+
+- `scene-audit`: observed geometry/material/image/camera/light/timebase facts.
+- `camera-fit`: explicit subjects, lens and view direction; evaluated bounds and actual aspect; new perspective/orthographic camera.
+- `camera-check`: sampled framing and clip-plane checks, not collision/occlusion certification.
+- `light-rig`: explicitly specified additive lights relative to observed geometry; no universal studio/sunset recipe.
+- `preview`: bounded CPU images with an existing camera, no armature requirement.
+
+Existing inspect/import/index/retarget/assemble/qa jobs remain. Read [job contracts](skills/blender-asset-director/references/jobs.md) and use `--help`; never invent flags. New jobs write separate results and reject altered inputs/code. A new code version requires preparing new jobs rather than bypassing stale-hash checks.
+
+## Evidence and testing
+
+```text
 python tools/run_checks.py --offline
 ```
 
-The offline tests exercise policy, schemas, catalog recovery, path/archive protections, credentials across mocked redirects, job identity and motion diagnostics. They do **not** emulate a successful Blender retarget.
+CI separately runs Windows/Linux unit tests, installer tests, actual Blender 4.5.3/5.0.0 fixtures, multi-scene camera/light and rig-free preview tests, and live provider/source-motion checks. Online failures are not silently converted into passes. The baseline recorded a Quaternius/OpenGameArt connection failure; consult actual current run evidence for its state.
 
-The CI workflow additionally downloads checksum-verified official Blender builds, runs real synthetic-rig/import/NLA tests, and attempts real free-asset acquisition/indexing/retargeting. It uses no private assets or provider secrets. Provider outages, schema changes and real Blender failures remain visible; do not hide them as skips.
+Fixtures test technical invariants using synthetic geometry/motion. They do not prove natural performance, historical accuracy, visual realism or the user's actual model. A contact sheet is not continuous-motion acceptance. Text-only models report visual review PENDING. A review record/hash validates evidence identity, not the correctness of an opinion. Final human acceptance is explicit.
 
-Follow [local acceptance](skills/blender-asset-director/references/local-test.md). Gate A verifies installation and read-only scene readiness. Gate B mutates a working copy only after **Run the Desert Warrior test** is authorized. The existing warrior is never replaced by a test mannequin.
-
-## Licensing and privacy
-
-Original toolkit code uses the repository's MIT license. The separately acquired Mwni backend declares GPL-3.0-or-later and is not relicensed or included in source bundles. Assets retain their own licenses. Read [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [SECURITY.md](SECURITY.md).
-
-Poly Haven API use is credited independently of its CC0 asset license. Default selection accepts evidenced CC0 and CC BY 3.0/4.0; unknown/custom/editorial/noncommercial restrictions are review gates, not blanket legal decisions. Catalog reports preserve source/author/rights evidence. Images supplied to an agent host can still be transmitted to its model provider.
+Read [studio upgrade](docs/STUDIO_UPGRADE.md), [baseline acceptance](docs/ACCEPTANCE.md), [design](docs/DESIGN.md), [security](SECURITY.md), and [third-party notices](THIRD_PARTY_NOTICES.md). Adapted studio-method notices are retained inside the installed skill in [upstream-licenses.md](skills/blender-asset-director/references/upstream-licenses.md).

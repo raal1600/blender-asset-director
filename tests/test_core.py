@@ -111,7 +111,7 @@ class PolicyCase(unittest.TestCase):
         self.assertIn('WRONG_MOTION_RUN_NOT_WALK',ranked[1]['policy']['reasons']);self.assertEqual(rank('slow armed walk',[b,a]),ranked)
     def test_plan_is_not_a_fabricated_catalog(self):
         p=plan('Warrior slowly walks over a dune and stops, vigilant')
-        self.assertEqual([x['query'] for x in p['motions']],['walk','stop','idle']);self.assertIn('target rig',p['unknowns'])
+        self.assertEqual(p['status'],'HOST_INTERPRETATION_REQUIRED');self.assertEqual(p['targets'],{});self.assertEqual(p['shots'],[])
     def test_nonfinite_asset_value_rejected(self):
         for v in (float('nan'),float('inf'),-1):
             with self.assertRaises(DirectorError): Asset.from_dict(sample_asset(price=v).to_dict())

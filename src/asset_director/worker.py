@@ -37,6 +37,7 @@ def execute(job_path, *, live=False):
     import bpy
     from asset_director import blender_ops as ops
     from asset_director import backend
+    from asset_director import scene_ops
     from asset_director.motion import quality
     job_path = Path(job_path).resolve()
     with Library(job_path.parents[2]) as lib:
@@ -56,6 +57,18 @@ def execute(job_path, *, live=False):
             else: bpy.ops.wm.read_factory_settings(use_empty=True)
             files = spec["source_files"]
             if op == "inspect": data = ops.inspect_scene()
+            elif op == "scene-audit":
+                data = scene_ops.scene_audit()
+                data["source_file_sha256"] = spec["inputs"][0]["sha256"]
+            elif op == "camera-fit": data = scene_ops.camera_fit(options, job["id"])
+            elif op == "camera-check": data = scene_ops.camera_check(options)
+            elif op == "light-rig": data = scene_ops.light_rig(options, job["id"])
+            elif op == "preview":
+                if options.get("stage"):
+                    target = bpy.context.scene.objects.get(options.get("target_object", ""))
+                    require(target is not None, "TARGET_REQUIRED", "Explicit staging needs an observed target object")
+                    stage(target)
+                data = ops.render_previews(directory, options)
             elif op == "index":
                 data = {"clips": [], "rigs": [], "unassigned_actions": [], "files_indexed": []}
                 candidates = [f for f in files if Path(f["path"]).suffix.lower() in {".glb", ".gltf", ".fbx", ".bvh", ".blend"}]
@@ -119,7 +132,7 @@ def execute(job_path, *, live=False):
                 data = ops.retarget(source, target, matches[0], options.get("slot"), options, backend.verify(lib), job["id"])
                 for o in created: bpy.data.objects.remove(o, do_unlink=True)
                 for a in new_actions: bpy.data.actions.remove(a)
-            elif op in {"assemble", "qa", "preview"}:
+            elif op in {"assemble", "qa"}:
                 name = options.get("target_object")
                 target = bpy.data.objects.get(name) if name else None
                 if not target:
@@ -133,11 +146,8 @@ def execute(job_path, *, live=False):
                     data = {"rig": report, "samples": sampled, "qa": quality(sampled, report["anatomical_height"], bpy.context.scene.render.fps/bpy.context.scene.render.fps_base)}
                     if options.get("terrain_object"):
                         data["terrain_qa"] = ops.terrain_quality(sampled,report["anatomical_height"],options["terrain_object"],options.get("sole_offsets"))
-                else:
-                    if options.get("stage"): stage(target)
-                    data = ops.render_previews(directory, options)
             else: raise DirectorError("UNKNOWN_OPERATION", "Unsupported operation")
-            if op in {"import", "retarget", "assemble", "preview"}:
+            if op in {"import", "retarget", "assemble", "preview", "camera-fit", "light-rig"}:
                 dest = directory / "result.blend"
                 require(not any(Path(f["path"]).resolve() == dest for f in spec["inputs"]), "ORIGINAL_OVERWRITE", "Output must not be an original input")
                 bpy.ops.wm.save_as_mainfile(filepath=str(dest), check_existing=False)

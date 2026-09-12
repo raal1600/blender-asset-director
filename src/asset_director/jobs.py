@@ -9,6 +9,10 @@ from .core import Asset, DirectorError, Library, SCHEMA, atomic_json, canonical,
 
 OPS = {
     "inspect": set(),
+    "scene-audit": set(),
+    "camera-fit": {"subjects", "frames", "direction", "lens_mm", "sensor_width_mm", "margin", "projection"},
+    "camera-check": {"subjects", "frames", "camera", "margin"},
+    "light-rig": {"subjects", "lights"},
     "index": {"max_clips", "sample"},
     "import": {"collection", "selection"},
     "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture"},
@@ -16,7 +20,7 @@ OPS = {
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage"},
 }
-MUTATIONS = {"import", "retarget", "assemble", "preview"}
+MUTATIONS = {"import", "retarget", "assemble", "preview", "camera-fit", "light-rig"}
 
 
 def implementation_hash():
@@ -47,7 +51,7 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
             if asset.metadata.get("slot") is not None: options.setdefault("slot", asset.metadata["slot"])
             if asset.metadata.get("source_object"): options.setdefault("source_object", asset.metadata["source_object"])
             if asset.metadata.get("fps"): options.setdefault("source_fps", asset.metadata["fps"])
-    if operation in {"retarget", "assemble", "qa", "preview"}:
+    if operation in {"retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check", "light-rig"}:
         require(inputs, "TARGET_REQUIRED", "Operation requires a specific saved working/target file")
     if operation in {"import", "retarget"}: require(source_files, "SOURCE_REQUIRED", "Operation requires an acquired asset ID")
     # No terminal strings, scripts, network endpoints, or model-provided output paths.

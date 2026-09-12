@@ -163,17 +163,10 @@ def tokens(s: str) -> set[str]:
     return {ALIASES.get(x, x) for x in re.findall(r"[a-z0-9]+", s.lower()) if x not in STOPWORDS}
 
 def plan(brief: str) -> dict:
-    text(brief, 8000)
-    words = tokens(brief)
-    beats = [x for x in ("walk", "run", "stop", "turn", "idle", "attack") if x in words]
-    if "vigilant" in words and "idle" not in beats: beats.append("idle")
-    return {"schema_version": SCHEMA, "brief": brief, "extraction": "deterministic keyword hints; host must confirm semantics",
-            "motions": [{"query": x, "constraints": sorted(words & {"armed", "slow", "vigilant"})} for x in beats],
-            "environment_queries": ["desert"] if "desert" in words else [],
-            "preserve": ["existing hero", "existing terrain", "original file"],
-            "order": ["inspect_scene", "local_search", "provider_search", "preflight", "source_preview", "retarget_flat", "terrain_qa", "human_review"],
-            "budget": {"paid_assets": 0, "local_ai": False, "max_render_frames": 8},
-            "unknowns": ["target rig", "source quality", "motion compatibility", "user asset rights"]}
+    # The reusable production entry point must not infer a genre, actor or terrain.
+    from .studio import intake
+    return intake(brief)
+
 
 def rank(query: str, assets: list[Asset], kind: str | None = None, limit: int = 5) -> list[dict]:
     require(1 <= limit <= 50, "INVALID_SCHEMA", "Limit must be 1..50")

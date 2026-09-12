@@ -57,6 +57,10 @@ jobs:
           mkdir -p evidence
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/headless_fixture.py -- "$RUNNER_TEMP/fixtures" "$RUNNER_TEMP/bad-library"
           cp "$RUNNER_TEMP/fixtures/fixture_report.json" evidence/
+      - name: Generic studio multi-scene and rig-free preview regression
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/studio_fixture.py -- "$RUNNER_TEMP/studio-fixtures"
+          cp "$RUNNER_TEMP/studio-fixtures/studio_report.json" evidence/
       - name: Live free asset acquisition and real-motion retarget
         if: matrix.blender == '5.0.0'
         run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence
