@@ -99,9 +99,15 @@ class SettingsCase(unittest.TestCase):
             self.assertEqual(cli(['doctor']), 0)
         self.assertEqual(json.loads(out.getvalue())['library'], str(self.root / 'CGI library'))
     def test_job_missing_blender_actionable(self):
-        self.configure()
-        with patch.object(settings, 'blender_candidates', return_value=[]), contextlib.redirect_stdout(io.StringIO()) as out:
-            self.assertEqual(cli(['job-run', 'j_'+'0'*24]), 2)
+        # The missing-Blender branch must be tested independently of the host machine.
+        # Some real users run the installer with Blender's bundled Python, where Blender
+        # is necessarily discoverable. Mock discovery before configure() so no detected
+        # executable is persisted into the temporary runtime settings.
+        with patch.object(settings, 'blender_candidates', return_value=[]):
+            self.configure()
+            self.assertIsNone(settings.blender_path())
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(cli(['job-run', 'j_'+'0'*24]), 2)
         self.assertEqual(json.loads(out.getvalue())['code'], 'BLENDER_NOT_FOUND')
     def test_cli_rejects_invalid_config_without_traceback(self):
         settings.config_path().write_text('{"schema_version":9,"owner":"blender-asset-director"}')
