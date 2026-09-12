@@ -77,7 +77,8 @@ def extract(archive, destination, expected):
             raise ValueError('Expanded release exceeds the size limit')
         seen = set(); regular_files = set()
         for i in records:
-            name = i.filename.rstrip('/')
+            # Inspect raw names before ZipInfo's platform-specific normalization.
+            name = i.orig_filename.rstrip('/')
             parts = name.split('/')
             if not name or '\\' in name or ':' in name or '\x00' in name or any(c in name for c in '\r\n\t'):
                 raise ValueError('Unsafe archive path')

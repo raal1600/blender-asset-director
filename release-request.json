@@ -1,0 +1,5 @@
+{
+  "version": "0.2.1",
+  "channel": "preview",
+  "reason": "Publish the verified one-step local Codex skill installer after required CI passes."
+}

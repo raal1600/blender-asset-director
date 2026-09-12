@@ -117,7 +117,13 @@ class BootstrapCase(unittest.TestCase):
     def archive(self, entries):
         path = self.root / 'release.zip'
         with zipfile.ZipFile(path, 'w') as z:
-            for name, content in entries: z.writestr(name, content)
+            for name, content in entries:
+                if isinstance(name, str):
+                    info = zipfile.ZipInfo('raw-fixture')
+                    info.filename = name
+                    info.orig_filename = name
+                    name = info
+                z.writestr(name, content)
         return path, hashlib.sha256(path.read_bytes()).hexdigest()
     def test_valid_archive(self):
         p, sha = self.archive([('tools/install_skill.py', '# trusted fixture')])
