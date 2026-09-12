@@ -1,27 +1,47 @@
-# Acceptance evidence — implementation candidate
+# Acceptance evidence — published implementation candidate
 
-## Executed in the build environment
+The GitHub app authorization problem is resolved. The complete implementation was published directly to `main`, preserving the original LICENSE. First implementation commit: `00a3f4287b3394b86bf2b0911ee021e349153d94`.
 
-- **PASS:** 65 independent Python unittest methods. Tests include catalog rebuild, schemas, license policy, ranking, job identity/stale input, environment credential removal, safe intake/extraction, URI boundaries, mock redirect credential separation, download-budget enforcement and motion metrics.
-- **PASS:** installer round trip in a temporary directory: fresh installation, bundled runtime launch, protection of edited files, and uninstall preserving the library.
-- **PASS:** Python compilation and CLI doctor/planner smoke checks.
-- Platform: Linux, Python 3.13.5. These results do not establish Windows or Blender compatibility.
+Latest tested code commit: `f5e6c6991f4d1df1f2f9881daf62b61562ec2f66`.
+Evidence run: https://github.com/raal1600/blender-asset-director/actions/runs/34719768696
 
-## Prepared but not executed
+## Executed and passed
 
-- **NOT RUN:** Windows/Python 3.11 CI.
-- **NOT RUN:** Blender 4.5.3 and 5.0.0 real GLB/FBX import, renamed/resized fixture rig transfer, FPS/NLA/root-controller and save tests.
-- **NOT RUN:** live Quaternius acquisition and per-clip indexing.
-- **NOT RUN:** real retrieved-motion retarget and small CPU previews.
-- **NOT RUN:** live Poly Haven/ambientCG acquisition/import and Sketchfab authenticated download.
-- **REQUIRES HUMAN CONFIRMATION:** the actual local Codex/DeepSeek/MCP integration and visual quality on the user's warrior.
+| Gate | Evidence |
+|---|---|
+| Unit/policy suite | 69 independent tests passed on Ubuntu/Python 3.11, Ubuntu/Python 3.13, and Windows/Python 3.11 |
+| Skill installer | Fresh installation, bundled runtime launch, edited-file protection, and uninstall preserving the library passed on all three matrix targets |
+| Real Blender 4.5.3 | GLB/FBX import/export, action/rig indexing, renamed/resized target transfer, FPS conversion, action preservation, rejection of an unskinned target, NLA repeats, one path controller, and separate-file save passed |
+| Real Blender 5.0.0 | The same real Blender fixture assertions passed |
+| Pinned backend acquisition | Reviewed Mwni source acquired and validated against pinned Git blob hashes |
+| Poly Haven live integration | Searched for a desert HDRI, acquired the file, and imported it into Blender 5.0.0 successfully |
+| ambientCG live integration | Searched for a sand material, acquired its ZIP, extracted it, and built the material in Blender 5.0.0 successfully |
 
-## Publication blocker
+The offline suite also passed in the build environment on Linux/Python 3.13.5. The original 65-test suite exposed two Windows dependency-path errors in CI. Canonical-root handling fixed them and a regression test was added. Three additional tests verify bounded failover between validated public server addresses and rejection of private fallback destinations.
 
-Both Git data creation and file-content creation were rejected by GitHub with HTTP 403, `Resource not accessible by integration`. The connected GitHub app installation uses selected-repository access; the new `blender-asset-director` repository is not included in that installation selection. Account-level `push: true` metadata was insufficient to establish app write authorization.
+The original Blender download endpoint returned HTTP 403. The CI downloader now uses Blender's official HTTPS mirror service while retaining release SHA256 verification. Both tested Blender versions downloaded successfully after that change.
 
-No code has been pushed by these failed calls and no GitHub Actions run has been started. Add the new repository to the installed app's repository selection, then publish the candidate and run the actual CI workflow. Do not call this version validated for the local scene before those gates pass.
+## Failed / blocked
 
-## Quality limits that remain even after CI
+**Quaternius live acquisition: FAIL.** The hosted runner could not establish a TCP connection to any validated public address for `opengameart.org`. The request timed out before receiving an HTTP response. The final error was `CONNECTION_FAILED`, not a GitHub permission error. We have not established whether this is a site/network restriction or a temporary availability problem.
 
-The fixture proves only the cases it actually exercises. It does not prove arbitrary-rig compatibility, foot IK, cloth/weapon contact, historically accurate motion or natural cinematic movement. The terrain controller handles gentle root-height changes only. Final acceptance requires review of the actual source motion and user scene in a separate working copy.
+**Actual retrieved-animation indexing/retargeting: BLOCKED.** No animation pack was acquired in that CI run, so the real-motion test was not executed. It has not been silently skipped into a pass. The overall CI result intentionally remains failed until this required gate succeeds.
+
+Source: https://opengameart.org/content/universal-animation-library
+
+The creator-posted Standard archive remains the intended source. A supported creator download or explicit local intake with verified provenance may be used to continue. Do not substitute a random mirror, fabricate clip names, weaken download security, or describe a synthetic fixture as an actual retrieved animation.
+
+## Not yet established
+
+- Authenticated Sketchfab downloads (no user token supplied in CI).
+- BlenderKit, Poly Pizza or Mixamo host-tool/account workflows.
+- Windows GUI Blender, the local Codex/DeepSeek session, and the existing Blender MCP/teaching overlay integration.
+- Rig compatibility and visual quality for `Desert Warrior.blend`. That file has not been accessed or modified here.
+
+## What the fixture pass means
+
+The synthetic fixtures prove their stated technical assertions, not natural locomotion. The numerical QA deliberately reports possible foot sliding on the synthetic gait; those warnings were retained. A successful transfer and save does not establish arbitrary-rig compatibility, historically accurate motion, weapon grip or cloth clearance.
+
+Terrain following adjusts root height on gentle routes only. It is not a full foot-IK/contact solver. Full source-motion and user-scene visual acceptance remains pending.
+
+**Readiness:** published and ready for controlled installation/read-only compatibility checks. Not yet fully validated for the end-to-end desert-warrior animation benchmark.

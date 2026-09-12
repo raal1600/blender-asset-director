@@ -2,7 +2,7 @@
 
 A reuse-first agent skill and Python toolkit for finding existing assets, indexing real animation clips, transferring motion to compatible Blender rigs, and checking the result. Keep the existing Codex/DeepSeek/Blender MCP setup; do not add another competing harness.
 
-**Status: implementation candidate.** Offline tests pass. Live provider acquisition, headless Blender fixtures, and the user's actual scene are separate acceptance gates. See [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) for evidence and blockers; do not infer runtime support from a configured workflow.
+**Status: published implementation candidate.** 69 unit tests and installer checks pass on Windows and Linux. Real headless Blender fixtures pass on 4.5.3 and 5.0.0; live Poly Haven and ambientCG acquisition/import also pass. Quaternius acquisition is blocked by a hosted-runner connection failure, so the actual retrieved-motion gate remains unvalidated and CI correctly remains failed. See [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) for exact evidence. The user scene still requires local acceptance.
 
 ## Workflow
 
@@ -32,7 +32,7 @@ This is not an AI motion-generation service. It calls no extra LLM, performs no 
 
 System Python 3.11+, a Blender installation, and an agent host that supports filesystem skills. Existing Blender MCP is used by the agent for live project discovery; the CLI itself does not change MCP configuration or connect to its socket.
 
-Headless CI is configured for Blender 4.5.3 and 5.0.0. These are planned test targets, not a claim about the latest Blender release or proof that tests ran. The actual installed Blender version must pass local compatibility testing.
+Headless fixtures have passed on Blender 4.5.3 and 5.0.0. These are tested versions, not a claim about the latest Blender release or arbitrary-rig compatibility. The actual installed Blender version and user scene must still pass local acceptance.
 
 ## Install the skill
 

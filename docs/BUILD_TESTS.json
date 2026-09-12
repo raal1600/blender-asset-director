@@ -1,22 +1,39 @@
 {
-  "status": "OFFLINE_TESTS_PASSED_RUNTIME_GATES_PENDING",
-  "python": "3.13.5",
-  "platform": "linux",
+  "status": "PUBLISHED_CORE_AND_FIXTURES_PASSED_REAL_MOTION_BLOCKED",
+  "tested_code_commit": "f5e6c6991f4d1df1f2f9881daf62b61562ec2f66",
+  "github_run_id": 34719768696,
+  "github_run_url": "https://github.com/raal1600/blender-asset-director/actions/runs/34719768696",
+  "github_publish": "PASS",
   "unit_tests": {
-    "run": 65,
-    "failures": 0,
-    "errors": 0,
-    "skipped": 0
+    "count_per_environment": 69,
+    "environments": [
+      "Ubuntu/Python 3.11",
+      "Ubuntu/Python 3.13",
+      "Windows/Python 3.11"
+    ],
+    "status": "PASS"
   },
-  "installer": "PASS",
-  "blender_headless": "NOT_RUN",
-  "live_provider_acquisition": "NOT_RUN",
-  "windows": "NOT_RUN",
-  "user_scene": "NOT_RUN",
-  "github_publish": "BLOCKED_APP_REPOSITORY_SELECTION",
-  "repo": "raal1600/blender-asset-director",
+  "installer": "PASS_ALL_THREE_ENVIRONMENTS",
+  "blender_headless": {
+    "4.5.3": "FIXTURE_PASS",
+    "5.0.0": "FIXTURE_PASS"
+  },
+  "live_providers": {
+    "polyhaven": "SEARCH_ACQUIRE_IMPORT_PASS",
+    "ambientcg": "SEARCH_ACQUIRE_IMPORT_PASS",
+    "quaternius": "FAIL_CONNECTION_FAILED",
+    "sketchfab": "AUTH_TEST_NOT_RUN"
+  },
+  "real_retrieved_motion": "BLOCKED_NO_ANIMATION_PACK_ACQUIRED",
+  "overall_ci": "FAIL",
+  "windows_gui_blender": "NOT_RUN",
+  "local_codex_deepseek_mcp": "NOT_RUN",
+  "user_scene": "UNTOUCHED_NOT_RUN",
+  "visual_animation_quality": "PENDING",
   "notes": [
-    "No source assets or user projects are included.",
-    "No successful GitHub write or CI run has occurred."
+    "Both Blender fixture runs are actual executions, but use synthetic motion.",
+    "OpenGameArt connection failed before any HTTP response; this is not a GitHub permissions failure.",
+    "Independent live gates preserve evidence even when another provider fails.",
+    "No downloaded assets, credentials, or user projects are included in the repository."
   ]
 }
