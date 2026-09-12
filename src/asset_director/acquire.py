@@ -64,6 +64,28 @@ def public_addresses(host: str) -> list[str]:
     return addresses
 
 
+def connect_public(addresses: list[str], timeout: float, deadline: float):
+    """Try the validated DNS set, rather than treating its first address as authoritative.
+
+    All candidates must already be global IP literals. Never re-resolve a hostname,
+    fall back to a private address, or change TLS hostname verification.
+    """
+    require(addresses and len(addresses) <= 32 and all(ipaddress.ip_address(a).is_global for a in addresses),
+            "UNSAFE_URL", "Invalid public destination set")
+    last_error = None
+    for index, address in enumerate(addresses):
+        remaining = deadline - time.monotonic()
+        require(remaining > 0, "DOWNLOAD_TIMEOUT", "Connection deadline exceeded")
+        # Share the bounded connection budget, so one unreachable address cannot
+        # prevent trying the remaining published endpoints.
+        attempt_timeout = min(timeout, remaining / (len(addresses) - index))
+        try:
+            return socket.create_connection((address, 443), attempt_timeout)
+        except OSError as exc:
+            last_error = exc
+    raise DirectorError("CONNECTION_FAILED", "All validated public provider addresses were unreachable") from last_error
+
+
 class HTTP:
     """Small GET-only client. Validates and pins public DNS addresses per connection."""
     def __init__(self, timeout: float = 20): self.timeout = timeout
@@ -79,7 +101,7 @@ class HTTP:
             response = None
             try:
                 # Pin the validated address while retaining TLS certificate/SNI verification for host.
-                raw = socket.create_connection((addresses[0], 443), self.timeout)
+                raw = connect_public(addresses, self.timeout, min(deadline, time.monotonic() + 30))
                 try: conn.sock = conn._context.wrap_socket(raw, server_hostname=host)
                 except BaseException:
                     raw.close(); raise
