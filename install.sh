@@ -25,4 +25,4 @@ else
     curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
         "https://raw.githubusercontent.com/raal1600/blender-asset-director/v$version/install.py" -o "$tmp/install.py"
 fi
-"$python_bin" "$tmp/install.py" "$@"
+"$python_bin" "$tmp/install.py" --version "$version" "$@"
