@@ -1,19 +1,57 @@
-# Setup acceptance — 0.2.1 preview
+# Setup acceptance — published 0.2.1 preview
 
-This release adds a pinned-release bootstrap (Windows PowerShell and macOS/Linux shell), SHA256 archive verification, managed installation/update/uninstall, local path configuration, Blender path discovery, and a read-only Codex first-run workflow. The README now starts with prerequisites, installation and two trial prompts.
+Release: https://github.com/raal1600/blender-asset-director/releases/tag/v0.2.1
 
-## Test boundaries
+Tested and released source commit: `7d19b6d53726bb861b15e8eca3500ccd575660f4`.
 
-Offline unit tests cover configuration precedence, rejecting overlapping library/skill paths, missing Blender, secret-free read-only MCP summaries, malformed settings, package checksum/path/collision/symlink checks and version identity. The process-level bootstrap smoke exercises installation, repeated installation, an update with backup, remembered paths, unchanged Codex configuration and offline uninstall preserving the library. CI runs it on PowerShell 5.1/7, Linux and macOS.
+Evidence: https://github.com/raal1600/blender-asset-director/actions/runs/34725395309
 
-Existing Blender/import/retarget/studio fixtures and live asset tests remain in the main CI workflow. Release publication is gated on this workflow, then a separate anonymous-download smoke tests the actual published package. A green packaging step alone is not the installation test.
+**All 13 jobs completed successfully:** nine verification jobs, release publication, and three public-download installation jobs. This documentation update follows the tested code; it does not move the published tag or replace release assets.
 
-This document initially describes the gates, not a claim that every platform has already passed. The executed run/commit evidence is recorded in the final setup evidence update.
+## What was executed
 
-## Not established by these tests
+| Gate | Result and scope |
+|---|---|
+| Unit/policy/studio/setup suite | 140 tests passed on Windows/Python 3.11, Ubuntu/Python 3.11 and Ubuntu/Python 3.13 |
+| Managed installer | Fresh installation, repeat installation, bundled runtime, role/license presence, edited-file protection and library-preserving uninstall passed |
+| Windows PowerShell 5.1 bootstrap | Actual process-level archive verification, install, repeat install, update with backup, saved paths, unchanged Codex config and offline uninstall passed |
+| Windows PowerShell 7 bootstrap | Same process-level checks passed |
+| macOS shell bootstrap | Same process-level checks passed |
+| Linux shell bootstrap | Same process-level checks passed |
+| Blender 4.5.3 and 5.0.0 | Existing real Blender import/retarget/NLA fixtures, generic studio camera/light cases and rig-free CPU preview regressions passed |
+| Live asset/source motion | Required live provider and retrieved-animation checks passed in the Blender 5.0.0 job |
+| Release publication | Created the v0.2.1 preview and uploaded the release ZIP, three launchers and SHA256SUMS.txt after verification |
+| Actual public Windows installation | A runner without repository checkout or supplied GitHub credentials fetched the tag-pinned PowerShell launcher, downloaded the published release ZIP, installed it, ran doctor/receipt verification and uninstalled while preserving the library |
+| Actual public macOS and Linux installation | Equivalent public shell-bootstrap and installed-runtime checks passed on both platforms |
 
-No test here authenticates a user's Codex or DeepSeek account, operates a user's Blender GUI/MCP, certifies a model's vision, or approves artistic output. The first-run prompt is an actual local acceptance step. Installation cannot give a hosted cloud session direct access to a user's desktop. Python/Blender/Codex/MCP are prerequisites, not secretly installed dependencies.
+The public installation jobs were run with Python available and explicit temporary destinations, not on a completely unprovisioned desktop. Their missing-Codex/MCP status was reported honestly. They demonstrate the published download path, not live Codex skill discovery.
+
+Release ZIP SHA256:
+
+```text
+1c773a32e0c49bdb82f90a04db34f1e903a0cffc1b8876bc0b48611653de101d
+```
+
+## Failures found and corrected
+
+The first Windows run exposed ZIP path normalization differences. Archive validation now checks the original stored entry name, and fixtures write the unsafe raw names deliberately on every OS. No traversal/collision checks were disabled.
+
+A repeated Windows test exposed a floating-point clock assertion (`15.000000000000007` versus `15`). The connection-timeout regression now uses a deterministic clock and separately tests an expired deadline. Production timeout and destination restrictions were not weakened. Failed historical runs remain visible.
+
+## What installation adds
+
+A pinned-release bootstrap, integrity-checked archive, complete managed skill/runtime, seven role modules, notices, path-only local configuration, a separate asset library, Blender executable discovery and first-run guidance. The installer runs offline checks before replacing a managed skill, refuses edited/unowned destinations, and supports explicit backed-up updates. Uninstall is offline and preserves library/settings.
+
+It does not install or replace Python, Blender, Codex, model providers or MCP servers. It does not launch a model call, bulk-download assets, enable Blender auto-run or render the user's scene. Existing Codex/provider/MCP configuration is not rewritten. The optional teaching overlay is not a prerequisite.
+
+## Remaining local acceptance
+
+The actual user must start a new local Codex session and invoke the first-run workflow. It must verify skill discovery and an actual read-only Blender MCP scene query. A configured declaration or executable path is not a live connection.
+
+No cloud test here authenticates the user's Codex/DeepSeek account, certifies the model's image capability, operates the user's Blender GUI or approves artistic output. Arbitrary-rig transfer, foot planting, equipment/cloth clearance and full authorized animation/audio delivery remain separate capabilities and acceptance scopes. See [studio acceptance](ACCEPTANCE.md) for those boundaries.
 
 ## Distribution trust
 
-The bootstrap selects a version tag and refuses fallback to main. Release ZIP bytes must match the checksum before extraction. Both come from the same GitHub publisher; this is integrity verification, not a detached signature, attestation or independent audit. Install/update runs no paid calls or model requests. Changes are confined to the managed skill and Asset Director's path configuration/library; existing Codex/provider/MCP/Blender settings are not rewritten.
+The bootstrap selects an explicit version and refuses fallback to moving main. ZIP bytes must match the published SHA256 before extraction. The ZIP and checksum come from the same GitHub publisher: this is integrity verification, not a detached publisher signature or independent security audit. Review the bootstrap code before execution. Runtime path records contain no provider keys.
+
+Machine-readable summary: [SETUP_TESTS.json](SETUP_TESTS.json).
