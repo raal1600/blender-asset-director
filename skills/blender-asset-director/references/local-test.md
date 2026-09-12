@@ -1,28 +1,23 @@
-# Local acceptance: two gates
+# Local acceptance — choose the actual project
 
-## Gate A — setup and safe readiness
+This procedure has no default scene filename, character, landscape or visual genre. A named sample used earlier in development is an optional benchmark only; never search for or load it automatically.
 
-1. Verify installed skill discovery, system Python, library location, installed Blender version and existing MCP connection. Never replace Codex provider/MCP configuration.
-2. Run CLI `doctor`, the offline unit tests from the repo, and installer self-test in temporary directories.
-3. Acquire/index the free starter pack using real commands. Confirm actual clip count and names. Run the repo headless fixture tests with this machine's Blender and pinned backend.
-4. Through existing MCP, inspect the live file path and unsaved state. Locate `Desert Warrior.blend` only within relevant project paths. Never scan the whole drive.
-5. Save a separate working copy if needed, preserving unsaved edits. Inspect actual skinning, rig roles/rest pose, equipment, constraints, existing actions and scene scale.
-6. Report `NEEDS_RIGGING` or other blockers accurately. Do not replace the warrior with a library mannequin.
-7. Select actual walk/idle candidates and propose a flat-stage test. Do not mutate the artistic scene until the user explicitly says **Run the Desert Warrior test**.
+## Gate A: installation and read-only compatibility
 
-The cloud fixture result is not proof of this machine's MCP, Blender build or warrior compatibility. A text-only model must hand visual review to the user or an already authorized image-capable model, not pretend it saw frames.
+1. Read the repository's current acceptance record and inspect the installer. Record the chosen revision. Preserve the existing host/MCP configuration; this skill does not replace it.
+2. Discover the actual Codex skills path and install the bundled skill there. Do not overwrite edited installations. Verify the entry point and role modules are discoverable in a fresh session when needed.
+3. Run doctor/providers without printing credentials. Provider code availability is distinct from runtime authentication or service health.
+4. Discover existing Blender MCP capabilities. Identify the current live file and dirty/unsaved status. Do not load another file over unsaved work or infer a target from an earlier conversation example.
+5. Inspect the user's selected scene. Preserve the original and unsaved work before any saved-file inspection. Use scene-audit for general geometry/material/camera facts; use detailed inspect for rigs/actions only when relevant.
+6. Interpret the current prompt, fill a production contract against observed objects, and run studio-plan. Check that only necessary departments are selected and that gaps correspond to missing requirements rather than automatic asset replacement.
+7. Report installation, MCP visibility, actual project settings, selected roles, blocked requirements and unverified visual capability. This gate grants no permission for an artistic mutation.
 
-## Gate B — actual warrior benchmark
+## Gate B: separately authorized creative test
 
-On a new working copy, retrieve and retarget the best evidenced motions. Validate a short flat-ground clip first. Only after that succeeds, assemble a short walk-stop-idle sequence on a gentle dune route. Preserve the existing hero, terrain and original file. Do not invent a walk from per-bone keyframes.
+After the user authorizes a test, use a separate working copy and the actual request. A still, product, environment, abstract animation, character sequence or narrow repair can all be valid. Do not require ten seconds, a walk, a sunset, a fixed lens or a particular FPS.
 
-Use a measured source pace, correct FPS, deliberate transition and one root-motion owner. Preserve weapon/clothing attachments. Record any required alignment or mapping edits. Render at most eight modest CPU frames, provide playback of the working file, and ask for human confirmation of naturalness.
+Reuse scene resources first; acquire only evidenced missing assets. Preview actual motion before retargeting when skeletal performance is requested. Do not apply a humanoid workflow to object motion or static scenes. Use generic camera/light helpers only where needed, with actual subject references and deliberately chosen settings.
 
-Report separately:
-- retrieval/provenance passed or blocked;
-- source quality reviewed or pending;
-- numerical transfer/contacts passed, warning, or failed;
-- actual Windows/Codex/Blender MCP flow verified or not;
-- human visual acceptance pending/passed/failed.
+One executor applies approved changes to a known revision. Keep all original files and unrelated content. Validate outputs and inspect bounded CPU previews; text-only models leave visual review pending for the user. Record measured failures separately from hypotheses and avoid automatic large retries.
 
-Do not call the test successful merely because a file saved or an armature moved. Persist outputs and reports so a new session can resume without repeating downloads or losing the original.
+Success evidence: which assets/roles were used, what changed, actual output paths, source licenses, preserved original hashes, technical checks, visual findings or pending review, and remaining limitations. Successful fixture CI is not a substitute for this actual local/creative acceptance.

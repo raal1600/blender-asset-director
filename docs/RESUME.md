@@ -1,26 +1,13 @@
-# Resume validation
+# Resume the scene-independent studio candidate
 
-GitHub authorization is fixed and the implementation is published on `main`. Do not ask for another repository-permission change.
+The implementation is published on main. Code commit `4af4711981088a0442a1f3d91b73f0456c65775a` passed all five CI jobs in run 34723246054. Read ACCEPTANCE.md and STUDIO_TESTS.json before making claims. Documentation commits may follow that tested code without changing runtime.
 
-Latest tested code: `f5e6c6991f4d1df1f2f9881daf62b61562ec2f66`.
-Run: https://github.com/raal1600/blender-asset-director/actions/runs/34719768696
+The seven-role layer is reusable across scene types. `plan` now returns an unfilled intake; the host interprets the actual prompt and fills an audited production contract. Follow `skills/blender-asset-director/references/studio-contracts.md`. Do not restore the old warrior/desert keyword planner.
 
-## Passed gates
+The earlier OpenGameArt timeout did not occur in the recorded passing run. Actual Standard pack acquisition/index and Walk_Loop transfer succeeded. Retarget target was a renamed/scaled duplicate, so arbitrary-rig acceptance and foot-lock/naturalness remain open. Keep warnings and source receipts.
 
-- 69 unit tests plus installer checks on Linux/Python 3.11 and 3.13 and Windows/Python 3.11.
-- Real Blender 4.5.3 and 5.0.0 import/rig/action/retarget/FPS/NLA/controller/save fixtures.
-- Live Poly Haven HDRI search/download/import and ambientCG material search/download/import in Blender 5.0.0.
+Next local gate: inspect/install the candidate without modifying existing Codex, DeepSeek or MCP configuration; verify skill discovery; inspect the user-selected project without replacing live unsaved work. Do not assume any filename, character, terrain, aspect or animation requirement. Preserve a separate working copy for authorized edits.
 
-## Current blocker
+For a material-only task, route no skeletal work. For product/environment work, no armature is required. For a character, inspect genuine skinning and source action compatibility. For every task, review technical evidence separately from images and human feedback. A text-only host cannot perform visual review.
 
-The runner cannot connect to `opengameart.org` to acquire the creator-posted Quaternius Standard animation pack. The bounded, public-IP-validated connection attempts return `CONNECTION_FAILED`. The request did not reach HTTP authentication or archive parsing. The actual source animation index/retarget test is consequently BLOCKED; overall CI correctly remains failed.
-
-1. Fetch current `main` and read current CI evidence before editing; do not assume the historical commit is still latest.
-2. Diagnose the named provider connectivity without weakening TLS, origin validation, or private-address rejection. Verify a supported creator-provided alternative acquisition route if needed. Do not scrape private APIs or use unaudited mirrors.
-3. Explicit local intake of an authorized creator download is also supported. Record its actual source/license/hash; do not present manual acquisition as automated success.
-4. Once the real pack is available, run actual indexing and record clip names, owners, slots and duration. Then execute `tools/real_motion_test.py` through the acceptance flow. Fix genuine Blender/data incompatibilities rather than treating synthetic fixtures as sufficient.
-5. Update ACCEPTANCE and BUILD_TESTS with actual measured outcomes. Refresh SOURCE_MANIFEST after source changes. Never turn an unavailable required live gate into a green skip.
-6. Only then hand off full end-to-end readiness. Controlled local installation/read-only checks may proceed sooner with the blocker clearly disclosed.
-7. The actual Windows Codex/DeepSeek/Blender MCP connection and `Desert Warrior.blend` still need local acceptance. Do not mutate the original file. Gate B requires the user to say **Run the Desert Warrior test**.
-
-Preserve direct-main authorization without force-pushing. Keep assets, credentials and user logs outside the public repository. No paid generation, local AI inference or heavy GPU render. No unsupported claims that a text-only model visually inspected frames.
+Follow the generic local-test reference. Scene-specific demonstrations belong only in explicit benchmark data. Do not change host/provider configuration, install a competing harness, invoke paid services, use heavy local GPU rendering, or publish user assets/logs/secrets. Host tracks the cumulative preview/repair budget across jobs.

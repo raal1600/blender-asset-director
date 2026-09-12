@@ -1,47 +1,39 @@
-# Acceptance evidence — published implementation candidate
+# Acceptance evidence — scene-independent studio candidate
 
-The GitHub app authorization problem is resolved. The complete implementation was published directly to `main`, preserving the original LICENSE. First implementation commit: `00a3f4287b3394b86bf2b0911ee021e349153d94`.
+Tested implementation commit: `4af4711981088a0442a1f3d91b73f0456c65775a`.
+GitHub Actions run: https://github.com/raal1600/blender-asset-director/actions/runs/34723246054
+All five jobs completed successfully in that run. This records technical execution, not a claim that arbitrary scenes are artistically accepted.
 
-Latest tested code commit: `f5e6c6991f4d1df1f2f9881daf62b61562ec2f66`.
-Evidence run: https://github.com/raal1600/blender-asset-director/actions/runs/34719768696
+## Passed in the recorded run
 
-## Executed and passed
-
-| Gate | Evidence |
+| Check | Actual result |
 |---|---|
-| Unit/policy suite | 69 independent tests passed on Ubuntu/Python 3.11, Ubuntu/Python 3.13, and Windows/Python 3.11 |
-| Skill installer | Fresh installation, bundled runtime launch, edited-file protection, and uninstall preserving the library passed on all three matrix targets |
-| Real Blender 4.5.3 | GLB/FBX import/export, action/rig indexing, renamed/resized target transfer, FPS conversion, action preservation, rejection of an unskinned target, NLA repeats, one path controller, and separate-file save passed |
-| Real Blender 5.0.0 | The same real Blender fixture assertions passed |
-| Pinned backend acquisition | Reviewed Mwni source acquired and validated against pinned Git blob hashes |
-| Poly Haven live integration | Searched for a desert HDRI, acquired the file, and imported it into Blender 5.0.0 successfully |
-| ambientCG live integration | Searched for a sand material, acquired its ZIP, extracted it, and built the material in Blender 5.0.0 successfully |
+| Unit/policy/studio suite | 109 tests passed on Windows/Python 3.11, Ubuntu/Python 3.11 and Ubuntu/Python 3.13 |
+| Skill installer | Bundled runtime launch, role/license presence, edited-file protection and library-preserving uninstall passed on all three targets |
+| Blender 4.5.3 | Existing synthetic import/retarget/NLA fixtures and new generic studio regressions passed |
+| Blender 5.0.0 | The same technical fixture groups passed |
+| Generic studio regression | Different scales, offsets and 16:9/9:16/1:1/21:9 aspects; perspective/orthographic cameras; sampled animated bounds; existing subject/world/light preservation |
+| Rig-free preview | Actual worker produced a 64x64, one-sample Cycles CPU PNG without any armature; original .blend file hash stayed unchanged |
+| Quaternius live acquisition | Creator-posted Standard package downloaded and indexed; 46 action records observed, including A_TPose. This is not a claim of 46 distinct production-ready motions |
+| Real retrieved motion | Actual Walk_Loop evaluated and baked over 33 output frames to a renamed/scaled duplicate source skeleton in Blender 5.0.0; three small CPU preview frames rendered |
+| Poly Haven live integration | HDRI search, acquisition and Blender import passed |
+| ambientCG live integration | Material search, ZIP acquisition and Blender material construction passed |
 
-The offline suite also passed in the build environment on Linux/Python 3.13.5. The original 65-test suite exposed two Windows dependency-path errors in CI. Canonical-root handling fixed them and a regression test was added. Three additional tests verify bounded failover between validated public server addresses and rejection of private fallback destinations.
+The previously blocking OpenGameArt connection timeout did not occur in this run. No security checks were weakened to obtain a pass. Earlier failed-run history is retained in ACCEPTANCE_0_1.md. A later provider outage is still possible; this is evidence for the recorded execution, not a perpetual availability guarantee.
 
-The original Blender download endpoint returned HTTP 403. The CI downloader now uses Blender's official HTTPS mirror service while retaining release SHA256 verification. Both tested Blender versions downloaded successfully after that change.
+## What these passes establish
 
-## Failed / blocked
+The studio entry point no longer selects a fixed character, terrain, lighting setup, lens, frame rate or duration. Capability-selected role modules and observed-object contracts are executable coordination mechanisms. Camera/light helpers work on the tested geometric variations, and previews do not depend on character rigs.
 
-**Quaternius live acquisition: FAIL.** The hosted runner could not establish a TCP connection to any validated public address for `opengameart.org`. The request timed out before receiving an HTTP response. The final error was `CONNECTION_FAILED`, not a GitHub permission error. We have not established whether this is a site/network restriction or a temporary availability problem.
+The scene tests use simple synthetic geometry, not finished product/interior films. They establish framing and preservation invariants, not realism. The motion test uses an actual downloaded clip, but its target is a renamed/scaled duplicate skeleton, not an unrelated artist rig or the user's warrior. Numeric QA retained POSSIBLE_FOOT_SLIDING warnings; contact metrics are heuristic and an in-place clip without calibrated travel is not a foot-lock demonstration. Visual acceptance remains pending human review.
 
-**Actual retrieved-animation indexing/retargeting: BLOCKED.** No animation pack was acquired in that CI run, so the real-motion test was not executed. It has not been silently skipped into a pass. The overall CI result intentionally remains failed until this required gate succeeds.
+## Still requiring acceptance
 
-Source: https://opengameart.org/content/universal-animation-library
+- Local Windows Blender GUI, the installed Codex/DeepSeek session and existing MCP/teaching overlay.
+- Runtime host discovery of the installed skill and real prompt-to-role execution.
+- Arbitrary-rig retargeting, grip/cloth cleanup and terrain foot planting. Root-height following is not foot IK.
+- Actual artistic quality against user briefs and reference images. Metadata scores and camera bounds are not aesthetic scores.
+- Authenticated Sketchfab and account-based/manual provider workflows.
+- Audio acquisition/mixing and full authorized animation delivery, which are not implemented by a planning role alone.
 
-The creator-posted Standard archive remains the intended source. A supported creator download or explicit local intake with verified provenance may be used to continue. Do not substitute a random mirror, fabricate clip names, weaken download security, or describe a synthetic fixture as an actual retrieved animation.
-
-## Not yet established
-
-- Authenticated Sketchfab downloads (no user token supplied in CI).
-- BlenderKit, Poly Pizza or Mixamo host-tool/account workflows.
-- Windows GUI Blender, the local Codex/DeepSeek session, and the existing Blender MCP/teaching overlay integration.
-- Rig compatibility and visual quality for `Desert Warrior.blend`. That file has not been accessed or modified here.
-
-## What the fixture pass means
-
-The synthetic fixtures prove their stated technical assertions, not natural locomotion. The numerical QA deliberately reports possible foot sliding on the synthetic gait; those warnings were retained. A successful transfer and save does not establish arbitrary-rig compatibility, historically accurate motion, weapon grip or cloth clearance.
-
-Terrain following adjusts root height on gentle routes only. It is not a full foot-IK/contact solver. Full source-motion and user-scene visual acceptance remains pending.
-
-**Readiness:** published and ready for controlled installation/read-only compatibility checks. Not yet fully validated for the end-to-end desert-warrior animation benchmark.
+No user project was accessed or modified. The candidate is ready for controlled local installation/read-only compatibility checks and then a separately authorized creative test on a working copy. Do not advertise universal scene support or a production-quality autonomous studio solely from CI success.
