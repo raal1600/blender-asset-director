@@ -1,6 +1,6 @@
 # Working-file jobs
 
-In examples, `director` means `python <skill>/scripts/director.py --library <library>`. `BLENDER` is the actual installed executable path, discovered without installing a replacement. Job/asset IDs below are placeholders returned by real commands.
+In examples, `director` means `python <skill>/scripts/director.py --library <library>`. `BLENDER` is the actual installed executable path, discovered without installing a replacement. After managed setup, `--library` and `job-run --blender` are optional because the saved local paths are used. Explicit paths still override defaults. Job/asset IDs below are placeholders returned by real commands.
 
 ```text
 director doctor

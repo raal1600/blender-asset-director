@@ -7,6 +7,10 @@ description: Coordinate scene-independent Blender production from a prompt and a
 
 One host-facing skill, seven selectively loaded responsibilities and one controlled Blender executor. This is not seven autonomous writers. A role title is not a quality guarantee. The existing catalog, providers and bounded jobs remain shared services; no new MCP, model service or credentials are required.
 
+## First run and installation
+
+For setup, missing tools, or a first-run check, load `references/first-run.md` before production work. Run `python <skill>/scripts/director.py doctor`: the installer saves paths outside the skill, so `--library` and `job-run --blender` are normally unnecessary. Verify the live MCP read-only; a local health report is not proof of a live connection.
+
 ## Start from reality, not an example
 
 Read the user's brief and inspect the actual live `.blend` through the existing MCP. Discover tool names; preserve unsaved work and save a separate working copy before background operations. Never reload over unsaved edits or overwrite an original. Existing subjects, materials, cameras, worlds and hierarchy are user-owned. Do not assume object names, a humanoid, terrain, sunset, a walk, a particular lens, 24 FPS or ten seconds. Example scenes are test data only.

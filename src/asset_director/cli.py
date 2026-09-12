@@ -1,4 +1,4 @@
-"""Small JSON CLI for agent hosts. Does not read or change host credentials/config."""
+"""Small JSON CLI. No host writes; doctor reads a redacted user-level MCP declaration."""
 from __future__ import annotations
 import argparse
 import json
@@ -10,6 +10,7 @@ from . import __version__
 from .core import DirectorError, Library, canonical, load_json, plan, require
 from .providers import Providers, capabilities
 from . import jobs
+from . import settings
 
 
 def compact_asset(a):
@@ -19,8 +20,9 @@ def compact_asset(a):
 
 def parser():
     p = argparse.ArgumentParser(prog="asset-director", description="Search, acquire, index and adapt existing Blender assets; JSON output.")
-    p.add_argument("--library", default=os.getenv("BAD_LIBRARY", str(Path.home()/"CGI-Library")))
+    p.add_argument("--library", default=settings.library_path())
     s = p.add_subparsers(dest="command", required=True)
+    q=s.add_parser("configure"); q.add_argument("--blender"); q.add_argument("--skill-path")
     s.add_parser("doctor"); s.add_parser("providers"); s.add_parser("report"); s.add_parser("rebuild-catalog")
     q=s.add_parser("plan"); q.add_argument("brief")
     q=s.add_parser("studio-plan"); q.add_argument("--brief",required=True); q.add_argument("--audit",required=True)
@@ -33,7 +35,7 @@ def parser():
     q=s.add_parser("intake"); q.add_argument("path"); q.add_argument("--evidence",required=True)
     s.add_parser("backend-install")
     q=s.add_parser("job-prepare"); q.add_argument("operation",choices=list(jobs.OPS)); q.add_argument("--input"); q.add_argument("--asset"); q.add_argument("--options",help="Path to options JSON (not an executable script)")
-    q=s.add_parser("job-run"); q.add_argument("job_id"); q.add_argument("--blender",required=True); q.add_argument("--timeout",type=int,default=360)
+    q=s.add_parser("job-run"); q.add_argument("job_id"); q.add_argument("--blender",default=settings.blender_path()); q.add_argument("--timeout",type=int,default=360)
     q=s.add_parser("job-show"); q.add_argument("job_id")
     q=s.add_parser("job-retry"); q.add_argument("job_id")
     q=s.add_parser("index-collect"); q.add_argument("asset_id"); q.add_argument("job_id")
@@ -41,18 +43,21 @@ def parser():
 
 
 def main(argv=None):
-    args = parser().parse_args(argv)
     try:
+        args = parser().parse_args(argv)
         with Library(args.library) as lib:
             command=args.command
-            if command == "doctor":
+            if command == "configure":
+                result=settings.configure(library=args.library,blender=args.blender,skill_path=args.skill_path)
+            elif command == "doctor":
                 from .backend import verify
                 try: backend_state={"status":"VERIFIED", "path":str(verify(lib))}
                 except DirectorError as e: backend_state={"status":e.code}
                 result={"version":__version__, "python":sys.version.split()[0], "library":str(lib.root),
                         "records":len(lib.all()), "blender_on_path":shutil.which("blender"), "backend":backend_state,
                         "providers":capabilities(), "extra_model_calls":False, "runtime_gpu_ai":False,
-                        "mcp_connection":"Host must verify its existing Blender MCP; this CLI does not replace or configure it"}
+                        "mcp_connection":"Host must verify its existing Blender MCP; this CLI does not replace or configure it",
+                        "environment":settings.health()}
             elif command == "providers": result=capabilities()
             elif command == "plan": result=plan(args.brief)
             elif command == "studio-plan":
@@ -82,7 +87,9 @@ def main(argv=None):
                 result=install(lib)
             elif command == "job-prepare":
                 result=jobs.prepare(lib,args.operation,args.input,args.asset,load_json(Path(args.options)) if args.options else {})
-            elif command == "job-run": result=jobs.run(lib,args.job_id,args.blender,args.timeout)
+            elif command == "job-run":
+                require(args.blender, "BLENDER_NOT_FOUND", "Run configure --blender <executable>, set BAD_BLENDER, or pass job-run --blender")
+                result=jobs.run(lib,args.job_id,args.blender,args.timeout)
             elif command == "job-show": result=jobs.read_job(lib,args.job_id)[0]
             elif command == "job-retry": result=jobs.retry(lib,args.job_id)
             elif command == "index-collect": result=jobs.index_result(lib,args.asset_id,args.job_id)
