@@ -1,6 +1,6 @@
 {
-  "version": "0.2.1",
+  "version": "0.2.2",
   "channel": "preview",
-  "attempt": 2,
-  "reason": "Publish after deterministic timer regression and complete cross-platform installer verification."
+  "attempt": 1,
+  "reason": "Fix environment-dependent missing-Blender installer test and publish corrected plug-and-play package."
 }
