@@ -1,4 +1,34 @@
-# Setup acceptance — published 0.3.0 preview
+# Setup acceptance — published 0.3.1 preview
+
+Release: https://github.com/raal1600/blender-asset-director/releases/tag/v0.3.1
+
+Release request commit: `0b7bc07` (implementation `08c908d`).
+
+Evidence: https://github.com/raal1600/blender-asset-director/actions/runs/34730860117 (verify, publish and anonymous public install).
+
+## Why 0.3.1 exists
+
+A real local v0.3.0 acceptance test on Blender 5.2.1 authored an improved animated camera for a 240-frame push-in and exposed two correctness defects: an all-`aim.point` plan was refused with `RESOURCE_LIMIT: Provide one to 32 screen targets` because internal verification only built targets from subject-based aims, and a plan requesting zero roll produced up to ~0.174 deg of measured roll because the screen offset was solved by yawing about the camera's pitch-tilted local up axis.
+
+0.3.1 makes explicit world-point aims first-class in both `camera-plan` and `camera-check`, and replaces the orientation composition with a closed-form roll-free frame plus an un-roll of the screen offset, so a requested roll is measured back from the evaluated camera. It is a correctness patch, not a new feature line.
+
+## v0.3.1 release gate
+
+- Windows/Python 3.11 unit/policy/studio/setup suite (185 tests).
+- Ubuntu/Python 3.11 and 3.13 unit/policy/studio/setup suites.
+- Managed skill installation and uninstall checks.
+- Windows PowerShell 5.1 and PowerShell 7 bootstrap install/repeat/update/health/uninstall checks.
+- macOS and Linux bootstrap checks.
+- Blender 4.5.3, 5.0.0 and 5.2.1 technical fixtures, including the extended camera fixture.
+- Preview-settings restoration, original-file preservation and stale-job checks (unregressed).
+- Required Blender 5.0 live provider/source-motion checks.
+- Release publication and anonymous installation of v0.3.1 on Windows, macOS and Linux without a repository checkout or supplied GitHub credentials.
+
+Published archive: `blender-asset-director-0.3.1.zip`, SHA256 `76b1285518b79795746224a791ba92de0227d4200663c1f1f4f5e4182f3c9160`.
+
+The release remains a preview: cloud/CI success is not the user's local Codex/MCP session or artistic acceptance, and `camera-plan` still authors perspective cameras only.
+
+## Earlier record — 0.3.0 preview
 
 Release: https://github.com/raal1600/blender-asset-director/releases/tag/v0.3.0
 

@@ -1,6 +1,8 @@
 # Resume the published Codex skill
 
-The current published installer preview is **v0.3.0**, release commit `8a1618c29f4b4dc50b745965af13fe26b2b51c71`. Release workflow 34729010327 passed its verify, publish and anonymous public-install jobs on Windows, macOS and Linux. Read SETUP_ACCEPTANCE.md, ACCEPTANCE.md and STUDIO_TESTS.json for evidence; documentation commits may follow the released code.
+The current published installer preview is **v0.3.1**, release commit `0b7bc07` (implementation `08c908d`). Release workflow 34730860117 passed its verify, publish and anonymous public-install jobs on Windows, macOS and Linux. Read SETUP_ACCEPTANCE.md, ACCEPTANCE.md and STUDIO_TESTS.json for evidence; documentation commits may follow the released code.
+
+v0.3.1 is a correctness patch from the real v0.3.0 acceptance test: explicit world-point camera aims are authorable and verifiable in both create and adapt mode (an all-point plan previously failed with `RESOURCE_LIMIT`), and camera orientation is solved as a roll-free frame so a requested roll is measured back from the evaluated camera instead of drifting through yaw/pitch composition. `camera-check` now compares requested versus measured roll per checkpoint.
 
 v0.3.0 adds reviewed animated camera authoring (`camera-plan`): host-supplied checkpoints, placement, aim, lens, normalized screen position, roll, focus and interpolation are solved, keyed and verified with real projection, and `camera-check` samples a move for framing, clip planes, lens/sensor, orientation, screen-target error and bounded occlusion rays. Preview jobs now restore and re-verify the project's own render settings before saving, so a preview artifact cannot become a delivery master. `camera-plan` remains perspective-only and orthographic plans are refused rather than approximated.
 

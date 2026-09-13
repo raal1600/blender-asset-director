@@ -1,5 +1,33 @@
 # Acceptance evidence — scene-independent studio candidate
 
+## v0.3.1 — correctness patch from the real v0.3.0 acceptance test
+
+Tested implementation commit: `08c908d` (release request `0b7bc07`, tag `v0.3.1`).
+Technical CI: https://github.com/raal1600/blender-asset-director/actions/runs/34730860035 — all ten jobs passed.
+Release: https://github.com/raal1600/blender-asset-director/releases/tag/v0.3.1 (run 34730860117: verify, publish and anonymous public install on Windows, macOS and Linux all passed; archive SHA256 `76b1285518b79795746224a791ba92de0227d4200663c1f1f4f5e4182f3c9160`).
+
+Two defects found by exercising v0.3.0 on a real Blender 5.2.1 project:
+
+| Defect | Root cause | Fix |
+|---|---|---|
+| An all-`aim.point` camera plan failed with `RESOURCE_LIMIT: Provide one to 32 screen targets` | The plan built its internal verification targets only from subject/bounds aims, so point-only plans produced an empty list, which `camera-check` rejects | Targets may name an explicit world `point`; the plan emits one verification target per checkpoint; the target contract moved into the portable module |
+| A plan requesting `roll_deg: 0` produced up to ~0.174 deg of measured roll early in the move | The screen offset was solved by yawing about the camera's *local* up axis, which is tilted by the base pitch, injecting roughly `yaw * sin(pitch)` | Orientation is built directly as a roll-free frame (closed form), and the screen offset is un-rolled before an explicit roll is applied |
+
+| Check | Actual result |
+|---|---|
+| Unit/policy/studio suite | 185 tests passed on Windows/Python 3.11, Ubuntu/Python 3.11 and Ubuntu/Python 3.13 |
+| Blender fixtures | 4.5.3, 5.0.0 and 5.2.1: existing import/retarget/NLA, generic studio and camera fixtures all passed |
+| Camera fixture (re-run locally on 5.2.1) | 152 checks, including all-point-aim plans (constant and changing lens, create and adapt mode), a standalone `camera-check` call with point targets, and roll cases: zero roll on centred and aggressively off-centre targets, +7 deg, -4 deg and a 0/+3/-2 deg ramp across one move |
+| Measured roll error | <= 5.2e-6 deg against requested values of 0, +7 and -4 deg (v0.3.0 drifted 0.174 deg) |
+| Point-aim screen error | <= 5.6e-7 normalized |
+| Public install | v0.3.1 installed anonymously on Windows, macOS and Ubuntu runners; runtime doctor, receipt verify and library-preserving uninstall passed |
+
+What this establishes: explicit world-point aims are authorable and verifiable with no scene object behind them, in both create and adapt mode and with constant or changing lens; a requested roll is measured back from the evaluated camera within a tolerance far below visual significance; and the v0.3.0 camera, preview, preservation and budget behaviour is unregressed on all three tested Blender versions.
+
+What this does not establish: `camera-plan` remains perspective-only; occlusion evidence is still bounded ray testing rather than collision or clearance safety; between-checkpoint extrema are not evaluated; and numerical framing and roll evidence is not an artistic verdict. No user scene was modified for this patch.
+
+## v0.3.0 — animated camera authoring and preview-artifact fix
+
 ## v0.3.0 — animated camera authoring and preview-artifact fix
 
 Tested implementation commit: `8a1618c29f4b4dc50b745965af13fe26b2b51c71`.
