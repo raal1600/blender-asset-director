@@ -28,6 +28,14 @@ Rest-pose direction/scale checks precede transfer. Missing or constrained rigs r
 
 An in-place action can repeat and receive one calibrated root controller. Embedded horizontal root travel blocks double translation. Terrain following samples only the specified evaluated mesh, rejects missing/steep/discontinuous ground, and adjusts root height. It does not plant each foot. Numerical ankle/foot metrics remain heuristic unless sole offsets are calibrated.
 
+## Camera authoring and preview artifacts
+
+`camera-plan` authors an explicit animated camera from host-decided values and refuses to invent creative choices. Its contract lives in a portable module (`camera_plan.py`), so `job-prepare` rejects a malformed plan on ordinary Python before Blender starts; execution, keyframing and authoritative verification live in the Blender-only adapter. The screen-space solve inverts the perspective relation exactly, and the runtime then measures the result with real projection instead of trusting the algebra. Framing is judged on the *evaluated* camera, so a kept constraint that defeats the authored aim fails loudly rather than silently producing a different shot.
+
+That solve is verified against Blender's own framing on each tested version: AUTO and HORIZONTAL fits use the declared sensor width (AUTO applies it to the larger image dimension), VERTICAL uses the declared sensor height, and pixel aspect is included. A wrong rule here would silently miss every screen target, so the Blender fixture asserts solved framing per fit mode. `BVHTree.FromObject` returns geometry in the object's local space, so occlusion rays are transformed into each object's space rather than copying large evaluated meshes into world space.
+
+Previews exist to bound CPU cost, not to replace the project. A preview job records the settings it borrows, renders, restores them, and refuses to report success unless the restored snapshot matches the original, so a preview `.blend` cannot silently become a low-quality delivery master. The job runner's own bounded thread count is part of the execution environment and is reported rather than hidden.
+
 ## Execution and evidence
 
 Jobs are versioned by input and implementation hash, write separate outputs, reject stale input, verify originals afterward, bound log size, and terminate on deadline or interruption. Result files separate technical execution from visual acceptance. Safe retries preserve prior failure evidence. A new host session can resume from durable receipts/reports without dumping a full conversation into the model.

@@ -4,7 +4,7 @@
 
 Blender Asset Director is a scene-independent Codex skill that can inspect an existing `.blend`, reuse suitable assets, discover genuinely missing assets, plan shots, adapt animations, improve camera/lighting, and review technical evidence. It selectively loads seven responsibilities: director/producer, production design/scouting, performance, cinematography, lighting/look development, editorial/finishing, and continuity/QA.
 
-**Current preview: v0.2.2.** This release fixes an installer test that could falsely fail on machines where Blender was already discoverable or where the installer was run with Blender's bundled Python. No warrior, desert, object name, lens, frame rate, duration, or scene type is hard-coded.
+**Current preview: v0.3.0.** This release adds reviewed **animated camera authoring**: `camera-plan` keys a move from your explicit checkpoints, placement, aim, lens, normalized screen position, roll, focus and interpolation, then verifies it with real projection - and `camera-check` now samples a move for framing, clip planes, lens/sensor, orientation, screen-target error and bounded occlusion rays. It also stops preview jobs from persisting preview render settings into the artifact they save. No warrior, desert, object name, lens, frame rate, duration, or scene type is hard-coded.
 
 ## Before you install
 
@@ -23,13 +23,13 @@ Open PowerShell and paste:
 
 ```powershell
 $installer = Join-Path $env:TEMP ("bad-install-" + [guid]::NewGuid().ToString("N") + ".ps1")
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.2.2/install.ps1" -OutFile $installer
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.3.0/install.ps1" -OutFile $installer
 powershell -NoProfile -ExecutionPolicy Bypass -File $installer
 ```
 
 No Git clone, `pip install`, administrator account, or extra API key is required. `ExecutionPolicy Bypass` applies only to that installer process; it does not change the machine-wide policy.
 
-The bootstrap downloads the **pinned v0.2.2 release**, verifies its SHA256, runs the offline checks, installs the complete managed skill/runtime, detects Blender from conventional locations, creates the separate asset library, and saves local paths.
+The bootstrap downloads the **pinned v0.3.0 release**, verifies its SHA256, runs the offline checks, installs the complete managed skill/runtime, detects Blender from conventional locations, creates the separate asset library, and saves local paths.
 
 If Python is installed in a non-standard place:
 
@@ -48,7 +48,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $installer -BlenderPath "D:\
 ```sh
 installer=$(mktemp)
 curl --fail --silent --show-error --location --proto '=https' \
-  https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.2.2/install.sh \
+  https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.3.0/install.sh \
   -o "$installer"
 sh "$installer"
 ```
@@ -124,6 +124,12 @@ small previews + evidence review
 
 The host model interprets creative meaning. The deterministic runtime validates object references, production contracts, source licenses, job identity, resource budgets, and evidence. Technical validation is not a beauty score, and a text-only model cannot claim visual acceptance of rendered frames.
 
+## Camera work and preview artifacts
+
+`camera-fit` remains the locked-off technical fit. `camera-plan` authors a deliberate move from host-supplied values - frame checkpoints, a world `position` or a `direction` with `distance`/`fit`, an aim (subject with optional bounds fractions, or an explicit point), lens per plan or per checkpoint, the normalized `screen` position the aim should occupy, and optional roll, focus and interpolation - then verifies every checkpoint with real projection. It creates a new camera or adapts an existing one, preserving that camera's earlier action in a muted NLA track. It will not choose a lens, duration, frame rate or format for you, it refuses orthographic plans rather than approximating them, and a smaller `fit` margin does not guarantee a larger subject when the aim sits off-centre.
+
+Preview renders exist to bound CPU cost. A preview job records the project's own engine, resolution, resolution percentage, samples, output path/format, thread settings and frame, restores them before saving, and labels its result `PREVIEW_ARTIFACT` with `delivery_master: false`. Keep a working/master `.blend` and any final delivery render separate from preview output; nothing renders a whole sequence automatically.
+
 ## Asset and animation support
 
 The current toolkit supports local catalog search, Poly Haven, ambientCG, Sketchfab search/authenticated acquisition, and a verified Quaternius animation-pack route. Mixamo, BlenderKit and Poly Pizza remain host-tool/manual acquisition paths where appropriate; private APIs are not scraped.
@@ -132,7 +138,7 @@ Animation tooling includes source indexing, rig inspection, pinned retargeting b
 
 ## Update / verify / remove
 
-Re-run the v0.2.2 installer with `-Update` when updating a different managed installation:
+Re-run the v0.3.0 installer with `-Update` when updating a different managed installation:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File $installer -Update
@@ -152,7 +158,9 @@ Uninstall preserves the external asset library and local path settings.
 
 ## Tests and evidence
 
-The release pipeline separately verifies unit/policy/studio/setup tests, Windows PowerShell 5.1 and 7 bootstraps, macOS/Linux bootstraps, Blender 4.5.3 and 5.0.0 fixtures, live asset/source-motion checks, release publication, and anonymous public installation from the published release.
+The release pipeline separately verifies unit/policy/studio/setup tests, Windows PowerShell 5.1 and 7 bootstraps, macOS/Linux bootstraps, Blender 4.5.3, 5.0.0 and 5.2.1 fixtures, live asset/source-motion checks, release publication, and anonymous public installation from the published release.
+
+The v0.3.0 release adds a Blender fixture (`tools/camera_fixture.py`) that authors camera moves on synthetic scenes with unrelated names, aspects, sensor fits, frame rates and lenses; validates an establishing-to-closer move whose subject changes screen position; confirms that adapting a constrained camera preserves its prior action and refuses a kept constraint that would defeat the authored aim; and proves a real preview job saves a `.blend` whose resolution, percentage, engine, samples, output format/path, thread settings and frame are the project's own rather than the preview's. Unit coverage for the camera-plan contract and the perspective screen-space solve runs on every unit target.
 
 The v0.2.2 release specifically fixes the environment-dependent `test_job_missing_blender_actionable` failure reported by a real Windows installation using Blender-bundled Python. The corrected test now mocks Blender discovery **before** local configuration is created, so it tests the missing-Blender branch independently of the host machine.
 

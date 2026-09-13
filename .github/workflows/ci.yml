@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        blender: ['4.5.3', '5.0.0']
+        blender: ['4.5.3', '5.0.0', '5.2.1']
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,6 +66,10 @@ jobs:
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/studio_fixture.py -- "$RUNNER_TEMP/studio-fixtures"
           cp "$RUNNER_TEMP/studio-fixtures/studio_report.json" evidence/
+      - name: Animated camera authoring, camera-check sampling and preview-settings regression
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/camera_fixture.py -- "$RUNNER_TEMP/camera-fixtures"
+          cp "$RUNNER_TEMP/camera-fixtures/camera_report.json" evidence/
       - name: Live free asset acquisition and real-motion retarget
         if: matrix.blender == '5.0.0'
         run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence

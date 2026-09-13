@@ -57,11 +57,13 @@ Use `job-prepare <operation> --input <copy> --options <json>` then `job-run`. Ev
 
 **camera-fit**: subjects [actual geometry names], direction [x,y,z] from subject to camera, required lens_mm; optional frames (max32), sensor_width_mm, margin, projection PERSP/ORTHO. Fits evaluated bounds using actual aspect/pixel aspect. Creates a new camera without changing subjects or previous cameras. DOF stays disabled until deliberately set. Full-bounds fitting is a technical starting point, not artistic composition.
 
-**camera-check**: subjects, exact camera name, frames, margin. Reports sampled framing/clip planes. Does not establish occlusion, continuous collision clearance, focus aesthetics or between-checkpoint extremes.
+**camera-plan**: authors an explicit animated camera from host-decided values instead of fitting one mechanically. Required: subjects and keyframes; `mode` create/adapt; lens (plan-level or per checkpoint); optional sensor_fit/height, rotation_mode, interpolation, fps, frame_range, constraints, existing_animation, set_scene_camera, dof, roll_deg. Each checkpoint needs one of position or direction, an aim (subject with optional bounds fractions, or an explicit point), and optionally distance/fit, lens_mm, screen, roll_deg, dof. The runtime solves, keyframes, applies interpolation and verifies; it invents no lens, duration, frame rate or format, and rejects orthographic plans rather than approximating them. Adapting preserves the previous action in a muted NLA track by default.
+
+**camera-check**: subjects, exact camera name, and explicit frames or a bounded `sample`; optional margin, expected `screen` targets and `occlusion`. Reports sampled framing, clip planes, lens/sensor, camera location, forward/up, pitch and roll (roll 0 = level horizon), distance and screen-target error. Occlusion evidence is bounded ray testing against non-subject geometry: obvious external occluders only. It does not establish artistic composition, collision clearance, focus aesthetics or between-checkpoint extremes.
 
 **light-rig**: subjects, lights (max8) with type (SUN/AREA/POINT/SPOT), energy, offset [x,y,z], color [r,g,b], optional size_ratio. Offset and AREA size are relative to selected subject bounds. Color is linear Blender RGB; powers are explicit caller choices. No universal studio/sunset preset. Adds lights without resetting world, existing lights or materials.
 
-**preview** needs a camera, not an armature. Legacy stage:true requires an explicit target and is diagnostic only; use deliberate camera/look plans for artistic work.
+**preview** needs a camera, not an armature. Legacy stage:true requires an explicit target and is diagnostic only; use deliberate camera/look plans for artistic work. A preview saves a disposable artifact, not a delivery master: the project's own render settings are restored before the job saves, and the result is labeled `PREVIEW_ARTIFACT` with `delivery_master:false`.
 
 ## Scope and budget
 

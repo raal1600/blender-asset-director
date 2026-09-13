@@ -482,6 +482,50 @@ def create_material(files):
     return mat, {k: v.name for k,v in selected.items()}
 
 
+def render_settings_snapshot(scene):
+    """Every production render setting a preview temporarily overrides."""
+    render = scene.render
+    cycles = getattr(scene, "cycles", None)
+    return {"engine": render.engine, "resolution_x": render.resolution_x, "resolution_y": render.resolution_y,
+            "resolution_percentage": render.resolution_percentage, "filepath": render.filepath,
+            "file_format": render.image_settings.file_format, "threads_mode": render.threads_mode,
+            "threads": render.threads, "frame": scene.frame_current, "subframe": scene.frame_subframe,
+            "cycles_device": getattr(cycles, "device", None), "cycles_samples": getattr(cycles, "samples", None)}
+
+
+def apply_render_settings(scene, values):
+    render = scene.render
+    cycles = getattr(scene, "cycles", None)
+    render.engine = values["engine"]
+    render.resolution_x = values["resolution_x"]
+    render.resolution_y = values["resolution_y"]
+    render.resolution_percentage = values["resolution_percentage"]
+    render.filepath = values["filepath"]
+    render.image_settings.file_format = values["file_format"]
+    render.threads_mode = values["threads_mode"]
+    render.threads = values["threads"]
+    if cycles is not None and values["cycles_samples"] is not None:
+        cycles.samples = values["cycles_samples"]
+    if cycles is not None and values["cycles_device"] is not None:
+        cycles.device = values["cycles_device"]
+    scene.frame_set(values["frame"], subframe=values["subframe"])
+
+
+@contextlib.contextmanager
+def preserved_render_settings(scene):
+    """Run bounded preview overrides and always restore the project's own settings.
+
+    A preview is an isolated artifact, not a delivery master. The worker saves a
+    .blend after this operation, so leaving preview resolution/samples/engine in
+    the scene would silently degrade any file a host mistook for the master.
+    """
+    before = render_settings_snapshot(scene)
+    try:
+        yield before
+    finally:
+        apply_render_settings(scene, before)
+
+
 def render_previews(directory: Path, options):
     frames = options.get("frames", [1])
     width, height, samples = options.get("width", 320), options.get("height", 320), options.get("samples", 8)
@@ -489,14 +533,28 @@ def render_previews(directory: Path, options):
     require(64 <= width <= 960 and 64 <= height <= 540 and 1 <= samples <= 32, "RESOURCE_LIMIT", "Preview size/sample limit")
     scene = bpy.context.scene
     require(scene.camera is not None, "CAMERA_REQUIRED", "Provide a camera before rendering previews")
-    scene.render.engine = "CYCLES"; scene.cycles.device = "CPU"; scene.cycles.samples = samples
-    scene.render.threads_mode = "FIXED"; scene.render.threads = 2
-    scene.render.resolution_x = width; scene.render.resolution_y = height; scene.render.resolution_percentage = 100
-    scene.render.image_settings.file_format = "PNG"
     outputs = []
-    for frame in frames:
-        scene.frame_set(frame); path = directory / f"preview_{frame:04d}.png"
-        scene.render.filepath = str(path); bpy.ops.render.render(write_still=True)
-        require(path.is_file() and path.stat().st_size > 0, "RENDER_FAILED", "Preview image missing")
-        outputs.append(path.name)
-    return {"files": outputs, "engine": "CYCLES_CPU", "samples": samples, "visual_acceptance": "PENDING"}
+    with preserved_render_settings(scene) as production:
+        scene.render.engine = "CYCLES"; scene.cycles.device = "CPU"; scene.cycles.samples = samples
+        scene.render.threads_mode = "FIXED"; scene.render.threads = 2
+        scene.render.resolution_x = width; scene.render.resolution_y = height; scene.render.resolution_percentage = 100
+        scene.render.image_settings.file_format = "PNG"
+        for frame in frames:
+            scene.frame_set(frame); path = directory / f"preview_{frame:04d}.png"
+            scene.render.filepath = str(path); bpy.ops.render.render(write_still=True)
+            require(path.is_file() and path.stat().st_size > 0, "RENDER_FAILED", "Preview image missing")
+            outputs.append(path.name)
+    restored = render_settings_snapshot(scene)
+    require(restored == production, "PREVIEW_SETTINGS_NOT_RESTORED",
+            "Preview overrides were not restored; refusing to report a contaminated result")
+    return {"files": outputs, "engine": "CYCLES_CPU", "samples": samples, "visual_acceptance": "PENDING",
+            "artifact_kind": "PREVIEW_ARTIFACT", "delivery_master": False,
+            "preview_overrides": {"resolution": [width, height], "resolution_percentage": 100, "samples": samples,
+                                  "engine": "CYCLES", "device": "CPU", "threads": 2, "file_format": "PNG"},
+            "production_settings": {"engine": production["engine"],
+                                    "resolution": [production["resolution_x"], production["resolution_y"]],
+                                    "resolution_percentage": production["resolution_percentage"],
+                                    "samples": production["cycles_samples"], "file_format": production["file_format"],
+                                    "filepath": production["filepath"], "frame": production["frame"],
+                                    "threads_mode": production["threads_mode"], "threads": production["threads"]},
+            "production_settings_restored": True}
