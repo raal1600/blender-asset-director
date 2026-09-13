@@ -1,6 +1,6 @@
 {
-  "version": "0.2.2",
+  "version": "0.3.0",
   "channel": "preview",
   "attempt": 1,
-  "reason": "Fix environment-dependent missing-Blender installer test and publish corrected plug-and-play package."
+  "reason": "Add reviewed animated camera authoring (camera-plan) with camera QA across a move, and stop preview jobs from persisting preview render settings into the artifact they save."
 }
