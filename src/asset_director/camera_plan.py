@@ -39,6 +39,8 @@ AIM_FIELDS = {"subject", "bounds", "point"}
 FIT_FIELDS = {"margin"}
 DOF_FIELDS = {"use_dof", "focus_object", "focus_distance"}
 INTERPOLATION_FIELDS = {"type", "easing", "handle_left", "handle_right", "extrapolation"}
+TARGET_FIELDS = {"frame", "subject", "bounds", "point", "screen", "roll_deg"}
+MAX_TARGETS = 32
 
 
 def triple(value, *, code="INVALID_SCHEMA", message="Provide three finite numbers", limit=MAGNITUDE_LIMIT):
@@ -265,19 +267,119 @@ def half_angles(lens_mm, sensor_w_mm, sensor_h_mm):
     return math.atan(sensor_w_mm / (2.0 * lens_mm)), math.atan(sensor_h_mm / (2.0 * lens_mm))
 
 
-def screen_angles(half_h, half_v, screen):
-    """Yaw and pitch that place an on-axis aim point at a normalized screen target.
+def cross(a, b):
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 
-    A point on the camera axis projects to (0.5, 0.5). Yawing the camera by psi
-    and pitching it by beta moves that point to
-        x = 0.5 + 0.5 * tan(psi) / (cos(beta) * tan(half_h))
-        y = 0.5 - 0.5 * tan(beta) / tan(half_v)
-    which this inverts exactly, so the solve is deterministic rather than a search.
+
+def screen_frame(direction, half_h, half_v, screen):
+    """Roll-free camera axes (forward, right, up) that put an aim direction at a screen target.
+
+    A camera whose local up axis is the projection of world up has zero roll. For
+    such a frame the aim direction expressed in camera coordinates is proportional
+    to (X, Y, 1) with
+        X = 2 * (screen_x - 0.5) * tan(half_h)
+        Y = 2 * (screen_y - 0.5) * tan(half_v)
+    Writing the frame as
+        f = (cos(phi)cos(theta), cos(phi)sin(theta), sin(phi))
+        r = (sin(theta), -cos(theta), 0)
+        u = r x f
+    gives f + X*r + Y*u proportional to the aim direction with
+        A = cos(phi) - Y*sin(phi)
+        C = d_z * sqrt(1 + X^2 + Y^2)
+        phi = asin(C / sqrt(1 + Y^2)) - atan2(Y, 1)
+        theta = atan2(d_y, d_x) + atan2(X, A)
+    so the solve is closed-form and roll stays exactly zero by construction.
+
+    The earlier implementation instead composed a yaw about the camera's *local*
+    up axis with a pitch about its local right axis. That was exact for the
+    projection, but the local up axis is tilted by the base pitch, so the yaw
+    injected roll of roughly psi * sin(pitch) - small, but not a reviewed value.
     """
+    vector = [float(v) for v in direction]
+    length = math.sqrt(sum(v * v for v in vector))
+    require(length > 1e-12, "DIRECTION_REQUIRED", "Aim direction is degenerate")
+    dx, dy, dz = (v / length for v in vector)
     target_x, target_y = float(screen[0]), float(screen[1])
-    beta = math.atan(-2.0 * (target_y - 0.5) * math.tan(half_v))
-    psi = math.atan(2.0 * (target_x - 0.5) * math.tan(half_h) * math.cos(beta))
-    return psi, beta
+    x_offset = 2.0 * (target_x - 0.5) * math.tan(half_h)
+    y_offset = 2.0 * (target_y - 0.5) * math.tan(half_v)
+    scale = math.sqrt(1.0 + y_offset * y_offset)
+    vertical = dz * math.sqrt(1.0 + x_offset * x_offset + y_offset * y_offset)
+    phi = math.asin(max(-1.0, min(1.0, vertical / scale))) - math.atan2(y_offset, 1.0)
+    a = math.cos(phi) - y_offset * math.sin(phi)
+    theta = math.atan2(dy, dx) + math.atan2(x_offset, a)
+    forward = [math.cos(phi) * math.cos(theta), math.cos(phi) * math.sin(theta), math.sin(phi)]
+    right = [math.sin(theta), -math.cos(theta), 0.0]
+    return forward, right, cross(right, forward)
+
+
+def roll_axes(right, up, roll_deg):
+    """Rotate the camera's right/up axes about the view axis by an explicit roll.
+
+    Convention: a positive requested roll must measure as positive in the
+    evaluated-orientation metric camera-check reports, which is
+    atan2(up . right, up . level_up). Rotating the local axes by -roll about the
+    view axis produces that sign, so requested and measured values agree.
+    """
+    angle = -math.radians(float(roll_deg))
+    cosine, sine = math.cos(angle), math.sin(angle)
+    rolled_right = [cosine * right[i] + sine * up[i] for i in range(3)]
+    rolled_up = [-sine * right[i] + cosine * up[i] for i in range(3)]
+    return rolled_right, rolled_up
+
+
+def unroll_screen(screen, half_h, half_v, roll_deg):
+    """Screen target to solve *before* rolling, so a requested roll does not move the aim point.
+
+    Rolling the camera also rotates image content, so a screen offset solved in the
+    unrolled frame would shift the aim point once the roll is applied. Rotating the
+    requested offset back by the same angle keeps the two host intents independent:
+    the aim point still lands on the requested screen position, and the measured
+    roll still matches the requested value.
+    """
+    angle = -math.radians(float(roll_deg))
+    cosine, sine = math.cos(angle), math.sin(angle)
+    tangent_h, tangent_v = math.tan(half_h), math.tan(half_v)
+    x = 2.0 * (float(screen[0]) - 0.5) * tangent_h
+    y = 2.0 * (float(screen[1]) - 0.5) * tangent_v
+    return [0.5 + (cosine * x - sine * y) / (2.0 * tangent_h),
+            0.5 + (sine * x + cosine * y) / (2.0 * tangent_v)]
+
+
+def validate_targets(raw):
+    """Normalize camera-check screen targets, including explicit world-point aims.
+
+    Each entry names an aim (an observed subject with optional bounds fractions,
+    or an explicit world point), the normalized screen position that aim should
+    occupy, and an optional requested roll. Returning None means the caller asked
+    for no screen targets at all; an empty list is still a schema error because it
+    silently verifies nothing.
+    """
+    if raw is None:
+        return None
+    require(isinstance(raw, list) and 1 <= len(raw) <= MAX_TARGETS, "RESOURCE_LIMIT",
+            "Provide one to %d screen targets" % MAX_TARGETS)
+    targets = []
+    seen = set()
+    for entry in raw:
+        require(isinstance(entry, dict), "INVALID_SCHEMA", "Each screen target must be an object")
+        fields(entry, TARGET_FIELDS, {"frame", "screen"})
+        frame = entry["frame"]
+        require(type(frame) is int and -FRAME_LIMIT <= frame <= FRAME_LIMIT, "INVALID_SCHEMA",
+                "Target frame must be a bounded integer")
+        require(frame not in seen, "INVALID_SCHEMA", "Duplicate target frame")
+        seen.add(frame)
+        aim_fields = {"subject", "bounds", "point"} & set(entry)
+        require(bool(aim_fields), "AIM_REQUIRED", "Each screen target needs a subject, bounds or point aim")
+        require("point" not in aim_fields or aim_fields == {"point"}, "INVALID_SCHEMA",
+                "A target aims either at an observed subject or at an explicit world point")
+        target = {"frame": frame, "aim": resolve_aim({key: entry[key] for key in aim_fields}),
+                  "screen": screen_target(entry["screen"])}
+        if "roll_deg" in entry:
+            target["roll_deg"] = number(entry["roll_deg"], code="INVALID_SCHEMA",
+                                        message="Requested roll must be a finite angle in degrees",
+                                        low=-180.0, high=180.0)
+        targets.append(target)
+    return targets
 
 
 def project_point(point, eye, forward, right, up, half_h, half_v):

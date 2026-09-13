@@ -83,6 +83,23 @@ def margin_respected(checkpoint, margin):
             and margin - 1e-3 <= min_y and max_y <= 1 - margin + 1e-3)
 
 
+def roll_checks(verification):
+    return [c["screen_target"]["roll_check"] for c in verification["checkpoints"]
+            if "screen_target" in c and "roll_check" in c["screen_target"]]
+
+
+def assert_roll(verification, requested, name):
+    checks = roll_checks(verification)
+    require(len(checks) == len(requested), name + "_count", checks=len(checks))
+    for check, want in zip(checks, requested):
+        require(abs(check["requested_deg"] - want) < 1e-9, name + "_requested_reported",
+                requested=check["requested_deg"], expected=want)
+        require(check["error_deg"] <= 0.01, name + "_measured_matches_requested",
+                requested_deg=check["requested_deg"], measured_deg=check["measured_deg"],
+                error_deg=check["error_deg"])
+    require(verification["roll_targets_within_tolerance"], name + "_summary")
+
+
 def fit_slack(checkpoint, margin):
     """Near-zero when the solved distance puts a bound exactly on the margin box.
 
@@ -397,11 +414,143 @@ def case_camera_check_sampling_and_occlusion():
     require(clear["all_fit"] and clear["screen_targets_within_tolerance"], "clear_view_verified")
 
 
+def case_point_aims():
+    """Every checkpoint aims at an explicit world point - the class that failed in local acceptance."""
+    scene, subject, _ = fresh("point_target", (0.0, 0.0, 0.0), (1.0, 1.0, 2.0), (1600, 900), 24, 24, lens=50)
+    source = OUT / "point_aims_source.blend"
+    bpy.ops.wm.save_as_mainfile(filepath=str(source))
+    baseline = file_hash(source)
+    aimed = [{"frame": 1, "aim": {"point": [0.0, 0.0, 0.2]}, "position": [2.4, -9.0, 1.4], "screen": [0.40, 0.52]},
+             {"frame": 12, "aim": {"point": [0.0, 0.0, 0.0]}, "position": [1.6, -7.0, 1.1], "screen": [0.52, 0.46]},
+             {"frame": 24, "aim": {"point": [0.0, 0.0, 0.3]}, "position": [1.4, -8.0, 1.2], "screen": [0.62, 0.58]}]
+    plan = {"mode": "create", "subjects": ["point_target"], "lens_mm": 50, "fps": 24, "keyframes": aimed}
+    _, directory, data = run_job("camera-plan", source, plan)
+    errors = screen_errors(data["verification"])
+    require(len(errors) == 3 and max(errors) <= 0.005, "point_aims_all_checkpoints_verified",
+            max_screen_error=max(errors))
+    require(data["verification"]["all_fit"] and data["verification"]["occlusion_checked"],
+            "point_aims_framing_and_occlusion")
+    assert_roll(data["verification"], [0.0, 0.0, 0.0], "point_aims")
+    require(len({k["lens_mm"] for k in data["keyframes"]}) == 1, "point_aims_constant_lens")
+    require(len({tuple(k["screen_requested"]) for k in data["keyframes"]}) == 3,
+            "point_aims_changing_screen_targets")
+    scene = reload_result(directory)
+    # The defect was in camera-check's target contract: point aims must be usable directly.
+    checks = scene_ops.camera_check({"subjects": ["point_target"], "camera": data["camera"], "margin": 0.0,
+                                     "frames": [k["frame"] for k in aimed],
+                                     "targets": [{"frame": k["frame"], "point": k["aim"]["point"],
+                                                  "screen": k["screen"]} for k in aimed]})
+    require(checks["screen_targets_within_tolerance"] and checks["max_screen_error"] <= 5e-3,
+            "camera_check_accepts_point_targets", max_screen_error=checks["max_screen_error"])
+    require(file_hash(source) == baseline, "point_aims_source_preserved")
+    varied = json.loads(json.dumps(plan))
+    for keyframe, lens in zip(varied["keyframes"], (35, 50, 85)):
+        keyframe["lens_mm"] = lens
+        # Fit placement keeps hand-picked point aims inside the frame at every lens.
+        keyframe.pop("position", None)
+        keyframe["direction"] = [0.25, -1.0, 0.12]
+        keyframe["fit"] = {"margin": 0.22}
+    _, _, lens_data = run_job("camera-plan", source, varied)
+    require(len({k["lens_mm"] for k in lens_data["keyframes"]}) == 3, "point_aims_changing_lens",
+            lens=[k["lens_mm"] for k in lens_data["keyframes"]])
+    require(max(screen_errors(lens_data["verification"])) <= 0.005, "point_aims_lens_targets_verified")
+    require(lens_data["verification"]["all_fit"], "point_aims_lens_framing")
+    assert_roll(lens_data["verification"], [0.0, 0.0, 0.0], "point_aims_lens")
+
+
+def case_point_aims_adapt():
+    """Explicit point aims through adapt mode, with the prior action preserved."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    bpy.ops.mesh.primitive_cube_add(size=1.0)
+    subject = bpy.context.object
+    subject.name = "adapt point prop"
+    subject.scale = (1.2, 1.2, 2.4)
+    scene = bpy.context.scene
+    scene.render.resolution_x, scene.render.resolution_y = 1280, 720
+    scene.frame_start, scene.frame_end = 1, 16
+    data = bpy.data.cameras.new("point_adapt_camera")
+    camera = bpy.data.objects.new("point_adapt_camera", data)
+    scene.collection.objects.link(camera)
+    camera.location = (-7.0, -8.0, 2.5)
+    camera.keyframe_insert("location", frame=1)
+    camera.location = (-5.0, -10.0, 1.6)
+    camera.keyframe_insert("location", frame=16)
+    aim = bpy.data.objects.new("point_adapt_aim", None)
+    scene.collection.objects.link(aim)
+    aim.location = (30.0, 20.0, 4.0)
+    track = camera.constraints.new("TRACK_TO")
+    track.name = "point_adapt_track"
+    track.target = aim
+    scene.camera = camera
+    bpy.context.view_layer.update()
+    old_action = camera.animation_data.action.name
+    source = OUT / "point_aims_adapt_source.blend"
+    bpy.ops.wm.save_as_mainfile(filepath=str(source))
+    plan = {"mode": "adapt", "camera": "point_adapt_camera", "subjects": ["adapt point prop"], "lens_mm": 40,
+            "existing_animation": "preserve", "constraints": "mute",
+            "keyframes": [
+                {"frame": 1, "aim": {"point": [0.0, 0.0, 0.4]}, "position": [-6.5, -9.0, 2.4],
+                 "screen": [0.45, 0.50]},
+                {"frame": 16, "aim": {"point": [0.0, 0.0, 0.8]}, "position": [-4.5, -8.0, 1.5],
+                 "screen": [0.58, 0.46]}]}
+    _, directory, out = run_job("camera-plan", source, plan)
+    require(max(screen_errors(out["verification"])) <= 0.005, "point_aims_adapt_verified",
+            max_screen_error=max(screen_errors(out["verification"])))
+    require(out["preserved_actions"] == [old_action] and out["muted_constraints"] == ["point_adapt_track"],
+            "point_aims_adapt_preserved", preserved=out["preserved_actions"], muted=out["muted_constraints"])
+    assert_roll(out["verification"], [0.0, 0.0], "point_aims_adapt")
+    scene = reload_result(directory)
+    camera = bpy.data.objects["point_adapt_camera"]
+    require(old_action in {a.name for a in bpy.data.actions}, "point_aims_adapt_action_retained")
+    require(camera.constraints["point_adapt_track"].mute, "point_aims_adapt_constraint_muted")
+
+
+def case_roll_control():
+    """Requested roll must equal the evaluated roll on unrelated scenes, offsets and screen targets."""
+    cases = [("roll zero centred", "prop_a", (24.0, -17.0, 0.5), (1.0, 1.0, 2.0), [0.35, -1.0, 0.25],
+              [(0.0, [0.5, 0.5], 0.30), (0.0, [0.5, 0.5], 0.20)]),
+             ("roll zero offcentre", "box_b", (-38.0, 26.0, 2.0), (2.0, 2.0, 4.0), [0.5, -1.0, 1.2],
+              [(0.0, [0.9, 0.12], 0.05), (0.0, [0.86, 0.18], 0.05)]),
+             ("roll positive", "0042 c", (0.0, 0.0, 0.0), (0.9, 0.9, 1.8), [0.3, -1.0, 0.35],
+              [(7.0, [0.72, 0.30], 0.12), (7.0, [0.66, 0.36], 0.12)]),
+             ("roll negative", "rigid prop d", (12.0, 7.0, -3.0), (1.0, 1.0, 1.0), [0.25, -1.0, 0.2],
+              [(-4.0, [0.28, 0.70], 0.14), (-4.0, [0.34, 0.64], 0.14)])]
+    for name, subject_name, location, scale, direction, spec in cases:
+        fresh(subject_name, location, scale, (1600, 900), 30, 12, lens=45)
+        source = OUT / (name.replace(" ", "_") + ".blend")
+        bpy.ops.wm.save_as_mainfile(filepath=str(source))
+        keyframes = [{"frame": 1 + index * 11, "aim": {"subject": subject_name}, "direction": direction,
+                      "fit": {"margin": margin}, "screen": screen, "roll_deg": roll_deg}
+                     for index, (roll_deg, screen, margin) in enumerate(spec)]
+        plan = {"mode": "create", "subjects": [subject_name], "lens_mm": 45, "keyframes": keyframes}
+        _, _, data = run_job("camera-plan", source, plan)
+        require(max(screen_errors(data["verification"])) <= 0.005, "roll_case_screen_targets", case=name,
+                max_screen_error=max(screen_errors(data["verification"])))
+        assert_roll(data["verification"], [roll for roll, _, _ in spec], "roll_case_" + name.replace(" ", "_"))
+    fresh("roll ramp prop", (5.0, 5.0, 1.0), (1.0, 1.0, 2.0), (1920, 1080), 24, 24, lens=40)
+    source = OUT / "roll_ramp_source.blend"
+    bpy.ops.wm.save_as_mainfile(filepath=str(source))
+    plan = {"mode": "create", "subjects": ["roll ramp prop"], "lens_mm": 40, "keyframes": [
+        {"frame": 1, "aim": {"subject": "roll ramp prop"}, "direction": [0.4, -1.0, 0.5],
+         "fit": {"margin": 0.30}, "screen": [0.55, 0.50], "roll_deg": 0.0},
+        {"frame": 12, "aim": {"subject": "roll ramp prop"}, "direction": [0.4, -1.0, 0.3],
+         "fit": {"margin": 0.20}, "screen": [0.70, 0.38], "roll_deg": 3.0},
+        {"frame": 24, "aim": {"subject": "roll ramp prop"}, "direction": [0.4, -1.0, 0.15],
+         "fit": {"margin": 0.12}, "screen": [0.42, 0.62], "roll_deg": -2.0}]}
+    _, _, data = run_job("camera-plan", source, plan)
+    require(max(screen_errors(data["verification"])) <= 0.005, "roll_ramp_screen_targets",
+            max_screen_error=max(screen_errors(data["verification"])))
+    assert_roll(data["verification"], [0.0, 3.0, -2.0], "roll_ramp")
+
+
 def main():
     case_formats()
     case_animated_camera_and_subject()
     case_explicit_position()
     case_adaptation()
+    case_point_aims()
+    case_point_aims_adapt()
+    case_roll_control()
     case_preview_settings()
     case_camera_check_sampling_and_occlusion()
     report = {"status": "PASS", "blender_version": bpy.app.version_string, "checks": CHECKS,

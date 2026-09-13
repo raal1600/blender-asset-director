@@ -17,7 +17,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-DEFAULT_VERSION = '0.3.0'
+DEFAULT_VERSION = '0.3.1'
 REPOSITORY = 'raal1600/blender-asset-director'
 ALLOWED_HOSTS = {'github.com', 'release-assets.githubusercontent.com', 'objects.githubusercontent.com'}
 MAX_ARCHIVE = 16 * 1024 * 1024

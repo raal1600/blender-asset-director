@@ -6,7 +6,7 @@ inside a reviewed working-file job. Technical framing is not artistic approval.
 from __future__ import annotations
 import math
 import bpy
-from mathutils import Quaternion, Vector
+from mathutils import Matrix, Quaternion, Vector
 from mathutils.bvhtree import BVHTree
 from bpy_extras.object_utils import world_to_camera_view
 from .core import fields, require
@@ -18,6 +18,7 @@ OCCLUSION_MAX_TRIANGLES = 4_000_000
 OCCLUSION_MAX_RAYS = 400
 SCREEN_TARGET_TOLERANCE = 5e-3
 SCREEN_TARGET_FAILURE = 2e-2
+ROLL_TOLERANCE_DEG = 1e-2
 
 
 def subjects(names):
@@ -198,19 +199,19 @@ def bound_points(objects):
 
 
 def check_targets(options):
-    raw=options.get('targets')
-    if raw is None: return {}
-    require(isinstance(raw,list) and 1<=len(raw)<=32,'RESOURCE_LIMIT','Provide one to 32 screen targets')
+    normalized=plan_contract.validate_targets(options.get('targets'))
+    if normalized is None: return {}
     targets={}
-    for entry in raw:
-        fields(entry,{'frame','subject','bounds','screen'},{'frame','subject','screen'})
-        frame=entry['frame']
-        require(type(frame) is int and -100000<=frame<=100000,'INVALID_SCHEMA','Target frame must be a bounded integer')
-        require(frame not in targets,'INVALID_SCHEMA','Duplicate target frame')
-        aim={'subject':entry['subject']}
-        if 'bounds' in entry: aim['bounds']=entry['bounds']
-        targets[frame]={'aim':plan_contract.resolve_aim(aim),'screen':plan_contract.screen_target(entry['screen']),
-                        'subject':entry['subject']}
+    for entry in normalized:
+        aim=entry['aim']
+        if 'point' in aim:
+            # An explicit world point needs no scene object; the projected point is
+            # the verification reference.
+            targets[entry['frame']]={'aim':None,'point':Vector(aim['point']),'subject':None,
+                                     'screen':entry['screen'],'roll_deg':entry.get('roll_deg')}
+        else:
+            targets[entry['frame']]={'aim':aim,'point':None,'subject':aim['subject'],
+                                     'screen':entry['screen'],'roll_deg':entry.get('roll_deg')}
     return targets
 
 
@@ -241,23 +242,37 @@ def camera_check(options):
                    **orientation_report(cam)}
             target=targets.get(frame)
             if target:
-                point=aim_point(objects,target['aim']); projection=world_to_camera_view(scene,cam,point)
+                explicit=target['point'] is not None
+                point=target['point'] if explicit else aim_point(objects,target['aim'])
+                projection=world_to_camera_view(scene,cam,point)
                 error_x=abs(projection.x-target['screen'][0]); error_y=abs(projection.y-target['screen'][1])
-                entry['screen_target']={'subject':target['subject'],'requested':list(target['screen']),
+                entry['screen_target']={'subject':target['subject'],
+                                        'point':vector(point) if explicit else None,
+                                        'requested':list(target['screen']),
                                         'achieved':[projection.x,projection.y],
                                         'error_normalized':[error_x,error_y],'error_max':max(error_x,error_y),
                                         'error_pixels':[error_x*scene.render.resolution_x,error_y*scene.render.resolution_y],
                                         'distance':(point-cam.matrix_world.translation).length,
                                         'within_tolerance':max(error_x,error_y)<=SCREEN_TARGET_TOLERANCE}
+                if target['roll_deg'] is not None:
+                    error_roll=abs(entry['roll_deg']-target['roll_deg'])
+                    entry['screen_target']['roll_check']={'requested_deg':target['roll_deg'],
+                                                          'measured_deg':entry['roll_deg'],
+                                                          'error_deg':error_roll,
+                                                          'within_tolerance':error_roll<=ROLL_TOLERANCE_DEG}
             if occlusion:
                 points=bound_points(objects); blocked=occlusion_sample(cam,trees,points)
                 entry['occlusion']={'rays':len(points),'blocked':len(blocked),'blocked_indices':blocked,
                                     'note':'obvious external occluders only; subject geometry excluded'}
             report.append(entry)
     measured=[] if not targets else [r['screen_target']['error_max'] for r in report if 'screen_target' in r]
+    rolls=[r['screen_target']['roll_check'] for r in report
+           if 'screen_target' in r and 'roll_check' in r['screen_target']]
     return {'camera':camera.name,'checkpoints':report,'all_fit':all(r['whole_bounds_in_frame'] for r in report),
             'occlusion_checked':occlusion,'max_screen_error':max(measured) if measured else None,
             'screen_targets_within_tolerance':all(r['screen_target']['within_tolerance'] for r in report if 'screen_target' in r),
+            'max_roll_error_deg':max(r['error_deg'] for r in rolls) if rolls else None,
+            'roll_targets_within_tolerance':all(r['within_tolerance'] for r in rolls) if rolls else None,
             'visual_acceptance':'PENDING',
             'not_measured':['artistic composition','camera-path collision','focus aesthetics',
                             'between-checkpoint extrema','motion blur']+([] if occlusion else ['subject occlusion'])}
@@ -422,13 +437,20 @@ def camera_plan(options,owner):
                 plan['sensor_fit'],
                 (scene.render.resolution_x,scene.render.resolution_y),
                 (scene.render.pixel_aspect_x,scene.render.pixel_aspect_y))
-            yaw,pitch=plan_contract.screen_angles(*plan_contract.half_angles(lens,sensor_w,sensor_h),entry['screen'])
-            roll=math.radians(entry.get('roll_deg',plan['roll_deg'] or 0.0))
+            roll_deg=float(entry.get('roll_deg',plan['roll_deg'] or 0.0))
             def orient():
-                base=(aim-camera.location).to_track_quat('-Z','Y')
+                # Solve the roll-free frame that places the aim direction on the
+                # requested screen position, then apply only the requested roll. The
+                # screen offset is un-rolled first so the two intents stay independent.
+                half_h,half_v=plan_contract.half_angles(lens,sensor_w,sensor_h)
+                solved_screen=plan_contract.unroll_screen(entry['screen'],half_h,half_v,roll_deg)
+                forward,right,up=plan_contract.screen_frame(aim-camera.location,half_h,half_v,solved_screen)
+                right,up=plan_contract.roll_axes(right,up,roll_deg)
                 camera.rotation_mode='QUATERNION'
-                camera.rotation_quaternion=(base@Quaternion((0,0,1),roll)
-                                            @Quaternion((0,1,0),yaw)@Quaternion((1,0,0),pitch))
+                # Columns of this matrix are the camera's local axes: +X right, +Y up, +Z backwards.
+                camera.rotation_quaternion=Matrix(((right[0],up[0],-forward[0]),
+                                                   (right[1],up[1],-forward[1]),
+                                                   (right[2],up[2],-forward[2]))).to_quaternion()
                 bpy.context.view_layer.update()
             def projected_of(point):
                 # Judge the evaluated camera so a kept constraint cannot silently
@@ -461,7 +483,7 @@ def camera_plan(options,owner):
             computed.append({'frame':entry['frame'],'location':list(camera.location),
                              'rotation':list(camera.rotation_quaternion),'lens_mm':lens,'aim':list(aim),
                              'screen':entry['screen'],'achieved':[projected.x,projected.y],
-                             'error':[error_x,error_y],'distance':distance,'roll_deg':math.degrees(roll),
+                             'error':[error_x,error_y],'distance':distance,'roll_deg':roll_deg,
                              'dof':merged_dof(plan,entry)})
     with restore_context():
         for item in computed:
@@ -496,11 +518,18 @@ def camera_plan(options,owner):
         exact=float(plan['fps']); whole=int(exact)
         scene.render.fps=whole; scene.render.fps_base=1.0 if abs(exact-whole)<1e-9 else whole/exact
     if plan['set_scene_camera']: scene.camera=camera
-    targets=[{'frame':k['frame'],'subject':k['aim']['subject'],'screen':k['screen'],'bounds':k['aim']['bounds']}
-             for k in plan['keyframes'] if 'subject' in k['aim']]
+    # Every checkpoint yields a verification target, whether it aims at an
+    # observed subject or at an explicit world point, so a valid plan can never
+    # produce an empty target list.
+    targets=[{'frame':k['frame'],'screen':k['screen'],
+              **({'subject':k['aim']['subject'],'bounds':k['aim']['bounds']} if 'subject' in k['aim']
+                 else {'point':k['aim']['point']}),
+              'roll_deg':float(k.get('roll_deg',plan['roll_deg'] or 0.0))}
+             for k in plan['keyframes']]
     verification=camera_check({'subjects':plan['subjects'],'camera':camera.name,
                                'frames':[k['frame'] for k in plan['keyframes']],'targets':targets,
                                'occlusion':True,'margin':0.0})
+    measured_roll={c['frame']: c['roll_deg'] for c in verification['checkpoints']}
     return {'camera':camera.name,'mode':plan['mode'],'action':action.name,'rotation_mode':rotation_mode,
             'projection':data.type,'lens_mm':plan['lens_mm'],
             'sensor':{'width_mm':plan['sensor_width_mm'],'height_mm':plan['sensor_height_mm'],
@@ -508,13 +537,17 @@ def camera_plan(options,owner):
             'keyframes':[{'frame':c['frame'],'camera_location':c['location'],'aim_point':c['aim'],
                           'screen_requested':c['screen'],'screen_achieved':c['achieved'],
                           'screen_error_normalized':c['error'],'distance':c['distance'],
-                          'lens_mm':c['lens_mm'],'roll_deg':c['roll_deg']} for c in computed],
+                          'lens_mm':c['lens_mm'],'roll_deg':c['roll_deg'],
+                          'roll_measured_deg':measured_roll.get(c['frame']),
+                          'roll_error_deg':abs(measured_roll.get(c['frame'],c['roll_deg'])-c['roll_deg'])}
+                         for c in computed],
             'scene_camera':scene.camera.name if scene.camera else None,
             'frame_range':[scene.frame_start,scene.frame_end],
             'fps':scene.render.fps/scene.render.fps_base,'interpolation':interpolation,
             'clip_planes':[data.clip_start,data.clip_end],'preserved_actions':preserved_actions,
             'preserved_animation':preserved_animation,'muted_constraints':muted_constraints,
             'max_screen_error':max(max(c['error']) for c in computed),'verification':verification,
+            'max_roll_error_deg':verification['max_roll_error_deg'],
             'visual_acceptance':'PENDING',
             'limitations':['Perspective cameras only; an orthographic plan is rejected rather than approximated.',
                            'Occlusion evidence comes from bounded ray tests, not collision or clearance safety.',

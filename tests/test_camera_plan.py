@@ -120,6 +120,26 @@ class ContractCase(unittest.TestCase):
         off_centre = contract.validate(plan(keyframes=[checkpoint(screen=[0.32, 0.61])]))
         self.assertEqual(off_centre["keyframes"][0]["screen"], [0.32, 0.61])
 
+    def test_all_point_aims_are_contract_valid(self):
+        """The plan class that failed in local acceptance: every checkpoint aims at a world point."""
+        result = contract.validate(plan(keyframes=[
+            checkpoint(frame=1, aim={"point": [11.0, -34.0, 4.863]}, position=[6.2681, -67.6691, 6.21],
+                       screen=[0.40, 0.50]),
+            checkpoint(frame=48, aim={"point": [11.0, -34.0, 4.863]}, position=[6.0486, -63.5886, 6.41],
+                       screen=[0.41, 0.50])]))
+        self.assertEqual([k["aim"]["point"] for k in result["keyframes"]],
+                         [[11.0, -34.0, 4.863], [11.0, -34.0, 4.863]])
+        self.assertEqual([k["screen"] for k in result["keyframes"]], [[0.40, 0.50], [0.41, 0.50]])
+
+    def test_roll_can_be_requested_per_checkpoint_or_for_the_plan(self):
+        result = contract.validate(plan(roll_deg=2.5, keyframes=[checkpoint(frame=1, roll_deg=-3.0),
+                                                                 checkpoint(frame=12)]))
+        self.assertEqual(result["roll_deg"], 2.5)
+        self.assertEqual(result["keyframes"][0]["roll_deg"], -3.0)
+        self.assertNotIn("roll_deg", result["keyframes"][1])
+        self.assertEqual(error_code(contract.validate, plan(keyframes=[checkpoint(roll_deg=400)])),
+                         "INVALID_SCHEMA")
+
     def test_lens_is_required_and_bounded(self):
         self.assertEqual(error_code(contract.validate, plan(lens_mm=None)), "LENS_REQUIRED")
         self.assertEqual(error_code(contract.validate, plan(lens_mm=0.5)), "LENS_REQUIRED")
@@ -216,13 +236,6 @@ class ProjectionMathCase(unittest.TestCase):
         self.assertAlmostEqual(math.degrees(half_h), 26.56505117707799, places=9)
         self.assertAlmostEqual(math.degrees(half_v), 14.036243467926477, places=9)
 
-    def base_basis(self):
-        """Camera-local basis (right, up, backward = -forward) for a look-at with world up."""
-        forward = self.normalize([0.3, -1.0, -0.12])
-        right = self.normalize(self.cross(forward, [0, 0, 1]))
-        up = self.cross(right, forward)
-        return right, up, [-x for x in forward]
-
     @staticmethod
     def normalize(v):
         length = math.sqrt(sum(x * x for x in v))
@@ -232,48 +245,86 @@ class ProjectionMathCase(unittest.TestCase):
     def cross(a, b):
         return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 
-    def rotate_axes(self, axes, yaw, pitch):
-        """Apply the plan's local rotation Ry(yaw) @ Rx(pitch) to right/up/forward axes."""
-        cos_y, sin_y = math.cos(yaw), math.sin(yaw)
-        cos_p, sin_p = math.cos(pitch), math.sin(pitch)
-        # Columns of Ry(yaw) @ Rx(pitch) expressed in the current camera frame.
-        yaw_matrix = [[cos_y, 0.0, sin_y], [0.0, 1.0, 0.0], [-sin_y, 0.0, cos_y]]
-        pitch_matrix = [[1.0, 0.0, 0.0], [0.0, cos_p, -sin_p], [0.0, sin_p, cos_p]]
-        matrix = [[sum(yaw_matrix[i][k] * pitch_matrix[k][j] for k in range(3)) for j in range(3)]
-                  for i in range(3)]
-        # new_basis[i] = sum_k matrix[k][i] * basis[k]  (the i-th column of the rotation)
-        return [[sum(matrix[k][i] * axes[k][c] for k in range(3)) for c in range(3)] for i in range(3)]
+    @staticmethod
+    def dot(a, b):
+        return sum(a[i] * b[i] for i in range(3))
 
-    def test_screen_solve_lands_on_target_for_real_axes(self):
-        right, up, backward = self.base_basis()
-        eye = [12.0, -40.0, 6.5]
-        for lens in (18.0, 35.0, 65.0, 135.0):
-            half_h, half_v = contract.half_angles(
-                lens, *contract.sensor_extents(36.0, 24.0, "AUTO", (1920, 1080)))
-            for target in ([0.5, 0.5], [0.32, 0.62], [0.72, 0.38], [0.5, 0.85], [0.18, 0.2]):
-                with self.subTest(lens=lens, target=target):
-                    yaw, pitch = contract.screen_angles(half_h, half_v, target)
-                    axes = self.rotate_axes([right, up, backward], yaw, pitch)
-                    forward_axis = [-x for x in axes[2]]
-                    distance = 9.0
-                    point = [eye[i] + (-backward[i]) * distance for i in range(3)]
-                    x, y, depth = contract.project_point(point, eye, forward_axis, axes[0], axes[1],
-                                                         half_h, half_v)
-                    self.assertAlmostEqual(x, target[0], places=9)
-                    self.assertAlmostEqual(y, target[1], places=9)
-                    # Rotating the camera foreshortens the axis distance but not the range.
-                    self.assertAlmostEqual(depth, distance * math.cos(yaw) * math.cos(pitch), places=9)
-                    self.assertAlmostEqual(math.dist(point, eye), distance, places=9)
+    def measured_roll(self, forward, up):
+        """Independent implementation of the roll metric camera-check reports."""
+        right = self.cross(forward, [0.0, 0.0, 1.0])
+        if math.sqrt(sum(v * v for v in right)) < 1e-12:
+            return 0.0
+        right = self.normalize(right)
+        level_up = self.cross(right, forward)
+        return math.degrees(math.atan2(self.dot(up, right), self.dot(up, level_up)))
 
-    def test_screen_solve_direction_matches_screen_direction(self):
+    def solve(self, direction, lens, resolution, screen, roll_deg=0.0, sensor_fit="AUTO"):
         half_h, half_v = contract.half_angles(
-            50.0, *contract.sensor_extents(36.0, 24.0, "AUTO", (1600, 900)))
-        yaw, pitch = contract.screen_angles(half_h, half_v, [0.9, 0.9])
-        self.assertGreater(yaw, 0.0)
-        self.assertLess(pitch, 0.0)
-        centre = contract.screen_angles(half_h, half_v, [0.5, 0.5])
-        self.assertAlmostEqual(centre[0], 0.0)
-        self.assertAlmostEqual(centre[1], 0.0)
+            lens, *contract.sensor_extents(36.0, 24.0, sensor_fit, resolution))
+        solved = contract.unroll_screen(screen, half_h, half_v, roll_deg)
+        forward, right, up = contract.screen_frame(direction, half_h, half_v, solved)
+        right, up = contract.roll_axes(right, up, roll_deg)
+        return forward, right, up, half_h, half_v
+
+    def test_screen_frame_places_aim_point_exactly_on_target(self):
+        eye = [12.0, -40.0, 6.5]
+        for lens, resolution in ((18.0, (1920, 1080)), (65.0, (1080, 1920)), (135.0, (2100, 900))):
+            for direction in ([0.3, -1.0, -0.12], [-0.8, 0.6, -0.4], [0.05, -1.0, 0.35]):
+                for target in ([0.5, 0.5], [0.32, 0.62], [0.72, 0.38], [0.5, 0.85], [0.18, 0.2]):
+                    with self.subTest(lens=lens, resolution=resolution, direction=direction, target=target):
+                        forward, right, up, half_h, half_v = self.solve(direction, lens, resolution, target)
+                        distance = 9.0
+                        point = [eye[i] + self.normalize(direction)[i] * distance for i in range(3)]
+                        x, y, depth = contract.project_point(point, eye, forward, right, up, half_h, half_v)
+                        self.assertAlmostEqual(x, target[0], places=9)
+                        self.assertAlmostEqual(y, target[1], places=9)
+                        # An off-centre target tilts the view axis away from the aim
+                        # direction, so depth is the true range over |(X, Y, 1)|.
+                        x_offset = 2.0 * (target[0] - 0.5) * math.tan(half_h)
+                        y_offset = 2.0 * (target[1] - 0.5) * math.tan(half_v)
+                        scale = math.sqrt(1.0 + x_offset ** 2 + y_offset ** 2)
+                        self.assertAlmostEqual(depth, distance / scale, places=9)
+                        self.assertAlmostEqual(
+                            math.sqrt(sum((point[i] - eye[i]) ** 2 for i in range(3))), distance, places=9)
+
+    def test_screen_frame_stays_roll_free_with_aggressive_offsets(self):
+        """A steeply pitched camera with a strong yaw offset used to inject roll."""
+        eye = [-13.0, 21.0, 2.0]
+        for lens, resolution in ((24.0, (1600, 900)), (85.0, (900, 1600))):
+            for pitch_deg in (-25.0, -8.0, 0.0, 11.0):
+                for target in ([0.9, 0.12], [0.1, 0.9], [0.5, 0.5], [0.5, 0.95]):
+                    with self.subTest(lens=lens, pitch=pitch_deg, target=target):
+                        radians = math.radians(pitch_deg)
+                        direction = [math.cos(radians), 0.4, math.sin(radians)]
+                        forward, right, up, half_h, half_v = self.solve(direction, lens, resolution, target)
+                        self.assertAlmostEqual(self.measured_roll(forward, up), 0.0, places=9)
+                        point = [eye[i] + self.normalize(direction)[i] * 7.0 for i in range(3)]
+                        x, y, _ = contract.project_point(point, eye, forward, right, up, half_h, half_v)
+                        self.assertAlmostEqual(x, target[0], places=9)
+                        self.assertAlmostEqual(y, target[1], places=9)
+
+    def test_roll_axes_match_the_requested_roll(self):
+        direction = [0.25, -1.0, -0.3]
+        target = [0.78, 0.28]
+        eye = [0.0, 0.0, 0.0]
+        aim = [v * 6.0 for v in self.normalize(direction)]
+        for requested in (0.0, 7.0, -4.0, 12.5, -150.0):
+            with self.subTest(requested=requested):
+                forward, right, up, half_h, half_v = self.solve(direction, 50.0, (1920, 1080), target,
+                                                                roll_deg=requested)
+                self.assertAlmostEqual(self.measured_roll(forward, up), requested, places=9)
+                # Rolling about the view axis must not move the aim point itself.
+                x, y, _ = contract.project_point(aim, eye, forward, right, up, half_h, half_v)
+                self.assertAlmostEqual(x, target[0], places=9)
+                self.assertAlmostEqual(y, target[1], places=9)
+
+    def test_screen_frame_centred_target_keeps_level_horizon(self):
+        direction = [0.0, -1.0, -0.15]
+        forward, right, up, _, _ = self.solve(direction, 35.0, (1920, 1080), [0.5, 0.5])
+        self.assertAlmostEqual(self.measured_roll(forward, up), 0.0, places=9)
+        self.assertAlmostEqual(up[0], 0.0, places=12)
+        pitch = math.asin(self.normalize(direction)[2])
+        self.assertAlmostEqual(self.dot(up, [0.0, 0.0, 1.0]), math.cos(pitch), places=9)
 
     def test_projection_rejects_points_behind_the_camera(self):
         half_h, half_v = contract.half_angles(50.0, 36.0, 24.0)
@@ -291,6 +342,75 @@ class ProjectionMathCase(unittest.TestCase):
     def test_bisect_threshold_reports_an_unreachable_fit(self):
         code = error_code(contract.bisect_threshold, lambda value: False, 0.001, 1.0, iterations=8, limit=10.0)
         self.assertEqual(code, "FIT_UNREACHABLE")
+
+
+class TargetContractCase(unittest.TestCase):
+    """Camera-check screen targets, including explicit world-point aims."""
+
+    def test_point_subject_and_mixed_targets_are_accepted(self):
+        targets = contract.validate_targets([
+            {"frame": 1, "point": [1.0, -2.0, 3.0], "screen": [0.4, 0.55]},
+            {"frame": 12, "subject": "opaque.004", "bounds": [0.5, 0.5, 0.9], "screen": [0.5, 0.5]},
+            {"frame": 24, "point": [-8.0, 12.5, 0.25], "screen": [0.85, 0.2], "roll_deg": -3.5}])
+        self.assertEqual(len(targets), 3)
+        self.assertEqual(targets[0]["aim"], {"point": [1.0, -2.0, 3.0]})
+        self.assertEqual(targets[1]["aim"], {"subject": "opaque.004", "bounds": [0.5, 0.5, 0.9]})
+        self.assertEqual(targets[2]["roll_deg"], -3.5)
+        self.assertNotIn("roll_deg", targets[0])
+
+    def test_absent_targets_mean_no_screen_checks(self):
+        self.assertIsNone(contract.validate_targets(None))
+
+    def test_empty_target_list_is_still_rejected(self):
+        """An empty list silently verifies nothing; absence must be explicit."""
+        self.assertEqual(error_code(contract.validate_targets, []), "RESOURCE_LIMIT")
+
+    def test_target_count_is_bounded(self):
+        too_many = [{"frame": i, "point": [0, 0, 0], "screen": [0.5, 0.5]} for i in range(33)]
+        self.assertEqual(error_code(contract.validate_targets, too_many), "RESOURCE_LIMIT")
+
+    def test_missing_aim_is_rejected(self):
+        self.assertEqual(error_code(contract.validate_targets, [{"frame": 1, "screen": [0.5, 0.5]}]),
+                         "AIM_REQUIRED")
+
+    def test_point_and_subject_cannot_be_mixed_in_one_target(self):
+        self.assertEqual(error_code(contract.validate_targets, [{"frame": 1, "point": [0, 0, 0],
+                                                                 "subject": "opaque", "screen": [0.5, 0.5]}]),
+                         "INVALID_SCHEMA")
+        self.assertEqual(error_code(contract.validate_targets, [{"frame": 1, "point": [0, 0, 0],
+                                                                 "bounds": [0.5, 0.5, 0.5],
+                                                                 "screen": [0.5, 0.5]}]),
+                         "INVALID_SCHEMA")
+
+    def test_malformed_points_are_rejected(self):
+        for bad in ([0, 0], [0, 0, 0, 0], [0, 0, "x"], [0, 0, float("nan")]):
+            with self.subTest(point=bad):
+                self.assertEqual(error_code(contract.validate_targets,
+                                            [{"frame": 1, "point": bad, "screen": [0.5, 0.5]}]),
+                                 "INVALID_SCHEMA")
+
+    def test_malformed_screen_targets_are_rejected(self):
+        for bad in ([0.5], [1.4, 0.5], [0.5, -0.2], ["x", 0.5]):
+            with self.subTest(screen=bad):
+                self.assertEqual(error_code(contract.validate_targets,
+                                            [{"frame": 1, "point": [0, 0, 0], "screen": bad}]),
+                                 "SCREEN_TARGET_INVALID")
+        self.assertEqual(error_code(contract.validate_targets, [{"frame": 1, "point": [0, 0, 0]}]),
+                         "INVALID_SCHEMA")
+
+    def test_duplicate_frames_unknown_keys_and_bad_roll_rejected(self):
+        duplicate = [{"frame": 4, "point": [0, 0, 0], "screen": [0.5, 0.5]},
+                     {"frame": 4, "subject": "opaque", "screen": [0.5, 0.5]}]
+        self.assertEqual(error_code(contract.validate_targets, duplicate), "INVALID_SCHEMA")
+        self.assertEqual(error_code(contract.validate_targets, [{"frame": 1, "point": [0, 0, 0],
+                                                                 "screen": [0.5, 0.5], "warp": 1}]),
+                         "INVALID_SCHEMA")
+        self.assertEqual(error_code(contract.validate_targets, [{"frame": 1, "point": [0, 0, 0],
+                                                                 "screen": [0.5, 0.5], "roll_deg": 400}]),
+                         "INVALID_SCHEMA")
+        self.assertEqual(error_code(contract.validate_targets, [{"frame": 1.5, "point": [0, 0, 0],
+                                                                 "screen": [0.5, 0.5]}]),
+                         "INVALID_SCHEMA")
 
 
 class JobRegistryCase(unittest.TestCase):
