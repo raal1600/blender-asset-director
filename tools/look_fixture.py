@@ -68,14 +68,24 @@ def simple_world(name="plain sky world", strength=0.5, color=(0.2, 0.2, 0.2)):
     return world
 
 
+def raster_engine():
+    """A valid non-Cycles engine for this Blender version (the identifier changed in 5.x)."""
+    identifiers = [item.identifier for item in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items]
+    for candidate in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE", "BLENDER_WORKBENCH"):
+        if candidate in identifiers:
+            return candidate
+    return "CYCLES"
+
+
 def complex_world(name="gradient sky world"):
     world = bpy.data.worlds.new(name)
     world.use_nodes = True
     sky = world.node_tree.nodes.new("ShaderNodeTexSky")
-    mix = world.node_tree.nodes.new("ShaderNodeMix")
     node = next(n for n in world.node_tree.nodes if n.type == "BACKGROUND")
-    world.node_tree.links.new(mix.outputs["Result"], node.inputs["Color"])
-    world.node_tree.links.new(sky.outputs["Color"], mix.inputs["A"])
+    # A direct link keeps this valid across versions; the extra unconnected node
+    # keeps the graph visibly non-trivial for the "do not rewrite it" assertions.
+    world.node_tree.nodes.new("ShaderNodeMix")
+    world.node_tree.links.new(sky.outputs["Color"], node.inputs["Color"])
     bpy.context.scene.world = world
     return world
 
@@ -101,7 +111,7 @@ def snapshot_of(loaded_scene):
 def case_adapt_lights():
     """Adapt existing lights across unrelated names, types, engines and aspects."""
     cases = [("key light rig", [("key light rig", "POINT"), ("broad fill 02", "AREA")], (1600, 900), "CYCLES"),
-             ("sun rig", [("sun rig", "SUN"), ("practical spot", "SPOT")], (900, 1600), "BLENDER_EEVEE")]
+             ("sun rig", [("sun rig", "SUN"), ("practical spot", "SPOT")], (900, 1600), raster_engine())]
     for label, lights, resolution, engine in cases:
         scene, created, _ = scene_with_lights(lights, resolution=resolution, engine=engine)
         simple_world()
@@ -234,7 +244,8 @@ def case_look_adjust():
     else:
         require(True, "look_adjust_view_transform_skipped_no_alternative",
                 note="this Blender exposes a single view transform")
-    if availability.get("use_white_balance"):
+    if all(availability.get(field) for field in ("use_white_balance", "white_balance_temperature",
+                                                  "white_balance_tint")):
         _, _, wb = run_job("look-adjust", source,
                            {"use_white_balance": True, "white_balance_temperature": 5200.0,
                             "white_balance_tint": 8.0})

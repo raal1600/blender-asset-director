@@ -697,7 +697,7 @@ def look_audit():
     state=look_state()
     world=state['world']
     return {'state':state,
-            'editable':{'lights':[o.name for o in bpy.data.objects if o.type=='LIGHT'],
+            'editable':{'lights':sorted(o.name for o in bpy.data.objects if o.type=='LIGHT'),
                         'world':world.get('supported_edits',[]),
                         'color_management':[k for k in ('view_transform','look','exposure','gamma','display_device')
                                             if k in state['color_management']]
