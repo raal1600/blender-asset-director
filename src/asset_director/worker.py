@@ -57,6 +57,9 @@ def execute(job_path, *, live=False):
             else: bpy.ops.wm.read_factory_settings(use_empty=True)
             files = spec["source_files"]
             if op == "inspect": data = ops.inspect_scene()
+            elif op == "stage-floor":
+                from asset_director.floor_stage import create
+                data = create(options, job["id"])
             elif op == "scene-audit":
                 data = scene_ops.scene_audit()
                 data["source_file_sha256"] = spec["inputs"][0]["sha256"]
@@ -152,7 +155,7 @@ def execute(job_path, *, live=False):
                     if options.get("terrain_object"):
                         data["terrain_qa"] = ops.terrain_quality(sampled,report["anatomical_height"],options["terrain_object"],options.get("sole_offsets"))
             else: raise DirectorError("UNKNOWN_OPERATION", "Unsupported operation")
-            if op in {"import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
+            if op in {"stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
                       "light-adjust", "world-adjust", "look-adjust", "light-rig"}:
                 dest = directory / "result.blend"
                 require(not any(Path(f["path"]).resolve() == dest for f in spec["inputs"]), "ORIGINAL_OVERWRITE", "Output must not be an original input")

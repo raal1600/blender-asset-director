@@ -10,6 +10,7 @@ from . import camera_plan
 from . import look_contract
 
 OPS = {
+    "stage-floor": {"size", "location", "color", "grid_color", "tile_size", "roughness"},
     "inspect": set(),
     "scene-audit": set(),
     "camera-fit": {"subjects", "frames", "direction", "lens_mm", "sensor_width_mm", "margin", "projection"},
@@ -27,9 +28,9 @@ OPS = {
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage"},
 }
-MUTATIONS = {"import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
+MUTATIONS = {"stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
              "light-adjust", "world-adjust", "look-adjust", "light-rig"}
-TARGET_REQUIRED = {"retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
+TARGET_REQUIRED = {"stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
                    "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 
 
@@ -41,6 +42,9 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
     options = options or {}
     fields(options, OPS[operation])
+    if operation == "stage-floor":
+        from .floor_contract import validate
+        validate(options)
     if operation == "retarget" and "pose_space" in options:
         from .pose_contract import validate
         validate(options["pose_space"])

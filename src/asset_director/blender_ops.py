@@ -290,11 +290,16 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
     ctx.did_setup_empty_alignment = True
     intermediate = {m.target: backend.mapping.get_intermediate_bones(ctx, m) for m in ctx.mappings}
     pose_transfer = None
+    ground_contact = None
     if "pose_space" in options:
         from .pose_transfer import PoseTransfer
         require(not sr["constrained_bones"] and not tr["constrained_bones"],
                 "MAPPING_REVIEW_REQUIRED", "Evaluated pose transfer requires unconstrained source and target chains")
         pose_transfer = PoseTransfer(source, target, pairs, options["pose_space"])
+        if 'ground_contact' in options['pose_space']:
+            from .ground_contact import GroundContact
+            ground_contact = GroundContact(target, options['pose_space']['translation_bone'],
+                                           options['pose_space']['ground_contact'])
     new = bpy.data.actions.new(f"BAD_{job_id}_{action.name}")
     target.animation_data.action = new
     previous_q = {}
@@ -321,6 +326,8 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
             pb.scale = (1,1,1)
             pb.keyframe_insert("location", frame=i+1, group=name)
             pb.keyframe_insert("rotation_quaternion", frame=i+1, group=name)
+        if ground_contact:
+            ground_contact.apply(i+1)
     new.use_fake_user = True
     new["bad_job"] = job_id; new["bad_source_action"] = action.name; new["bad_source_fps"] = sfps; new["bad_target_fps"] = tfps
     new["bad_target_fingerprint"] = tr["fingerprint"]
@@ -342,6 +349,7 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
     return {"action": new.name, "slot": getattr(target.animation_data.action_slot, "identifier", None), "mapping": pairs,
             "source": sr["name"], "target": tr["name"], "target_fingerprint": tr["fingerprint"],
             "source_fingerprint": sr["fingerprint"], "frames": n, "fps": tfps, "qa": qa, "samples": samples,
+            "ground_contact": ground_contact.report() if ground_contact else None,
             "backend": "evaluated world-pose transfer; explicit alignment and translation anchor" if pose_transfer else "Mwni 2.4.0 direct matrix-transfer adapter; no scripted drivers", "visual_acceptance": "PENDING"}
 
 
