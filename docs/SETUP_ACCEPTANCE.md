@@ -1,4 +1,34 @@
-# Setup acceptance — published 0.3.1 preview
+# Setup acceptance — published 0.4.0 preview
+
+Release: https://github.com/raal1600/blender-asset-director/releases/tag/v0.4.0
+
+Release request commit: `662b506` (implementation `d9f93bc`, cross-version fixture fix `f53e9f2`).
+
+Evidence: https://github.com/raal1600/blender-asset-director/actions/runs/34734198761 (verify, publish and anonymous public install).
+
+## Why 0.4.0 exists
+
+Real acceptance tests repeatedly found that the Lighting / Look Development role could reason about exposure, world contribution, colour management and existing-light changes while the reviewed executor had no safe operation for them - and the agent correctly refused to bypass the executor with arbitrary scene Python. 0.4.0 makes those decisions executable as explicit values: `look-audit`, `light-adjust`, `world-adjust` and `look-adjust`, with before/after snapshots, isolation guarantees and runtime validation of version-dependent values. It is a new capability, not a preset library: there is no genre keyword path, no shader-node editing and no arbitrary Python.
+
+## v0.4.0 release gate
+
+- Windows/Python 3.11 unit/policy/studio/setup suite (198 tests).
+- Ubuntu/Python 3.11 and 3.13 unit/policy/studio/setup suites.
+- Managed skill installation and uninstall checks.
+- Windows PowerShell 5.1 and PowerShell 7 bootstrap install/repeat/update/health/uninstall checks.
+- macOS and Linux bootstrap checks.
+- Blender 4.5.3, 5.0.0 and 5.2.1 technical fixtures, including the new look fixture.
+- Preview-settings restoration, original-file preservation and stale-job checks (unregressed).
+- Required Blender 5.0 live provider/source-motion checks.
+- Release publication and anonymous installation of v0.4.0 on Windows, macOS and Linux without a repository checkout or supplied GitHub credentials.
+
+Published archive: `blender-asset-director-0.4.0.zip`, SHA256 `2a688ba058880ed9dc29ecd686c1502ba0f10c370c1ece5b0cfada7e2172379e`.
+
+The first release request failed required CI: the new Blender fixture hardcoded the EEVEE engine identifier, which Blender 4.5.3 does not accept. The pipeline correctly refused to publish; the fixture now discovers a valid engine from the running version and the retried request (attempt 2) passed. Blender 4.5.3, 5.0.0 and 5.2.1 all pass with the corrected fixture.
+
+The release remains a preview: cloud/CI success is not the user's local Codex/MCP session or artistic acceptance, and technically applied lighting or exposure changes still require rendered before/after inspection.
+
+## Earlier record — 0.3.1 preview
 
 Release: https://github.com/raal1600/blender-asset-director/releases/tag/v0.3.1
 

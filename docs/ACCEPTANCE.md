@@ -1,5 +1,26 @@
 # Acceptance evidence — scene-independent studio candidate
 
+## v0.4.0 — reviewed lighting and look-development authoring
+
+Tested implementation commit: `f53e9f2` (feature `d9f93bc`, release request `662b506`, tag `v0.4.0`).
+Technical CI: https://github.com/raal1600/blender-asset-director/actions/runs/34734057514 — all ten jobs passed.
+Release: https://github.com/raal1600/blender-asset-director/releases/tag/v0.4.0 (run 34734198761: verify, publish and anonymous public install on Windows, macOS and Linux all passed; archive SHA256 `2a688ba058880ed9dc29ecd686c1502ba0f10c370c1ece5b0cfada7e2172379e`).
+
+New operations: `look-audit` (read-only state), `light-adjust` (adapt observed lights), `world-adjust` (bounded active-world background edits) and `look-adjust` (scene exposure, gamma, view transform, look, display device and white balance where the running version exposes it). `light-rig` keeps the additive CREATE path and now reports its classification and inventory.
+
+| Check | Actual result |
+|---|---|
+| Unit/policy/studio suite | 198 tests passed on Windows/Python 3.11, Ubuntu/Python 3.11 and Ubuntu/Python 3.13 |
+| Blender fixtures | 4.5.3, 5.0.0 and 5.2.1: import/retarget/NLA, generic studio, camera and the new look fixture all passed |
+| Look fixture (re-run locally on 5.2.1) | 67 checks: adapting point/area/sun/spot lights across unrelated names, engines and aspects; additive light evidence; per-type property rejections and unknown-light rejection; exposure/gamma/white-balance edits; a runtime-discovered view transform; safe world strength/colour edits; refusal of a linked Background colour with the graph left intact and strength still editable; refusal of an ambiguous two-Background graph; snapshot before/after evidence; no material mutation |
+| Isolation | Look operations fail (`LIGHT_ISOLATION_VIOLATION`, `LOOK_ISOLATION_VIOLATION`, `MATERIALS_CHANGED`) if unrelated lights, the world graph or the material set change; the fixture asserts only requested properties differ |
+| Preview-settings regression | After a `look-adjust`, a real preview job saved a `.blend` whose resolution, resolution percentage, samples, engine, output format/path and frame were the project's own |
+| Public install | v0.4.0 installed anonymously on Windows, macOS and Ubuntu runners; runtime doctor, receipt verify and library-preserving uninstall passed |
+
+What this establishes: reviewed, scene-independent look development can adapt existing lights, edit scene exposure and colour management, and adjust the active world's background within explicit bounds, with per-type rejection of meaningless properties, runtime validation of version-dependent values, before/after snapshots, and isolation guarantees. Complex world graphs are refused rather than rewritten, and materials remain untouched.
+
+What this does not establish: no genre or taste judgement - a technically applied exposure or light change can still be visually rejected; occlusion, composition and colour-critical delivery acceptance remain separate; Blender 5.x always keeps world nodes enabled, so the plain non-node world path applies only where a version allows disabling them; `camera-plan` remains perspective-only; and no user scene was modified. Materials, textures, geometry and reshading are out of scope for look operations.
+
 ## v0.3.1 — correctness patch from the real v0.3.0 acceptance test
 
 Tested implementation commit: `08c908d` (release request `0b7bc07`, tag `v0.3.1`).
