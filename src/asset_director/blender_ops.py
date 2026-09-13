@@ -289,6 +289,12 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
         m.offset = backend.util.matrix_to_list(target.pose.bones[t].matrix_basis)
     ctx.did_setup_empty_alignment = True
     intermediate = {m.target: backend.mapping.get_intermediate_bones(ctx, m) for m in ctx.mappings}
+    pose_transfer = None
+    if "pose_space" in options:
+        from .pose_transfer import PoseTransfer
+        require(not sr["constrained_bones"] and not tr["constrained_bones"],
+                "MAPPING_REVIEW_REQUIRED", "Evaluated pose transfer requires unconstrained source and target chains")
+        pose_transfer = PoseTransfer(source, target, pairs, options["pose_space"])
     new = bpy.data.actions.new(f"BAD_{job_id}_{action.name}")
     target.animation_data.action = new
     previous_q = {}
@@ -298,10 +304,13 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
         f = min(f, end)
         bpy.context.scene.frame_set(math.floor(f), subframe=f-math.floor(f))
         matrices = {}
-        for m in ctx.mappings:
-            sb = source.pose.bones[m.source]
-            loc, rot, _ = sb.matrix_basis.decompose()
-            matrices[m.target] = backend.drivers.drive_bone_mat(target.name, m.target, list(loc) + list(rot), intermediate[m.target])
+        if pose_transfer:
+            matrices = pose_transfer.matrices()
+        else:
+            for m in ctx.mappings:
+                sb = source.pose.bones[m.source]
+                loc, rot, _ = sb.matrix_basis.decompose()
+                matrices[m.target] = backend.drivers.drive_bone_mat(target.name, m.target, list(loc) + list(rot), intermediate[m.target])
         for name, mat in matrices.items():
             pb = target.pose.bones[name]
             loc, q, _ = mat.decompose()
@@ -324,7 +333,8 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
     require(after["fingerprint"] == tr["fingerprint"], "REST_POSE_CHANGED", "Retarget unexpectedly changed the target rest data")
     samples = samples_for(target, after, 1, n, max_samples=361)
     qa = quality(samples, after["anatomical_height"], tfps)
-    new["bad_in_place_horizontal"] = max(max(s["root"][axis] for s in samples)-min(s["root"][axis] for s in samples) for axis in (0,1)) < .02*after["anatomical_height"]
+    new["bad_in_place_horizontal"] = max(max(s[role][axis] for s in samples)-min(s[role][axis] for s in samples)
+                                         for role in ("root", "hips") for axis in (0,1)) < .02*after["anatomical_height"]
     # A genuine idle can have stationary feet. Assert pose-key motion separately,
     # but leave locomotion semantics to the clip/quality gate rather than faking a gait.
     ranges=[max(k.co.y for k in c.keyframe_points)-min(k.co.y for k in c.keyframe_points) for c in curves(new,getattr(target.animation_data,"action_slot",None)) if c.keyframe_points]
@@ -332,7 +342,7 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
     return {"action": new.name, "slot": getattr(target.animation_data.action_slot, "identifier", None), "mapping": pairs,
             "source": sr["name"], "target": tr["name"], "target_fingerprint": tr["fingerprint"],
             "source_fingerprint": sr["fingerprint"], "frames": n, "fps": tfps, "qa": qa, "samples": samples,
-            "backend": "Mwni 2.4.0 direct matrix-transfer adapter; no scripted drivers", "visual_acceptance": "PENDING"}
+            "backend": "evaluated world-pose transfer; explicit alignment and translation anchor" if pose_transfer else "Mwni 2.4.0 direct matrix-transfer adapter; no scripted drivers", "visual_acceptance": "PENDING"}
 
 
 def assemble(target, options, job_id):

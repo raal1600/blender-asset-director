@@ -22,7 +22,7 @@ OPS = {
     "light-rig": {"subjects", "lights"},
     "index": {"max_clips", "sample"},
     "import": {"collection", "selection"},
-    "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture"},
+    "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture"},
     "assemble": {"target_object", "clips", "fps", "controller_speed", "direction", "terrain_object", "travel_frames"},
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage"},
@@ -41,6 +41,11 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
     options = options or {}
     fields(options, OPS[operation])
+    if operation == "retarget" and "pose_space" in options:
+        from .pose_contract import validate
+        validate(options["pose_space"])
+        require(options.get("mapping") and options.get("alignment"), "MAPPING_REVIEW_REQUIRED",
+                "Evaluated pose transfer requires explicit mapping and reference alignment")
     # Reject an invalid camera plan on portable Python: no Blender process, no
     # file write and no partial scene mutation for a contract that cannot execute.
     if operation == "camera-plan":
