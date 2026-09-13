@@ -1,6 +1,6 @@
 {
   "version": "0.4.0",
   "channel": "preview",
-  "attempt": 1,
+  "attempt": 2,
   "reason": "Add reviewed lighting and look-development authoring: adapt observed lights (light-adjust), bounded world background edits (world-adjust), scene exposure/view-transform/look/display/white-balance edits (look-adjust) and a read-only look-audit, all with explicit values, before/after snapshots and isolation guarantees."
 }
