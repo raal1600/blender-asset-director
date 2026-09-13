@@ -7,6 +7,7 @@ import threading
 import time
 from .core import Asset, DirectorError, Library, SCHEMA, atomic_json, canonical, digest, fields, file_hash, load_json, require, rights, tokens, within
 from . import camera_plan
+from . import look_contract
 
 OPS = {
     "inspect": set(),
@@ -14,6 +15,10 @@ OPS = {
     "camera-fit": {"subjects", "frames", "direction", "lens_mm", "sensor_width_mm", "margin", "projection"},
     "camera-check": {"subjects", "frames", "camera", "margin", "sample", "targets", "occlusion"},
     "camera-plan": set(camera_plan.TOP_LEVEL),
+    "look-audit": set(),
+    "light-adjust": {"lights"},
+    "world-adjust": set(look_contract.WORLD_FIELDS),
+    "look-adjust": set(look_contract.LOOK_FIELDS),
     "light-rig": {"subjects", "lights"},
     "index": {"max_clips", "sample"},
     "import": {"collection", "selection"},
@@ -22,9 +27,10 @@ OPS = {
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage"},
 }
-MUTATIONS = {"import", "retarget", "assemble", "preview", "camera-fit", "camera-plan", "light-rig"}
+MUTATIONS = {"import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
+             "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 TARGET_REQUIRED = {"retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
-                   "camera-plan", "light-rig"}
+                   "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 
 
 def implementation_hash():
@@ -39,6 +45,13 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     # file write and no partial scene mutation for a contract that cannot execute.
     if operation == "camera-plan":
         camera_plan.validate(options)
+    # Same rule for look development: validate explicit values before Blender runs.
+    elif operation == "light-adjust":
+        look_contract.validate_light_adjust(options)
+    elif operation == "world-adjust":
+        look_contract.validate_world_adjust(options)
+    elif operation == "look-adjust":
+        look_contract.validate_look_adjust(options)
     require(not options.get("allow_unskinned_fixture"), "FIXTURE_ONLY", "Unskinned fixture override is not available to production jobs")
     inputs = []
     if input_file:

@@ -63,6 +63,14 @@ Use `job-prepare <operation> --input <copy> --options <json>` then `job-run`. Ev
 
 **light-rig**: subjects, lights (max8) with type (SUN/AREA/POINT/SPOT), energy, offset [x,y,z], color [r,g,b], optional size_ratio. Offset and AREA size are relative to selected subject bounds. Color is linear Blender RGB; powers are explicit caller choices. No universal studio/sunset preset. Adds lights without resetting world, existing lights or materials.
 
+**look-audit** (read-only): no options beyond the target file. Reports every light and its properties, the active world's mode and safely editable fields, colour-management values and availability, the render engine, the material set and per-element reasons where an edit is unsupported.
+
+**light-adjust**: `lights` (max 32) entries of an observed light name plus explicit property changes. Adapts existing lights only; per-type applicability is enforced (AREA size/shape, SUN angle, SPOT cone, POINT/SPOT soft radius), `temperature` requires `use_temperature`, values are checked against this Blender version's own limits, and unrelated lights and properties must remain unchanged or the job fails.
+
+**world-adjust**: `strength` and/or `color` for the active world's background only. A single, unlinked Background node is required; linked inputs and ambiguous graphs are refused rather than rewritten. No node creation, removal or rewiring.
+
+**look-adjust**: `exposure`, `gamma`, `view_transform`, `look`, `display_device` and white-balance fields where the running Blender exposes them. Values are validated at execution time by applying and reading them back; unsupported values or unavailable fields fail explicitly instead of being clamped or skipped.
+
 **preview** needs a camera, not an armature. Legacy stage:true requires an explicit target and is diagnostic only; use deliberate camera/look plans for artistic work. A preview saves a disposable artifact, not a delivery master: the project's own render settings are restored before the job saves, and the result is labeled `PREVIEW_ARTIFACT` with `delivery_master:false`.
 
 ## Scope and budget

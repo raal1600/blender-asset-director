@@ -4,7 +4,7 @@
 
 Blender Asset Director is a scene-independent Codex skill that can inspect an existing `.blend`, reuse suitable assets, discover genuinely missing assets, plan shots, adapt animations, improve camera/lighting, and review technical evidence. It selectively loads seven responsibilities: director/producer, production design/scouting, performance, cinematography, lighting/look development, editorial/finishing, and continuity/QA.
 
-**Current preview: v0.3.1.** This is a focused correctness patch on v0.3.0's animated camera authoring: checkpoints that aim at an **explicit world point** are now fully authorable and verifiable (v0.3.0 refused an all-point plan with `RESOURCE_LIMIT`), and the orientation solve is **roll-free by construction**, so a requested `roll_deg` of zero measures zero and an explicit nonzero roll measures back to the requested value (v0.3.0 drifted up to ~0.17 deg through yaw/pitch composition). `camera-check` reports requested versus measured roll per checkpoint. No warrior, desert, object name, lens, frame rate, duration, or scene type is hard-coded.
+**Current preview: v0.4.0.** This adds reviewed **Lighting / Look Development authoring**: adapt observed existing lights (`light-adjust`), edit the active world's background within safe bounds (`world-adjust`), set scene exposure, view transform, look, display device and white balance where the running Blender exposes them (`look-adjust`), and inspect what is safely editable first (`look-audit`). Every look mutation returns a full before/after snapshot, proves unrelated lights, the world and the material set are untouched, and validates version-dependent values against the running Blender instead of assuming them. No genre presets, no shader-node scripting, no scenario or scene-name special cases.
 
 ## Before you install
 
@@ -23,13 +23,13 @@ Open PowerShell and paste:
 
 ```powershell
 $installer = Join-Path $env:TEMP ("bad-install-" + [guid]::NewGuid().ToString("N") + ".ps1")
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.3.1/install.ps1" -OutFile $installer
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.4.0/install.ps1" -OutFile $installer
 powershell -NoProfile -ExecutionPolicy Bypass -File $installer
 ```
 
 No Git clone, `pip install`, administrator account, or extra API key is required. `ExecutionPolicy Bypass` applies only to that installer process; it does not change the machine-wide policy.
 
-The bootstrap downloads the **pinned v0.3.1 release**, verifies its SHA256, runs the offline checks, installs the complete managed skill/runtime, detects Blender from conventional locations, creates the separate asset library, and saves local paths.
+The bootstrap downloads the **pinned v0.4.0 release**, verifies its SHA256, runs the offline checks, installs the complete managed skill/runtime, detects Blender from conventional locations, creates the separate asset library, and saves local paths.
 
 If Python is installed in a non-standard place:
 
@@ -48,7 +48,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $installer -BlenderPath "D:\
 ```sh
 installer=$(mktemp)
 curl --fail --silent --show-error --location --proto '=https' \
-  https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.3.1/install.sh \
+  https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.4.0/install.sh \
   -o "$installer"
 sh "$installer"
 ```
@@ -130,6 +130,12 @@ The host model interprets creative meaning. The deterministic runtime validates 
 
 Preview renders exist to bound CPU cost. A preview job records the project's own engine, resolution, resolution percentage, samples, output path/format, thread settings and frame, restores them before saving, and labels its result `PREVIEW_ARTIFACT` with `delivery_master: false`. Keep a working/master `.blend` and any final delivery render separate from preview output; nothing renders a whole sequence automatically.
 
+## Lighting and look development
+
+Look work is explicit and reversible. `look-audit` reports what exists and what is safely editable; `light-adjust` adapts observed lights (energy, color, per-light exposure, temperature, size/shape, sun angle, spot cone, soft radius, location/rotation, render visibility) and rejects properties that are not meaningful for that light type instead of storing values Blender would ignore; `world-adjust` edits the active world's background strength and colour only where the graph is a single unlinked Background node; `look-adjust` sets exposure, gamma, view transform, look, display device and white balance where the running Blender exposes it. Enum and range validity are checked against the running version at execution time - nothing is silently clamped or substituted, and complex world graphs are refused (`WORLD_GRAPH_UNSUPPORTED`, `WORLD_COLOR_LINKED`) rather than rewritten. `light-rig` remains the additive CREATE path.
+
+Every mutation reports `classification` (PRESERVE is the absence of an operation), a full `before_snapshot` and `after_snapshot` (lights with properties, world state, colour management, render engine, material set), the values Blender measured back, and isolation guarantees for unrelated lights, the world and materials. Materials are never mutated by look operations. Numbers are not a beauty score: look acceptance still requires rendered before/after images and an image-capable reviewer.
+
 ## Asset and animation support
 
 The current toolkit supports local catalog search, Poly Haven, ambientCG, Sketchfab search/authenticated acquisition, and a verified Quaternius animation-pack route. Mixamo, BlenderKit and Poly Pizza remain host-tool/manual acquisition paths where appropriate; private APIs are not scraped.
@@ -138,7 +144,7 @@ Animation tooling includes source indexing, rig inspection, pinned retargeting b
 
 ## Update / verify / remove
 
-Re-run the v0.3.1 installer with `-Update` when updating a different managed installation:
+Re-run the v0.4.0 installer with `-Update` when updating a different managed installation:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File $installer -Update
@@ -160,7 +166,7 @@ Uninstall preserves the external asset library and local path settings.
 
 The release pipeline separately verifies unit/policy/studio/setup tests, Windows PowerShell 5.1 and 7 bootstraps, macOS/Linux bootstraps, Blender 4.5.3, 5.0.0 and 5.2.1 fixtures, live asset/source-motion checks, release publication, and anonymous public installation from the published release.
 
-The v0.3.0 release added a Blender fixture (`tools/camera_fixture.py`) that authors camera moves on synthetic scenes with unrelated names, aspects, sensor fits, frame rates and lenses; validates an establishing-to-closer move whose subject changes screen position; confirms that adapting a constrained camera preserves its prior action and refuses a kept constraint that would defeat the authored aim; and proves a real preview job saves a `.blend` whose resolution, percentage, engine, samples, output format/path, thread settings and frame are the project's own rather than the preview's. v0.3.1 extends it with all-point-aim plans (constant and changing lens, create and adapt mode), an explicit camera-check call with point targets, and roll cases covering zero roll on centred and aggressively off-centre targets, explicit positive and negative roll, and a roll ramp across one move. Unit coverage for the camera-plan contract, the target contract and the perspective screen-space solve runs on every unit target.
+The v0.3.0 release added a Blender fixture (`tools/camera_fixture.py`) that authors camera moves on synthetic scenes with unrelated names, aspects, sensor fits, frame rates and lenses; validates an establishing-to-closer move whose subject changes screen position; confirms that adapting a constrained camera preserves its prior action and refuses a kept constraint that would defeat the authored aim; and proves a real preview job saves a `.blend` whose resolution, percentage, engine, samples, output format/path, thread settings and frame are the project's own rather than the preview's. v0.3.1 extends it with all-point-aim plans (constant and changing lens, create and adapt mode), an explicit camera-check call with point targets, and roll cases covering zero roll on centred and aggressively off-centre targets, explicit positive and negative roll, and a roll ramp across one move. v0.4.0 adds `tools/look_fixture.py`: adapting point/area/sun/spot lights, additive lights, exposure, gamma, a runtime-discovered view transform, white balance where available, safe world strength/colour edits, graded refusal of linked and ambiguous world graphs with the graph left intact, per-type property rejections, snapshot evidence and preview-settings restoration after a look adjustment. Unit coverage for the camera-plan, target and look contracts runs on every unit target.
 
 The v0.2.2 release specifically fixes the environment-dependent `test_job_missing_blender_actionable` failure reported by a real Windows installation using Blender-bundled Python. The corrected test now mocks Blender discovery **before** local configuration is created, so it tests the missing-Blender branch independently of the host machine.
 

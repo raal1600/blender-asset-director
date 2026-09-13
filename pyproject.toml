@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "blender-asset-director"
-version = "0.3.1"
+version = "0.4.0"
 description = "Reuse-first Blender asset discovery, motion indexing and validated adaptation"
 requires-python = ">=3.11"
 license = "MIT"

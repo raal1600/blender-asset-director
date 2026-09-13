@@ -6,7 +6,7 @@ Requires Python 3.11+. Existing Codex/MCP/Blender settings are never rewritten.
 #>
 [CmdletBinding()]
 param(
-[ValidatePattern('^\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$')][string]$Version = '0.3.1',
+[ValidatePattern('^\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$')][string]$Version = '0.4.0',
     [string]$PythonPath,
     [string]$BlenderPath,
     [string]$LibraryPath,

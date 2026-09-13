@@ -100,4 +100,37 @@ It never invents a lens, duration, frame rate or format, and orthographic plans 
 
 A target names either an observed `subject` (with optional `bounds` fractions) or an explicit world `point`; adding `roll_deg` to a target makes the report compare `requested_deg`, the measured `roll_deg` and `error_deg` with a tolerance verdict. `camera-check` accepts explicit `frames` or a bounded `sample`, optional expected `screen` targets, and optional `occlusion`. Each checkpoint reports normalized bounds, depth, clip planes, lens/sensor, camera location, forward/up vectors, pitch and roll (roll 0 means a level horizon), distance, and the screen-target error in normalized units and pixels. Occlusion uses bounded ray tests against non-subject geometry and reports obvious external occluders only; it is not collision, clearance or composition safety. Successful renders and passed numbers are not artistic acceptance.
 
+## Lighting and look development
+
+These operations execute only explicit values. There are no genre presets, no scene-name switches and no arbitrary shader or Python surface: the host decides, the runtime validates and applies, then reports what Blender measured back.
+
+```text
+director job-prepare look-audit --input "path/to/Working Copy.blend"
+```
+
+`look-audit` is read-only. It returns the full look state - every light with its type and properties, the active world's mode and which of its fields are safely editable, colour-management values, the render engine, the material set and the object count - plus explicit reasons where an edit is unsupported.
+
+```json
+{"lights": [{"name": "ACTUAL_LIGHT", "energy": 250, "color": [1.0, 0.8, 0.6], "location": [2, -3, 4]},
+            {"name": "ACTUAL_AREA_LIGHT", "size": 2.5, "shape": "RECTANGLE", "size_y": 1.0},
+            {"name": "ACTUAL_SUN", "angle_deg": 3.0, "use_shadow": false}]}
+```
+
+`light-adjust` adapts **observed** existing lights. Supported per type: energy, color, exposure, `use_temperature`/`temperature`, normalize, `use_shadow`, `use_soft_falloff`, `cutoff_distance`, location, `rotation_euler_deg` (Euler-mode objects only), `rotation_quaternion` (quaternion-mode objects only), `hide_render`; AREA adds `size`, `size_y` and `shape`; SUN adds `angle_deg`; SPOT adds `spot_size_deg` and `spot_blend`; POINT and SPOT add `shadow_soft_size`. Anything else is refused by light type (`LIGHT_PROPERTY_UNSUPPORTED`) rather than stored and ignored, `temperature` is refused unless the same entry enables `use_temperature`, and values outside this Blender version's own limits are refused. Unrelated lights and properties are proven unchanged, or the job fails with `LIGHT_ISOLATION_VIOLATION`.
+
+```json
+{"strength": 0.35, "color": [0.6, 0.4, 0.25]}
+```
+
+`world-adjust` edits only the active world's background strength and colour. A plain non-node world uses `world.color`; a node world must have exactly one Background node, and each input must be unlinked. Linked inputs are refused (`WORLD_COLOR_LINKED`, `WORLD_STRENGTH_LINKED`) and ambiguous graphs with several Background nodes are refused (`WORLD_GRAPH_UNSUPPORTED`) - the executor never rewires or simplifies a user node graph. Blender 5.x always keeps world nodes enabled, so the plain-colour path applies only where the running version allows disabling them.
+
+```json
+{"exposure": 0.4, "view_transform": "AgX", "look": "None", "display_device": "sRGB",
+ "use_white_balance": true, "white_balance_temperature": 5200, "white_balance_tint": 8}
+```
+
+`look-adjust` sets scene exposure, gamma, view transform, look and display device, plus white balance where the running Blender exposes it. Enum values are not assumed: each value is applied and read back, and a value this Blender rejects fails with `LOOK_VALUE_REJECTED` (including Blender's own message listing what it accepts). Version-specific fields that do not exist are refused with `LOOK_PROPERTY_UNAVAILABLE` instead of silently skipped. `light-rig` remains the additive CREATE path; all four operations report their classification (`ADAPT`, or `CREATE` for `light-rig`) and a full `before_snapshot` / `after_snapshot` for QA. Materials are never mutated: a material change fails with `MATERIALS_CHANGED`.
+
+Look-development previews use the existing `preview` operation, which still restores the project's own render settings before saving its artifact.
+
 Each job is content-addressed by operation, options, input hashes and implementation. `job-run` verifies inputs before and after, uses a clean child environment, disables auto-run scripts, enforces a deadline, records bounded logs and writes only a new job output. A separate process is defense in depth, not an OS sandbox. `job-retry` explicitly preserves failed-attempt evidence. Do not alter a job/receipt manually.

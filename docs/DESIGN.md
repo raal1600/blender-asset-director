@@ -36,6 +36,16 @@ That solve is verified against Blender's own framing on each tested version: AUT
 
 Previews exist to bound CPU cost, not to replace the project. A preview job records the settings it borrows, renders, restores them, and refuses to report success unless the restored snapshot matches the original, so a preview `.blend` cannot silently become a low-quality delivery master. The job runner's own bounded thread count is part of the execution environment and is reported rather than hidden.
 
+## Lighting and look development
+
+Look operations follow the same split as camera authoring: portable contracts (`look_contract.py`) validate explicit values on ordinary Python so `job-prepare` rejects a malformed request before Blender starts, while `scene_ops` applies and measures. Nothing in the surface accepts code, shader graphs or preset keywords - a request is a list of named lights with named properties, or bounded world and colour-management values.
+
+Anything version-dependent is discovered at execution time rather than assumed: view transforms, looks, display devices and light shapes are validated by applying them and reading the result back, numeric values are checked against Blender's own RNA limits, and fields such as white balance or per-light exposure are refused when the running Blender does not expose them. A rejected value surfaces Blender's own message instead of being clamped or silently ignored.
+
+World editing is deliberately narrow. A world must present exactly one Background node whose target input is unlinked (or be a plain non-node world, which Blender 5.x no longer allows). Linked inputs and ambiguous graphs are refused with explicit reasons, because the alternative - overwriting a link or simplifying a user graph - would destroy authored work that this executor cannot see. The same principle governs lights: adapting a light changes only the properties named, and the operation fails if any other light or property moved.
+
+Every mutation embeds a full look snapshot before and after, so a reviewer can diff lights, world state, colour management, engine and the material set without trusting the summary. Materials stay out of scope: look operations assert the material set is unchanged and fail otherwise.
+
 ## Execution and evidence
 
 Jobs are versioned by input and implementation hash, write separate outputs, reject stale input, verify originals afterward, bound log size, and terminate on deadline or interruption. Result files separate technical execution from visual acceptance. Safe retries preserve prior failure evidence. A new host session can resume from durable receipts/reports without dumping a full conversation into the model.

@@ -4,14 +4,16 @@ No subject names, scene genres, global resets, or required armatures. Call only
 inside a reviewed working-file job. Technical framing is not artistic approval.
 """
 from __future__ import annotations
+import json
 import math
 import bpy
 from mathutils import Matrix, Quaternion, Vector
 from mathutils.bvhtree import BVHTree
 from bpy_extras.object_utils import world_to_camera_view
-from .core import fields, require
+from .core import DirectorError, fields, require
 from .blender_ops import curves, restore_context, vector, flatten
 from . import camera_plan as plan_contract
+from . import look_contract
 
 GEOMETRY = {'MESH','CURVE','SURFACE','FONT','META'}
 OCCLUSION_MAX_TRIANGLES = 4_000_000
@@ -19,6 +21,23 @@ OCCLUSION_MAX_RAYS = 400
 SCREEN_TARGET_TOLERANCE = 5e-3
 SCREEN_TARGET_FAILURE = 2e-2
 ROLL_TOLERANCE_DEG = 1e-2
+LOOK_FLOAT_TOLERANCE = 1e-6
+
+# Contract key -> (Blender data attribute, kind). Degrees are used at the
+# contract boundary; Blender stores sun angle and spot size in radians.
+LIGHT_PROPERTY_TARGETS = {"energy": ("energy", "float"), "color": ("color", "color"),
+                          "exposure": ("exposure", "float"), "use_temperature": ("use_temperature", "bool"),
+                          "temperature": ("temperature", "float"), "normalize": ("normalize", "bool"),
+                          "use_shadow": ("use_shadow", "bool"), "use_soft_falloff": ("use_soft_falloff", "bool"),
+                          "cutoff_distance": ("cutoff_distance", "float"), "size": ("size", "float"),
+                          "size_y": ("size_y", "float"), "shape": ("shape", "enum"),
+                          "angle_deg": ("angle", "degrees"), "spot_size_deg": ("spot_size", "degrees"),
+                          "spot_blend": ("spot_blend", "float"), "shadow_soft_size": ("shadow_soft_size", "float"),
+                          "location": ("location", "vector"), "rotation_euler_deg": ("rotation_euler", "degrees_vector"),
+                          "rotation_quaternion": ("rotation_quaternion", "quaternion"),
+                          "hide_render": ("hide_render", "bool")}
+# These live on the light *object*; everything else lives on its data block.
+LIGHT_OBJECT_PROPERTIES = {"location", "rotation_euler_deg", "rotation_quaternion", "hide_render"}
 
 
 def subjects(names):
@@ -356,9 +375,338 @@ def light_rig(options,owner):
         obj.location=center+extent*Vector(spec['offset'])
         obj.rotation_euler=(center-obj.location).to_track_quat('-Z','Y').to_euler()
         created.append(obj.name)
-    return {'created_lights':created,'subject_center':vector(center),'subject_extent':extent,
+    return {'classification':'CREATE','created_lights':created,'subject_center':vector(center),'subject_extent':extent,
+            'lights_after':light_inventory()['lights'],
             'existing_world_preserved':True,'existing_lights_preserved':True,'visual_acceptance':'PENDING',
             'notice':'Explicit additive light plan; powers/colors are caller choices, not automatic physical calibration'}
+
+
+def light_state(obj):
+    """Every contract-visible property of one light, in contract units."""
+    data=obj.data
+    state={'name':obj.name,'type':data.type,'rotation_mode':obj.rotation_mode,
+           'hide_render':bool(obj.hide_render)}
+    for key,(attr,kind) in LIGHT_PROPERTY_TARGETS.items():
+        source=obj if key in LIGHT_OBJECT_PROPERTIES else data
+        if not hasattr(source,attr):
+            state[key+'_available']=False
+            continue
+        raw=getattr(source,attr)
+        if kind=='bool': state[key]=bool(raw)
+        elif kind=='float': state[key]=float(raw)
+        elif kind=='degrees': state[key]=round(math.degrees(float(raw)),6)
+        elif kind in ('color','vector','quaternion'): state[key]=vector(raw)
+        elif kind=='degrees_vector': state[key]=[round(math.degrees(float(v)),6) for v in raw]
+        elif kind=='enum': state[key]=str(raw)
+    return state
+
+
+def light_inventory():
+    return {'lights':[light_state(o) for o in sorted(bpy.data.objects,key=lambda o:o.name) if o.type=='LIGHT']}
+
+
+def light_blender_value(key,kind,value):
+    if kind=='degrees': return math.radians(float(value))
+    if kind=='degrees_vector': return [math.radians(float(v)) for v in value]
+    # Light.color is a three-element array; the world Background node input is the
+    # four-element RGBA case and is set directly in world_adjust.
+    if kind=='color': return (float(value[0]),float(value[1]),float(value[2]))
+    if kind=='quaternion': return [float(v) for v in value]
+    return value
+
+
+def runtime_bounds(source,attr,kind):
+    prop=source.bl_rna.properties.get(attr)
+    if prop is None: return None,None
+    low=getattr(prop,'hard_min',None); high=getattr(prop,'hard_max',None)
+    if kind=='degrees':
+        low=None if low is None or not math.isfinite(float(low)) else math.degrees(float(low))
+        high=None if high is None or not math.isfinite(float(high)) else math.degrees(float(high))
+    elif kind=='float':
+        low=None if low is None or not math.isfinite(float(low)) else float(low)
+        high=None if high is None or not math.isfinite(float(high)) else float(high)
+    else:
+        low=high=None
+    return low,high
+
+
+def apply_light_change(obj,key,value):
+    """Apply one explicit light property and prove Blender kept the requested value."""
+    attr,kind=LIGHT_PROPERTY_TARGETS[key]
+    source=obj if key in LIGHT_OBJECT_PROPERTIES else obj.data
+    require(hasattr(source,attr),'LIGHT_PROPERTY_UNAVAILABLE',
+            key+' is not available on this Blender version')
+    if key=='rotation_euler_deg':
+        require(obj.rotation_mode!='QUATERNION','LIGHT_ROTATION_MODE',
+                'rotation_euler_deg needs an Euler rotation mode; this light is QUATERNION')
+    if key=='rotation_quaternion':
+        require(obj.rotation_mode=='QUATERNION','LIGHT_ROTATION_MODE',
+                'rotation_quaternion needs QUATERNION rotation mode; this light is '+obj.rotation_mode)
+    low,high=runtime_bounds(source,attr,kind)
+    if low is not None: require(float(value)>=low-1e-9,'LIGHT_VALUE_REJECTED',
+                                key+' below this Blender version limit ('+str(low)+')')
+    if high is not None: require(float(value)<=high+1e-9,'LIGHT_VALUE_REJECTED',
+                                 key+' above this Blender version limit ('+str(high)+')')
+    try:
+        setattr(source,attr,light_blender_value(key,kind,value))
+    except (TypeError,ValueError) as exc:
+        raise DirectorError('LIGHT_VALUE_REJECTED','Blender rejected '+key+'='+repr(value)+': '+str(exc)[:300])
+    applied=light_state(obj).get(key)
+    if kind in ('float','degrees'):
+        ok=abs(float(applied)-float(value))<=max(1e-4,abs(float(value))*1e-6)
+    elif kind=='color' or kind=='vector':
+        ok=all(abs(float(applied[i])-float(value[i]))<=max(1e-6,abs(float(value[i]))*1e-6) for i in range(3))
+    elif kind=='degrees_vector':
+        ok=all(abs(float(applied[i])-float(value[i]))<=1e-4 for i in range(3))
+    else:
+        ok=applied==value
+    require(ok,'LIGHT_VALUE_REJECTED',
+            'requested '+key+'='+repr(value)+' but Blender reports '+repr(applied))
+    return applied
+
+
+def light_adjust(options,owner):
+    """Adapt observed existing lights; unrelated lights and properties are proven untouched."""
+    plan=look_contract.validate_light_adjust(options)
+    scene=bpy.context.scene
+    before=light_inventory()
+    snapshot_before=look_state()
+    objects={o.name:o for o in bpy.data.objects if o.type=='LIGHT'}
+    applied=[]
+    for entry in plan['lights']:
+        obj=objects.get(entry['name'])
+        require(obj is not None,'LIGHT_NOT_FOUND','No light named '+entry['name']+' in this scene')
+        unsupported=look_contract.unsupported_properties(obj.data.type,entry['changes'])
+        require(not unsupported,'LIGHT_PROPERTY_UNSUPPORTED',
+                'Not meaningful for a '+obj.data.type+' light: '+', '.join(unsupported))
+        changes=dict(entry['changes'])
+        if 'temperature' in changes and not changes.get('use_temperature',bool(getattr(obj.data,'use_temperature',False))):
+            raise DirectorError('LIGHT_PROPERTY_UNSUPPORTED',
+                                'temperature is ignored by Blender unless the light uses temperature; '
+                                'set use_temperature true in the same entry')
+        if 'size_y' in changes:
+            shape=changes.get('shape',getattr(obj.data,'shape',None))
+            require(shape in look_contract.AREA_SHAPES_REQUIRING_SIZE_Y,'LIGHT_PROPERTY_UNSUPPORTED',
+                    'size_y applies only to RECTANGLE/ELLIPSE area lights, not '+str(shape))
+        for key,value in changes.items():
+            applied.append({'light':obj.name,'property':key,'requested':value,
+                            'applied':apply_light_change(obj,key,value)})
+    after=light_inventory()
+    after_snapshot=look_state()
+    before_by_name={item['name']:item for item in before['lights']}
+    after_by_name={item['name']:item for item in after['lights']}
+    require(set(before_by_name)==set(after_by_name),'LIGHT_SET_CHANGED','The set of lights changed unexpectedly')
+    differences=[]
+    for name,state in after_by_name.items():
+        for key in sorted(set(before_by_name[name])|set(state)):
+            if before_by_name[name].get(key)!=state.get(key):
+                differences.append({'light':name,'property':key,'before':before_by_name[name].get(key),
+                                    'after':state.get(key)})
+    requested={(item['light'],item['property']) for item in applied}
+    unexpected=[item for item in differences if (item['light'],item['property']) not in requested]
+    require(not unexpected,'LIGHT_ISOLATION_VIOLATION',
+            'Unrequested light properties changed: '+json.dumps(unexpected[:4]))
+    require(snapshot_before['materials']==after_snapshot['materials'],'MATERIALS_CHANGED',
+            'Look development must not mutate materials')
+    return {'classification':'ADAPT','lights':[entry['name'] for entry in plan['lights']],'applied':applied,
+            'differences':differences,'lights_before':before['lights'],'lights_after':after['lights'],
+            'unrelated_lights_unchanged':True,'materials_unchanged':True,
+            'before_snapshot':snapshot_before,'after_snapshot':after_snapshot,
+            'visual_acceptance':'PENDING',
+            'not_measured':['artistic lighting quality','render appearance','photometric calibration']}
+
+
+def world_state(world):
+    """Safe, bounded description of what may be edited in a world."""
+    if world is None:
+        return {'world':None,'mode':'none','supported_edits':[],'unsupported_reason':'NO_ACTIVE_WORLD'}
+    use_nodes=bool(getattr(world,'use_nodes',False))
+    tree=getattr(world,'node_tree',None)
+    state={'world':world.name,'use_nodes':use_nodes,'color':vector(world.color),
+           'background_count':0,'supported_edits':[]}
+    if not use_nodes or tree is None:
+        state.update({'mode':'world_color','supported_edits':['color']})
+        return state
+    backgrounds=[n for n in tree.nodes if n.type=='BACKGROUND']
+    state['background_count']=len(backgrounds)
+    state['node_types']=sorted({n.type for n in tree.nodes})
+    if len(backgrounds)!=1:
+        state.update({'mode':'unsupported_graph','unsupported_reason':'WORLD_GRAPH_UNSUPPORTED'})
+        return state
+    node=backgrounds[0]
+    color_linked=node.inputs['Color'].is_linked
+    strength_linked=node.inputs['Strength'].is_linked
+    edits=[]
+    if not color_linked: edits.append('color')
+    if not strength_linked: edits.append('strength')
+    state.update({'mode':'background_node','background_node':node.name,
+                  'background_color':[round(float(c),6) for c in node.inputs['Color'].default_value],
+                  'background_strength':round(float(node.inputs['Strength'].default_value),6),
+                  'color_linked':color_linked,'strength_linked':strength_linked,'supported_edits':edits})
+    if color_linked: state['color_unsupported_reason']='WORLD_COLOR_LINKED'
+    if strength_linked: state['strength_unsupported_reason']='WORLD_STRENGTH_LINKED'
+    return state
+
+
+def world_adjust(options,owner):
+    """Bounded edit of the active world; complex graphs are refused, never simplified."""
+    plan=look_contract.validate_world_adjust(options)
+    scene=bpy.context.scene
+    world=scene.world
+    require(world is not None,'WORLD_REQUIRED','The scene has no active world to adjust')
+    before=world_state(world)
+    require(before['mode'] in ('world_color','background_node'),'WORLD_GRAPH_UNSUPPORTED',
+            'The active world structure is not a single Background node feeding the world output; '
+            'refusing to rewrite it ('+json.dumps(before.get('node_types'))+')')
+    snapshot_before=look_state()
+    applied={}
+    if before['mode']=='world_color':
+        if 'color' in plan:
+            world.color=(plan['color'][0],plan['color'][1],plan['color'][2])
+            applied['color']={'requested':plan['color'],'applied':vector(world.color)}
+        if 'strength' in plan:
+            raise DirectorError('WORLD_STRENGTH_UNSUPPORTED',
+                                'This world has no node background; strength is not a supported edit here')
+    else:
+        node=next(n for n in world.node_tree.nodes if n.type=='BACKGROUND' and n.name==before['background_node'])
+        if 'color' in plan:
+            require(not before['color_linked'],'WORLD_COLOR_LINKED',
+                    'The Background color is linked to a node graph; refusing to overwrite the link')
+            node.inputs['Color'].default_value=(plan['color'][0],plan['color'][1],plan['color'][2],1.0)
+            applied['color']={'requested':plan['color'],
+                              'applied':[round(float(c),6) for c in node.inputs['Color'].default_value][:3]}
+        if 'strength' in plan:
+            require(not before['strength_linked'],'WORLD_STRENGTH_LINKED',
+                    'The Background strength is linked to a node graph; refusing to overwrite the link')
+            node.inputs['Strength'].default_value=plan['strength']
+            applied['strength']={'requested':plan['strength'],
+                                 'applied':round(float(node.inputs['Strength'].default_value),6)}
+    after=world_state(world)
+    after_snapshot=look_state()
+    require(after_snapshot['materials']==snapshot_before['materials'],'MATERIALS_CHANGED',
+            'Look development must not mutate materials')
+    require(after_snapshot['lights']==snapshot_before['lights'],'LIGHT_ISOLATION_VIOLATION',
+            'A world edit must not change lights')
+    for key,record in applied.items():
+        requested=record['requested']; measured=record['applied']
+        if key=='strength':
+            require(abs(float(measured)-float(requested))<=max(1e-6,abs(float(requested))*1e-6),
+                    'LOOK_VALUE_REJECTED','world strength was not applied as requested')
+        else:
+            require(all(abs(float(measured[i])-float(requested[i]))<=1e-6 for i in range(3)),
+                    'LOOK_VALUE_REJECTED','world color was not applied as requested')
+    return {'classification':'ADAPT','world':world.name,'applied':applied,
+            'world_before':before,'world_after':after,
+            'before_snapshot':snapshot_before,'after_snapshot':after_snapshot,
+            'materials_unchanged':True,'lights_unchanged':True,'visual_acceptance':'PENDING',
+            'not_measured':['artistic quality','environment integration','render appearance']}
+
+
+def look_settings_state(scene):
+    view=scene.view_settings
+    state={'engine':scene.render.engine,'view_transform':view.view_transform,'look':view.look,
+           'exposure':float(view.exposure),'gamma':float(view.gamma),
+           'display_device':scene.display_settings.display_device}
+    available={}
+    for key,kind in (('use_white_balance','bool'),('white_balance_temperature','float'),
+                     ('white_balance_tint','float'),('white_balance_whitepoint','vector')):
+        exists=hasattr(view,key)
+        available[key]=exists
+        if exists:
+            raw=getattr(view,key)
+            if kind=='bool': state[key]=bool(raw)
+            elif kind=='float': state[key]=round(float(raw),6)
+            else: state[key]=[round(float(v),6) for v in raw]
+    return state,available
+
+
+def look_state():
+    """Snapshot used before and after every look-development mutation."""
+    scene=bpy.context.scene
+    settings,available=look_settings_state(scene)
+    materials=sorted(m.name for m in bpy.data.materials)
+    return {'engine':settings['engine'],'color_management':settings,'color_management_available':available,
+            'world':world_state(scene.world),'lights':light_inventory()['lights'],
+            'materials':{'count':len(materials),'names':materials},'objects':len(bpy.data.objects),
+            'resolution':[scene.render.resolution_x,scene.render.resolution_y],
+            'frame_range':[scene.frame_start,scene.frame_end],'frame_current':scene.frame_current,
+            'fps':scene.render.fps/scene.render.fps_base}
+
+
+def apply_look_change(scene,key,value):
+    """Set one colour-management value and prove Blender accepted it."""
+    view=scene.view_settings
+    target=scene.display_settings if key=='display_device' else view
+    attribute='display_device' if key=='display_device' else key
+    require(hasattr(target,attribute),'LOOK_PROPERTY_UNAVAILABLE',
+            key+' is not available in this Blender version')
+    prop=target.bl_rna.properties.get(attribute)
+    if prop is not None and type(value) in (int,float):
+        low=getattr(prop,'hard_min',None); high=getattr(prop,'hard_max',None)
+        if low is not None and math.isfinite(float(low)):
+            require(float(value)>=float(low)-1e-9,'LOOK_VALUE_REJECTED',
+                    key+' below this Blender version limit ('+str(low)+')')
+        if high is not None and math.isfinite(float(high)):
+            require(float(value)<=float(high)+1e-9,'LOOK_VALUE_REJECTED',
+                    key+' above this Blender version limit ('+str(high)+')')
+    try:
+        setattr(target,attribute,value)
+    except (TypeError,ValueError) as exc:
+        raise DirectorError('LOOK_VALUE_REJECTED','Blender rejected '+key+'='+repr(value)+': '+str(exc)[:300])
+    applied=getattr(target,attribute)
+    if type(value) is bool:
+        ok=bool(applied)==value
+    elif type(value) in (int,float):
+        ok=abs(float(applied)-float(value))<=max(1e-6,abs(float(value))*1e-6)
+    else:
+        ok=str(applied)==str(value)
+    require(ok,'LOOK_VALUE_REJECTED','requested '+key+'='+repr(value)+' but Blender reports '+repr(applied))
+    return applied if not isinstance(applied,float) else round(float(applied),6)
+
+
+def look_adjust(options,owner):
+    """Explicit scene exposure / view-transform / look / display / white-balance values."""
+    plan=look_contract.validate_look_adjust(options)
+    scene=bpy.context.scene
+    before=look_state()
+    applied={}
+    # Order matters: the view transform defines which looks exist, and Blender may
+    # reset the look when the transform changes.
+    for key in ('view_transform','display_device','look','exposure','gamma',
+                'use_white_balance','white_balance_temperature','white_balance_tint'):
+        if key in plan:
+            if key.startswith('white_balance') or key=='use_white_balance':
+                require(before['color_management_available'].get(key,False),'LOOK_PROPERTY_UNAVAILABLE',
+                        key+' is not available in this Blender version; no fallback is attempted')
+            applied[key]={'requested':plan[key],'applied':apply_look_change(scene,key,plan[key])}
+    after=look_state()
+    require(after['materials']==before['materials'],'MATERIALS_CHANGED',
+            'Look development must not mutate materials')
+    require(after['lights']==before['lights'],'LIGHT_ISOLATION_VIOLATION','A look edit must not change lights')
+    require(after['world']==before['world'],'LOOK_ISOLATION_VIOLATION',
+            'A look edit must not change the world graph')
+    return {'classification':'ADAPT','applied':applied,'color_management_before':before['color_management'],
+            'color_management_after':after['color_management'],'availability':before['color_management_available'],
+            'before_snapshot':before,'after_snapshot':after,'materials_unchanged':True,'lights_unchanged':True,
+            'world_unchanged':True,'visual_acceptance':'PENDING',
+            'not_measured':['artistic quality','exposure aesthetics','colour-critical delivery acceptance']}
+
+
+def look_audit():
+    """Read-only look snapshot: what exists, what is safely editable, and why not."""
+    state=look_state()
+    world=state['world']
+    return {'state':state,
+            'editable':{'lights':[o.name for o in bpy.data.objects if o.type=='LIGHT'],
+                        'world':world.get('supported_edits',[]),
+                        'color_management':[k for k in ('view_transform','look','exposure','gamma','display_device')
+                                            if k in state['color_management']]
+                                            +[k for k,v in state['color_management_available'].items() if v]},
+            'unsupported':{'world':world.get('unsupported_reason') or world.get('color_unsupported_reason'),
+                           'world_strength':world.get('strength_unsupported_reason')},
+            'materials_are_read_only':'Material authoring is out of scope for look-development operations',
+            'visual_acceptance':'PENDING',
+            'not_measured':['artistic quality','render appearance']}
 
 
 def merged_dof(plan,entry):
