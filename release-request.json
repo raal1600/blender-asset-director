@@ -1,6 +1,6 @@
 {
-  "version": "0.3.0",
+  "version": "0.3.1",
   "channel": "preview",
   "attempt": 1,
-  "reason": "Add reviewed animated camera authoring (camera-plan) with camera QA across a move, and stop preview jobs from persisting preview render settings into the artifact they save."
+  "reason": "Correctness patch from the real v0.3.0 acceptance test: explicit world-point aims are fully authorable and verifiable, and the camera orientation solve is roll-free so a requested roll is measured back from the evaluated camera."
 }
