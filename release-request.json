@@ -1,6 +1,6 @@
 {
-  "version": "0.3.1",
+  "version": "0.4.0",
   "channel": "preview",
   "attempt": 1,
-  "reason": "Correctness patch from the real v0.3.0 acceptance test: explicit world-point aims are fully authorable and verifiable, and the camera orientation solve is roll-free so a requested roll is measured back from the evaluated camera."
+  "reason": "Add reviewed lighting and look-development authoring: adapt observed lights (light-adjust), bounded world background edits (world-adjust), scene exposure/view-transform/look/display/white-balance edits (look-adjust) and a read-only look-audit, all with explicit values, before/after snapshots and isolation guarantees."
 }
