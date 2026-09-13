@@ -1,47 +1,59 @@
 # Motion selection, transfer and honest limits
 
-**Search -> inspect source -> compare rigs -> preview -> retarget flat -> validate -> terrain -> human review.**
+Search -> inspect source -> compare rigs -> retarget flat -> validate timing and
+contacts -> temporal review -> optional terrain adaptation -> human review.
 
-The local catalog stores each actual action/slot/owner binding, source file hash, FPS, frame range, measured motion, inferred filename tags and provenance. A filename tag is not a verified semantic description. The lexical ranking score is not an artistic-quality score. Re-evaluate an apparently relevant walk for pace, arm posture, held weapon, loop quality and genre.
+The catalog stores each actual action/slot/owner binding, file hash, imported FPS,
+frame range, measured motion, inferred tags and provenance. A filename is not a
+verified action description, and lexical rank is not a realism score. Review pace,
+support exchange, arm posture, props and transitions before selecting a source.
 
-The Mwni backend is pinned by upstream commit and per-file Git object hash. It is acquired separately, remains GPL-3.0-or-later, and is not vendored into the MIT core. The adapter registers only its data schema in a disposable process and calls matrix-transfer functions directly. It does not install the add-on globally or enable scripted drivers. New uniquely named actions preserve old actions.
+The Mwni backend is pinned by upstream commit and per-file Git object hash. It is
+acquired separately, remains GPL-3.0-or-later and is not vendored into the MIT
+core. The adapter registers its data schema only in a disposable process and
+uses matrix-transfer functions without globally installed handlers or drivers.
+Legacy local transfer remains default.
 
-### Explicit evaluated-pose transfer
+## Opt-in evaluated world-pose transfer
 
-For unlike rest poses/parent frames, local-delta transfer can distort motion even
-when every bone name is mapped. `retarget` may explicitly select `pose_space`:
-`{"rotation":[1,0,0,0,1,0,0,0,1],"translation_bone":"observed target pelvis","translation_scale":1.0,"target_origin":[0,0,1]}`.
-These numbers are schema examples, not a ready-made alignment. Supply a reviewed
-one-to-one `mapping` and target pose-basis `alignment` as well. `rotation` is a
-proper row-major 3x3 world rotation mapping source anatomical facing to target
-facing. `target_origin` is the selected target anchor's world position at the
-first sampled source frame. Only that anchor receives source world displacement,
-scaled by the explicit positive ratio; target segment lengths are preserved.
+Use retarget `pose_space` only with an explicit one-to-one mapping, reviewed target
+pose-basis alignment, proper source-to-target row-major 3x3 rotation, one mapped
+translation_bone, positive translation_scale and target_origin. Origin is the
+target anchor's world position at the first sampled source frame. Only the anchor
+receives converted source displacement; target segment lengths are preserved.
 
-This mode transfers evaluated world-rotation deltas and reconstructs target local
-bases in parent order. It is opt-in, never an automatic backend switch. Source and
-target object transforms must stay fixed; all chains must be unconstrained;
-animated non-anchor local translations and non-unit pose scales are rejected.
-The pinned backend remains verified by the job runner, but this mode does not
-invoke its local-delta transfer math. Other calls retain the existing behavior.
+Evaluated world rotations are converted into local target bases in parent order.
+Unmapped reference bases are retained. Armature world transforms must stay fixed,
+chains must be unconstrained, source non-anchor local translations must not vary,
+and source/target reference pose scales must be unit. The pinned backend is still
+verified, but its local-delta math is not invoked for this explicit mode.
+Unknown/control rigs and substantial rest-pose differences remain review gates,
+not reasons to guess a mapping. Matching names alone do not prove compatibility.
 
-Compare source and target in the **same world coordinate system** and at matched
-times. An imported glTF's frame coordinates depend on import FPS; confirm its
-actual action range/timebase rather than assuming indexed coordinates remain
-unchanged in a differently timed scene. Match a short cycle, then measure limb
-directions, preserved lengths and anchor displacement after saving/reopening.
-Different proportions can still cause contact errors: this mode is not a foot-IK
-solver. Travel on either root or hips disqualifies automatic cycle repetition.
+Compare in the same world coordinate system at matched times. Imported frame
+coordinates, native capture rate (possibly unknown), destination FPS and artistic
+playback_speed are distinct. Retargeted glTF imports use the catalog timebase;
+assembly rejects a conflicting source_fps override instead of treating it as speed.
+See [grounded motion and timing](grounded-motion.md) for supported contracts.
 
-Automatic mapping uses limited anatomical aliases. Unknown/control rigs, missing skinning, nonuniform/negative scales, active constraints, substantial rest-pose differences, ambiguous slots or object-level source travel require explicit review. A matching bone name alone is not proof of compatibility. Rest direction checks are conservative, not a complete skeleton-equivalence proof.
+Travel in either root or hips prevents automatic repetition and conflicts with a
+second path controller. An action returning to its starting position can still
+travel. In-place clips may repeat only after appropriate loop/contact review.
+The fingerprint confirms a target rig, not the naturalness of the transferred motion.
 
-NLA accepts actions baked for the exact target fingerprint. A root that returns to its origin can still contain travel: use range, not only net displacement. Do not repeat a traveling root without handling continuity. In-place cycles can repeat and receive **one** external controller with a calibrated speed; do not simultaneously add that controller to an already traveling action.
+Numerical QA measures sampled root/hip/ankle paths and heuristic stance drift,
+seams and discontinuities. It does not prove biologically natural gait, support
+pressure or correct toe/heel phases. Grounding is not horizontal foot IK. A good
+source can still fail on a different character's proportions. Do not hide defects
+with cropping, camera movement or fog.
 
-Numerical QA measures sampled root/hip/ankle paths, relative limb movement, heuristic stance drift, endpoint seams and discontinuities. Foot motion relative to the root helps catch a static character translated through space. It does not establish biologically natural gait. Static feet can be legitimate during an idle. In-place source clips often show apparent world-space foot sliding until locomotion travel is applied.
+Retarget/NLA reports leave performance_acceptance NOT_EVALUATED and require
+separate temporal visual review. A source tagged Moonwalk may still be a backward
+walk. Contact sheets supplement continuous-motion evidence; they do not replace
+it. Keep technical, source-performance, temporal and human acceptance distinct.
 
-Terrain following in this version adjusts only controller root height on a gentle, sampled route. There is no full foot-IK/contact solver, ragdoll, cloth simulation, procedural combat synthesis or automatic equipment-grip repair. Report remaining defects rather than obscuring them with camera motion or fog. A good source can still fail on a different character's proportions.
-
-Blender actions from 4.4 onward can use slots/channel bags. Do not assume legacy `action.fcurves` or take the first slot from a multi-object action. Source ownership and duration must come from actual channels/bindings.
+Blender layered actions require slot/channel-bag handling; do not assume legacy
+action.fcurves or choose the first slot when ownership is ambiguous.
 
 Primary references:
 - https://github.com/Mwni/blender-animation-retargeting/tree/424f08bd7e675619adf539209a1e8816c242c386

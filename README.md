@@ -1,46 +1,73 @@
 # Blender Asset Director
 
-**Give Codex a small Blender production team—not another Blender harness.**
+**Give Codex a small Blender production team, not another Blender harness.**
 
-Blender Asset Director is a scene-independent Codex skill that can inspect an existing `.blend`, reuse suitable assets, discover genuinely missing assets, plan shots, adapt animations, improve camera/lighting, and review technical evidence. It selectively loads seven responsibilities: director/producer, production design/scouting, performance, cinematography, lighting/look development, editorial/finishing, and continuity/QA.
+Use a prompt and an existing scene to reuse suitable assets, scout real gaps,
+plan shots, adapt sourced motion, improve camera/lighting and review evidence.
+One skill selectively loads seven responsibilities: director/producer,
+production design/scout, performance, cinematography, lighting/look development,
+editorial/finishing and continuity/QA. There are no scene-name, lens, FPS or
+character-specific production presets.
 
-**Current preview: v0.4.0.** This adds reviewed **Lighting / Look Development authoring**: adapt observed existing lights (`light-adjust`), edit the active world's background within safe bounds (`world-adjust`), set scene exposure, view transform, look, display device and white balance where the running Blender exposes them (`look-adjust`), and inspect what is safely editable first (`look-audit`). Every look mutation returns a full before/after snapshot, proves unrelated lights, the world and the material set are untouched, and validates version-dependent values against the running Blender instead of assuming them. No genre presets, no shader-node scripting, no scenario or scene-name special cases.
+## Current preview: v0.5.0
 
-## Before you install
+This release completes the evaluated-pose retargeting branch with explicit
+reference-frame conversion, optional bounded sole grounding and additive floor
+staging. It fixes glTF retarget import timebases and fractional NLA endpoints,
+adds separate `playback_speed`, and includes the new Blender component and
+end-to-end job tests in CI. Legacy retargeting stays the default.
 
-You need:
+**Technical transfer is not proof of natural performance.** The current source
+moonwalk has not been turned into authentic human footwork by these fixes.
+Video-to-mocap and live streaming are **not implemented**. The researched next
+steps are in [Real-performance capture roadmap](docs/CAPTURE_ROADMAP.md).
 
-- **Python 3.11+**
-- **local Codex**
-- **Blender**
-- a **working Blender MCP connection** for live scene work
+[Retarget validation and limitations](docs/RETARGET_ACCEPTANCE.md) identifies the
+exact tested runtime. Release publication is gated by the complete CI suite;
+public installer checks run after publishing. An installed copy does not update
+just because source changes on GitHub.
 
-The Teaching Overlay is optional. Keep your current model provider and MCP setup—the installer does not replace or rewrite them.
+## Before installation
 
-## Install on Windows — one copy/paste
+You need Python 3.11+, local Codex, Blender, and an existing functioning Blender
+MCP connection for live scene work. The optional teaching overlay is not required.
+The installer adds this skill, not Python, Blender, model accounts or another MCP
+server. It does not change your Codex provider, MCP declarations, Blender
+preferences, credentials or projects. Use the same OS environment as Codex;
+native Windows and WSL have different home directories.
 
-Open PowerShell and paste:
+## Windows: install or update
+
+Run this in PowerShell, not inside Blender:
 
 ```powershell
 $installer = Join-Path $env:TEMP ("bad-install-" + [guid]::NewGuid().ToString("N") + ".ps1")
-Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.4.0/install.ps1" -OutFile $installer
+Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.5.0/install.ps1" -OutFile $installer
 powershell -NoProfile -ExecutionPolicy Bypass -File $installer
 ```
 
-No Git clone, `pip install`, administrator account, or extra API key is required. `ExecutionPolicy Bypass` applies only to that installer process; it does not change the machine-wide policy.
-
-The bootstrap downloads the **pinned v0.4.0 release**, verifies its SHA256, runs the offline checks, installs the complete managed skill/runtime, detects Blender from conventional locations, creates the separate asset library, and saves local paths.
-
-If Python is installed in a non-standard place:
+For an existing managed installation, use the downloaded **v0.5.0** script with
+`-Update` instead of the last command above:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $installer -PythonPath "C:\Path\To\python.exe"
+powershell -NoProfile -ExecutionPolicy Bypass -File $installer -Update
 ```
 
-If Blender is portable/custom:
+It protects edited/unowned destinations and backs up a previous managed install.
+Your external asset library is preserved. An old downloaded script still selects
+its old version; downloading the new script is intentional.
+
+No Git clone, pip install, administrator account or extra API key is needed.
+Bypass applies only to the child installer process. Review [install.ps1](install.ps1)
+and [install.py](install.py) before execution. The release ZIP is verified against
+its published SHA256; this is integrity checking, not an independent signature.
+
+For a custom or Blender-bundled interpreter, append `-PythonPath` with its actual
+absolute path. Do not depend on the Microsoft Store placeholder `python` alias.
+For a custom Blender installation, append `-BlenderPath`.
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $installer -BlenderPath "D:\Apps\Blender\blender.exe"
+powershell -NoProfile -ExecutionPolicy Bypass -File $installer -Update -PythonPath "C:\Path\To\python.exe" -BlenderPath "D:\Apps\Blender\blender.exe"
 ```
 
 ## macOS / Linux
@@ -48,111 +75,117 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $installer -BlenderPath "D:\
 ```sh
 installer=$(mktemp)
 curl --fail --silent --show-error --location --proto '=https' \
-  https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.4.0/install.sh \
-  -o "$installer"
+  https://raw.githubusercontent.com/raal1600/blender-asset-director/v0.5.0/install.sh -o "$installer"
 sh "$installer"
+# Existing managed installation: use sh "$installer" --update instead.
 ```
 
-Set `BAD_PYTHON` if you want to select an explicit Python 3.11+ interpreter.
+Use `BAD_PYTHON` for an explicit Python 3.11+ interpreter. [Full installation,
+paths, offline packages and troubleshooting](docs/INSTALL.md).
 
-## Then open a new Codex session
+## First run in a fresh local Codex session
 
-Paste this into **Codex**, not PowerShell:
+With Blender open and its existing addon connection running, paste into Codex:
 
 ```text
 $blender-asset-director
-Run the first-run check. Verify the existing Blender MCP read-only.
-Do not modify my scene. Tell me exactly what is ready or missing.
+Run the first-run check and verify the existing Blender MCP read-only.
+Do not modify or save the scene. Report exactly what is ready or missing.
 ```
 
-This is the local acceptance step. The installer can prove the skill files, paths, Python and Blender executable are available, but only the fresh Codex session can prove that Codex discovers the skill and can actually query your live Blender MCP.
+Installation, addon configuration and live connection are different checks.
+A successful background Blender job does not prove the live GUI/MCP is connected.
+Use the registered interpreter and actual saved runtime paths. Do not restart or
+reload Blender over unsaved work merely to repair connectivity.
 
-## First safe scene test
-
-With Blender open, try:
+## Try it safely
 
 ```text
 $blender-asset-director
-Improve the lighting and framing of my selected object.
-Inspect the scene first. Preserve the original .blend and work on a separate copy.
-Do not change geometry or replace existing materials.
-Render one small CPU preview and report exactly what changed.
+Improve the lighting and framing of my selected object. Inspect first, preserve
+my original file and use a separate working copy. Reuse existing geometry and
+materials. Render one small CPU preview and report what changed.
 ```
 
-For a broader test:
+For an asset/motion task:
 
 ```text
 $blender-asset-director
-Turn the currently open Blender project into a cinematic showcase.
-Inspect the actual scene first. Reuse suitable existing assets and search only for genuinely missing elements.
-Preserve the original file, use a working copy, keep previews small, and do not use paid services.
+Inspect this character and find a suitable sourced motion for the requested
+performance. Search the local catalog, then supported external providers for
+real gaps. Review the source before retargeting. Do not treat its filename as
+proof of the action or ask me for a file before checking supported sources.
+Preserve my original and keep technical, temporal and human review separate.
 ```
 
-## What installation changes
+Search capabilities are provider-specific: Poly Haven and ambientCG have free
+API routes; Sketchfab search and authenticated download are separate; the free
+Quaternius Standard pack is a specific source, not a universal animation search.
+Mixamo and other unsupported integrations require approved host tools or manual
+intake. No private API scraping or bypassing authentication. See [provider
+contracts](skills/blender-asset-director/references/providers.md).
+
+## What is stored where
 
 | Location | Purpose |
 |---|---|
-| `~/.agents/skills/blender-asset-director` | Managed Codex skill, role references, bundled runtime, notices |
-| `~/CGI-Library` by default | Asset catalog, downloads, animations, previews and working jobs |
-| OS-local `runtime.json` | Library, Blender, Python and skill paths only |
+| `~/.agents/skills/blender-asset-director` | Managed skill, role references, bundled runtime and notices |
+| `~/CGI-Library` by default | Asset catalog, source files, prepared assets, previews and jobs |
+| OS-local `runtime.json` | Python, Blender, skill and library paths only |
 
-The installer **does not modify** Codex provider settings, DeepSeek/OpenAI configuration, MCP declarations, Blender preferences, existing `.blend` projects, credentials, or API keys. It does not bulk-download assets or start rendering user scenes during setup.
+No bulk asset download occurs during installation. Assets and credentials never
+belong in this public source repository. Retarget-backend acquisition is separate
+and happens only for an authorized relevant task.
 
-## How the studio works
+## Reviewed production capabilities
 
-```text
-prompt
-  ↓
-director / producer
-  ↓
-actual scene audit
-  ↓
-reuse / adapt / missing / uncertain
-  ↓
-only the required specialist roles
-  ├─ production design / scout
-  ├─ performance
-  ├─ cinematography
-  ├─ lighting / look development
-  ├─ editorial / finishing
-  └─ continuity / QA
-  ↓
-one controlled Blender execution path
-  ↓
-small previews + evidence review
+- Scene/rig/look audits and explicit production contracts, gap queries and role
+  handoffs. Specialists propose; one controlled executor writes a new working file.
+- Local/provider search, license/provenance evidence, bounded downloads, indexing,
+  hashes and repeat-job reuse.
+- Perspective animated `camera-plan`, static `camera-fit`, projection/roll/limited
+  occlusion checks; no claim of continuous swept collision safety.
+- `light-adjust`, `world-adjust`, `look-adjust`, `look-audit`, additive `light-rig`.
+  Unsupported world graphs are refused instead of rewritten. Existing materials
+  are not edited by these operations.
+- Opt-in evaluated world-pose `retarget` requires explicit mapping, reference
+  alignment and one translation anchor. Fixed transforms/unconstrained chains
+  remain restrictions. Optional ground correction is vertical-only, not foot IK.
+- `stage-floor` adds one explicitly sized horizontal mesh and two new matte
+  materials. The production-design `set` role owns this scoped creation.
+- NLA clips accept `playback_speed`; a 0.8 speed plays a one-second take over
+  1.25 seconds. Frame-coordinate FPS is not a speed control. Fractional end keys
+  remain intact, but the scene range excludes uncovered integer rest frames.
+- Bounded CPU previews restore production render settings and are labelled
+  `PREVIEW_ARTIFACT`, never a delivery master.
+
+[Job contracts](skills/blender-asset-director/references/jobs.md) ·
+[Grounded motion and timing](skills/blender-asset-director/references/grounded-motion.md) ·
+[Motion source/transfer policy](skills/blender-asset-director/references/motion.md).
+
+Naturalness, timing, footwork, seamless loops and semantic action suitability
+require motion review. The new retarget/NLA reports explicitly leave performance
+acceptance unevaluated. Eight still images cannot prove temporal smoothness.
+No paid calls, local AI inference, new capture service or device streaming is
+silently introduced. Default production limits remain eight CPU preview frames
+and two repairs, tracked across jobs by the host.
+
+## Tests, maintenance and removal
+
+The completion runtime passed 223 unit tests and ten CI jobs: three Python/OS
+configurations, three real Blender versions (4.5.3, 5.0.0, 5.2.1) and four bootstrap
+configurations. New CI steps run evaluated-pose, sole-topology/floor, and full
+retarget/ground/NLA/floor/camera/preview regressions. Live free-provider/source-motion
+checks run on Blender 5.0.0. [Exact evidence](docs/RETARGET_ACCEPTANCE.md).
+
+From a source checkout:
+
+```sh
+python tools/run_checks.py --offline
+python tools/install_skill.py --configure
 ```
 
-The host model interprets creative meaning. The deterministic runtime validates object references, production contracts, source licenses, job identity, resource budgets, and evidence. Technical validation is not a beauty score, and a text-only model cannot claim visual acceptance of rendered frames.
-
-## Camera work and preview artifacts
-
-`camera-fit` remains the locked-off technical fit. `camera-plan` authors a deliberate move from host-supplied values - frame checkpoints, a world `position` or a `direction` with `distance`/`fit`, an aim (subject with optional bounds fractions, or an explicit world point), lens per plan or per checkpoint, the normalized `screen` position the aim should occupy, and optional roll, focus and interpolation - then verifies every checkpoint with real projection. Explicit point aims need no scene object and are verified exactly like subject aims, and mixed plans are supported. Orientation is solved as a roll-free frame, so zero requested roll measures zero and a nonzero roll measures back to the requested value while the aim point stays on its requested screen position. It creates a new camera or adapts an existing one, preserving that camera's earlier action in a muted NLA track. It will not choose a lens, duration, frame rate or format for you, it refuses orthographic plans rather than approximating them, and a smaller `fit` margin does not guarantee a larger subject when the aim sits off-centre.
-
-Preview renders exist to bound CPU cost. A preview job records the project's own engine, resolution, resolution percentage, samples, output path/format, thread settings and frame, restores them before saving, and labels its result `PREVIEW_ARTIFACT` with `delivery_master: false`. Keep a working/master `.blend` and any final delivery render separate from preview output; nothing renders a whole sequence automatically.
-
-## Lighting and look development
-
-Look work is explicit and reversible. `look-audit` reports what exists and what is safely editable; `light-adjust` adapts observed lights (energy, color, per-light exposure, temperature, size/shape, sun angle, spot cone, soft radius, location/rotation, render visibility) and rejects properties that are not meaningful for that light type instead of storing values Blender would ignore; `world-adjust` edits the active world's background strength and colour only where the graph is a single unlinked Background node; `look-adjust` sets exposure, gamma, view transform, look, display device and white balance where the running Blender exposes it. Enum and range validity are checked against the running version at execution time - nothing is silently clamped or substituted, and complex world graphs are refused (`WORLD_GRAPH_UNSUPPORTED`, `WORLD_COLOR_LINKED`) rather than rewritten. `light-rig` remains the additive CREATE path.
-
-Every mutation reports `classification` (PRESERVE is the absence of an operation), a full `before_snapshot` and `after_snapshot` (lights with properties, world state, colour management, render engine, material set), the values Blender measured back, and isolation guarantees for unrelated lights, the world and materials. Materials are never mutated by look operations. Numbers are not a beauty score: look acceptance still requires rendered before/after images and an image-capable reviewer.
-
-## Asset and animation support
-
-The current toolkit supports local catalog search, Poly Haven, ambientCG, Sketchfab search/authenticated acquisition, and a verified Quaternius animation-pack route. Mixamo, BlenderKit and Poly Pizza remain host-tool/manual acquisition paths where appropriate; private APIs are not scraped.
-
-Animation tooling includes source indexing, rig inspection, pinned retargeting backend support, NLA assembly, root-motion handling and numerical QA. Root-height terrain following is **not** full foot IK, and arbitrary production rigs still require local visual acceptance.
-
-## Update / verify / remove
-
-Re-run the v0.4.0 installer with `-Update` when updating a different managed installation:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File $installer -Update
-```
-
-Managed updates back up the prior version and refuse to overwrite edited or unowned skill directories.
-
-Useful installed commands:
+From the installed runtime (substitute its actual path and working interpreter):
 
 ```text
 python <installed-skill>/scripts/director.py doctor
@@ -160,14 +193,8 @@ python <installed-skill>/scripts/manage_install.py --dest <installed-skill> --ve
 python <installed-skill>/scripts/manage_install.py --dest <installed-skill> --uninstall
 ```
 
-Uninstall preserves the external asset library and local path settings.
-
-## Tests and evidence
-
-The release pipeline separately verifies unit/policy/studio/setup tests, Windows PowerShell 5.1 and 7 bootstraps, macOS/Linux bootstraps, Blender 4.5.3, 5.0.0 and 5.2.1 fixtures, live asset/source-motion checks, release publication, and anonymous public installation from the published release.
-
-The v0.3.0 release added a Blender fixture (`tools/camera_fixture.py`) that authors camera moves on synthetic scenes with unrelated names, aspects, sensor fits, frame rates and lenses; validates an establishing-to-closer move whose subject changes screen position; confirms that adapting a constrained camera preserves its prior action and refuses a kept constraint that would defeat the authored aim; and proves a real preview job saves a `.blend` whose resolution, percentage, engine, samples, output format/path, thread settings and frame are the project's own rather than the preview's. v0.3.1 extends it with all-point-aim plans (constant and changing lens, create and adapt mode), an explicit camera-check call with point targets, and roll cases covering zero roll on centred and aggressively off-centre targets, explicit positive and negative roll, and a roll ramp across one move. v0.4.0 adds `tools/look_fixture.py`: adapting point/area/sun/spot lights, additive lights, exposure, gamma, a runtime-discovered view transform, white balance where available, safe world strength/colour edits, graded refusal of linked and ambiguous world graphs with the graph left intact, per-type property rejections, snapshot evidence and preview-settings restoration after a look adjustment. Unit coverage for the camera-plan, target and look contracts runs on every unit target.
-
-The v0.2.2 release specifically fixes the environment-dependent `test_job_missing_blender_actionable` failure reported by a real Windows installation using Blender-bundled Python. The corrected test now mocks Blender discovery **before** local configuration is created, so it tests the missing-Blender branch independently of the host machine.
-
-See [setup acceptance](docs/SETUP_ACCEPTANCE.md), [studio acceptance](docs/ACCEPTANCE.md), [installation details](docs/INSTALL.md), [design](docs/DESIGN.md), [security](SECURITY.md), and [third-party notices](THIRD_PARTY_NOTICES.md).
+Uninstall preserves the asset library and local path settings. Never manually edit
+a job/receipt to bypass hashes after an upgrade; prepare new jobs against current
+code and inputs. Cloud tests do not certify your current GUI state or artistic
+output. [Resume](docs/RESUME.md) · [Security](SECURITY.md) ·
+[Design](docs/DESIGN.md) · [Third-party notices](THIRD_PARTY_NOTICES.md).

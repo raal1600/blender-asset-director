@@ -1,13 +1,11 @@
 {
   "schema_version": 1,
-  "scope": "Published release identity, not a hash list for later moving-main documentation",
-  "version": "0.2.1",
-  "release_tag": "v0.2.1",
-  "source_commit": "7d19b6d53726bb861b15e8eca3500ccd575660f4",
-  "release_url": "https://github.com/raal1600/blender-asset-director/releases/tag/v0.2.1",
-  "archive": "blender-asset-director-0.2.1.zip",
-  "archive_sha256": "1c773a32e0c49bdb82f90a04db34f1e903a0cffc1b8876bc0b48611653de101d",
-  "verification": "Compare release ZIP to SHA256SUMS.txt, then check _release.json version and commit. Installed receipts cover bundled runtime files.",
+  "scope": "Verification procedure; exact bytes and commit are recorded by each published release",
+  "version": "0.5.0",
+  "release_tag": "v0.5.0",
+  "verification": "Verify release archive against that release SHA256SUMS.txt, then inspect _release.json. Installed receipts separately cover installed runtime files. A release request is not proof of publication.",
+  "implementation_commit": "7820ec90c215ce2a16cf8fa8e975643202143371",
+  "validation_run": "https://github.com/raal1600/blender-asset-director/actions/runs/34788489612",
   "historical_manifest": "docs/SOURCE_MANIFEST_0_1.json",
-  "historical_note": "The old 0.1.0 candidate file list is retained as historical evidence, not used to verify this release. The already published ZIP still contains its historical snapshot; bootstrap verification uses the release checksum, not this source manifest."
+  "capture_status": "RESEARCH_ONLY_NOT_IMPLEMENTED"
 }

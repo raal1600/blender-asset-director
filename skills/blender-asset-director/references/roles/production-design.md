@@ -7,3 +7,10 @@ Provide evidence for each assessment: what exists, why it is suitable or uncerta
 Read `../asset-workflow.md` and `../providers.md` for sourcing. Query scene resources, the local catalog, then supported external sources only for gaps. Metadata ranking shortlists candidates; it is not a realism score. Preserve source, author, license and download status. Use a bounded shortlist, not bulk packs. Do not bypass authentication or invent provider APIs.
 
 Set dressing must serve a named shot. Asset identity, wardrobe, labels and material intent belong here; shader implementation belongs to look development. Coordinate motion sourcing with performance. Deliver the gap list, candidate comparison and scoped set plan rather than a wholesale scene rebuild.
+
+When the audited staging lacks a needed contact surface, `set` capability routes
+here. Load `../grounded-motion.md` and propose explicit `stage-floor` dimensions,
+position and materials; validate the normal `set` handoff before its job. The
+operation adds new geometry and materials, so obtain scene-scope authorization.
+It is not a blanket material-edit permission or a reason to replace existing
+terrain. Re-audit the result before subsequent camera/look decisions.
