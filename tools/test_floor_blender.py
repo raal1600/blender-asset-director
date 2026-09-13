@@ -31,4 +31,17 @@ r=create(dict(size=[4,6],location=[1,2,0],color=[.2]*3,grid_color=[.22]*3,tile_s
 assert set(bpy.data.objects)-existing=={bpy.data.objects[r['floor']]}
 assert r['faces']==24 and before==[tuple(v.co) for v in mesh.vertices]
 assert len(mesh.materials)==0
+# Same-count deform modifiers are not proof of stable selected vertex indices.
+unsupported=obj.modifiers.new('UnreviewedDeform','SMOOTH')
+try:
+    contact.minimum()
+    raise AssertionError('An unreviewed modifier was accepted')
+except DirectorError as e:assert e.code=='CONTACT_MODIFIER_UNSUPPORTED'
+obj.modifiers.remove(unsupported)
+# Same vertex count but changed connectivity must be refused.
+mesh.clear_geometry();mesh.from_pydata([(-.1,-.1,.2),(.1,-.1,.2),(.1,.1,.2),(-.1,.1,.2)],[],[(0,1,2),(0,2,3)])
+try:
+    contact.minimum()
+    raise AssertionError('Same-count topology replacement was accepted')
+except DirectorError as e:assert e.code=='CONTACT_TOPOLOGY_CHANGED'
 print('FLOOR_CONTACT_REGRESSION_PASS')

@@ -26,6 +26,9 @@ class PoseTransfer:
                             for s in pairs}
         self.target_reference = {t:(target.matrix_world @ target.pose.bones[t].matrix).to_quaternion().to_matrix()
                                  for t in pairs.values()}
+        self.reference_basis = {b.name:b.matrix_basis.copy() for b in target.pose.bones}
+        require(all(max(abs(v-1) for v in b.scale) < 1e-4 for b in target.pose.bones),
+                'TARGET_REFERENCE_SCALE_UNSUPPORTED', 'Target reference pose must use unit scales')
         self.source_origin = None
         self.local_positions = None
         def depth(bone):
@@ -59,8 +62,9 @@ class PoseTransfer:
         solved, result = {}, {}
         for bone in self.order:
             parent = bone.parent
-            inherited = (solved[parent.name] @ parent.matrix_local.inverted() @ bone.matrix_local
-                         if parent else bone.matrix_local.copy())
+            inherited = (bone.convert_local_to_pose(self.reference_basis[bone.name], bone.matrix_local,
+                         parent_matrix=solved[parent.name], parent_matrix_local=parent.matrix_local)
+                         if parent else bone.convert_local_to_pose(self.reference_basis[bone.name], bone.matrix_local))
             desired = inherited.copy()
             name = bone.name
             if name in self.inverse:

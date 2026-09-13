@@ -42,6 +42,9 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
     options = options or {}
     fields(options, OPS[operation])
+    if operation == "assemble":
+        from .motion_timing import validate_assembly
+        validate_assembly(options)
     if operation == "stage-floor":
         from .floor_contract import validate
         validate(options)
@@ -80,7 +83,10 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
             options.setdefault("action", asset.metadata.get("action"))
             if asset.metadata.get("slot") is not None: options.setdefault("slot", asset.metadata["slot"])
             if asset.metadata.get("source_object"): options.setdefault("source_object", asset.metadata["source_object"])
-            if asset.metadata.get("fps"): options.setdefault("source_fps", asset.metadata["fps"])
+            if asset.metadata.get("fps"):
+                require("source_fps" not in options or options["source_fps"] == asset.metadata["fps"],
+                        "SOURCE_TIMEBASE_MISMATCH", "Do not override indexed timebase to change speed; use assemble playback_speed")
+                options.setdefault("source_fps", asset.metadata["fps"])
     if operation in TARGET_REQUIRED:
         require(inputs, "TARGET_REQUIRED", "Operation requires a specific saved working/target file")
     if operation in {"import", "retarget"}: require(source_files, "SOURCE_REQUIRED", "Operation requires an acquired asset ID")

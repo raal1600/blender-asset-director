@@ -126,7 +126,7 @@ def execute(job_path, *, live=False):
                     require(len(primary) == 1, "SOURCE_AMBIGUOUS", "Select an indexed clip, not an ambiguous archive")
                     f = primary[0]
                 before_actions = set(bpy.data.actions)
-                created = ops.import_file(lib.verify_file(f), package_root(lib,f))
+                created = ops.import_file(lib.verify_file(f), package_root(lib,f), frame_fps=options.get("source_fps"))
                 new_actions = set(bpy.data.actions) - before_actions
                 rigs = [o for o in created if o.type == "ARMATURE"]
                 selected_rigs = [o for o in rigs if o.name == options.get("source_object")]

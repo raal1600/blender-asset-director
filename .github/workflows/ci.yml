@@ -1,7 +1,7 @@
 name: Asset Director Tests
 on:
   push:
-    branches: [main]
+    branches: [main, 'fix/**']
   pull_request:
   workflow_dispatch:
   workflow_call:
@@ -74,6 +74,15 @@ jobs:
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/look_fixture.py -- "$RUNNER_TEMP/look-fixtures"
           cp "$RUNNER_TEMP/look-fixtures/look_report.json" evidence/
+      - name: Evaluated pose, sole topology and bounded floor regressions
+        shell: bash
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/test_pose_transfer_blender.py | tee evidence/evaluated-pose.log
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/test_floor_blender.py | tee evidence/floor-contact.log
+      - name: Retarget timebase, grounding, fractional NLA and presentation job chain
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/retarget_pipeline_fixture.py -- "$RUNNER_TEMP/pipeline-fixtures" "$RUNNER_TEMP/bad-library"
+          cp "$RUNNER_TEMP/pipeline-fixtures/retarget_pipeline_report.json" evidence/
       - name: Live free asset acquisition and real-motion retarget
         if: matrix.blender == '5.0.0'
         run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence

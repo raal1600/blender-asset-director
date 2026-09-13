@@ -12,6 +12,7 @@ from mathutils import Matrix, Vector, Quaternion
 from .core import DirectorError, digest, file_hash, require
 from .motion import identify_roles, rig_fingerprint, mapping_plan, quality
 from .acquire import gltf_dependencies
+from . import motion_timing
 
 
 def flatten(m): return [round(float(x), 8) for row in m for x in row]
@@ -108,13 +109,21 @@ def inspect_scene():
                 "actions": [{"name": a.name, "slots": [s.identifier for s in getattr(a, "slots", [])]} for a in bpy.data.actions]}
 
 
-def import_file(path: Path, package_root: Path, *, selection=None):
+def import_file(path: Path, package_root: Path, *, selection=None, frame_fps=None):
     path = path.resolve()
     before = set(bpy.data.objects)
     extension = path.suffix.lower()
     if extension in {".glb", ".gltf"}:
         gltf_dependencies(path, package_root)
-        bpy.ops.import_scene.gltf(filepath=str(path))
+        scene = bpy.context.scene
+        saved = scene.render.fps, scene.render.fps_base
+        try:
+            if frame_fps is not None:
+                require(motion_timing.number(frame_fps, 1, 240), "INVALID_TIMING", "Invalid glTF import timebase")
+                scene.render.fps = int(frame_fps); scene.render.fps_base = int(frame_fps)/frame_fps
+            bpy.ops.import_scene.gltf(filepath=str(path))
+        finally:
+            scene.render.fps, scene.render.fps_base = saved
     elif extension == ".fbx":
         bpy.ops.import_scene.fbx(filepath=str(path), automatic_bone_orientation=False, use_custom_props=False)
     elif extension == ".obj": bpy.ops.wm.obj_import(filepath=str(path))
@@ -210,7 +219,10 @@ def index_file(path: Path, file_record: dict, options: dict, package_root: Path 
         qa = quality(sampled, report["anatomical_height"], fps) if report["anatomical_height"] else {"status": "HEIGHT_UNKNOWN", "visual_acceptance": "PENDING"}
         clips.append({"file": file_record, "action": action.name, "slot": slot.identifier if slot else None,
                       "source_object": obj.name, "ownership_evidence": evidence, "frame_start": start, "frame_end": end,
-                      "fps": fps, "duration_seconds": (end-start)/fps, "skeleton_fingerprint": report["fingerprint"],
+                      "fps": fps, "duration_seconds": (end-start)/fps,
+                      "timebase": {"frame_coordinate_fps": fps, "native_capture_fps": None,
+                                   "playback_speed": 1, "source": "observed imported action in seconds; capture rate unknown"},
+                      "skeleton_fingerprint": report["fingerprint"],
                       "roles": report["roles"], "curve_count": len(curves(action, slot)), "qa": qa,
                       "sampling": "full integer frames" if end-start <= 240 else "bounded subsample", "samples": sampled})
     return {"clips": clips, "rigs": list(reports.values()), "unassigned_actions": unassigned, "version": bpy.app.version_string}
@@ -263,10 +275,9 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
     start, end = options.get("start", start), options.get("end", end)
     require(end > start, "EMPTY_ACTION", "Invalid source range")
     sfps = options.get("source_fps", bpy.context.scene.render.fps / bpy.context.scene.render.fps_base)
-    tfps = options.get("target_fps", 24)
-    require(1 <= sfps <= 240 and 1 <= tfps <= 120, "INVALID_TIMING", "Unsupported frame rate")
-    n = int(round((end-start) / sfps * tfps)) + 1
-    require(2 <= n <= 361, "RESOURCE_LIMIT", "Retarget only a short source clip (up to 361 output frames)")
+    tfps = options.get("target_fps", bpy.context.scene.render.fps / bpy.context.scene.render.fps_base)
+    bake = motion_timing.bake_samples(start, end, sfps, tfps)
+    n, last_frame = len(bake), bake[-1][0]
     for c in curves(action, slot):
         if c.data_path in {"location", "rotation_euler", "rotation_quaternion", "scale"}:
             ys = [k.co.y for k in c.keyframe_points]
@@ -304,9 +315,7 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
     target.animation_data.action = new
     previous_q = {}
     # Invoke the upstream matrix transfer directly. No generated driver expressions are executed.
-    for i in range(n):
-        f = start + i * sfps / tfps
-        f = min(f, end)
+    for output_frame, f in bake:
         bpy.context.scene.frame_set(math.floor(f), subframe=f-math.floor(f))
         matrices = {}
         if pose_transfer:
@@ -324,54 +333,60 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
             pb.rotation_mode = 'QUATERNION'; pb.location = loc; pb.rotation_quaternion = q
             # Like upstream loc/rotation drivers, do not apply the transfer matrix's unit scale to pose.scale.
             pb.scale = (1,1,1)
-            pb.keyframe_insert("location", frame=i+1, group=name)
-            pb.keyframe_insert("rotation_quaternion", frame=i+1, group=name)
+            pb.keyframe_insert("location", frame=output_frame, group=name)
+            pb.keyframe_insert("rotation_quaternion", frame=output_frame, group=name)
         if ground_contact:
-            ground_contact.apply(i+1)
+            ground_contact.apply(output_frame)
     new.use_fake_user = True
     new["bad_job"] = job_id; new["bad_source_action"] = action.name; new["bad_source_fps"] = sfps; new["bad_target_fps"] = tfps
     new["bad_target_fingerprint"] = tr["fingerprint"]
     for c in curves(new, getattr(target.animation_data, "action_slot", None)):
         for k in c.keyframe_points: k.interpolation = "LINEAR"
     bpy.context.scene.render.fps = int(tfps); bpy.context.scene.render.fps_base = int(tfps) / tfps
-    bpy.context.scene.frame_start = 1; bpy.context.scene.frame_end = n
+    bpy.context.scene.frame_start = 1; bpy.context.scene.frame_end = max(1, math.floor(last_frame))
     bpy.context.scene.frame_set(1)
     after = rig_report(target)
     require(after["fingerprint"] == tr["fingerprint"], "REST_POSE_CHANGED", "Retarget unexpectedly changed the target rest data")
-    samples = samples_for(target, after, 1, n, max_samples=361)
+    samples = samples_for(target, after, 1, last_frame, max_samples=361)
     qa = quality(samples, after["anatomical_height"], tfps)
-    new["bad_in_place_horizontal"] = max(max(s[role][axis] for s in samples)-min(s[role][axis] for s in samples)
-                                         for role in ("root", "hips") for axis in (0,1)) < .02*after["anatomical_height"]
+    new["bad_in_place_horizontal"] = motion_timing.horizontal_span(samples) < .02*after["anatomical_height"]
     # A genuine idle can have stationary feet. Assert pose-key motion separately,
     # but leave locomotion semantics to the clip/quality gate rather than faking a gait.
     ranges=[max(k.co.y for k in c.keyframe_points)-min(k.co.y for k in c.keyframe_points) for c in curves(new,getattr(target.animation_data,"action_slot",None)) if c.keyframe_points]
     require(ranges and max(ranges)>1e-6,"NO_POSE_MOTION","Transfer produced no measurable pose-channel movement")
     return {"action": new.name, "slot": getattr(target.animation_data.action_slot, "identifier", None), "mapping": pairs,
             "source": sr["name"], "target": tr["name"], "target_fingerprint": tr["fingerprint"],
-            "source_fingerprint": sr["fingerprint"], "frames": n, "fps": tfps, "qa": qa, "samples": samples,
+            "source_fingerprint": sr["fingerprint"], "frames": n, "frame_range": [1, last_frame], "fps": tfps,
+            "duration_seconds": (end-start)/sfps, "source_frame_coordinate_fps": sfps,
+            "performance_acceptance": "NOT_EVALUATED", "temporal_visual_review": "REQUIRED",
+            "qa": qa, "samples": samples,
             "ground_contact": ground_contact.report() if ground_contact else None,
             "backend": "evaluated world-pose transfer; explicit alignment and translation anchor" if pose_transfer else "Mwni 2.4.0 direct matrix-transfer adapter; no scripted drivers", "visual_acceptance": "PENDING"}
 
 
 def assemble(target, options, job_id):
     """Conservative NLA assembly. No guessed gait speed or repeating embedded root travel."""
-    clips = options.get("clips")
-    require(isinstance(clips, list) and 1 <= len(clips) <= 4, "INVALID_SEQUENCE", "Specify one to four validated retarget actions")
+    motion_timing.validate_assembly(options)
+    clips = options["clips"]
     target.animation_data_create()
     for track in target.animation_data.nla_tracks: track.mute = True
     target.animation_data.action = None
-    tfps = options.get("fps", 24)
+    tfps = options.get("fps", bpy.context.scene.render.fps / bpy.context.scene.render.fps_base)
     require(1 <= tfps <= 120, "INVALID_TIMING", "Invalid sequence FPS")
     fp = rig_report(target)["fingerprint"]
     strips = []
     for idx, item in enumerate(clips):
-        require(set(item) <= {"action", "slot", "start", "source_fps", "blend_in", "repeat"} and {"action", "start"} <= set(item), "INVALID_SEQUENCE", "Invalid clip fields")
+        require(set(item) <= {"action", "slot", "start", "source_fps", "playback_speed", "blend_in", "repeat"} and {"action", "start"} <= set(item), "INVALID_SEQUENCE", "Invalid clip fields")
         action = bpy.data.actions.get(item["action"])
         require(action and action.get("bad_target_fingerprint") == fp, "INCOMPATIBLE_ACTION", "Use a validated action baked for this exact rig")
         slots = [s for s in action.slots if s.identifier == item.get("slot")] if item.get("slot") else list(action.slots)
         require(len(slots) == 1, "SLOT_AMBIGUOUS", "Specify action slot")
         start, end = action_range(action, slots[0])
-        sfps = item.get("source_fps", action.get("bad_target_fps", tfps))
+        sfps = action.get("bad_target_fps", item.get("source_fps", tfps))
+        require("source_fps" not in item or abs(item["source_fps"]-sfps) < 1e-6,
+                "SOURCE_TIMEBASE_MISMATCH", "source_fps must match baked metadata; use playback_speed for intentional retiming")
+        speed_factor = item.get("playback_speed", 1)
+        scale_factor = motion_timing.strip_scale(sfps, tfps, speed_factor)
         require(1 <= sfps <= 240 and 1 <= item["start"] <= 360, "INVALID_TIMING", "Invalid timeline timing")
         track = target.animation_data.nla_tracks.new(); track.name = f"BAD_{job_id}_{idx}"
         strip = track.strips.new(action.name, int(item["start"]), action)
@@ -381,15 +396,19 @@ def assemble(target, options, job_id):
         require(type(repeat) is int and 1 <= repeat <= 8, "INVALID_SEQUENCE", "Repeat must be 1..8 complete cycles")
         if repeat > 1:
             require(action.get("bad_in_place_horizontal") is True, "ROOT_REPEAT_REVIEW", "Only verified horizontally in-place actions may repeat")
-        strip.scale = tfps / sfps; strip.repeat = repeat
+        strip.scale = scale_factor; strip.repeat = repeat
         strip.extrapolation = "NOTHING"; strip.blend_type = "REPLACE"; strip.use_auto_blend = False
-        strip.blend_in = min(float(item.get("blend_in", 0)), (end-start)*tfps/sfps / 2)
-        strips.append({"action": action.name, "start": strip.frame_start, "end": strip.frame_end, "blend_in": strip.blend_in, "repeat": repeat})
+        strip.blend_in = min(float(item.get("blend_in", 0)), (end-start)*scale_factor / 2)
+        strips.append({"action": action.name, "start": strip.frame_start, "end": strip.frame_end,
+                       "blend_in": strip.blend_in, "repeat": repeat, "source_frame_coordinate_fps": sfps,
+                       "source_duration_seconds": (end-start)/sfps, "playback_speed": speed_factor,
+                       "duration_seconds": (strip.frame_end-strip.frame_start)/tfps})
     require(max(s["end"] for s in strips) <= 361, "RESOURCE_LIMIT", "Sequence exceeds 361 frames")
     bpy.context.scene.render.fps = int(tfps); bpy.context.scene.render.fps_base = int(tfps)/tfps
-    bpy.context.scene.frame_start = 1; bpy.context.scene.frame_end = math.ceil(max(s["end"] for s in strips))
+    first, last = motion_timing.retained_range(strips)
+    bpy.context.scene.frame_start = first; bpy.context.scene.frame_end = last
     report = rig_report(target)
-    data = samples_for(target, report, 1, bpy.context.scene.frame_end, max_samples=361)
+    data = samples_for(target, report, first, last, max_samples=361)
     controller = None
     speed = options.get("controller_speed")
     if speed is not None:
@@ -397,7 +416,7 @@ def assemble(target, options, job_id):
                 "INVALID_SPEED", "Provide a calibrated speed in scene units per second")
         # Range, not only first/last displacement: a looping root can return to its origin.
         h = report["anatomical_height"]
-        span = max(max(s["root"][axis] for s in data)-min(s["root"][axis] for s in data) for axis in (0,1))
+        span = motion_timing.horizontal_span(data)
         require(span <= .02*h, "DOUBLE_ROOT_MOTION", "Embedded horizontal root travel conflicts with a path controller")
         direction = options.get("direction")
         require(isinstance(direction,list) and len(direction)==3 and all(math.isfinite(x) for x in direction), "INVALID_DIRECTION", "Specify a finite world-space direction vector")
@@ -405,7 +424,7 @@ def assemble(target, options, job_id):
         require(abs(direction.z) < 1e-6 and direction.length > 1e-6, "INVALID_DIRECTION", "Use a horizontal nonzero direction; terrain controls height")
         direction.normalize()
         interval = options.get("travel_frames")
-        require(isinstance(interval,list) and len(interval)==2 and 1 <= interval[0] < interval[1] <= bpy.context.scene.frame_end,
+        require(isinstance(interval,list) and len(interval)==2 and first <= interval[0] < interval[1] <= last,
                 "INVALID_TIMING", "travel_frames must bound the moving portion, excluding the stationary idle")
         bpy.context.scene.frame_set(1)
         world = target.matrix_world.copy(); old_parent = target.parent
@@ -433,8 +452,11 @@ def assemble(target, options, job_id):
             controller.keyframe_insert("location",frame=frame)
         for curve in curves(controller.animation_data.action, getattr(controller.animation_data,"action_slot",None)):
             for k in curve.keyframe_points: k.interpolation="LINEAR"
-        data = samples_for(target, report, 1, bpy.context.scene.frame_end, max_samples=361)
-    return {"strips":strips,"qa":quality(data,report["anatomical_height"],tfps),"samples":data,
+        data = samples_for(target, report, first, last, max_samples=361)
+    return {"strips":strips,"frame_range":[first,last],
+            "endpoint_policy":"last integer inside active strips; no padded rest-pose frame",
+            "performance_acceptance":"NOT_EVALUATED", "temporal_visual_review":"REQUIRED",
+            "qa":quality(data,report["anatomical_height"],tfps),"samples":data,
             "root_owner":"single external controller + in-place skeletal motion" if controller else "existing baked skeletal motion",
             "controller":controller.name if controller else None, "terrain_following":"root-height only; no foot IK" if options.get("terrain_object") else "none",
             "transition_visual_review":"PENDING"}
