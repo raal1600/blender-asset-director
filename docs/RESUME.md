@@ -1,6 +1,8 @@
 # Resume the published Codex skill
 
-The current published installer preview is **v0.2.1**, source commit `7d19b6d53726bb861b15e8eca3500ccd575660f4`. Release workflow 34725395309 passed all 13 jobs, including actual public-download installs on Windows, macOS and Linux. Read SETUP_ACCEPTANCE.md and SETUP_TESTS.json for evidence; documentation commits may follow the released code.
+The current published installer preview is **v0.3.0**, release commit `8a1618c29f4b4dc50b745965af13fe26b2b51c71`. Release workflow 34729010327 passed its verify, publish and anonymous public-install jobs on Windows, macOS and Linux. Read SETUP_ACCEPTANCE.md, ACCEPTANCE.md and STUDIO_TESTS.json for evidence; documentation commits may follow the released code.
+
+v0.3.0 adds reviewed animated camera authoring (`camera-plan`): host-supplied checkpoints, placement, aim, lens, normalized screen position, roll, focus and interpolation are solved, keyed and verified with real projection, and `camera-check` samples a move for framing, clip planes, lens/sensor, orientation, screen-target error and bounded occlusion rays. Preview jobs now restore and re-verify the project's own render settings before saving, so a preview artifact cannot become a delivery master. `camera-plan` remains perspective-only and orthographic plans are refused rather than approximated.
 
 The README is the installation entry point. The bootstrap verifies an explicit version's release ZIP, runs offline checks and uses the managed installer. It remembers Blender/library paths without modifying Codex, DeepSeek, MCP or Blender preferences. Python 3.11+, local Codex and a functioning Blender MCP are prerequisites, not secretly installed dependencies. Teaching overlay is optional. Keep assets and credentials outside the public repo.
 

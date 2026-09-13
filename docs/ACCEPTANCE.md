@@ -1,5 +1,25 @@
 # Acceptance evidence — scene-independent studio candidate
 
+## v0.3.0 — animated camera authoring and preview-artifact fix
+
+Tested implementation commit: `8a1618c29f4b4dc50b745965af13fe26b2b51c71`.
+Technical CI: https://github.com/raal1600/blender-asset-director/actions/runs/34729010248 — all ten jobs passed.
+Verified preview release: https://github.com/raal1600/blender-asset-director/releases/tag/v0.3.0 (run 34729010327: verify, publish and anonymous public install on Windows, macOS and Linux all passed; archive SHA256 `e29704738f0b18a2b566a24801f5d95c5b4bd47291e2ef1f7998703262f3ecee`).
+
+| Check | Actual result |
+|---|---|
+| Unit/policy/studio suite | 172 tests passed on Windows/Python 3.11, Ubuntu/Python 3.11 and Ubuntu/Python 3.13 |
+| Blender fixtures | 4.5.3, 5.0.0 and 5.2.1: existing import/retarget/NLA fixtures, generic studio regressions and the new camera fixture all passed |
+| Camera fixture (re-run locally on 5.2.1) | 80 checks: create-mode moves on unrelated names, aspects, sensor fits, frame rates and lenses; establishing-to-closer move with a changing screen position, a per-checkpoint lens change and an animated subject; host-chosen world positions honoured exactly; adapt mode preserving the prior action and refusing a kept constraint that would defeat the authored aim; sampled checkpoints, screen-target error and bounded occlusion rays |
+| Preview-settings regression | A real preview job saved a `.blend` whose resolution, resolution percentage, engine, samples, output format/path, thread settings and frame were re-verified as the project's own |
+| Public install | v0.3.0 installed anonymously on Windows, macOS and Ubuntu runners; runtime doctor, receipt verify and library-preserving uninstall passed |
+
+What this establishes: `camera-plan` authors and verifies explicit camera moves from host-supplied values on synthetic scenes with unrelated names, formats and timebases; the perspective screen-space solve matches Blender's own framing for AUTO, HORIZONTAL and VERTICAL sensor fits on the tested versions; adapting a camera preserves its earlier action and refuses a kept constraint that would silently defeat the authored aim; and preview rendering no longer contaminates the settings of the file it saves.
+
+What this does not establish: `camera-plan` authors perspective cameras only and rejects orthographic plans rather than approximating them; the fixture is synthetic geometry with no rigs, cloth or terrain contact; occlusion evidence is bounded ray testing rather than collision or clearance safety; framing numbers, screen-target errors and successful saves are not an artistic verdict; and no user scene, local Codex/MCP session or human review was involved. Artistic acceptance of any shot remains with the user.
+
+## Earlier recorded run — studio candidate (v0.2.x)
+
 Tested implementation commit: `4af4711981088a0442a1f3d91b73f0456c65775a`.
 GitHub Actions run: https://github.com/raal1600/blender-asset-director/actions/runs/34723246054
 All five jobs completed successfully in that run. This records technical execution, not a claim that arbitrary scenes are artistically accepted.
