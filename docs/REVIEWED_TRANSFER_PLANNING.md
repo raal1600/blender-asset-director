@@ -80,6 +80,13 @@ translation anchor and origin, unit conversion, proportions, facing and any
 explicit grounding request. Target provenance/rights remain unknown when no
 linked evidence exists; the source license is not attributed to the target.
 
+An explicitly justified grounding request may include `subdivisions` (1..8,
+default 1). This densifies only vertical anchor correction on the completed
+action, retaining rotation keys, source timing and the exact final key. The cap
+is measured against the uncorrected action at each checkpoint, not against an
+already partially repaired interpolation. Use separate contact-check samples
+between the correction keys; this is not continuous collision detection or IK.
+
 ## Approval and execution
 
 After inspecting result.json, the host creates a review containing the actual

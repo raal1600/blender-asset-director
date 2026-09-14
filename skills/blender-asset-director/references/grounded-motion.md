@@ -19,6 +19,20 @@ Base and evaluated edge/loop connectivity are fingerprinted, not merely counted.
 Ground correction also rejects source alignment that tilts world Z. These are
 conservative supported-case checks, not a general topology-identity proof.
 
+Optional `subdivisions` (integer 1..8, default 1) adds reviewed contact keys within
+each baked frame interval, including a fractional final interval. Use 4 when a
+measured half-frame defect warrants quarter-frame correction; do not densify
+motion blindly. The pass runs after the uncorrected action is fully baked and
+linearized, changes only anchor-location curves, and verifies its declared
+checkpoints again after all corrections. Rotation keys and duration are retained.
+The cap bounds total vertical displacement from the original uncorrected action,
+not merely the residual correction after neighboring keys. Sampling is bounded
+to 2,881 checkpoints and 50 million explicit mesh-vertex evaluations.
+
+Reports separate integer/subframe verified clearances. These are checkpoint
+results, not a continuous-contact guarantee; independently sample between the new
+keys as well. A changed subdivisions value requires a new transfer plan/review.
+
 Do not use this correction for jumps, steps, uneven terrain or arbitrary motion.
 It does not implement pressure, horizontal foot locking or IK. Subsequent NLA
 retiming interpolates the baked poses, so recheck contact on the final timebase.

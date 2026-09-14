@@ -346,13 +346,13 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
             pb.scale = (1,1,1)
             pb.keyframe_insert("location", frame=output_frame, group=name)
             pb.keyframe_insert("rotation_quaternion", frame=output_frame, group=name)
-        if ground_contact:
-            ground_contact.apply(output_frame)
     new.use_fake_user = True
     new["bad_job"] = job_id; new["bad_source_action"] = action.name; new["bad_source_fps"] = sfps; new["bad_target_fps"] = tfps
     new["bad_target_fingerprint"] = tr["fingerprint"]
     for c in curves(new, getattr(target.animation_data, "action_slot", None)):
         for k in c.keyframe_points: k.interpolation = "LINEAR"
+    if ground_contact:
+        ground_contact.correct([frame for frame, _ in bake])
     bpy.context.scene.render.fps = int(tfps); bpy.context.scene.render.fps_base = int(tfps) / tfps
     bpy.context.scene.frame_start = 1; bpy.context.scene.frame_end = max(1, math.floor(last_frame))
     bpy.context.scene.frame_set(1)

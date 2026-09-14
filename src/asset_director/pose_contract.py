@@ -36,7 +36,9 @@ def validate(config):
         require(max(abs(r[i]) for i in (2,5,6,7)) < 1e-5 and abs(r[8]-1) < 1e-5,
                 'GROUND_ALIGNMENT_REVIEW', 'Ground correction requires a world-Z-preserving alignment, not tilted travel')
         ground=config['ground_contact']
-        fields(ground, {'mesh','vertex_groups','height','max_correction'}, {'mesh','vertex_groups','height','max_correction'})
+        fields(ground, {'mesh','vertex_groups','height','max_correction','subdivisions'}, {'mesh','vertex_groups','height','max_correction'})
+        from .ground_sampling import validate_subdivisions
+        validate_subdivisions(ground.get('subdivisions', 1))
         require(isinstance(ground['mesh'],str) and ground['mesh'].strip(), 'INVALID_GROUND_CONTACT','Name the skinned mesh')
         names=ground['vertex_groups']
         require(isinstance(names,list) and 1<=len(names)<=16 and all(isinstance(n,str) and n.strip() for n in names) and len(set(names)) == len(names),

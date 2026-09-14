@@ -100,6 +100,10 @@ jobs:
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/transfer_planning_fixture.py -- "$RUNNER_TEMP/transfer-planning" "$RUNNER_TEMP/bad-library"
           cp "$RUNNER_TEMP/transfer-planning/transfer_planning_report.json" evidence/
+      - name: Bounded subframe grounding, rotation preservation and total correction cap
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/ground_contact_fixture.py -- "$RUNNER_TEMP/ground-contact"
+          cp "$RUNNER_TEMP/ground-contact/ground_contact_report.json" evidence/
       - name: Live free asset acquisition and real-motion retarget
         if: matrix.blender == '5.0.0'
         run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence
