@@ -81,3 +81,8 @@ No safely bound multi-window playback controller is included. Use only actually
 available approved host UI tools with explicit process/window/file binding, or
 report the limitation. Do not start a service or arbitrary command channel, switch
 an unrelated unsaved scene, or delete a root control to hide its display.
+
+For showing or styling bones, load `references/bone-display.md`. Audit actual
+custom shapes and per-bone overrides before explaining their appearance.
+`bone-display` creates a display-only derived copy through the reviewed executor;
+configured display and advancing frames are not proof of a visually verified view.

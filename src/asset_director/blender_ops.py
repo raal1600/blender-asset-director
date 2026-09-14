@@ -92,6 +92,8 @@ def rig_report(obj, reviewed_roles=None):
               "constrained_bones": constrained, "drivers": len(obj.animation_data.drivers) if obj.animation_data else 0,
               "attachments": [{"name": o.name, "parent_type": o.parent_type, "bone": o.parent_bone} for o in bpy.data.objects if o.parent == obj and o not in meshes]}
     report["readiness"] = "NEEDS_RIGGING" if not weighted else "MAPPING_REVIEW_REQUIRED" if roles["missing"] or roles["ambiguous"] or constrained else "RETARGETABLE"
+    from .bone_display import audit as display_audit
+    report['bone_display'] = display_audit(obj)
     return report
 
 

@@ -61,7 +61,10 @@ def execute(job_path, *, live=False):
             require(isinstance(embedded, list) and set(embedded) <= set(spec.get("license_grants", [])),
                     "LICENSE_SCOPE_MISMATCH", "Restricted working scene needs its originating library lineage")
             files = spec["source_files"]
-            if op == "transfer-plan":
+            if op in {'bone-display-audit', 'bone-display'}:
+                from asset_director import bone_display
+                data = bone_display.inspect(options) if op == 'bone-display-audit' else bone_display.apply(options)
+            elif op == "transfer-plan":
                 from asset_director.transfer_blender import propose
                 data = propose(lib, spec)
             elif op == "contact-check":

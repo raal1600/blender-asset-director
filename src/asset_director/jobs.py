@@ -11,8 +11,11 @@ from . import camera_plan
 from . import look_contract
 from . import motion_contract
 from . import transfer_contract
+from . import bone_display_contract
 
 OPS = {
+    "bone-display-audit": bone_display_contract.AUDIT_FIELDS,
+    "bone-display": bone_display_contract.DISPLAY_FIELDS,
     "transfer-plan": transfer_contract.PLAN_FIELDS,
     "contact-check": transfer_contract.CONTACT_FIELDS,
     "stage-floor": {"size", "location", "color", "grid_color", "tile_size", "roughness"},
@@ -34,9 +37,9 @@ OPS = {
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage"},
 }
-MUTATIONS = {"native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
+MUTATIONS = {"bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
              "light-adjust", "world-adjust", "look-adjust", "light-rig"}
-TARGET_REQUIRED = {"transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
+TARGET_REQUIRED = {"bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
                    "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 
 OPS.update(motion_contract.OPS)
@@ -52,6 +55,7 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
     options = copy.deepcopy(options or {})
     fields(options, OPS[operation])
+    if operation in {'bone-display-audit', 'bone-display'}: bone_display_contract.validate(operation, options)
     if operation == "transfer-plan": transfer_contract.plan(options)
     if operation == "contact-check": transfer_contract.contact(options)
     if operation == "camera-check": transfer_contract.camera_check(options)

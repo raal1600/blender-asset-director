@@ -25,6 +25,11 @@ budget or pretend an image-only host watched a video. For sliding dance moves,
 distinguish deliberately gliding feet from planted support before any cleanup.
 No video-to-mocap or real-time capture provider is implemented by this release.
 
+For skeleton presentation load `../bone-display.md`. Inspect custom bone widgets
+before describing spherical shapes as anatomical joints. Use reviewed display
+operations and preserve custom-shape references, rest data, skinning and actions.
+Never equate a configured style with an actually inspected viewport.
+
 ## Canonical motion / body fitting
 
 Load `../motion-foundation.md` for the new contracts. Use motion-scout before
