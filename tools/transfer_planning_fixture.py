@@ -1,6 +1,8 @@
 """Real Blender planning/approval/transfer with generated data, never user assets.
 
 Run factory background Blender: -- OUTPUT_DIRECTORY DISPOSABLE_LIBRARY.
+Append custom to use deliberately unrecognizable target bone names and an
+explicit reviewed semantic map. Use a fresh output/library pair for each run.
 Existing pinned retarget backend required; no downloads inside this fixture.
 """
 from pathlib import Path
@@ -60,7 +62,7 @@ def skin_signature(obj):
                    'groups':[g.name for g in obj.vertex_groups]})
 
 
-def main(out,library):
+def main(out,library,custom_roles=False):
     assert bpy.app.background
     out=Path(out).resolve();out.mkdir(parents=True,exist_ok=True);checks=[]
     def passed(name,**data):
@@ -86,6 +88,12 @@ def main(out,library):
     t=time.time()-10;os.utime(source_path,(t,t));source_hash=file_hash(source_path)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     target,target_skin,tn=make_rig('Other_Character','target',1.18)
+    if custom_roles:
+        for i,(role,old) in enumerate(list(tn.items())):
+            new=f'Joint_{i:03d}_CUSTOM'
+            target.data.bones[old].name=new
+            tn[role]=new
+        assert ops.rig_report(target)['anatomical_height'] is None
     target_name,skin_name=target.name,target_skin.name
     target.rotation_euler.z=math.radians(67);target.location=(3,2,0)
     target.pose.bones[tn['head']].rotation_mode='XYZ'
@@ -111,6 +119,10 @@ def main(out,library):
         parent=lib.get(synced['roots'][0]['assets'][0]['asset_id']);clip=lib.get(parent.metadata['indexed_clips'][0])
         plan_options=dict(target_object=target_name,source_meters_per_unit=1,target_meters_per_unit=1,
                           target_fps=30,root_mode='morphology_scaled',facing={'mode':'anatomical'},check_count=65)
+        if custom_roles:
+            plan_options['target_roles']={k:v for k,v in tn.items() if k!='root'}
+            fails(lambda:ops.rig_report(target,{'head':'absent'}),'MAPPING_REVIEW_REQUIRED')
+            fails(lambda:ops.rig_report(target,{'head':tn['head'],'hips':tn['head']}),'MAPPING_REVIEW_REQUIRED')
         planned,p,pdir=run('transfer-plan',target_path,clip.id,plan_options)
         assert p['status']=='REVIEW_REQUIRED' and len(p['mapping'])==52,p['mapping']
         assert p['retarget_options']['pose_space']['translation_bone']==tn['hips']
@@ -138,6 +150,17 @@ def main(out,library):
         assert ops.rig_report(target)['fingerprint']==target_fingerprint and skin_hash==skin_signature(skin)
         assert original_action_name in bpy.data.actions
         assert all(max(abs(v-1) for v in pb.scale)<1e-5 for pb in target.pose.bones)
+        assert data['qa_roles']==p['target_roles']
+        assert math.isfinite(data['qa_anatomical_height']) and data['qa_anatomical_height']>0
+        assert all(k in data['samples'][0] for k in ('hips','foot_l','foot_r'))
+        if custom_roles:
+            assert ops.rig_report(target)['anatomical_height'] is None
+            bpy.context.scene.frame_set(1)
+            evaluated=target.evaluated_get(bpy.context.evaluated_depsgraph_get())
+            for role in ('hips','foot_l','foot_r'):
+                measured=evaluated.matrix_world@evaluated.pose.bones[tn[role]].head
+                assert (measured-Vector(data['samples'][0][role])).length<1e-5
+            passed('custom-named rig uses bound reviewed roles for evaluated QA without renaming or metadata mutation')
         assert not any(c.keyframe_points for c in ops.curves(target.animation_data.action,target.animation_data.action_slot) if tn['root'] in c.data_path)
         passed('existing mesh/weights/rest/action, unit scales, timing, root and grants preserved')
         asset,src,act=tb.import_source(lib,planned['specification']);ops.assign(src,act,clip.metadata.get('slot'))

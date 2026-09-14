@@ -309,6 +309,9 @@ def verify_execution(lib, source, target, action, slot_id, options):
     ops.assign(source,action,slot_id)
     require(action_signature(action,source.animation_data.action_slot)==proposal['source_checks']['curve_signature'],
             'STALE_TRANSFER_BINDING','Selected action curves/slot changed since review')
+    # Only pass roles from the immutable proposal after world, rig and action
+    # binding checks. Do not infer them again from custom bone names at QA time.
+    return {key: dict(proposal[key+'_roles']) for key in ('source', 'target')}
 
 
 def contact_check(options):

@@ -159,8 +159,8 @@ def execute(job_path, *, live=False):
                     matches = [a for a in new_actions if re_original(a.name) == re_original(options.get("action", ""))]
                 require(len(matches) == 1, "ACTION_AMBIGUOUS", "Choose the actual indexed source action")
                 from asset_director.transfer_blender import verify_execution
-                verify_execution(lib, source, target, matches[0], options.get("slot"), options)
-                data = ops.retarget(source, target, matches[0], options.get("slot"), options, backend.verify(lib), job["id"])
+                reviewed_roles = verify_execution(lib, source, target, matches[0], options.get("slot"), options)
+                data = ops.retarget(source, target, matches[0], options.get("slot"), options, backend.verify(lib), job["id"], reviewed_roles=reviewed_roles)
                 for o in created: bpy.data.objects.remove(o, do_unlink=True)
                 for a in new_actions: bpy.data.actions.remove(a)
             elif op in {"assemble", "qa"}:

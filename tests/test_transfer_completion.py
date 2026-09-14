@@ -2,7 +2,7 @@
 import copy
 import unittest
 from asset_director.core import DirectorError
-from asset_director.motion import identify_roles, frame_convert
+from asset_director.motion import identify_roles, frame_convert, quality
 from asset_director.contact_diagnostics import summarize
 import test_transfer_planning as fixtures
 chain = fixtures.chain
@@ -82,6 +82,12 @@ class ContactCompletion(unittest.TestCase):
 
 
 class MatchedTimeRegression(unittest.TestCase):
+    def test_missing_or_invalid_qa_scale_is_structured_error(self):
+        for height, fps in ((None,30),(2,None),('2',30),(True,30),(2,True),(float('nan'),30),(2,float('inf'))):
+            with self.subTest(height=height,fps=fps), self.assertRaises(DirectorError) as caught:
+                quality([],height,fps)
+            self.assertEqual(caught.exception.code,'INVALID_SCALE')
+
     def test_shifted_fbx_start_is_not_equal_frame_comparison(self):
         self.assertEqual(frame_convert(17,30,30,source_start=1,target_start=2),18)
 

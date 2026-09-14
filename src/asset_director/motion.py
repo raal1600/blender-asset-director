@@ -70,7 +70,9 @@ def frame_convert(frame: float, source_fps: float, target_fps: float, source_sta
     return target_start + (frame-source_start) * target_fps / source_fps
 
 def quality(samples: list[dict], height: float, fps: float, *, ground_z: float | None = None, sole_offsets: dict | None = None) -> dict:
-    require(0 < height < 1e7 and math.isfinite(height) and 0 < fps <= 240, "INVALID_SCALE", "Invalid anatomical height or FPS")
+    require(type(height) in (int, float) and type(fps) in (int, float) and
+            0 < height < 1e7 and math.isfinite(height) and 0 < fps <= 240 and math.isfinite(fps),
+            "INVALID_SCALE", "Invalid anatomical height or FPS")
     require(2 <= len(samples) <= 10000, "INVALID_MOTION", "Need at least two bounded motion samples")
     times = [s["frame"] / fps for s in samples]
     require(all(b > a for a, b in zip(times, times[1:])), "INVALID_MOTION", "Frames must increase")
