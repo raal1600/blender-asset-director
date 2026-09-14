@@ -1,0 +1,57 @@
+name: Integrate reviewed motion foundation
+on:
+  push:
+    branches: [feature/motion-foundation]
+    paths: ['tools/_motion_patch_*.txt', '.github/workflows/integrate-motion-foundation.yml']
+permissions:
+  contents: read
+concurrency:
+  group: integrate-motion-foundation
+  cancel-in-progress: false
+jobs:
+  integrate:
+    if: github.ref == 'refs/heads/feature/motion-foundation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify exact reviewed patch and apply tracked source
+        shell: python
+        run: |
+          import base64, hashlib, lzma, os, subprocess
+          from pathlib import Path
+          subprocess.run(['git','merge-base','--is-ancestor','4f3d0c9099e3141b06b3e9fc9dc4e3845f69e67f','HEAD'],check=True)
+          parts=[Path('tools')/('_motion_patch_'+str(i)+'.txt') for i in range(5)]
+          compressed=base64.b64decode(''.join(p.read_text().strip() for p in parts),validate=True)
+          assert len(compressed)==29552
+          assert hashlib.sha256(compressed).hexdigest()=='44695071269e6bec17e0122dee0fc2886d506a207657a422396c9454cba3d4ac'
+          patch=lzma.decompress(compressed,memlimit=256*1024*1024)
+          assert len(patch)==104483
+          assert hashlib.sha256(patch).hexdigest()=='05b547d5977c65f91a02cb1ae57e3ad6f812554ad67c41fc205390c8be09ed66'
+          allowed={'.github/workflows/ci.yml','README.md','docs/LOCAL_MOTION_ACCEPTANCE.md','docs/MOTION_FOUNDATION.md','install.ps1','install.py','install.sh','pyproject.toml','skills/blender-asset-director/SKILL.md','skills/blender-asset-director/references/motion-foundation.md','skills/blender-asset-director/references/roles/performance.md','src/asset_director/__init__.py','src/asset_director/blender_ops.py','src/asset_director/cli.py','src/asset_director/jobs.py','src/asset_director/motion_assets.py','src/asset_director/motion_blender.py','src/asset_director/motion_cli.py','src/asset_director/motion_contract.py','src/asset_director/motion_review.py','src/asset_director/motion_scout.py','src/asset_director/pose_contract.py','src/asset_director/pose_transfer.py','src/asset_director/studio.py','src/asset_director/worker.py','tests/test_motion_foundation.py','tools/motion_foundation_fixture.py'}
+          headers=[line.split(' b/',1)[1] for line in patch.decode('utf-8').splitlines() if line.startswith('diff --git a/')]
+          assert set(headers)==allowed and len(headers)==len(allowed)
+          path=Path(os.environ['RUNNER_TEMP'])/'reviewed-motion-foundation.patch'
+          path.write_bytes(patch)
+          subprocess.run(['git','apply','--stat',str(path)],check=True)
+          subprocess.run(['git','apply','--check',str(path)],check=True)
+          subprocess.run(['git','apply','--index',str(path)],check=True)
+          changed=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
+          assert changed==allowed
+      - name: Execute offline tests and managed installer self-test
+        run: python tools/run_checks.py --offline
+      - name: Commit source and remove this one-time transport
+        shell: bash
+        run: |
+          git rm tools/_motion_patch_*.txt .github/workflows/integrate-motion-foundation.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: integrate canonical motion, clay proxy and reviewed retarget bridge'
+          git push origin HEAD:refs/heads/feature/motion-foundation
