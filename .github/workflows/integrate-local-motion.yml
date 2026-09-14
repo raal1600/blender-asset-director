@@ -46,10 +46,11 @@ jobs:
           assert set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())==allowed
       - name: Offline tests and managed installer self-test
         run: python tools/run_checks.py --offline
-      - name: Commit source and remove one-time transport
+      - name: Commit source without changing workflows
         shell: bash
         run: |
-          git rm tools/_local_motion_v2_*.txt tools/_local_motion_patch_0.txt .github/workflows/integrate-local-motion.yml
+          git restore --source=HEAD --staged --worktree .github/workflows/ci.yml
+          git rm tools/_local_motion_v2_*.txt tools/_local_motion_patch_0.txt
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'feat: add read-only motion inboxes, reviewed Mixamo grants and native clip playback'
