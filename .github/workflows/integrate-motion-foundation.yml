@@ -47,10 +47,11 @@ jobs:
           assert changed==allowed
       - name: Execute offline tests and managed installer self-test
         run: python tools/run_checks.py --offline
-      - name: Commit source and remove this one-time transport
+      - name: Commit source only; workflow changes use the authorized connector separately
         shell: bash
         run: |
-          git rm tools/_motion_patch_*.txt .github/workflows/integrate-motion-foundation.yml
+          git restore --source=HEAD --staged --worktree .github/workflows/ci.yml
+          git rm tools/_motion_patch_*.txt
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'feat: integrate canonical motion, clay proxy and reviewed retarget bridge'
