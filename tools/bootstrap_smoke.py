@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -21,6 +22,9 @@ def main(shell):
                  and not any(x in p.parts for x in ('.git', '__pycache__', 'dist'))]
         archive = build(home / 'package', paths=paths, commit=os.getenv('GITHUB_SHA', '0'*40))
         sha = hashlib.sha256(archive.read_bytes()).hexdigest()
+        # The test archive uses this checkout's version, not the installer
+        # entrypoint's independently pinned release/development default.
+        version = tomllib.loads((ROOT/'pyproject.toml').read_text())['project']['version']
         env = dict(os.environ)
         env.update(BAD_CONFIG=str(home/'config'/'runtime.json'), CODEX_HOME=str(home/'codex'),
                    BAD_LIBRARY='', BAD_BLENDER='', LOCALAPPDATA=str(home/'local'), BAD_PYTHON=sys.executable)
@@ -31,13 +35,13 @@ def main(shell):
         dest = home/'skills'/'blender-asset-director'; library = home/'CGI Library'
         if shell in ('powershell', 'pwsh'):
             command = [shell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(ROOT/'install.ps1'),
-                       '-PythonPath', sys.executable, '-Archive', str(archive), '-Sha256', sha,
+                       '-Version', version, '-PythonPath', sys.executable, '-Archive', str(archive), '-Sha256', sha,
                        '-SkillPath', str(dest), '-LibraryPath', str(library)]
         elif shell == 'sh':
-            command = ['sh', str(ROOT/'install.sh'), '--archive', str(archive), '--sha256', sha,
+            command = ['sh', str(ROOT/'install.sh'), '--version', version, '--archive', str(archive), '--sha256', sha,
                        '--dest', str(dest), '--library', str(library)]
         else:
-            command = [sys.executable, str(ROOT/'install.py'), '--archive', str(archive), '--sha256', sha,
+            command = [sys.executable, str(ROOT/'install.py'), '--version', version, '--archive', str(archive), '--sha256', sha,
                        '--dest', str(dest), '--library', str(library)]
         for repeat in range(2):
             result = subprocess.run(command, env=env, text=True, capture_output=True, timeout=240, cwd=home)

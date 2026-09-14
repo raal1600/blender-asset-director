@@ -1,10 +1,28 @@
 """Pure reduction of measured sole samples; no edits or automatic foot locking."""
 import math
-from .core import require
+import copy
+from .core import require, fields
+from .motion_assets import finite, vector
 
 
 def summarize(samples, options):
-    require(samples, 'CONTACT_SAMPLES_REQUIRED', 'No sole measurements')
+    require(isinstance(samples, list) and 1 <= len(samples) <= 257,
+            'CONTACT_SAMPLES_REQUIRED', 'Need 1..257 measured sole samples')
+    # Preserve the raw measurements and reject nonfinite/unsorted evidence.
+    samples = copy.deepcopy(samples)
+    finite(options['meters_per_unit'], 1e-6, 1e3)
+    finite(options['ground_z'], -1e4, 1e4)
+    finite(options['tolerance_m'], 1e-6, .1)
+    finite(options['near_ground_m'], options['tolerance_m'], .5)
+    finite(options['glide_speed_m_s'], 1e-6, 10)
+    for sample in samples:
+        fields(sample, {'frame', 'time', 'left', 'right'}, {'frame', 'time', 'left', 'right'})
+        finite(sample['frame'], -100000, 100000); finite(sample['time'], -1e7, 1e7)
+        for side in ('left', 'right'):
+            fields(sample[side], {'minimum_z', 'centroid'}, {'minimum_z', 'centroid'})
+            finite(sample[side]['minimum_z']); vector(sample[side]['centroid'], bound=1e6)
+    require(all(a['frame'] < b['frame'] and a['time'] < b['time'] for a,b in zip(samples,samples[1:])),
+            'INVALID_TIMING', 'Measured frames and times must both increase')
     meters = options['meters_per_unit']; floor = options['ground_z']
     tol = options['tolerance_m']; near = options['near_ground_m']
     groups = {'integer_frames': [], 'subframes': []}; previous = None
@@ -33,7 +51,13 @@ def summarize(samples, options):
                            'maximum_clearance_m': max(values) if values else None,
                            'max_penetration_m': max(0, -min(values)) if values else None,
                            'penetration_within_tolerance': min(values) >= -tol if values else None}
-    return {'samples': samples, 'extrema': summaries, 'tolerance_m': tol,
+    per_foot = {side: {'minimum_clearance_m': min(s[side]['minimum_clearance_m'] for s in samples),
+                       'maximum_clearance_m': max(s[side]['minimum_clearance_m'] for s in samples),
+                       'maximum_horizontal_centroid_speed_m_s': max(
+                           (s[side]['horizontal_centroid_speed_m_s'] for s in samples
+                            if s[side]['horizontal_centroid_speed_m_s'] is not None), default=None)}
+                for side in ('left', 'right')}
+    return {'samples': samples, 'extrema': summaries, 'per_foot': per_foot, 'tolerance_m': tol,
             'status': 'SAMPLED_PENETRATION' if any(s[k]['state']=='PENETRATING' for s in samples for k in ('left','right')) else 'NO_SAMPLED_PENETRATION',
             'channels_changed': [], 'repair_applied': False, 'intentional_glide': 'REQUIRES_PERFORMANCE_EVIDENCE',
             'floating_vs_airborne': 'NOT_INFERRED', 'performance': 'PENDING',

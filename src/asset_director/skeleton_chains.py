@@ -18,12 +18,12 @@ def base_name(name):
 def finger_candidate(name):
     raw = base_name(name)
     # Mixamo and exported DEF-only naming families. Side and index are explicit.
-    match = re.fullmatch(r'(left|right)hand(thumb|index|middle|ring|pinky)([1-3])', raw)
+    match = re.fullmatch(r'(left|right)hand(thumb|index|middle|ring|pinky)([1-9][0-9]{0,2})', raw)
     if match:
         side, finger, index = match.groups()
         return finger, 'l' if side == 'left' else 'r', int(index)
     match = re.fullmatch(r'(?:f[_-])?(thumb|index|middle|ring|pinky)[._-](\d{1,3})[._-]([lr])', raw)
-    if match and 1 <= int(match[2]) <= 3:
+    if match and 1 <= int(match[2]) <= 999:
         return match[1], match[3], int(match[2])
     return None
 
@@ -39,7 +39,7 @@ def extend(bones, assigned, ambiguous, torso):
         if match:
             numbered.append((int(match[1]) if match[1] else 0, bone))
     # Preserve the existing single-spine fallback. Never collapse multiple joints.
-    if torso is None and len(numbered) > 1:
+    if len(numbered) > 1:
         ordered = sorted(numbered, key=lambda x: (x[0], x[1]['name']))
         nums, chain = [n for n, _ in ordered], [b for _, b in ordered]
         valid = (len(chain) == 3 and nums in ([0, 1, 2], [1, 2, 3])
@@ -53,19 +53,23 @@ def extend(bones, assigned, ambiguous, torso):
                      'chain': [assigned['hips']] + [b['name'] for b in chain],
                      'provider_identity_proven': False}
         else:
-            assigned.pop('spine', None)
+            for role in ('spine', 'spine_mid', 'chest'): assigned.pop(role, None)
+            torso = None
             ambiguous['spine'] = sorted(b['name'] for _, b in numbered)
             notes.append({'chain': 'torso', 'status': 'REVIEW_REQUIRED',
                           'reason': 'Need one directly connected three-joint torso; no count compression or alias choice'})
     for side in ('l', 'r'):
         hand = assigned.get('hand_' + side)
         for finger in FINGERS:
-            candidates = {i: [b for b in bones if finger_candidate(b['name']) == (finger, side, i)]
-                          for i in (1, 2, 3)}
+            candidates = {}
+            for b in bones:
+                parsed = finger_candidate(b['name'])
+                if parsed and parsed[:2] == (finger, side):
+                    candidates.setdefault(parsed[2], []).append(b)
             if not any(candidates.values()):
                 notes.append({'chain': finger+'_'+side, 'status': 'ABSENT'})
                 continue
-            valid = hand is not None and all(len(v) == 1 for v in candidates.values())
+            valid = hand is not None and set(candidates) == {1, 2, 3} and all(len(v) == 1 for v in candidates.values())
             chain = [candidates[i][0] for i in (1, 2, 3)] if valid else []
             valid = (valid and chain[0].get('parent') == hand
                      and all(b.get('parent') == a['name'] for a, b in zip(chain, chain[1:])))

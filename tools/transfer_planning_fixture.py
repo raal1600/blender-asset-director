@@ -63,7 +63,9 @@ def skin_signature(obj):
 def main(out,library):
     assert bpy.app.background
     out=Path(out).resolve();out.mkdir(parents=True,exist_ok=True);checks=[]
-    def passed(name,**data):checks.append({'name':name,'status':'PASS',**data})
+    def passed(name,**data):
+        checks.append({'name':name,'status':'PASS',**data})
+        atomic_json(out/'transfer_planning_progress.json',{'status':'INCOMPLETE','checks':checks})
     def fails(call,expected):
         try:call();raise AssertionError('Expected '+expected)
         except DirectorError as e:assert e.code==expected,(e.code,expected)
@@ -153,14 +155,30 @@ def main(out,library):
                 direction_error=max(direction_error,1-delta.normalized().dot(expected_direction.normalized()))
         assert direction_error<2e-5,direction_error
         passed('reference agrees with measured semantic head paths',max_direction_error=direction_error)
-        ops.assign(target,actual_action,actual_slot);bpy.context.scene.frame_set(17)
+        ops.assign(target,actual_action,actual_slot)
         vals=p['retarget_options']['pose_space']['rotation'];w=Matrix([vals[i:i+3] for i in (0,3,6)]).to_quaternion();error=0.
-        for s,t in p['mapping'].items():
-            sq=(src.matrix_world@src.pose.bones[s].matrix).to_quaternion();expected=w@sq@source_rest[s].inverted()@w.inverted()@ref[t]
-            observed=(target.matrix_world@target.pose.bones[t].matrix).to_quaternion()
-            error=max(error,1-abs(expected.normalized().dot(observed.normalized())))
+        # FBX import may offset the first key. Match elapsed seconds, not equal
+        # scene frame labels: the retargeted action always begins at frame one.
+        output_start, output_end = data['frame_range']
+        sfps=p['retarget_options']['source_fps'];tfps=data['fps']
+        for i in range(32):
+            out_frame=output_start+(output_end-output_start)*i/31
+            src_frame=p['retarget_options']['start']+(out_frame-output_start)*sfps/tfps
+            bpy.context.scene.frame_set(math.floor(src_frame),subframe=src_frame-math.floor(src_frame))
+            bpy.context.view_layer.update()
+            expected={}
+            for s,t in p['mapping'].items():
+                sq=(src.matrix_world@src.pose.bones[s].matrix).to_quaternion()
+                expected[t]=w@sq@source_rest[s].inverted()@w.inverted()@ref[t]
+            bpy.context.scene.frame_set(math.floor(out_frame),subframe=out_frame-math.floor(out_frame))
+            bpy.context.view_layer.update()
+            for t,q in expected.items():
+                observed=(target.matrix_world@target.pose.bones[t].matrix).to_quaternion()
+                error=max(error,1-abs(q.normalized().dot(observed.normalized())))
         assert error<2e-6,error
-        passed('independent mapped world-rotation relation',max_quaternion_one_minus_dot=error)
+        passed('independent mapped world-rotation relation at matched times',
+               max_quaternion_one_minus_dot=error,checkpoints=32,
+               source_start=p['retarget_options']['start'],output_start=output_start)
         target.rotation_euler.z+=.02;bpy.context.view_layer.update()
         fails(lambda:tb.verify_execution(lib,src,target,act,clip.metadata.get('slot'),approved['specification']['options']),'STALE_TRANSFER_BINDING')
         passed('world-binding change rejected despite unchanged rest fingerprint')
