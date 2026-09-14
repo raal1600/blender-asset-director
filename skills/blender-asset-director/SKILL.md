@@ -38,7 +38,7 @@ Load only selected modules:
 1. Compare the brief with observed assets: reuse, adapt, missing, uncertain. Record evidence. Missing does not mean an existing asset is merely unsuitable.
 2. For a motion request, read `references/local-motion-library.md`, refresh registered roots once with bounded `motion-sync --index`, inspect per-file readiness and search local clips. Folder labels are not licenses; never broaden source roots without approval. Search justified gaps only: scene resources, local library, supported external providers. Read `references/asset-workflow.md` and `references/providers.md`. Never download a replacement scene by default.
 3. Coordinate provisional blocking, camera and look; refine only useful detail. `camera-fit`, `camera-plan`, `camera-check`, `look-audit`, `light-adjust`, `world-adjust`, `look-adjust` and `light-rig` are explicit generic helpers, not automatic cinematic design: `camera-plan` keys a move only from host-supplied checkpoints, aims, screen positions, lens and interpolation, and the look operations apply only named values to observed lights, the active world's single Background node and scene colour management. All of them reject what they cannot verify, and none mutates materials. Respect their measured limitations.
-4. For skeletal motion or a morphable proxy load `references/motion-foundation.md` and `references/motion.md`: retrieve, inspect, retarget and validate a real source. Object motion uses suitable transforms/pivots; products and environments need no armature. Don't invent human gaits.
+4. For skeletal motion or a morphable proxy load `references/motion-foundation.md` and `references/motion.md`: retrieve, inspect, retarget and validate a real source. For indexed-source to existing-character transfers, also load `references/transfer-planning.md` before creating task-local alignment scripts. Object motion uses suitable transforms/pivots; products and environments need no armature. Don't invent human gaits.
 5. Validate handoffs before preparing jobs. One executor publishes the chosen working result; do not merge concurrent binary scene edits. These checks are coordination contracts, not substitutes for host-level tool permissions.
 6. Produce bounded evidence and route failures to the responsible role. Record technical, visual and human acceptance separately. A repair or still must not summon every department. Sound and full video output remain separate scopes.
 
@@ -67,3 +67,17 @@ creates a new frozen diagnostic body; never reshape an existing character silent
 Before retargeting a new character/animation, use `native-clip` to review its original
 pairing/timebase. Copy/index readiness is not licensing. Mixamo review needs actual
 user/host attestation and retained terms; future-inbox approval is not implicit.
+
+## Reviewed transfer planning (development)
+
+`transfer-plan` audits an indexed source and saved target without saving a changed
+scene. Inspect its exact mappings, units, proportions, facing and target anchor;
+`transfer-prepare --review` requires explicit host approval of the returned plan.
+Changes require replanning, not editing old receipts. Run the resulting existing
+retarget job, then use `contact-check` for bounded integer/subframe sole evidence.
+No automatic horizontal foot locking or formal performance pass follows.
+
+No safely bound multi-window playback controller is included. Use only actually
+available approved host UI tools with explicit process/window/file binding, or
+report the limitation. Do not start a service or arbitrary command channel, switch
+an unrelated unsaved scene, or delete a root control to hide its display.

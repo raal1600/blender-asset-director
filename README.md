@@ -1,11 +1,13 @@
 # Blender Asset Director
 
-> **Development branch: `feature/local-motion-library`, runtime `0.6.0-dev.2`.**
-> Adds read-only user animation folders, bounded sync/index/reuse, reviewed Mixamo
-> project-use grants, clear import preflight and native-character playback before
-> retargeting. No unofficial downloader, watcher, new addon or GPU dependency.
-> [Setup, contracts and local acceptance](docs/LOCAL_MOTION_LIBRARY.md).
-> Built on the [motion foundation](docs/MOTION_FOUNDATION.md) and proxy fixes.
+> **Development branch: `feature/reviewed-transfer-planning`, runtime `0.6.0-dev.3`.**
+> Adds hierarchy-checked torso/finger proposals, read-only alignment planning,
+> approval-bound retargeting and evaluated integer/subframe contact diagnostics.
+> Builds on local animation folders and reviewed Mixamo intake. No new downloader,
+> GPU dependency, addon or arbitrary-code endpoint. Multi-window UI control is
+> explicitly deferred.
+> [Planning contracts and local acceptance](docs/REVIEWED_TRANSFER_PLANNING.md) ·
+> [Local library setup](docs/LOCAL_MOTION_LIBRARY.md).
 > The published installer below still selects **v0.5.0**. No v0.6 release exists.
 
 **Give Codex a small Blender production team, not another Blender harness.**
@@ -17,7 +19,7 @@ production design/scout, performance, cinematography, lighting/look development,
 editorial/finishing and continuity/QA. There are no scene-name, lens, FPS or
 character-specific production presets.
 
-## Current preview: v0.5.0
+## Current published preview: v0.5.0
 
 This release completes the evaluated-pose retargeting branch with explicit
 reference-frame conversion, optional bounded sole grounding and additive floor
@@ -178,13 +180,29 @@ No paid calls, local AI inference, new capture service or device streaming is
 silently introduced. Default production limits remain eight CPU preview frames
 and two repairs, tracked across jobs by the host.
 
+## Development transfer planning
+
+This branch additionally provides `transfer-plan`, `transfer-prepare` and
+`contact-check`. An eligible indexed source and saved existing target produce a
+read-only alignment proposal. A host reviews the exact mapping, action, units,
+facing, proportions and target anchor before the existing executor transfers it.
+Contact diagnostics report integer and fractional-frame evidence separately and
+never automatically lock a sliding foot. Target mesh/rest anatomy is preserved.
+
+Read [the contracts](docs/REVIEWED_TRANSFER_PLANNING.md) and selectively load
+[the agent reference](skills/blender-asset-director/references/transfer-planning.md).
+Use a separate worktree/disposable library for testing; do not replace an installed
+working release or merge automatically. A proposal is not a performance verdict.
+No safe multi-window playback controller, full IK or GPU reconstruction is included.
+
 ## Tests, maintenance and removal
 
-The completion runtime passed 223 unit tests and ten CI jobs: three Python/OS
+The published v0.5.0 runtime passed 223 unit tests and ten CI jobs: three Python/OS
 configurations, three real Blender versions (4.5.3, 5.0.0, 5.2.1) and four bootstrap
 configurations. New CI steps run evaluated-pose, sole-topology/floor, and full
 retarget/ground/NLA/floor/camera/preview regressions. Live free-provider/source-motion
-checks run on Blender 5.0.0. [Exact evidence](docs/RETARGET_ACCEPTANCE.md).
+checks run on Blender 5.0.0. [Published-release evidence](docs/RETARGET_ACCEPTANCE.md).
+Development validation is separate from that release and your local acceptance.
 
 From a source checkout:
 
