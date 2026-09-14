@@ -40,8 +40,12 @@ def identify_roles(bones: list[dict]) -> dict:
             ambiguous.pop('spine', None)
             torso = {'method': 'observed Mixamo-compatible torso hierarchy',
                      'chain': [b['name'] for b in chain], 'provider_identity_proven': False}
+    from .skeleton_chains import extend
+    torso, fingers, notes = extend(bones, assigned, ambiguous, torso)
     return {"roles": assigned, "ambiguous": ambiguous, "missing": sorted(REQUIRED - assigned.keys()),
-            "evidence": "name aliases and verified torso hierarchy; geometry/rest pose still require review", "torso_chain": torso}
+            "evidence": "name candidates with verified chains; geometry/rest pose still require review",
+            "torso_chain": torso, "finger_chains": fingers, "chain_notes": notes,
+            "unmapped_bones": sorted(b["name"] for b in bones if b["name"] not in assigned.values())}
 
 def rig_fingerprint(bones: list[dict], object_scale=(1, 1, 1)) -> str:
     return digest({"bones": sorted([{k: b[k] for k in ("name", "parent", "rest")} for b in bones], key=lambda b: b["name"]),

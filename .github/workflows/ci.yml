@@ -96,6 +96,10 @@ jobs:
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/local_motion_fixture.py -- "$RUNNER_TEMP/local-motion" "$RUNNER_TEMP/bad-library"
           cp "$RUNNER_TEMP/local-motion/local_motion_report.json" evidence/
+      - name: Reviewed transfer planning, numbered chains, fingers and subframe sole diagnostics
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/transfer_planning_fixture.py -- "$RUNNER_TEMP/transfer-planning" "$RUNNER_TEMP/bad-library"
+          cp "$RUNNER_TEMP/transfer-planning/transfer_planning_report.json" evidence/
       - name: Live free asset acquisition and real-motion retarget
         if: matrix.blender == '5.0.0'
         run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence

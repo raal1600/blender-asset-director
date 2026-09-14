@@ -29,7 +29,7 @@ def finger_candidate(name):
 
 
 def extend(bones, assigned, ambiguous, torso):
-    require(len(bones) <= 256, 'RESOURCE_LIMIT', 'Skeleton discovery is bounded to 256 bones')
+    require(len(bones) <= 4096, 'RESOURCE_LIMIT', 'Skeleton discovery is bounded to 4096 bones')
     by_name = {b['name']: b for b in bones}
     require(len(by_name) == len(bones), 'INVALID_SKELETON', 'Duplicate bone names')
     chains, notes = [], []

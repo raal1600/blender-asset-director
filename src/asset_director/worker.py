@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from asset_director.core import DirectorError, Library, atomic_json, file_hash, require, within
+from asset_director.core import DirectorError, Library, atomic_json, file_hash, require, within, digest
 from asset_director.jobs import read_job
 
 
@@ -61,7 +61,13 @@ def execute(job_path, *, live=False):
             require(isinstance(embedded, list) and set(embedded) <= set(spec.get("license_grants", [])),
                     "LICENSE_SCOPE_MISMATCH", "Restricted working scene needs its originating library lineage")
             files = spec["source_files"]
-            if op == "inspect": data = ops.inspect_scene()
+            if op == "transfer-plan":
+                from asset_director.transfer_blender import propose
+                data = propose(lib, spec)
+            elif op == "contact-check":
+                from asset_director.transfer_blender import contact_check
+                data = contact_check(options)
+            elif op == "inspect": data = ops.inspect_scene()
             elif op in {"motion-export", "body-audit", "clay-proxy", "motion-source", "motion-retarget"}:
                 from asset_director import motion_blender
                 if op == "motion-export": data = motion_blender.export(job, directory, lib)
@@ -152,6 +158,8 @@ def execute(job_path, *, live=False):
                 if not matches:
                     matches = [a for a in new_actions if re_original(a.name) == re_original(options.get("action", ""))]
                 require(len(matches) == 1, "ACTION_AMBIGUOUS", "Choose the actual indexed source action")
+                from asset_director.transfer_blender import verify_execution
+                verify_execution(lib, source, target, matches[0], options.get("slot"), options)
                 data = ops.retarget(source, target, matches[0], options.get("slot"), options, backend.verify(lib), job["id"])
                 for o in created: bpy.data.objects.remove(o, do_unlink=True)
                 for a in new_actions: bpy.data.actions.remove(a)
@@ -170,6 +178,13 @@ def execute(job_path, *, live=False):
                     if options.get("terrain_object"):
                         data["terrain_qa"] = ops.terrain_quality(sampled,report["anatomical_height"],options["terrain_object"],options.get("sole_offsets"))
             else: raise DirectorError("UNKNOWN_OPERATION", "Unsupported operation")
+            if op in {"retarget", "motion-retarget"}:
+                # Deliver direct actions with their exact final key covered. This
+                # is not the NLA strip rule (which rejects uncovered end frames).
+                from asset_director.motion_morph import inclusive_scene_end
+                scene = bpy.context.scene
+                scene.frame_end, _ = inclusive_scene_end(data["frame_range"][0], data["duration_seconds"], data["fps"])
+                data["scene_frame_range"] = [scene.frame_start, scene.frame_end]
             from asset_director.jobs import MUTATIONS
             if op in MUTATIONS:
                 dest = directory / "result.blend"
@@ -180,6 +195,8 @@ def execute(job_path, *, live=False):
                 lp.retain_derivation(lib, dest, spec.get("license_grants", []))
             if spec.get("license_grants"):
                 data["project_rights"] = {"grants": spec["license_grants"], "raw_redistribution": "DENIED", "scope": lp.SCOPE}
+        if op == "transfer-plan":
+            data["id"] = "tp_" + digest({k:v for k,v in data.items() if k != "id"})
         summary = {"operation": op, "blender_version": bpy.app.version_string, "clips": len(data.get("clips", [])), "visual_acceptance": "PENDING"}
         atomic_json(directory / "result.json", {"status": "OK", "job_id": job["id"], "summary": summary, "data": data})
         return summary

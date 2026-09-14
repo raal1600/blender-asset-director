@@ -188,6 +188,9 @@ def propose(lib, spec):
     require(abs(start-asset.metadata['frame_start'])<1e-5 and abs(end-asset.metadata['frame_end'])<1e-5
             and sr['fingerprint']==asset.metadata['skeleton_fingerprint'],
             'STALE_SOURCE_INDEX','Reimported action/rig differs from indexed evidence')
+    start, end = o.get('start', start), o.get('end', end)
+    from .motion_timing import bake_samples
+    bake_samples(start, end, sfps, o['target_fps'])
     # Own the scratch state only. Planning never saves either input file.
     bpy.context.scene.frame_set(math.floor(start),subframe=start-math.floor(start))
     if target.animation_data:
@@ -250,16 +253,29 @@ def propose(lib, spec):
         'start':start,'end':end,'mapping':pairs,'alignment':alignment,
         'pose_space':{'rotation':flat(world),'translation_bone':t_roles['hips'],
                       'translation_scale':scale,'target_origin':list(origin)}}
+    ground_evidence = None
+    if 'ground_contact' in o:
+        from .ground_contact import GroundContact
+        # No correction is applied while proposing a transfer. The existing
+        # executor receives only the host's explicit selected groups and cap.
+        probe = GroundContact(target, t_roles['hips'], o['ground_contact'])
+        ground_evidence = {'request':o['ground_contact'], 'selected_vertices':len(probe.indices),
+                           'topology':probe.topology, 'repair_applied':False,
+                           'scope':'vertical anchor correction only; no jumping or horizontal lock'}
+        retarget['pose_space']['ground_contact'] = copy.deepcopy(o['ground_contact'])
     if asset.metadata.get('slot') is not None:retarget['slot']=asset.metadata['slot']
     from .pose_contract import validate_binding
     validate_binding(retarget['pose_space'],pairs)
-    target_grants=spec.get('license_grants',[])
+    from .license_policy import derivation
+    target_grants=derivation(lib, spec['inputs'][0]['sha256'])
     result={'schema':SCHEMA,'status':'REVIEW_REQUIRED','source_asset_id':asset.id,
-        'source_character':{'provider':asset.provider,'title':asset.title,'object':source.name,
+        'source_character':{'provider':asset.provider,'provider_hint':asset.metadata.get('local_motion',{}).get('provider_hint'),
+                            'title':asset.title,'object':source.name,
                             'license':rights(asset,lib=lib),'source_url':asset.source_url},
         'target_character':{'object':target.name,'meshes':tr['meshes'],
                             'provider':'UNKNOWN_UNLESS_LINKED_CATALOG_EVIDENCE',
-                            'inherited_grants':target_grants,'provenance':'keep separate from animation provider'},
+                            'inherited_grants':target_grants,'project_use':'HOST_REVIEW_REQUIRED_UNLESS_LINKED_EVIDENCE',
+                            'provenance':'keep separate from animation provider'},
         'source_fingerprint':sr['fingerprint'],'target_fingerprint':tr['fingerprint'],
         'source_world':source_world,'target_world':target_world,'source_checks':evidence,
         'source_roles':s_roles,'target_roles':t_roles,'mapping':pairs,
@@ -271,7 +287,7 @@ def propose(lib, spec):
             'morphology_ratio':morphology,'runtime_translation_scale':scale},
         'facing':{'yaw_degrees':math.degrees(yaw),'source_forward':list(sf),'target_forward':list(tf),'evidence':facing_evidence},
         'alignment_method':'minimal anatomical swing; nearest target-rest twist; host must review terminal axes',
-        'alignment_evidence':alignment_evidence,'retarget_options':retarget,
+        'alignment_evidence':alignment_evidence,'retarget_options':retarget,'grounding':ground_evidence,
         'duration_seconds':(end-start)/sfps,'performance':'PENDING',
         'limitations':['not full IK, retiming, foot locking or volume fitting','terminal bone axes require review',
                        'no universal finger/control-rig support','review does not establish source quality or target licensing']}

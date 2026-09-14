@@ -22,6 +22,7 @@ def parser():
     p = argparse.ArgumentParser(prog="asset-director", description="Search, acquire, index and adapt existing Blender assets; JSON output.")
     p.add_argument("--library", default=settings.library_path())
     s = p.add_subparsers(dest="command", required=True)
+    q=s.add_parser("transfer-prepare"); q.add_argument("--review",required=True,help="Explicit approval of a completed transfer-plan job")
     q=s.add_parser("configure"); q.add_argument("--blender"); q.add_argument("--skill-path")
     s.add_parser("doctor"); s.add_parser("providers"); s.add_parser("report"); s.add_parser("rebuild-catalog")
     q=s.add_parser("plan"); q.add_argument("brief")
@@ -63,6 +64,9 @@ def main(argv=None):
                         "providers":capabilities(), "extra_model_calls":False, "runtime_gpu_ai":False,
                         "mcp_connection":"Host must verify its existing Blender MCP; this CLI does not replace or configure it",
                         "environment":settings.health()}
+            elif command == "transfer-prepare":
+                from .transfer_review import prepare
+                result=prepare(lib,load_json(Path(args.review)))
             elif command == "providers": result=capabilities()
             elif command == "plan": result=plan(args.brief)
             elif command == "studio-plan":

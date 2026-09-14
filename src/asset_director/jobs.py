@@ -114,6 +114,11 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     if operation == "transfer-plan":
         require(asset and asset.kind == "animation" and asset.metadata.get("action") and asset.metadata.get("file")
                 and asset.metadata.get("fps"), "INDEX_REQUIRED", "Planning requires one indexed animation clip")
+        from .motion_timing import bake_samples
+        start, end = options.get("start", asset.metadata.get("frame_start")), options.get("end", asset.metadata.get("frame_end"))
+        bake_samples(start, end, asset.metadata["fps"], options["target_fps"])
+        require(start >= asset.metadata["frame_start"]-1e-5 and end <= asset.metadata["frame_end"]+1e-5,
+                "SOURCE_RANGE_REVIEW", "Excerpt leaves the actual indexed action")
     if operation == "contact-check": require(asset_id is None, "INVALID_SCHEMA", "Contact diagnostics use the saved target only")
     if operation == "retarget" and "transfer_binding" in options:
         from .transfer_review import checked_binding
