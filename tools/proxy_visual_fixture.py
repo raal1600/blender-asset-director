@@ -10,6 +10,7 @@ import math
 import shutil
 import sys
 import bpy
+import bmesh
 from mathutils import Matrix, Quaternion, Vector
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,7 +43,6 @@ def main(out, library):
         scene = bpy.context.scene; scene.render.fps = 24
         source, old_skin = humanoid('UnrelatedTestRig')
         bpy.data.objects.remove(old_skin, do_unlink=True)
-        # Create a root->pelvis edge exactly 1.316 m long. It must never be body.
         bpy.context.view_layer.objects.active = source
         bpy.ops.object.mode_set(mode='EDIT')
         source.data.edit_bones['root'].head = (0, 0, -.316)
@@ -56,13 +56,11 @@ def main(out, library):
             ornament.head = source.data.edit_bones[base].head + Vector((0, 0, .1))
             ornament.tail = ornament.head + Vector((7, 2, 4))
             ornament.parent = source.data.edit_bones[base]
-        # Display vectors intentionally do not represent anatomical segments.
         for name in ('thigh_l', 'calf_l', 'thigh_r', 'calf_r', 'hand_l', 'foot_r', 'head'):
             bone = source.data.edit_bones[name]
             bone.tail = bone.head + Vector((.27, .05, .08))
         bpy.ops.object.mode_set(mode='OBJECT')
         roles = {r: r for r in ops.rig_report(source)['roles']}
-        # Explicit, reviewed semantic aliases; do not rely on recognizable names.
         renames = {b.name: f'ControlNode_{i:03}' for i, b in enumerate(source.data.bones)}
         for old, new in renames.items(): source.data.bones[old].name = new
         roles = {r: renames[n] for r, n in roles.items()}
@@ -115,6 +113,13 @@ def main(out, library):
             target = bpy.data.objects[proxy['armature']]; skin = bpy.data.objects[proxy['mesh']]
             assert all(n in target.data.bones for n in excluded), 'Helpers were deleted from the rig'
             assert not excluded & {g.name for g in skin.vertex_groups}
+            surface = bmesh.new()
+            try:
+                surface.from_mesh(skin.data)
+                assert all(edge.is_manifold for edge in surface.edges), 'Open capsule surface'
+                assert surface.calc_volume(signed=True) > 0, 'Capsule normals face inward'
+            finally:
+                surface.free()
             assert {b['name'] for b in proxy['rig']['bones']} == set(renames.values())
             root_start = target.pose.bones[roles['root']].head.copy()
             origin = list(target.pose.bones[roles['hips']].head)
@@ -157,12 +162,12 @@ def main(out, library):
                                    'lens_mm': 50, 'direction': [.3,-1,.15], 'margin': .15})
                 lit, _, _ = run('light-rig', camera, {'subjects': [proxy['mesh']],
                                 'lights': [{'type': 'AREA', 'energy': 200, 'offset': [1,-2,2], 'color': [1,1,1], 'size_ratio': 2}]})
-                _, preview, preview_job = run('preview', lit, {'frames': [1,31], 'width': 480, 'height': 480, 'samples': 8})
+                _, preview, preview_job = run('preview', lit, {'frames': [1,16], 'width': 480, 'height': 480, 'samples': 8})
                 assert preview['production_settings_restored']
                 directory = lib.root/'jobs'/preview_job['id']
                 pngs = sorted(directory.glob('*.png')); assert len(pngs) == 2, list(directory.iterdir())
                 for label, image in zip(('proxy-rest.png','proxy-pose.png'), pngs): shutil.copyfile(image, out/label)
-                passed('two bounded CPU mesh previews; render settings restored', frames=2)
+                passed('rest and articulated midpoint CPU mesh previews; render settings restored', frames=[1,16])
         assert file_hash(original) == original_hash and file_hash(staging) == staging_hash
         passed('source and staging preserved; old timing/scale implementation unchanged')
         atomic_json(out/'proxy_visual_report.json', {'status': 'PASS', 'blender_version': bpy.app.version_string,

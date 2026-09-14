@@ -23,7 +23,7 @@ def _radius(length, ratio):
 
 def create_skin(rig, skeleton, radius_ratio=.1, color=(.45, .45, .45)):
     """Create one skinned mesh; record inspectable landmark/ring membership."""
-    graph = anatomy_graph(skeleton)  # Refuse missing anatomy before creating data.
+    graph = anatomy_graph(skeleton)
     finite(radius_ratio, .025, .3)
     vertices, faces, assignments, attachments = [], [], [], []
     segment_reports = []
@@ -40,9 +40,10 @@ def create_skin(rig, skeleton, radius_ratio=.1, color=(.45, .45, .45)):
         for first, second in zip(rings, rings[1:]):
             for k in range(SIDES):
                 n = (k + 1) % SIDES
-                faces.append((first[k], first[n], second[n], second[k]))
-        faces.append(tuple(reversed(rings[0])))
-        faces.append(tuple(rings[-1]))
+                # Rings are in XZ; this winding points outward along +Y.
+                faces.append((first[k], second[k], second[n], first[n]))
+        faces.append(tuple(rings[0]))
+        faces.append(tuple(reversed(rings[-1])))
 
     for segment in graph['segments']:
         start, end = Vector(segment['start']), Vector(segment['end'])
@@ -58,19 +59,16 @@ def create_skin(rig, skeleton, radius_ratio=.1, color=(.45, .45, .45)):
             influences = {name: weight for name, weight in ((a, 1-u), (b, u)) if weight > 0}
             rings.append(ring(start, frame, y, r, influences))
         join(rings)
-        # Centroid of these symmetric rings must coincide with evaluated heads.
         attachments += [{'kind': 'segment_start', 'bone': a, 'indices': rings[2]},
                         {'kind': 'segment_end', 'bone': b, 'indices': rings[6]}]
         segment_reports.append({**segment, 'radius_m': radius,
                                 'start_ring': rings[2], 'end_ring': rings[6]})
 
-    # Bound endpoint markers from incident anatomical reach, never helper tails.
     for landmark in graph['landmarks']:
         name = landmark['bone']
         incident = [s['length_m'] for s in graph['segments'] if name in (s['start_bone'], s['end_bone'])]
         radius = _radius(min(incident) if incident else .2, radius_ratio)
         center = Vector(landmark['head']); rings = []
-        # Symmetric rings have a centroid exactly at this semantic joint head.
         for y_factor in (-.99, -.7, 0., .7, .99):
             rings.append(ring(center, Matrix.Identity(3), radius*y_factor,
                               radius*math.sqrt(1-y_factor*y_factor), {name: 1.}))
@@ -89,7 +87,7 @@ def create_skin(rig, skeleton, radius_ratio=.1, color=(.45, .45, .45)):
         for name, weight in influences.items(): groups[name].add([index], weight, 'REPLACE')
     modifier = skin.modifiers.new('CanonicalSkin', 'ARMATURE'); modifier.object = rig
     modifier.use_vertex_groups = True; modifier.use_bone_envelopes = False
-    modifier.use_deform_preserve_volume = False  # Endpoint-centroid checks use linear blend skinning.
+    modifier.use_deform_preserve_volume = False
     skin.parent = rig
     material = bpy.data.materials.new(rig.name + '_matte'); material.use_nodes = True
     bsdf = next(n for n in material.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
