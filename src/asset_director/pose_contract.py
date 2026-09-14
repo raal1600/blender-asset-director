@@ -46,3 +46,21 @@ def validate(config):
         cap=ground['max_correction']
         require(type(cap) in (int,float) and math.isfinite(cap) and 0<cap<=1,
                 'INVALID_GROUND_CONTACT','Vertical correction cap must be in (0,1] scene units')
+
+
+
+def validate_binding(config, mapping):
+    """Check the reviewed source-to-target binding before launching Blender.
+
+    translation_bone is a TARGET name. Source and target aliases are not
+    interchangeable, even when both represent the same anatomical role.
+    """
+    validate(config)
+    require(isinstance(mapping, dict) and 1 <= len(mapping) <= 256
+            and all(isinstance(s, str) and s.strip() and isinstance(t, str) and t.strip()
+                    for s, t in mapping.items()),
+            'MAPPING_REVIEW_REQUIRED', 'Provide bounded source-to-target bone names')
+    require(len(set(mapping.values())) == len(mapping),
+            'MAPPING_REVIEW_REQUIRED', 'Each mapped target bone needs one source')
+    require(config['translation_bone'] in mapping.values(),
+            'INVALID_POSE_TRANSFER', 'translation_bone must name a mapped TARGET bone, not a source bone')

@@ -63,6 +63,9 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
         validate(options["pose_space"])
         require(options.get("mapping") and options.get("alignment"), "MAPPING_REVIEW_REQUIRED",
                 "Evaluated pose transfer requires explicit mapping and reference alignment")
+    if operation in {"retarget", "motion-retarget"} and "pose_space" in options:
+        from .pose_contract import validate_binding
+        validate_binding(options["pose_space"], options.get("mapping"))
     # Reject an invalid camera plan on portable Python: no Blender process, no
     # file write and no partial scene mutation for a contract that cannot execute.
     if operation == "camera-plan":

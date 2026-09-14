@@ -125,8 +125,16 @@ def main(out,library):
         mapping={clip.metadata['roles'][r]:tr['roles'][r] for r in common}
         opts={'target_object':target.name,'target_fps':30,'mapping':mapping,
               'alignment':{n:[v for row in Matrix.Identity(4) for v in row] for n in mapping.values()},
-              'pose_space':{'rotation':[1,0,0,0,1,0,0,0,1],'translation_bone':clip.metadata['roles']['hips'],
+              'pose_space':{'rotation':[1,0,0,0,1,0,0,0,1],'translation_bone':tr['roles']['hips'],
                             'translation_scale':1,'target_origin':list(target.pose.bones['target:hips'].head)}}
+        # This fixture deliberately uses unlike source/target namespaces. A
+        # source-side anchor must fail before a job or Blender process exists.
+        wrong={**opts,'pose_space':{**opts['pose_space'],'translation_bone':clip.metadata['roles']['hips']}}
+        planned_before=set((lib.root/'jobs').iterdir())
+        try:jobs.prepare(lib,'retarget',str(target_path),clip.id,wrong);raise AssertionError('Source anchor accepted')
+        except DirectorError as e:assert e.code=='INVALID_POSE_TRANSFER',e.code
+        assert set((lib.root/'jobs').iterdir())==planned_before
+        passed('source-named translation anchor refused before creating a job')
         retargeted,transfer,_=run('retarget',target_path,clip.id,opts)
         assert lp.derivation(lib,file_hash(retargeted))==[gid] and file_hash(target_path)==target_hash
         assert abs(transfer['duration_seconds']-31/30)<1e-4,transfer['duration_seconds']
