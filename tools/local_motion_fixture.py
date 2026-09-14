@@ -87,9 +87,16 @@ def main(out,library):
             worst=max(worst,max(abs(a-b) for a,b in zip(actual,sample['hips'])))
         assert worst<2e-5,worst
         assert not native_report['retargeted'] and not native_report['motion_edited']
-        assert json.loads(bpy.context.scene[lp.SCENE_KEY])==[gid] and bpy.context.scene.frame_end==32
+        assert json.loads(bpy.context.scene[lp.SCENE_KEY])==[gid], 'Saved scene dropped its grant'
+        observed_start,observed_end=clip.metadata['frame_start'],clip.metadata['frame_end']
+        expected_scene_range=[math.floor(observed_start),math.ceil(observed_end-1e-5)]
+        assert native_report['frame_range']==[observed_start,observed_end], native_report
+        assert native_report['scene_frame_range']==expected_scene_range, native_report
+        assert [bpy.context.scene.frame_start,bpy.context.scene.frame_end]==expected_scene_range, native_report
+        assert bpy.context.scene.frame_end+1e-5>=observed_end, native_report
         assert abs(native_report['duration_seconds']-31/30)<1e-5
-        passed('native character/action pairing preserves timing, final frame and indexed trajectory',max_pose_error=worst)
+        passed('native character/action pairing preserves timing, final frame and indexed trajectory',max_pose_error=worst,
+               fps=native_report['fps'], imported_action_range=native_report['frame_range'], scene_frame_range=native_report['scene_frame_range'])
         native_hash=file_hash(native);names=[o.name for o in bpy.data.objects if o.type=='MESH']
         floor,_,_=run('stage-floor',native,options={'size':[4,4],'location':[0,0,0],'color':[.3]*3,'grid_color':[.2]*3,'tile_size':.5,'roughness':.7})
         assert lp.derivation(lib,file_hash(floor))==[gid]
