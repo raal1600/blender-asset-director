@@ -1,7 +1,7 @@
 name: Asset Director Tests
 on:
   push:
-    branches: [main, 'fix/**']
+    branches: [main, 'fix/**', 'feature/**']
   pull_request:
   workflow_dispatch:
   workflow_call:
@@ -83,6 +83,10 @@ jobs:
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/retarget_pipeline_fixture.py -- "$RUNNER_TEMP/pipeline-fixtures" "$RUNNER_TEMP/bad-library"
           cp "$RUNNER_TEMP/pipeline-fixtures/retarget_pipeline_report.json" evidence/
+      - name: Canonical motion, clay morphology and reviewed retarget bridge
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/motion_foundation_fixture.py -- "$RUNNER_TEMP/motion-foundation" "$RUNNER_TEMP/bad-library"
+          cp "$RUNNER_TEMP/motion-foundation/motion_foundation_report.json" evidence/
       - name: Live free asset acquisition and real-motion retarget
         if: matrix.blender == '5.0.0'
         run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence
