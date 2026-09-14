@@ -10,8 +10,11 @@ from .core import Asset, DirectorError, Library, SCHEMA, atomic_json, canonical,
 from . import camera_plan
 from . import look_contract
 from . import motion_contract
+from . import transfer_contract
 
 OPS = {
+    "transfer-plan": transfer_contract.PLAN_FIELDS,
+    "contact-check": transfer_contract.CONTACT_FIELDS,
     "stage-floor": {"size", "location", "color", "grid_color", "tile_size", "roughness"},
     "native-clip": set(),
     "inspect": set(),
@@ -26,14 +29,14 @@ OPS = {
     "light-rig": {"subjects", "lights"},
     "index": {"max_clips", "sample"},
     "import": {"collection", "selection"},
-    "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture"},
+    "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture", "transfer_binding"},
     "assemble": {"target_object", "clips", "fps", "controller_speed", "direction", "terrain_object", "travel_frames"},
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage"},
 }
 MUTATIONS = {"native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
              "light-adjust", "world-adjust", "look-adjust", "light-rig"}
-TARGET_REQUIRED = {"stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
+TARGET_REQUIRED = {"transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
                    "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 
 OPS.update(motion_contract.OPS)
@@ -49,6 +52,12 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
     options = copy.deepcopy(options or {})
     fields(options, OPS[operation])
+    if operation == "transfer-plan": transfer_contract.plan(options)
+    if operation == "contact-check": transfer_contract.contact(options)
+    if operation == "camera-check": transfer_contract.camera_check(options)
+    if operation == "retarget" and "transfer_binding" in options:
+        from .transfer_review import validate_review
+        validate_review(options["transfer_binding"])
     if operation in motion_contract.OPS:
         motion_contract.validate(operation, options)
     require(operation not in {"motion-source", "native-clip"} or input_file is None, "SOURCE_ONLY_OPERATION", "motion-source creates a fresh source-only file")
@@ -66,6 +75,8 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     if operation in {"retarget", "motion-retarget"} and "pose_space" in options:
         from .pose_contract import validate_binding
         validate_binding(options["pose_space"], options.get("mapping"))
+    if operation in {"retarget", "motion-retarget"} and options.get("alignment"):
+        transfer_contract.alignment(options["alignment"])
     # Reject an invalid camera plan on portable Python: no Blender process, no
     # file write and no partial scene mutation for a contract that cannot execute.
     if operation == "camera-plan":
@@ -87,7 +98,7 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     source_files = []
     if asset:
         require(asset.local_files, "ASSET_NOT_ACQUIRED", "Acquire/intake the source first")
-        if operation in {"import", "retarget", "native-clip"}:
+        if operation in {"import", "retarget", "native-clip", "transfer-plan"}:
             policy = rights(asset, lib=lib)
             require(policy["eligible"], "BLOCKED_POLICY", "; ".join(policy["reasons"]))
         for f in asset.local_files: lib.verify_file(f)
@@ -100,6 +111,14 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
                 require("source_fps" not in options or options["source_fps"] == asset.metadata["fps"],
                         "SOURCE_TIMEBASE_MISMATCH", "Do not override indexed timebase to change speed; use assemble playback_speed")
                 options.setdefault("source_fps", asset.metadata["fps"])
+    if operation == "transfer-plan":
+        require(asset and asset.kind == "animation" and asset.metadata.get("action") and asset.metadata.get("file")
+                and asset.metadata.get("fps"), "INDEX_REQUIRED", "Planning requires one indexed animation clip")
+    if operation == "contact-check": require(asset_id is None, "INVALID_SCHEMA", "Contact diagnostics use the saved target only")
+    if operation == "retarget" and "transfer_binding" in options:
+        from .transfer_review import checked_binding
+        _, dependency = checked_binding(lib, options, input_file, asset_id)
+        source_files = list(source_files) + [dependency]
     from . import license_policy as lp
     grants = set()
     if asset and operation != "index" and asset.metadata.get("license_grant"):
@@ -112,7 +131,7 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
         options["rights"] = lp.canonical_rights(lib, sorted(grants))
     if operation in TARGET_REQUIRED:
         require(inputs, "TARGET_REQUIRED", "Operation requires a specific saved working/target file")
-    if operation in {"import", "retarget", "native-clip"}: require(source_files, "SOURCE_REQUIRED", "Operation requires an acquired asset ID")
+    if operation in {"import", "retarget", "native-clip", "transfer-plan"}: require(source_files, "SOURCE_REQUIRED", "Operation requires an acquired asset ID")
     if operation in motion_contract.OPS:
         require(not asset_id, "INVALID_MOTION", "Motion jobs use canonical IDs or explicit saved inputs")
         if "motion_id" in options:
