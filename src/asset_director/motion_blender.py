@@ -13,6 +13,7 @@ from mathutils import Matrix, Quaternion, Vector
 from .core import atomic_json, require
 from . import motion_assets as ma
 from .motion_body import body_profile
+from .motion_morph import inclusive_scene_end, morph_skeleton
 from . import blender_ops as ops
 
 
@@ -162,44 +163,55 @@ def source_import(lib,options,owner):
     guard();record,samples,_=allowed_motion(lib,options)
     fps=options['fps'];obj,action=load_source(record,samples,fps,owner)
     scene=bpy.context.scene;scene.render.fps=int(fps);scene.render.fps_base=int(fps)/fps
-    scene.frame_start=1;scene.frame_end=max(1,math.floor(1+samples[-1]['time']*fps+1e-6));scene.frame_set(1)
+    scene.frame_start=1;scene.frame_end,exact_end=inclusive_scene_end(1,samples[-1]['time'],fps);scene.frame_set(1)
     return {'source_object':obj.name,'action':action.name,'slot':getattr(obj.animation_data.action_slot,'identifier',None),
             'motion_id':record['id'],'fps':fps,'duration_seconds':samples[-1]['time'],
+            'final_key_frame':exact_end,'scene_frame_end':scene.frame_end,
             'rig':ops.rig_report(obj),'performance':'NOT_EVALUATED','source_only':True}
+
+
+def _capsule(vertices,faces,weights,start,end,weight_name,radius_ratio):
+    start=Vector(start);end=Vector(end);axis=end-start;length=axis.length
+    if length<=1e-6:return
+    radius=min(.08,max(.008,length*radius_ratio));base=len(vertices);sides=10
+    q=Vector((0,1,0)).rotation_difference(axis.normalized())
+    frame=Matrix.Translation(start)@q.to_matrix().to_4x4()
+    rings=[(-radius*.99,radius*.14),(-radius*.7,radius*.714),(0,radius),
+           (length,radius),(length+radius*.7,radius*.714),(length+radius*.99,radius*.14)]
+    for y,r in rings:
+        for k in range(sides):
+            theta=2*math.pi*k/sides
+            vertices.append(values(frame@Vector((r*math.cos(theta),y,r*math.sin(theta)))))
+    weights.append((weight_name,list(range(base,base+len(rings)*sides))))
+    for row in range(len(rings)-1):
+        for k in range(sides):
+            a=base+row*sides+k;b=base+row*sides+(k+1)%sides;faces.append((a,b,b+sides,a+sides))
+    faces.append(tuple(base+k for k in reversed(range(sides))))
+    faces.append(tuple(base+(len(rings)-1)*sides+k for k in range(sides)))
 
 
 def clay(lib,options,owner):
     guard();record,_,_=allowed_motion(lib,options)
-    sk=copy.deepcopy(record['skeleton']);byname={j['name']:j for j in record['skeleton']['joints']}
     scales=options.get('length_scales',{})
-    require(set(scales)<=sk['roles'].keys(),'BODY_ROLE_MISSING','A scale names an unknown role')
-    bybone={sk['roles'][r]:v for r,v in scales.items()};solved={}
-    for j in sk['joints']:
-        old=byname[j['name']]
-        shift=Vector(solved[j['parent']]['tail'])-Vector(byname[j['parent']]['tail']) if j['parent'] else Vector((0,0,0))
-        head=Vector(old['head'])+shift;tail=head+(Vector(old['tail'])-Vector(old['head']))*bybone.get(j['name'],1)
-        j['head']=values(head);j['tail']=values(tail);solved[j['name']]=j
+    sk=morph_skeleton(record['skeleton'],scales)
     before={o.name:(o.data.as_pointer() if o.data else 0,ops.flatten(o.matrix_world)) for o in bpy.data.objects}
     materials={m.name:m.as_pointer() for m in bpy.data.materials}
-    obj=create_rig(sk,'BAD_CLAY_'+owner);vertices=[];faces=[];weights=[];sides=10
+    obj=create_rig(sk,'BAD_CLAY_'+owner);vertices=[];faces=[];weights=[]
+    byname={j['name']:j for j in sk['joints']};children={j['name']:[] for j in sk['joints']}
     for j in sk['joints']:
-        bone=obj.data.bones[j['name']];length=bone.length
-        radius=min(.08,max(.008,length*options.get('radius_ratio',.1)));base=len(vertices)
-        rings=[(-radius*.99,radius*.14),(-radius*.7,radius*.714),(0,radius),
-               (length,radius),(length+radius*.7,radius*.714),(length+radius*.99,radius*.14)]
-        for y,r in rings:
-            for k in range(sides):
-                theta=2*math.pi*k/sides
-                vertices.append(values(bone.matrix_local@Vector((r*math.cos(theta),y,r*math.sin(theta)))))
-        weights.append((j['name'],list(range(base,base+len(rings)*sides))))
-        for row in range(len(rings)-1):
-            for k in range(sides):
-                a=base+row*sides+k;b=base+row*sides+(k+1)%sides;faces.append((a,b,b+sides,a+sides))
-        faces.append(tuple(base+k for k in reversed(range(sides))))
-        faces.append(tuple(base+(len(rings)-1)*sides+k for k in range(sides)))
+        if j['parent']:children[j['parent']].append(j['name'])
+    # Render the same joint-head hierarchy that body_profile measures. Display
+    # tails are used only for terminal visualization, never as chain landmarks.
+    for j in sk['joints']:
+        if children[j['name']]:
+            for child in children[j['name']]:
+                _capsule(vertices,faces,weights,j['head'],byname[child]['head'],j['name'],options.get('radius_ratio',.1))
+        else:
+            _capsule(vertices,faces,weights,j['head'],j['tail'],j['name'],options.get('radius_ratio',.1))
     mesh=bpy.data.meshes.new(obj.name+'_skin');mesh.from_pydata(vertices,[],faces);mesh.update()
     skin=bpy.data.objects.new(mesh.name,mesh);bpy.context.scene.collection.objects.link(skin)
-    for name,ids in weights:skin.vertex_groups.new(name=name).add(ids,1.0,'REPLACE')
+    for name,ids in weights:
+        group=skin.vertex_groups.get(name) or skin.vertex_groups.new(name=name);group.add(ids,1.0,'REPLACE')
     modifier=skin.modifiers.new('CanonicalSkin','ARMATURE');modifier.object=obj;skin.parent=obj
     material=bpy.data.materials.new(obj.name+'_matte');material.use_nodes=True
     bsdf=next(n for n in material.node_tree.nodes if n.type=='BSDF_PRINCIPLED')
@@ -215,6 +227,7 @@ def clay(lib,options,owner):
     return {'armature':obj.name,'mesh':skin.name,'skeleton':actual,'body_profile':body_profile(actual),
             'classification':'CREATE_DIAGNOSTIC_PROXY','length_scales':scales,'morphology_locked':True,
             'existing_object_transforms_and_data_ids_preserved':True,'rig':ops.rig_report(obj),
+            'visual_geometry_basis':'joint-head hierarchy; terminal display tails only',
             'limitations':['segmented rigid-weight capsule proxy, not production skin',
               'girth is a visualization setting, not measured anatomy','existing characters are never reshaped',
               'fixed rest lengths, not animated bone scales'],'performance':'NOT_EVALUATED'}
