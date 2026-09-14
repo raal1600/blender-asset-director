@@ -191,21 +191,51 @@ def main(out,library):
         bpy.ops.wm.read_factory_settings(use_empty=True);probe,pskin,n=make_rig('ContactBody','target');scene=bpy.context.scene;scene.render.fps=30
         for f,x in [(1,0),(2,.05),(3,.1)]:
             pb=probe.pose.bones[n['hips']];pb.location=(x,0,0);pb.keyframe_insert('location',frame=f)
+        # Pose-bone location channels are bone-local, not world coordinates.
+        # Derive the downward handle offset from the actual unposed fixture basis.
+        local_down=(probe.matrix_world@probe.data.bones[n['hips']].matrix_local).to_3x3().inverted()@Vector((0,0,-.04))
         for c in ops.curves(probe.animation_data.action,probe.animation_data.action_slot):
             for k in c.keyframe_points:k.interpolation='LINEAR'
-            if c.array_index==2:
+            component=local_down[c.array_index]
+            if abs(component)>1e-8:
                 for k in c.keyframe_points:
                     k.interpolation='BEZIER';k.handle_left_type='FREE';k.handle_right_type='FREE'
-                    k.handle_left=(k.co.x-.333,-.04);k.handle_right=(k.co.x+.333,-.04)
+                    k.handle_left=(k.co.x-1/3,k.co.y+component)
+                    k.handle_right=(k.co.x+1/3,k.co.y+component)
         scene.frame_set(1);scene.frame_start=1;scene.frame_end=3;bpy.context.view_layer.update()
         deps=pskin.evaluated_get(bpy.context.evaluated_depsgraph_get());m=deps.to_mesh()
         ids=[v.index for v in pskin.data.vertices if any(g.group==pskin.vertex_groups[n['foot_l']].index for g in v.groups)]
         floor=min((deps.matrix_world@m.vertices[i].co).z for i in ids);deps.to_mesh_clear()
+        # Independently establish that the TEST DATA really penetrates between
+        # keys before asking contact-check to diagnose it. Do not reuse the
+        # runtime reducer or inferred contact states to establish this oracle.
+        frames=[1,1.5,2,2.5,3];expected={}
+        foot_ids={side:[v.index for v in pskin.data.vertices if any(
+            g.group==pskin.vertex_groups[n['foot_'+suffix]].index for g in v.groups)]
+            for side,suffix in [('left','l'),('right','r')]}
+        for f in frames:
+            scene.frame_set(math.floor(f),subframe=f-math.floor(f))
+            evaluated=pskin.evaluated_get(bpy.context.evaluated_depsgraph_get());mesh=evaluated.to_mesh()
+            try:
+                expected[f]={side:min((evaluated.matrix_world@mesh.vertices[i].co).z for i in selected)
+                             for side,selected in foot_ids.items()}
+            finally:evaluated.to_mesh_clear()
+        for f in (1,2,3):
+            assert all(abs(h-floor)<2e-6 for h in expected[f].values()),expected
+        for f in (1.5,2.5):
+            assert all(abs((h-floor)+.03)<2e-5 for h in expected[f].values()),expected
+        passed('fixture independently contains world-vertical subframe penetration',
+               measured_clearance={str(f):{side:h-floor for side,h in row.items()} for f,row in expected.items()})
+        scene.frame_set(1)
         contact_path=out/'contact-original.blend';bpy.ops.wm.save_as_mainfile(filepath=str(contact_path));h=file_hash(contact_path)
         opts={'target_object':probe.name,'mesh':pskin.name,'feet':{'left':[n['foot_l']],'right':[n['foot_r']]},
               'ground_z':floor,'meters_per_unit':1,'tolerance_m':.001,'near_ground_m':.02,'glide_speed_m_s':.01,
-              'frames':[1,1.5,2,2.5,3]}
+              'frames':frames}
         _,contact,cdir=run('contact-check',contact_path,options=opts)
+        for sample in contact['samples']:
+            for side in ('left','right'):
+                assert abs(sample[side]['minimum_z']-expected[sample['frame']][side])<2e-6,sample
+        assert any(sample['left']['state']=='GLIDE_CANDIDATE' for sample in contact['samples'])
         assert contact['extrema']['integer_frames']['penetration_within_tolerance']
         assert not contact['extrema']['subframes']['penetration_within_tolerance'],contact
         assert contact['repair_applied'] is False and contact['channels_changed']==[] and contact['performance']=='PENDING'
