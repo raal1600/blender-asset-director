@@ -63,7 +63,7 @@ def public_url(value):
 
 
 def validate_rights(rights):
-    fields(rights, {'license_id','license_url','evidence','commercial','adaptation','raw_redistribution','attribution'},
+    fields(rights, {'license_id','license_url','evidence','commercial','adaptation','raw_redistribution','attribution','review_grants'},
            {'license_id','license_url','evidence','commercial','adaptation','raw_redistribution','attribution'})
     text(rights['license_id'], 100)
     public_url(rights['license_url'])
@@ -82,10 +82,16 @@ def validate_rights(rights):
             'INVALID_MOTION', 'Rights fields are allowed/denied/unknown, not inferred booleans')
 
 
-def rights_gate(source, rights, project_use):
+def rights_gate(source, rights, project_use, *, lib=None):
     validate_rights(rights)
     require(project_use in PROJECT_USES, 'INVALID_MOTION', 'Declare project use')
     reasons = []
+    from .license_policy import LICENSE, validate_motion_scope
+    if rights['license_id'] == LICENSE or rights.get('review_grants') or source.get('provider','').lower() == 'mixamo':
+        try: validate_motion_scope(lib, source, rights)
+        except DirectorError as exc: reasons.append(exc.code)
+    elif rights['license_id'] not in {'CC0','CC0-1.0','CC-BY-4.0','CC-BY-3.0','CC-BY-NC-4.0'}:
+        reasons.append('LICENSE_REVIEW_REQUIRED')
     if project_use == 'unknown': reasons.append('PROJECT_USE_REQUIRED')
     if rights['adaptation'] != 'allowed': reasons.append('ADAPTATION_NOT_CLEARED')
     if project_use == 'commercial':
@@ -153,6 +159,13 @@ def validate_record(record):
         fields(f, {'sha256','size'}, {'sha256','size'}); sha(f['sha256'])
         require(type(f['size']) is int and f['size']>0,'INVALID_MOTION','Invalid source size')
     validate_rights(record['rights'])
+    if 'review_grants' in record['rights']:
+        from .license_policy import identifier, LICENSE
+        grants = record['rights']['review_grants']
+        require(isinstance(grants,list) and 1 <= len(grants) <= 32 and len(set(grants)) == len(grants)
+                and record['rights']['license_id'] == LICENSE and record['rights']['raw_redistribution'] == 'denied',
+                'LICENSE_SCOPE_MISMATCH', 'Restricted motion cannot shed its grant or redistribution limit')
+        for gid in grants: identifier(gid, 'lg_')
     names = validate_skeleton(record['skeleton'])
     timing = record['timing']
     fields(timing, {'duration_seconds','sample_count','source_frame_fps','native_capture_fps','sampling'},
@@ -248,6 +261,10 @@ def store(lib, record, payload):
     record=copy.deepcopy(record);record['id']=validate_record(record)
     read_payload(payload,record)
     for f in record['rights']['evidence']:lib.verify_file(f)
+    if (record['rights'].get('review_grants') or record['rights']['license_id']=='LicenseRef-Adobe-Mixamo'
+            or record['source']['provider'].lower()=='mixamo'):
+        from .license_policy import validate_motion_scope
+        validate_motion_scope(lib, record['source'], record['rights'])
     for parent in record['lineage']:load(lib,parent)
     root=within(lib.root,'motions');root.mkdir(exist_ok=True)
     target=root/record['id']
@@ -270,6 +287,10 @@ def load(lib, motion_id, *, samples=False):
     require(record_path.is_file(),'MOTION_NOT_FOUND','Unknown motion ID')
     r=load_json(record_path,2*1024**2);require(validate_record(r)==motion_id,'MOTION_HASH_MISMATCH','Record identity mismatch')
     for f in r['rights']['evidence']:lib.verify_file(f)
+    if (r['rights'].get('review_grants') or r['rights']['license_id']=='LicenseRef-Adobe-Mixamo'
+            or r['source']['provider'].lower()=='mixamo'):
+        from .license_policy import validate_motion_scope
+        validate_motion_scope(lib, r['source'], r['rights'])
     # Verify both immutable files even when numeric arrays are not requested.
     path=within(lib.root,f'motions/{motion_id}/motion.bin')
     data=read_payload(path,r) if samples else None

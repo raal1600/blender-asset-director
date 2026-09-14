@@ -65,10 +65,10 @@ def audit(options):
             'read_only':True,'unit_evidence':'explicit caller-supplied conversion, not inferred from a label'}
 
 
-def export(job,directory):
+def export(job,directory,lib):
     guard();o=job['specification']['options'];obj=rig(o['target_object'])
     action=bpy.data.actions.get(o['action']);require(action is not None,'ACTION_NOT_FOUND','Observed action not found')
-    gate=ma.rights_gate(o['source'],o['rights'],o['project_use'])
+    gate=ma.rights_gate(o['source'],o['rights'],o['project_use'], lib=lib)
     require(gate['eligible'],'MOTION_RIGHTS_BLOCKED','; '.join(gate['reasons']))
     sk=skeleton(obj,o['meters_per_unit'],rotation(o['source_to_canonical']),o['roles'])
     axes=rotation(o['source_to_canonical']);meters=o['meters_per_unit']
@@ -154,7 +154,7 @@ def load_source(record,samples,fps,owner):
 
 def allowed_motion(lib,options):
     record,samples=ma.load(lib,options['motion_id'],samples=True)
-    gate=ma.rights_gate(record['source'],record['rights'],options['project_use'])
+    gate=ma.rights_gate(record['source'],record['rights'],options['project_use'], lib=lib)
     require(gate['eligible'],'MOTION_RIGHTS_BLOCKED','; '.join(gate['reasons']))
     return record,samples,gate
 

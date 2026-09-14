@@ -55,11 +55,16 @@ def execute(job_path, *, live=False):
             bpy.context.preferences.filepaths.use_scripts_auto_execute = False
             if spec["inputs"]: ops.load_input(Path(spec["inputs"][0]["path"]))
             else: bpy.ops.wm.read_factory_settings(use_empty=True)
+            from asset_director import license_policy as lp
+            import json
+            embedded = json.loads(bpy.context.scene.get(lp.SCENE_KEY, '[]'))
+            require(isinstance(embedded, list) and set(embedded) <= set(spec.get("license_grants", [])),
+                    "LICENSE_SCOPE_MISMATCH", "Restricted working scene needs its originating library lineage")
             files = spec["source_files"]
             if op == "inspect": data = ops.inspect_scene()
             elif op in {"motion-export", "body-audit", "clay-proxy", "motion-source", "motion-retarget"}:
                 from asset_director import motion_blender
-                if op == "motion-export": data = motion_blender.export(job, directory)
+                if op == "motion-export": data = motion_blender.export(job, directory, lib)
                 elif op == "body-audit": data = motion_blender.audit(options)
                 elif op == "clay-proxy": data = motion_blender.clay(lib, options, job["id"])
                 elif op == "motion-source": data = motion_blender.source_import(lib, options, job["id"])
@@ -100,6 +105,9 @@ def execute(job_path, *, live=False):
                     for key in ("clips", "rigs", "unassigned_actions"): data[key].extend(report[key])
                     data["files_indexed"].append(f["path"])
                 data["blender_version"] = bpy.app.version_string
+            elif op == "native-clip":
+                from asset_director.native_clip import import_native
+                data = import_native(lib, lib.get(spec["asset_id"]))
             elif op == "import":
                 asset = lib.get(spec["asset_id"])
                 collection = bpy.data.collections.new("BAD_" + job["id"]); bpy.context.scene.collection.children.link(collection)
@@ -166,7 +174,12 @@ def execute(job_path, *, live=False):
             if op in MUTATIONS:
                 dest = directory / "result.blend"
                 require(not any(Path(f["path"]).resolve() == dest for f in spec["inputs"]), "ORIGINAL_OVERWRITE", "Output must not be an original input")
+                if spec.get("license_grants"):
+                    bpy.context.scene[lp.SCENE_KEY] = json.dumps(spec["license_grants"])
                 bpy.ops.wm.save_as_mainfile(filepath=str(dest), check_existing=False)
+                lp.retain_derivation(lib, dest, spec.get("license_grants", []))
+            if spec.get("license_grants"):
+                data["project_rights"] = {"grants": spec["license_grants"], "raw_redistribution": "DENIED", "scope": lp.SCOPE}
         summary = {"operation": op, "blender_version": bpy.app.version_string, "clips": len(data.get("clips", [])), "visual_acceptance": "PENDING"}
         atomic_json(directory / "result.json", {"status": "OK", "job_id": job["id"], "summary": summary, "data": data})
         return summary

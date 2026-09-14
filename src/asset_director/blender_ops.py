@@ -136,7 +136,7 @@ def import_file(path: Path, package_root: Path, *, selection=None, frame_fps=Non
         finally:
             scene.render.fps, scene.render.fps_base = saved
     elif extension == ".fbx":
-        bpy.ops.import_scene.fbx(filepath=str(path), automatic_bone_orientation=False, use_custom_props=False)
+        bpy.ops.import_scene.fbx(filepath=str(path), automatic_bone_orientation=False, use_custom_props=False, use_image_search=False)
     elif extension == ".obj": bpy.ops.wm.obj_import(filepath=str(path))
     elif extension == ".bvh": bpy.ops.import_anim.bvh(filepath=str(path))
     elif extension == ".blend":

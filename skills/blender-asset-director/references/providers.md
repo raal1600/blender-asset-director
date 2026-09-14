@@ -30,3 +30,11 @@ Primary references:
 - https://docs.ambientcg.com/license/
 - https://sketchfab.com/developers/download-api/downloading-models
 - https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html
+
+## Local motion inboxes
+
+See `local-motion-library.md` for registered read-only roots, scoped Mixamo grants,
+bounded sync and preflight. Copy/index readiness, import eligibility and performance
+are separate. Folder names alone never authorize import; no raw redistribution or
+unofficial provider downloader is included. Other datasets still need their own
+licenses and any native-format converter not already present.

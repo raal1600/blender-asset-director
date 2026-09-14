@@ -1,6 +1,7 @@
 """Durable, versioned jobs and bounded isolated Blender execution."""
 from __future__ import annotations
 import os
+import copy
 from pathlib import Path
 import subprocess
 import threading
@@ -12,6 +13,7 @@ from . import motion_contract
 
 OPS = {
     "stage-floor": {"size", "location", "color", "grid_color", "tile_size", "roughness"},
+    "native-clip": set(),
     "inspect": set(),
     "scene-audit": set(),
     "camera-fit": {"subjects", "frames", "direction", "lens_mm", "sensor_width_mm", "margin", "projection"},
@@ -29,7 +31,7 @@ OPS = {
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage"},
 }
-MUTATIONS = {"stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
+MUTATIONS = {"native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
              "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 TARGET_REQUIRED = {"stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
                    "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
@@ -45,11 +47,11 @@ def implementation_hash():
 
 def prepare(lib: Library, operation: str, input_file: str | None = None, asset_id: str | None = None, options=None) -> dict:
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
-    options = options or {}
+    options = copy.deepcopy(options or {})
     fields(options, OPS[operation])
     if operation in motion_contract.OPS:
         motion_contract.validate(operation, options)
-    require(operation != "motion-source" or input_file is None, "SOURCE_ONLY_OPERATION", "motion-source creates a fresh source-only file")
+    require(operation not in {"motion-source", "native-clip"} or input_file is None, "SOURCE_ONLY_OPERATION", "motion-source creates a fresh source-only file")
     if operation == "assemble":
         from .motion_timing import validate_assembly
         validate_assembly(options)
@@ -82,8 +84,8 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     source_files = []
     if asset:
         require(asset.local_files, "ASSET_NOT_ACQUIRED", "Acquire/intake the source first")
-        if operation in {"import", "retarget"}:
-            policy = rights(asset)
+        if operation in {"import", "retarget", "native-clip"}:
+            policy = rights(asset, lib=lib)
             require(policy["eligible"], "BLOCKED_POLICY", "; ".join(policy["reasons"]))
         for f in asset.local_files: lib.verify_file(f)
         source_files = asset.local_files
@@ -95,26 +97,44 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
                 require("source_fps" not in options or options["source_fps"] == asset.metadata["fps"],
                         "SOURCE_TIMEBASE_MISMATCH", "Do not override indexed timebase to change speed; use assemble playback_speed")
                 options.setdefault("source_fps", asset.metadata["fps"])
+    from . import license_policy as lp
+    grants = set()
+    if asset and operation != "index" and asset.metadata.get("license_grant"):
+        grants.add(asset.metadata["license_grant"])
+    for f in inputs: grants.update(lp.derivation(lib, f["sha256"]))
+    if operation == "native-clip":
+        require(asset and asset.kind == "animation" and asset.metadata.get("action") and asset.metadata.get("fps"),
+                "INDEX_REQUIRED", "Choose an indexed animation clip for native playback")
+    if operation == "motion-export" and grants:
+        options["rights"] = lp.canonical_rights(lib, sorted(grants))
     if operation in TARGET_REQUIRED:
         require(inputs, "TARGET_REQUIRED", "Operation requires a specific saved working/target file")
-    if operation in {"import", "retarget"}: require(source_files, "SOURCE_REQUIRED", "Operation requires an acquired asset ID")
+    if operation in {"import", "retarget", "native-clip"}: require(source_files, "SOURCE_REQUIRED", "Operation requires an acquired asset ID")
     if operation in motion_contract.OPS:
         require(not asset_id, "INVALID_MOTION", "Motion jobs use canonical IDs or explicit saved inputs")
         if "motion_id" in options:
             from .motion_assets import load, record_files, rights_gate
             record, _ = load(lib, options["motion_id"])
-            gate = rights_gate(record["source"], record["rights"], options["project_use"])
+            gate = rights_gate(record["source"], record["rights"], options["project_use"], lib=lib)
             require(gate["eligible"], "MOTION_RIGHTS_BLOCKED", "; ".join(gate["reasons"]))
             source_files = record_files(lib, options["motion_id"]) + record["rights"]["evidence"]
+            grants.update(record["rights"].get("review_grants", []))
         elif operation == "motion-export":
             from .motion_assets import rights_gate
-            gate = rights_gate(options["source"], options["rights"], options["project_use"])
+            if options["rights"].get("review_grants"):
+                lp.validate_motion_scope(lib, {**options["source"], "raw_files": [
+                    {k:f[k] for k in ("sha256", "size")} for f in inputs]}, options["rights"])
+            gate = rights_gate(options["source"], options["rights"], options["project_use"], lib=lib)
             require(gate["eligible"], "MOTION_RIGHTS_BLOCKED", "; ".join(gate["reasons"]))
             source_files = options["rights"]["evidence"]
+            grants.update(options["rights"].get("review_grants", []))
         for f in source_files: lib.verify_file(f)
+    grant_ids = sorted(grants)
+    license_files = lp.dependencies(lib, grant_ids)
     # No terminal strings, scripts, network endpoints, or model-provided output paths.
     specification = {"schema_version": SCHEMA, "operation": operation, "inputs": inputs, "asset_id": asset_id,
-                     "source_files": source_files, "source_file": asset.metadata.get("file") if asset else None, "options": options, "implementation": implementation_hash()}
+                     "source_files": source_files, "source_file": asset.metadata.get("file") if asset else None, "options": options, "implementation": implementation_hash(),
+                     "license_grants": grant_ids, "license_files": license_files}
     jid = "j_" + digest(specification)[:24]
     path = lib.root / "jobs" / jid / "job.json"
     if path.exists():
@@ -140,6 +160,10 @@ def read_job(lib: Library, jid: str) -> tuple[dict, Path]:
         p = Path(f["path"])
         require(p.is_file() and p.stat().st_size == f["size"] and file_hash(p) == f["sha256"], "STALE_INPUT", "Target input changed; prepare a new job")
     for f in job["specification"]["source_files"]: lib.verify_file(f)
+    from . import license_policy as lp
+    current = lp.dependencies(lib, job["specification"].get("license_grants", []))
+    require(current == job["specification"].get("license_files", []), "LICENSE_EVIDENCE_CHANGED", "Prepared license evidence changed")
+    for f in current: lib.verify_file(f)
     return job, path
 
 
@@ -220,6 +244,7 @@ def index_result(lib: Library, asset_id: str, jid: str) -> dict:
     a = lib.get(asset_id)
     job, path = read_job(lib, jid)
     require(job["state"] == "SUCCEEDED" and job["specification"]["operation"] == "index", "INDEX_NOT_READY", "Need a successful index job")
+    for output in job["outputs"]: lib.verify_file(output)
     report = load_json(path.parent / "result.json")
     clips = report.get("data", {}).get("clips", [])
     added = []
@@ -228,15 +253,20 @@ def index_result(lib: Library, asset_id: str, jid: str) -> dict:
         require(any(f["sha256"] == sf["sha256"] and f["path"] == sf["path"] for f in a.local_files), "INDEX_SOURCE_MISMATCH", "Index result refers to a different asset")
         family = re_clip_name(clip["action"])
         sid = digest([a.id, sf["sha256"], clip["action"], clip.get("slot"), clip["source_object"]])
-        record = Asset(a.provider, "clip-" + sid, clip["action"], "animation", a.source_url, a.license_id, a.license_url, a.author,
-                       a.price, True, [Path(sf["path"]).suffix.lower()], sorted(tokens(clip["action"])), a.evidence,
+        record = Asset(a.provider, "clip-" + sid, (a.title + " / " + clip["action"]) if a.metadata.get("local_motion") else clip["action"], "animation", a.source_url, a.license_id, a.license_url, a.author,
+                       a.price, True, [Path(sf["path"]).suffix.lower()], sorted(tokens(clip["action"]) | (set(a.tags) if a.metadata.get("local_motion") else set())), a.evidence,
                        # Include sidecar dependencies, not only the primary glTF.
                        local_files=a.local_files,
-                       metadata={**clip, "parent_asset": a.id, "motion_family": digest([a.id, family]),
+                       metadata={**{k:a.metadata[k] for k in ("license_grant", "local_motion", "semantic_evidence") if k in a.metadata}, **clip, "parent_asset": a.id, "motion_family": digest([a.id, family]),
                                  "family_match": "name-grouped format variants; not proof of identical motion", "tag_origin": "filename inference", "visual_review": "PENDING"})
-        lib.put(record); added.append(record.id)
+        try:
+            old = lib.get(record.id); record.checked_at = old.checked_at
+        except DirectorError: old = None
+        if old is None or old.to_dict() != record.to_dict(): lib.put(record)
+        added.append(record.id)
+    previous_asset = copy.deepcopy(a.to_dict())
     a.metadata["indexed_clips"] = added; a.metadata["index_job"] = jid
-    lib.put(a)
+    if a.to_dict() != previous_asset: lib.put(a)
     return {"status": "INDEXED", "clips": len(added), "motion_families": len({lib.get(i).metadata["motion_family"] for i in added}), "ids": added}
 
 

@@ -47,7 +47,7 @@ def search(lib,query,project_use,*,remote=False,limit=8):
         if terms and not matched:continue
         rows.append({'id':rec['id'],'title':sem['title'],'provider':rec['source']['provider'],'kind':'canonical_motion',
           'matched_terms':sorted(matched),'unmatched_terms':sorted(terms-corpus),'semantic_score':round(len(matched)/max(1,len(terms)),4),
-          'eligibility':rights_gate(rec['source'],rec['rights'],project_use),'acquisition':'LOCAL_VERIFIED',
+          'eligibility':rights_gate(rec['source'],rec['rights'],project_use, lib=lib),'acquisition':'LOCAL_VERIFIED',
           'capture_method':rec['source']['capture_method'],'capture_evidence':rec['source']['capture_evidence'],'performance':'REVIEW_REQUIRED'})
     assets={a.id:a for a in lib.all() if a.kind in ('animation','pack') or a.metadata.get('animation_count_claimed',0)}
     sources.append({'provider':'local','status':'SEARCHED','canonical_records':len(paths),'asset_records':len(assets)})
@@ -64,7 +64,7 @@ def search(lib,query,project_use,*,remote=False,limit=8):
     for a in assets.values():
         corpus=words(a.title+' '+' '.join(a.tags));matched=terms&corpus
         if terms and not matched:continue
-        gate=rights(a)
+        gate=rights(a, lib=lib)
         if project_use=='unknown':gate={'eligible':False,'reasons':['PROJECT_USE_REQUIRED']}
         acquisition='PROVIDER_ROUTE'
         if a.local_files:

@@ -26,7 +26,7 @@ def capabilities() -> dict:
         "polyhaven": {"search": "READY", "download": "READY", "credit": "Assets from Poly Haven; API use credited separately from CC0"},
         "ambientcg": {"search": "READY", "download": "READY", "note": "v3 with explicit documented v2 fallback"},
         "sketchfab": {"search": "READY", "download": "READY" if auth else "AUTH_REQUIRED", "note": "Credentials present does not mean authentication has been runtime-tested"},
-        "mixamo": {"search": "MANUAL_ONLY", "download": "MANUAL_ONLY", "intake": "READY", "note": "Use official Adobe site; no bulk ripper or auto-upload"},
+        "mixamo": {"search": "MANUAL_ONLY", "download": "MANUAL_ONLY", "local_sync": "REGISTERED_ROOT_ONLY", "intake": "READY_COPY_AND_INDEX", "project_import": "REVIEWED_GRANT_REQUIRED", "raw_redistribution": "DENIED_BY_PROFILE", "note": "Folder names do not prove origin. No bulk ripper, token extraction or auto-upload."},
         "blenderkit": {"search": "HOST_TOOL_OR_MANUAL", "download": "HOST_TOOL_OR_MANUAL", "intake": "READY"},
         "poly_pizza": {"search": "HOST_TOOL_OR_MANUAL", "download": "HOST_TOOL_OR_MANUAL", "intake": "READY"}}
 
@@ -103,7 +103,7 @@ class Providers:
                     metadata={"animation_count_claimed": item.get("animationCount"), "face_count_claimed": item.get("faceCount"), "download_auth": "REQUIRED"}))
         else:
             return {"provider": provider, "status": "MANUAL_ONLY", "results": [], "next": "Use the supported provider UI/host tool; then intake local files with source and license evidence"}
-        selected = rank(query, candidates, kind if provider != "quaternius" else None, limit)
+        selected = rank(query, candidates, kind if provider != "quaternius" else None, limit, lib=self.lib)
         for r in selected:
             a = Asset.from_dict(r["asset"])
             try:

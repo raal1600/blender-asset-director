@@ -132,8 +132,16 @@ class Asset:
         canonical(a.to_dict())
         return a
 
-def rights(a: Asset, *, commercial: bool = True) -> dict:
+def rights(a: Asset, *, commercial: bool = True, lib=None, purpose="project_use") -> dict:
     """Conservative policy classification, not legal advice or third-party-rights clearance."""
+    require(purpose in {"project_use", "raw_redistribution"}, "INVALID_SCHEMA", "Unknown usage scope")
+    if (a.license_id == "LicenseRef-Adobe-Mixamo" or a.metadata.get("license_grant")
+            or a.provider == "mixamo" or a.metadata.get("local_motion", {}).get("provider_hint") == "mixamo"):
+        from .license_policy import asset_gate
+        result = asset_gate(lib, a, purpose)
+        if a.price != 0 or not a.local_files or not any(x.lower() in FORMATS for x in a.formats):
+            result["eligible"] = False; result["reasons"].append("ASSET_NOT_READY")
+        return result
     reasons = []
     if a.price is None: reasons.append("PRICE_UNVERIFIED")
     elif a.price != 0: reasons.append("PAID_NOT_AUTHORIZED")
@@ -141,7 +149,7 @@ def rights(a: Asset, *, commercial: bool = True) -> dict:
     if not any(x.lower() in FORMATS for x in a.formats): reasons.append("FORMAT_UNSUPPORTED")
     lid = a.license_id.upper().strip()
     allowed = lid in {"CC0", "CC0-1.0", "CC-BY-4.0", "CC-BY-3.0"}
-    if commercial and not allowed: reasons.append("LICENSE_REVIEW_REQUIRED")
+    if not allowed: reasons.append("LICENSE_REVIEW_REQUIRED")
     if a.evidence not in {"provider", "user_attested"} or not a.license_url:
         reasons.append("LICENSE_EVIDENCE_MISSING")
     return {"eligible": not reasons, "reasons": reasons, "attribution_required": lid.startswith("CC-BY-"),
@@ -168,7 +176,7 @@ def plan(brief: str) -> dict:
     return intake(brief)
 
 
-def rank(query: str, assets: list[Asset], kind: str | None = None, limit: int = 5) -> list[dict]:
+def rank(query: str, assets: list[Asset], kind: str | None = None, limit: int = 5, *, lib=None) -> list[dict]:
     require(1 <= limit <= 50, "INVALID_SCHEMA", "Limit must be 1..50")
     q = tokens(text(query, 2000))
     results = []
@@ -177,7 +185,7 @@ def rank(query: str, assets: list[Asset], kind: str | None = None, limit: int = 
         corpus = tokens(a.title + " " + " ".join(a.tags))
         match = q & corpus
         if q and not match: continue
-        p = rights(a)
+        p = rights(a, lib=lib)
         # A known wrong gait is not rescued by matching 'armed' or 'slow'.
         if "walk" in q and "run" in corpus and "walk" not in corpus:
             p["eligible"] = False; p["reasons"].append("WRONG_MOTION_RUN_NOT_WALK")
@@ -250,7 +258,7 @@ class Library:
         records = self.all()
         report = {"schema_version": SCHEMA, "assets": len(records), "clips": sum(a.kind == "animation" for a in records),
                   "licenses": [{"id": a.id, "title": a.title, "source": a.source_url, "author": a.author,
-                                "license": a.license_id, "license_url": a.license_url, "policy": rights(a)} for a in records]}
+                                "license": a.license_id, "license_url": a.license_url, "policy": rights(a, lib=self)} for a in records]}
         atomic_json(self.root / "reports" / "library.json", report)
         lines = ["# Asset sources and attribution", "", "This records evidence, not a blanket legal clearance. Raw assets are not part of the code repository.", ""]
         for a in records:

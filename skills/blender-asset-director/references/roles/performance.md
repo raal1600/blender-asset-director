@@ -36,3 +36,11 @@ not an IK solution. Clay geometry is fitted once in rest space and kept separate
 from the final character. Kinematic contact candidates are not intended contact
 states; do not lock a deliberate slide. Temporal acceptance needs actual temporal
 evidence, not a filename, still image or numeric score.
+
+## Local source-first workflow
+
+Load `../local-motion-library.md`. Refresh approved roots once per motion task,
+search local clips, and inspect `motion-preflight`. Prefer `native-clip` to inspect
+the original character/action before proxy or retarget work. Names and copying do
+not prove rights. A verified torso chain resolves distinct joints, not by inventing
+a spine. Keep gliding, root travel, native timebase and loop acceptance explicit.

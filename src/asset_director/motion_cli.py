@@ -6,6 +6,8 @@ from . import motion_assets as ma
 
 
 def add_parsers(sub):
+    from .local_motion_cli import add_parsers as add_local
+    add_local(sub)
     sub.add_parser('motion-providers')
     q=sub.add_parser('motion-scout');q.add_argument('query');q.add_argument('--use',required=True,choices=sorted(ma.PROJECT_USES));q.add_argument('--remote',action='store_true');q.add_argument('--limit',type=int,default=8)
     q=sub.add_parser('motion-evidence');q.add_argument('path',help='Explicit local terms/permission text, never credentials')
@@ -18,6 +20,8 @@ def add_parsers(sub):
 
 def dispatch(lib,args):
     cmd=args.command
+    from .local_motion_cli import COMMANDS, dispatch as local_dispatch
+    if cmd in COMMANDS: return local_dispatch(lib,args)
     if cmd=='motion-providers':
         from .motion_scout import capabilities
         return capabilities()

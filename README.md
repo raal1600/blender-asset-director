@@ -1,14 +1,12 @@
 # Blender Asset Director
 
-> **Development branch: `feature/motion-foundation`, runtime `0.6.0-dev.1`.**
-> This first motion milestone adds immutable canonical records, rights-aware
-> scouting, measured body profiles, a fitted segmented clay proxy, a bridge to
-> the existing retargeter, and temporal-review receipts.
-> [Pull and test without replacing your installed skill](docs/LOCAL_MOTION_ACCEPTANCE.md)
-> · [Contracts and limitations](docs/MOTION_FOUNDATION.md).
-> The published installer below remains v0.5.0. There is **no v0.6 release** yet.
-> Native CMU/AIST/AMASS conversion, GPU video reconstruction, foot IK and a
-> production-quality sculptable human mesh are not implemented in this milestone.
+> **Development branch: `feature/local-motion-library`, runtime `0.6.0-dev.2`.**
+> Adds read-only user animation folders, bounded sync/index/reuse, reviewed Mixamo
+> project-use grants, clear import preflight and native-character playback before
+> retargeting. No unofficial downloader, watcher, new addon or GPU dependency.
+> [Setup, contracts and local acceptance](docs/LOCAL_MOTION_LIBRARY.md).
+> Built on the [motion foundation](docs/MOTION_FOUNDATION.md) and proxy fixes.
+> The published installer below still selects **v0.5.0**. No v0.6 release exists.
 
 **Give Codex a small Blender production team, not another Blender harness.**
 

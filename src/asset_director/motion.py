@@ -27,7 +27,21 @@ def identify_roles(bones: list[dict]) -> dict:
         matches = [b["name"] for b in bones if norm_bone(b["name"]) in aliases]
         if len(matches) == 1: assigned[role] = matches[0]
         elif matches: ambiguous[role] = sorted(matches)
-    return {"roles": assigned, "ambiguous": ambiguous, "missing": sorted(REQUIRED - assigned.keys()), "evidence": "name aliases; hierarchy/geometry still require validation"}
+    # Resolve only an exact observed Mixamo-compatible torso hierarchy.
+    # Spine/Spine1/Spine2 are distinct joints, not synonyms. No provider guess.
+    by_name = {b['name']: b for b in bones}
+    matches = {n: [b for b in bones if norm_bone(b['name']) == n]
+               for n in ('hips', 'spine', 'spine1', 'spine2')}
+    torso = None
+    if len(by_name) == len(bones) and all(len(v) == 1 for v in matches.values()):
+        chain = [matches[n][0] for n in ('hips', 'spine', 'spine1', 'spine2')]
+        if all(child.get('parent') == parent['name'] for parent, child in zip(chain, chain[1:])):
+            assigned.update(spine=chain[1]['name'], spine_mid=chain[2]['name'], chest=chain[3]['name'])
+            ambiguous.pop('spine', None)
+            torso = {'method': 'observed Mixamo-compatible torso hierarchy',
+                     'chain': [b['name'] for b in chain], 'provider_identity_proven': False}
+    return {"roles": assigned, "ambiguous": ambiguous, "missing": sorted(REQUIRED - assigned.keys()),
+            "evidence": "name aliases and verified torso hierarchy; geometry/rest pose still require review", "torso_chain": torso}
 
 def rig_fingerprint(bones: list[dict], object_scale=(1, 1, 1)) -> str:
     return digest({"bones": sorted([{k: b[k] for k in ("name", "parent", "rest")} for b in bones], key=lambda b: b["name"]),
