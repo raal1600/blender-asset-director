@@ -74,9 +74,9 @@ def export(job,directory,lib):
     axes=rotation(o['source_to_canonical']);meters=o['meters_per_unit']
     fps=bpy.context.scene.render.fps/bpy.context.scene.render.fps_base
     duration=(o['end']-o['start'])/fps;ma.finite(duration,1e-7,600)
-    n=math.ceil(duration*o['sample_fps'])
-    require(n+1<=ma.MAX_FRAMES and (n+1)*len(sk['joints'])<=ma.MAX_JOINT_FRAMES,'RESOURCE_LIMIT','Export sample budget exceeded')
-    times=[i/o['sample_fps'] for i in range(n)]+[duration]
+    from .motion_timing import capture_times
+    times=capture_times(duration,o['sample_fps'],ma.MAX_FRAMES)
+    require(len(times)*len(sk['joints'])<=ma.MAX_JOINT_FRAMES,'RESOURCE_LIMIT','Export sample budget exceeded')
     ops.assign(obj,action,o.get('slot'))
     for track in obj.animation_data.nla_tracks:track.mute=True
     start,end=ops.action_range(action,getattr(obj.animation_data,'action_slot',None))
