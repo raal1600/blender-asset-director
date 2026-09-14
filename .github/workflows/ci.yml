@@ -87,6 +87,11 @@ jobs:
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/motion_foundation_fixture.py -- "$RUNNER_TEMP/motion-foundation" "$RUNNER_TEMP/bad-library"
           cp "$RUNNER_TEMP/motion-foundation/motion_foundation_report.json" evidence/
+      - name: Evaluated clay skin, root/controller exclusion and landmark attachments
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/proxy_visual_fixture.py -- "$RUNNER_TEMP/proxy-visual" "$RUNNER_TEMP/bad-library"
+          cp "$RUNNER_TEMP/proxy-visual/proxy_visual_report.json" evidence/
+          cp "$RUNNER_TEMP/proxy-visual/"proxy-*.png evidence/
       - name: Live free asset acquisition and real-motion retarget
         if: matrix.blender == '5.0.0'
         run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence

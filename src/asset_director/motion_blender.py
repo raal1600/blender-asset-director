@@ -170,54 +170,18 @@ def source_import(lib,options,owner):
             'rig':ops.rig_report(obj),'performance':'NOT_EVALUATED','source_only':True}
 
 
-def _capsule(vertices,faces,weights,start,end,weight_name,radius_ratio):
-    start=Vector(start);end=Vector(end);axis=end-start;length=axis.length
-    if length<=1e-6:return
-    radius=min(.08,max(.008,length*radius_ratio));base=len(vertices);sides=10
-    q=Vector((0,1,0)).rotation_difference(axis.normalized())
-    frame=Matrix.Translation(start)@q.to_matrix().to_4x4()
-    rings=[(-radius*.99,radius*.14),(-radius*.7,radius*.714),(0,radius),
-           (length,radius),(length+radius*.7,radius*.714),(length+radius*.99,radius*.14)]
-    for y,r in rings:
-        for k in range(sides):
-            theta=2*math.pi*k/sides
-            vertices.append(values(frame@Vector((r*math.cos(theta),y,r*math.sin(theta)))))
-    weights.append((weight_name,list(range(base,base+len(rings)*sides))))
-    for row in range(len(rings)-1):
-        for k in range(sides):
-            a=base+row*sides+k;b=base+row*sides+(k+1)%sides;faces.append((a,b,b+sides,a+sides))
-    faces.append(tuple(base+k for k in reversed(range(sides))))
-    faces.append(tuple(base+(len(rings)-1)*sides+k for k in range(sides)))
-
-
 def clay(lib,options,owner):
     guard();record,_,_=allowed_motion(lib,options)
     scales=options.get('length_scales',{})
     sk=morph_skeleton(record['skeleton'],scales)
     before={o.name:(o.data.as_pointer() if o.data else 0,ops.flatten(o.matrix_world)) for o in bpy.data.objects}
     materials={m.name:m.as_pointer() for m in bpy.data.materials}
-    obj=create_rig(sk,'BAD_CLAY_'+owner);vertices=[];faces=[];weights=[]
-    byname={j['name']:j for j in sk['joints']};children={j['name']:[] for j in sk['joints']}
-    for j in sk['joints']:
-        if j['parent']:children[j['parent']].append(j['name'])
-    # Render the same joint-head hierarchy that body_profile measures. Display
-    # tails are used only for terminal visualization, never as chain landmarks.
-    for j in sk['joints']:
-        if children[j['name']]:
-            for child in children[j['name']]:
-                _capsule(vertices,faces,weights,j['head'],byname[child]['head'],j['name'],options.get('radius_ratio',.1))
-        else:
-            _capsule(vertices,faces,weights,j['head'],j['tail'],j['name'],options.get('radius_ratio',.1))
-    mesh=bpy.data.meshes.new(obj.name+'_skin');mesh.from_pydata(vertices,[],faces);mesh.update()
-    skin=bpy.data.objects.new(mesh.name,mesh);bpy.context.scene.collection.objects.link(skin)
-    for name,ids in weights:
-        group=skin.vertex_groups.get(name) or skin.vertex_groups.new(name=name);group.add(ids,1.0,'REPLACE')
-    modifier=skin.modifiers.new('CanonicalSkin','ARMATURE');modifier.object=obj;skin.parent=obj
-    material=bpy.data.materials.new(obj.name+'_matte');material.use_nodes=True
-    bsdf=next(n for n in material.node_tree.nodes if n.type=='BSDF_PRINCIPLED')
-    bsdf.inputs['Base Color'].default_value=(*options.get('color',[.45]*3),1)
-    bsdf.inputs['Roughness'].default_value=.7;mesh.materials.append(material)
-    for poly in mesh.polygons:poly.use_smooth=True
+    from .motion_proxy import anatomy_graph
+    from .proxy_geometry import create_skin, check_attachments
+    anatomy_graph(sk)  # Validate semantic body before creating any Blender data.
+    obj=create_rig(sk,'BAD_CLAY_'+owner)
+    skin,geometry=create_skin(obj,sk,options.get('radius_ratio',.1),options.get('color',[.45]*3))
+    attachment_qa=check_attachments(obj,[bpy.context.scene.frame_current+bpy.context.scene.frame_subframe])
     obj['bad_morphology_locked']=True;obj['bad_source_motion']=record['id']
     require(all(n in bpy.data.objects and (bpy.data.objects[n].data.as_pointer() if bpy.data.objects[n].data else 0,
             ops.flatten(bpy.data.objects[n].matrix_world))==v for n,v in before.items()),'CLAY_ISOLATION_FAILED','Existing objects changed')
@@ -227,8 +191,10 @@ def clay(lib,options,owner):
     return {'armature':obj.name,'mesh':skin.name,'skeleton':actual,'body_profile':body_profile(actual),
             'classification':'CREATE_DIAGNOSTIC_PROXY','length_scales':scales,'morphology_locked':True,
             'existing_object_transforms_and_data_ids_preserved':True,'rig':ops.rig_report(obj),
-            'visual_geometry_basis':'joint-head hierarchy; terminal display tails only',
-            'limitations':['segmented rigid-weight capsule proxy, not production skin',
+            'visual_geometry_basis':geometry['graph']['geometry_basis'],
+            'proxy_geometry':geometry,'proxy_attachment_check':attachment_qa,
+            'limitations':['segmented anatomical links and landmarks, not production skin',
+              'endpoint-blended links can shear or self-intersect; no IK or volume guarantee',
               'girth is a visualization setting, not measured anatomy','existing characters are never reshaped',
               'fixed rest lengths, not animated bone scales'],'performance':'NOT_EVALUATED'}
 
@@ -256,4 +222,8 @@ def retarget(lib,options,owner):
         bpy.data.objects.remove(source,do_unlink=True)
         if action.name in bpy.data.actions:bpy.data.actions.remove(action)
     result['source_motion_id']=record['id'];result['source_rights']=gate
+    from .proxy_geometry import check_attachments
+    start,end=result['frame_range']
+    frames=[start+(end-start)*i/8 for i in range(9)]
+    result['proxy_attachment_check']=check_attachments(target,frames)
     return result

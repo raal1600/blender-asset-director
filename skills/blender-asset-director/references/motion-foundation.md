@@ -62,10 +62,15 @@ an automatic scale suggestion.
 
 `clay-proxy` needs motion_id and project_use plus a saved staging input. Optional:
 length_scales (observed roles, 0.5–2), radius_ratio (0.025–0.3), RGB color. It creates
-new segmented capsule geometry, a rig and rigid skin weights. Bone lengths are set
-in rest geometry once; pose scales remain one. Girth is a display choice, not a
-measured human body. This is not seamless production skin, and a proxy does not
-remove the need to solve final-character contacts.
+new segmented anatomy geometry and a rig. Visible links use only reviewed
+anatomical roles beneath hips, never the root/controller hierarchy or arbitrary
+terminal display tails. Root, helper and decorative bones stay in the rig but
+receive no direct surface weights. Segment ends bind to their own anatomical
+landmarks; terminal hands/feet/head use bounded landmark markers, not guessed
+tail anatomy. This remains a segmented diagnostic body, not seamless skin.
+Bone lengths are set in rest geometry once; pose scales remain one. Girth is a
+display choice, not a measured human body. A proxy does not remove the need to
+solve final-character contacts.
 
 `motion-source` needs motion_id, project_use, explicit fps. No input blend is
 accepted: this creates a source-only reconstruction in an empty worker.
@@ -84,6 +89,15 @@ one and world-Z-preserving alignment, preventing accidental double scaling.
 All jobs use the existing job-prepare/job-run worker, source hashes, new result
 files, reviewed schemas and resource bounds. Existing asset catalogs stay intact.
 Do not manually edit a job receipt or installed managed runtime.
+
+Generated proxies carry `asset-director.proxy-geometry/2` metadata, including
+rendered segments, excluded bones, endpoint ring indices and landmark membership.
+`clay-proxy` checks the created mesh at rest. `motion-retarget` checks the evaluated
+mesh at nine bounded timestamps and reports `proxy_attachment_check`. A detached
+ring/marker centre fails with PROXY_ATTACHMENT_FAILED even if skeletal transfer
+passes. Old proxies are NOT_CHECKED; regenerate them through new jobs rather than
+editing old receipts. This is structural attachment QA, not continuous performance,
+volume, self-intersection or skin-quality acceptance. Preserve the old results.
 
 ## Diagnostics / reviews
 
