@@ -39,6 +39,8 @@ def parser():
     q=s.add_parser("job-show"); q.add_argument("job_id")
     q=s.add_parser("job-retry"); q.add_argument("job_id")
     q=s.add_parser("index-collect"); q.add_argument("asset_id"); q.add_argument("job_id")
+    from .motion_cli import add_parsers
+    add_parsers(s)
     return p
 
 
@@ -47,7 +49,10 @@ def main(argv=None):
         args = parser().parse_args(argv)
         with Library(args.library) as lib:
             command=args.command
-            if command == "configure":
+            if command.startswith("motion-") or command == "retarget-profile":
+                from .motion_cli import dispatch
+                result = dispatch(lib, args)
+            elif command == "configure":
                 result=settings.configure(library=args.library,blender=args.blender,skill_path=args.skill_path)
             elif command == "doctor":
                 from .backend import verify

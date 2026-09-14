@@ -57,6 +57,13 @@ def execute(job_path, *, live=False):
             else: bpy.ops.wm.read_factory_settings(use_empty=True)
             files = spec["source_files"]
             if op == "inspect": data = ops.inspect_scene()
+            elif op in {"motion-export", "body-audit", "clay-proxy", "motion-source", "motion-retarget"}:
+                from asset_director import motion_blender
+                if op == "motion-export": data = motion_blender.export(job, directory)
+                elif op == "body-audit": data = motion_blender.audit(options)
+                elif op == "clay-proxy": data = motion_blender.clay(lib, options, job["id"])
+                elif op == "motion-source": data = motion_blender.source_import(lib, options, job["id"])
+                else: data = motion_blender.retarget(lib, options, job["id"])
             elif op == "stage-floor":
                 from asset_director.floor_stage import create
                 data = create(options, job["id"])
@@ -155,8 +162,8 @@ def execute(job_path, *, live=False):
                     if options.get("terrain_object"):
                         data["terrain_qa"] = ops.terrain_quality(sampled,report["anatomical_height"],options["terrain_object"],options.get("sole_offsets"))
             else: raise DirectorError("UNKNOWN_OPERATION", "Unsupported operation")
-            if op in {"stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
-                      "light-adjust", "world-adjust", "look-adjust", "light-rig"}:
+            from asset_director.jobs import MUTATIONS
+            if op in MUTATIONS:
                 dest = directory / "result.blend"
                 require(not any(Path(f["path"]).resolve() == dest for f in spec["inputs"]), "ORIGINAL_OVERWRITE", "Output must not be an original input")
                 bpy.ops.wm.save_as_mainfile(filepath=str(dest), check_existing=False)

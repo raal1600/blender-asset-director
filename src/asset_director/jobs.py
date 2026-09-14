@@ -8,6 +8,7 @@ import time
 from .core import Asset, DirectorError, Library, SCHEMA, atomic_json, canonical, digest, fields, file_hash, load_json, require, rights, tokens, within
 from . import camera_plan
 from . import look_contract
+from . import motion_contract
 
 OPS = {
     "stage-floor": {"size", "location", "color", "grid_color", "tile_size", "roughness"},
@@ -33,6 +34,10 @@ MUTATIONS = {"stage-floor", "import", "retarget", "assemble", "preview", "camera
 TARGET_REQUIRED = {"stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
                    "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 
+OPS.update(motion_contract.OPS)
+MUTATIONS.update(motion_contract.MUTATIONS)
+TARGET_REQUIRED.update(motion_contract.TARGETS)
+
 
 def implementation_hash():
     return digest({p.name: file_hash(p) for p in sorted(Path(__file__).parent.glob("*.py"))})
@@ -42,6 +47,9 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
     options = options or {}
     fields(options, OPS[operation])
+    if operation in motion_contract.OPS:
+        motion_contract.validate(operation, options)
+    require(operation != "motion-source" or input_file is None, "SOURCE_ONLY_OPERATION", "motion-source creates a fresh source-only file")
     if operation == "assemble":
         from .motion_timing import validate_assembly
         validate_assembly(options)
@@ -90,6 +98,20 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     if operation in TARGET_REQUIRED:
         require(inputs, "TARGET_REQUIRED", "Operation requires a specific saved working/target file")
     if operation in {"import", "retarget"}: require(source_files, "SOURCE_REQUIRED", "Operation requires an acquired asset ID")
+    if operation in motion_contract.OPS:
+        require(not asset_id, "INVALID_MOTION", "Motion jobs use canonical IDs or explicit saved inputs")
+        if "motion_id" in options:
+            from .motion_assets import load, record_files, rights_gate
+            record, _ = load(lib, options["motion_id"])
+            gate = rights_gate(record["source"], record["rights"], options["project_use"])
+            require(gate["eligible"], "MOTION_RIGHTS_BLOCKED", "; ".join(gate["reasons"]))
+            source_files = record_files(lib, options["motion_id"]) + record["rights"]["evidence"]
+        elif operation == "motion-export":
+            from .motion_assets import rights_gate
+            gate = rights_gate(options["source"], options["rights"], options["project_use"])
+            require(gate["eligible"], "MOTION_RIGHTS_BLOCKED", "; ".join(gate["reasons"]))
+            source_files = options["rights"]["evidence"]
+        for f in source_files: lib.verify_file(f)
     # No terminal strings, scripts, network endpoints, or model-provided output paths.
     specification = {"schema_version": SCHEMA, "operation": operation, "inputs": inputs, "asset_id": asset_id,
                      "source_files": source_files, "source_file": asset.metadata.get("file") if asset else None, "options": options, "implementation": implementation_hash()}

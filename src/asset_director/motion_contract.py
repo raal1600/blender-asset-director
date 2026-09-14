@@ -7,7 +7,7 @@ OPS={
  'body-audit':{'target_object','meters_per_unit','source_to_canonical','roles'},
  'clay-proxy':{'motion_id','project_use','length_scales','radius_ratio','color'},
  'motion-source':{'motion_id','project_use','fps'},
- 'motion-retarget':{'motion_id','project_use','target_object','target_fps','mapping','alignment','pose_space','expected_source_fingerprint','expected_target_fingerprint'},
+ 'motion-retarget':{'motion_id','project_use','target_object','target_fps','mapping','alignment','pose_space','expected_source_fingerprint','expected_target_fingerprint','target_meters_per_unit'},
 }
 MUTATIONS={'clay-proxy','motion-source','motion-retarget'}
 TARGETS={'motion-export','body-audit','clay-proxy','motion-retarget'}
@@ -36,8 +36,9 @@ def validate(op,o):
         color=vector(o.get('color',[.45,.45,.45]));require(all(0<=v<=1 for v in color),'INVALID_MOTION','Invalid clay color')
     if op=='motion-source':fields(o,OPS[op],{'fps'});finite(o['fps'],1,240)
     if op=='motion-retarget':
-        fields(o,OPS[op],{'target_object','target_fps','mapping','alignment','pose_space','expected_source_fingerprint','expected_target_fingerprint'})
+        fields(o,OPS[op],{'target_object','target_fps','mapping','alignment','pose_space','expected_source_fingerprint','expected_target_fingerprint','target_meters_per_unit'})
         finite(o['target_fps'],1,240)
+        finite(o['target_meters_per_unit'],1e-6,1e3)
         from .motion_assets import sha
         for k in ('expected_source_fingerprint','expected_target_fingerprint'):sha(o[k])
         require(isinstance(o['mapping'],dict) and o['mapping'] and len(set(o['mapping'].values()))==len(o['mapping']),

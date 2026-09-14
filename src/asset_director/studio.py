@@ -12,6 +12,7 @@ from .core import digest, fields, file_hash, require, text
 VERSION = 1
 CAPABILITY_ROLES = {
     'assets': 'production-design', 'set': 'production-design',
+    'motion-discovery': 'performance', 'body-profile': 'performance', 'clay-proxy': 'performance',
     'reference': 'production-design', 'character-motion': 'performance',
     'object-motion': 'performance', 'camera': 'cinematography',
     'lighting': 'lighting-lookdev', 'materials': 'lighting-lookdev',

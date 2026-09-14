@@ -38,7 +38,7 @@ Load only selected modules:
 1. Compare the brief with observed assets: reuse, adapt, missing, uncertain. Record evidence. Missing does not mean an existing asset is merely unsuitable.
 2. Search justified gaps only: scene resources, local library, supported external providers. Read `references/asset-workflow.md` and `references/providers.md`. Never download a replacement scene by default.
 3. Coordinate provisional blocking, camera and look; refine only useful detail. `camera-fit`, `camera-plan`, `camera-check`, `look-audit`, `light-adjust`, `world-adjust`, `look-adjust` and `light-rig` are explicit generic helpers, not automatic cinematic design: `camera-plan` keys a move only from host-supplied checkpoints, aims, screen positions, lens and interpolation, and the look operations apply only named values to observed lights, the active world's single Background node and scene colour management. All of them reject what they cannot verify, and none mutates materials. Respect their measured limitations.
-4. For skeletal motion load `references/motion.md`: retrieve, inspect, retarget and validate a real source. Object motion uses suitable transforms/pivots; products and environments need no armature. Don't invent human gaits.
+4. For skeletal motion or a morphable proxy load `references/motion-foundation.md` and `references/motion.md`: retrieve, inspect, retarget and validate a real source. Object motion uses suitable transforms/pivots; products and environments need no armature. Don't invent human gaits.
 5. Validate handoffs before preparing jobs. One executor publishes the chosen working result; do not merge concurrent binary scene edits. These checks are coordination contracts, not substitutes for host-level tool permissions.
 6. Produce bounded evidence and route failures to the responsible role. Record technical, visual and human acceptance separately. A repair or still must not summon every department. Sound and full video output remain separate scopes.
 
@@ -57,3 +57,9 @@ A preview render is an isolated artifact, not a delivery master: preview jobs re
 Output actual paths, sources/licenses, relevant role passes, mutations, technical findings and untested areas. Follow the applicable local checks in `references/local-test.md`; its named scene is an optional benchmark, never a runtime default. Never run that user's artistic benchmark without authorization.
 
 Source adaptations and notices: `references/upstream-licenses.md`.
+
+For motion requests, `motion-scout` must distinguish local matches, actual adapter
+queries, pending host-search tasks, auth failures and unsupported formats. A task
+emitted is not a completed search. Inspect native-speed performance before source
+acceptance. An image-only review cannot certify temporal performance. `clay-proxy`
+creates a new frozen diagnostic body; never reshape an existing character silently.

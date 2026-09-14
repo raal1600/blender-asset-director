@@ -4,7 +4,7 @@ from .core import fields, require
 
 
 def validate(config):
-    fields(config, {'rotation', 'translation_bone', 'translation_scale', 'target_origin', 'ground_contact'},
+    fields(config, {'rotation', 'translation_bone', 'translation_scale', 'target_origin', 'ground_contact', 'translation_scale_xyz'},
            {'rotation', 'translation_bone', 'translation_scale', 'target_origin'})
     for key, count in [('rotation', 9), ('target_origin', 3)]:
         values = config[key]
@@ -24,6 +24,14 @@ def validate(config):
     require(isinstance(config['translation_bone'], str) and config['translation_bone'].strip(),
             'INVALID_POSE_TRANSFER', 'Specify the mapped target translation bone')
     require(all(abs(v) <= 1e4 for v in config['target_origin']), 'INVALID_POSE_TRANSFER', 'Target origin exceeds bound')
+    if 'translation_scale_xyz' in config:
+        axes = config['translation_scale_xyz']
+        require(config['translation_scale'] == 1, 'INVALID_POSE_TRANSFER',
+                'Use scalar 1 with per-axis scaling to avoid double scaling')
+        require(isinstance(axes,list) and len(axes)==3 and all(type(v) in (int,float) and math.isfinite(v) and .25<=v<=4 for v in axes),
+                'INVALID_POSE_TRANSFER', 'Per-axis scaling is bounded to [0.25,4]')
+        require(max(abs(r[i]) for i in (2,5,6,7)) < 1e-5 and abs(r[8]-1)<1e-5,
+                'GROUND_ALIGNMENT_REVIEW', 'Per-axis root scaling requires explicit world-Z alignment')
     if 'ground_contact' in config:
         require(max(abs(r[i]) for i in (2,5,6,7)) < 1e-5 and abs(r[8]-1) < 1e-5,
                 'GROUND_ALIGNMENT_REVIEW', 'Ground correction requires a world-Z-preserving alignment, not tilted travel')

@@ -1,5 +1,15 @@
 # Blender Asset Director
 
+> **Development branch: `feature/motion-foundation`, runtime `0.6.0-dev.1`.**
+> This first motion milestone adds immutable canonical records, rights-aware
+> scouting, measured body profiles, a fitted segmented clay proxy, a bridge to
+> the existing retargeter, and temporal-review receipts.
+> [Pull and test without replacing your installed skill](docs/LOCAL_MOTION_ACCEPTANCE.md)
+> · [Contracts and limitations](docs/MOTION_FOUNDATION.md).
+> The published installer below remains v0.5.0. There is **no v0.6 release** yet.
+> Native CMU/AIST/AMASS conversion, GPU video reconstruction, foot IK and a
+> production-quality sculptable human mesh are not implemented in this milestone.
+
 **Give Codex a small Blender production team, not another Blender harness.**
 
 Use a prompt and an existing scene to reuse suitable assets, scout real gaps,

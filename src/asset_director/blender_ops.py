@@ -53,6 +53,17 @@ def rig_report(obj):
     bones = [{"name": b.name, "parent": b.parent.name if b.parent else None, "rest": flatten(b.matrix_local),
               "head": vector(b.head_local), "tail": vector(b.tail_local), "deform": b.use_deform} for b in obj.data.bones]
     roles = identify_roles(bones)
+    if obj.get("bad_semantic_roles") is not None:
+        raw = obj["bad_semantic_roles"]
+        require(isinstance(raw, str) and len(raw) <= 65536, "MAPPING_REVIEW_REQUIRED", "Invalid semantic role record")
+        try: declared = json.loads(raw)
+        except (ValueError, TypeError): raise DirectorError("MAPPING_REVIEW_REQUIRED", "Invalid semantic role JSON")
+        from .motion import REQUIRED
+        require(isinstance(declared, dict) and len(declared) <= 256 and
+                all(isinstance(k,str) and isinstance(v,str) and v in obj.data.bones for k,v in declared.items()) and
+                len(set(declared.values())) == len(declared), "MAPPING_REVIEW_REQUIRED", "Semantic roles must be one-to-one observed bones")
+        roles = {"roles": declared, "ambiguous": {}, "missing": sorted(REQUIRED-set(declared)),
+                 "evidence": "explicit host-reviewed roles; anatomy still needs validation"}
     meshes = [o for o in bpy.data.objects if o.type == "MESH" and any(m.type == "ARMATURE" and m.object == obj for m in o.modifiers)]
     weighted = 0
     for mesh in meshes:

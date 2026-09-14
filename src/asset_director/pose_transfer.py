@@ -20,6 +20,7 @@ class PoseTransfer:
         self.rotation = Matrix([values[i:i+3] for i in (0,3,6)])
         self.origin = Vector(config['target_origin'])
         self.scale = config['translation_scale']
+        self.axis_scale = config.get('translation_scale_xyz')
         self.source_world = source.matrix_world.copy()
         self.target_world = target.matrix_world.copy()
         self.source_rest = {s:(source.matrix_world @ source.data.bones[s].matrix_local).to_quaternion().to_matrix()
@@ -56,7 +57,10 @@ class PoseTransfer:
                 'ANIMATED_SCALE_UNSUPPORTED', 'Pose transfer requires unit source pose scales')
         if self.source_origin is None:
             self.source_origin = source_position.copy()
-        anchor_world = self.origin + self.scale * (self.rotation @ (source_position-self.source_origin))
+        displacement = self.rotation @ (source_position-self.source_origin)
+        if self.axis_scale is not None:
+            displacement = Vector([displacement[i]*self.axis_scale[i] for i in range(3)])
+        anchor_world = self.origin + self.scale * displacement
         world_inverse = target.matrix_world.inverted()
         rotation_inverse = target.matrix_world.to_quaternion().to_matrix().inverted()
         solved, result = {}, {}

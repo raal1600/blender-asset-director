@@ -120,7 +120,11 @@ def validate_skeleton(skeleton):
         names.append(j['name'])
         head, tail = vector(j['head']), vector(j['tail'])
         require(math.dist(head, tail) > 1e-6, 'INVALID_SKELETON', 'Zero-length joints cannot form a Blender rig')
-        quaternion(j['rotation'])
+        w,x,y,z = quaternion(j['rotation'])
+        axis = [2*(x*y-w*z), 1-2*(x*x+z*z), 2*(y*z+w*x)]
+        length = math.dist(head,tail)
+        require(max(abs(axis[i]-(tail[i]-head[i])/length) for i in range(3)) < .003,
+                'INVALID_SKELETON', 'Rest quaternion local Y must agree with the observed bone head/tail')
     require(roots == 1, 'INVALID_SKELETON', 'Canonical v1 requires one connected skeleton root')
     roles = skeleton['roles']
     require(isinstance(roles, dict) and len(roles) <= MAX_JOINTS and len(set(roles.values())) == len(roles),
