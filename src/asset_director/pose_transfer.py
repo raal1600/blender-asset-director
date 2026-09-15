@@ -23,6 +23,10 @@ class PoseTransfer:
         self.axis_scale = config.get('translation_scale_xyz')
         self.source_world = source.matrix_world.copy()
         self.target_world = target.matrix_world.copy()
+        self.translation_precision = None
+        if 'source_meters_per_unit' in config:
+            from .translation_precision import precision
+            self.translation_precision = precision(config['source_meters_per_unit'], max(self.source_world.to_scale()))
         self.source_rest = {s:(source.matrix_world @ source.data.bones[s].matrix_local).to_quaternion().to_matrix()
                             for s in pairs}
         self.target_reference = {t:(target.matrix_world @ target.pose.bones[t].matrix).to_quaternion().to_matrix()
@@ -50,9 +54,19 @@ class PoseTransfer:
         positions = {b.name:b.location.copy() for b in source.pose.bones}
         if self.local_positions is None:
             self.local_positions = positions
-        require(all((positions[n]-p).length < 1e-4 for n,p in self.local_positions.items()
-                    if n != self.inverse[self.anchor]),
-                'NON_ANCHOR_TRANSLATION', 'Animated local translations outside the selected anchor need review')
+        if self.translation_precision is not None:
+            from .translation_precision import check_span
+            for name, initial in self.local_positions.items():
+                if name == self.inverse[self.anchor]: continue
+                for axis in range(3):
+                    check_span([float(initial[axis]), float(positions[name][axis])],
+                               self.translation_precision, f'{name}[{axis}]')
+        else:
+            # Preserve the historical explicit low-level contract when units are
+            # not supplied. New reviewed transfer plans always bind physical units.
+            require(all((positions[n]-p).length < 1e-4 for n,p in self.local_positions.items()
+                        if n != self.inverse[self.anchor]),
+                    'NON_ANCHOR_TRANSLATION', 'Animated local translations outside the selected anchor need review')
         require(all(max(abs(v-1) for v in b.scale) < 1e-4 for b in source.pose.bones),
                 'ANIMATED_SCALE_UNSUPPORTED', 'Pose transfer requires unit source pose scales')
         if self.source_origin is None:

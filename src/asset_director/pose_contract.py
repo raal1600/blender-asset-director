@@ -4,7 +4,7 @@ from .core import fields, require
 
 
 def validate(config):
-    fields(config, {'rotation', 'translation_bone', 'translation_scale', 'target_origin', 'ground_contact', 'translation_scale_xyz'},
+    fields(config, {'rotation', 'translation_bone', 'translation_scale', 'target_origin', 'ground_contact', 'translation_scale_xyz', 'source_meters_per_unit'},
            {'rotation', 'translation_bone', 'translation_scale', 'target_origin'})
     for key, count in [('rotation', 9), ('target_origin', 3)]:
         values = config[key]
@@ -24,6 +24,9 @@ def validate(config):
     require(isinstance(config['translation_bone'], str) and config['translation_bone'].strip(),
             'INVALID_POSE_TRANSFER', 'Specify the mapped target translation bone')
     require(all(abs(v) <= 1e4 for v in config['target_origin']), 'INVALID_POSE_TRANSFER', 'Target origin exceeds bound')
+    if 'source_meters_per_unit' in config:
+        from .translation_precision import precision
+        precision(config['source_meters_per_unit'])
     if 'translation_scale_xyz' in config:
         axes = config['translation_scale_xyz']
         require(config['translation_scale'] == 1, 'INVALID_POSE_TRANSFER',

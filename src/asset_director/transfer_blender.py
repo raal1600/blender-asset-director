@@ -141,9 +141,12 @@ def action_signature(action, slot):
                    for c in curves])
 
 
-def source_checks(source, action, anchor, start, end, count):
+def source_checks(source, action, anchor, start, end, count, meters_per_unit=1):
     slot=source.animation_data.action_slot
     signature=action_signature(action,slot)
+    from .translation_precision import precision, check_span
+    policy = precision(meters_per_unit, max(source.matrix_world.to_scale()))
+    largest_non_anchor_span_m = 0.0
     for c in ops.curves(action,slot):
         require(not c.modifiers, 'TRANSFER_CURVE_MODIFIERS_UNSUPPORTED', 'Curve modifiers need a separately baked source')
         values = [float(k.co.y) for k in c.keyframe_points]
@@ -153,7 +156,9 @@ def source_checks(source, action, anchor, start, end, count):
         if c.data_path.endswith('.scale'):
             require(all(abs(v-1)<1e-5 for v in values),'ANIMATED_SCALE_UNSUPPORTED','Source bone scales must remain one')
         if c.data_path.endswith('.location') and c.data_path != source.pose.bones[anchor].path_from_id('location'):
-            require(not values or max(values)-min(values)<1e-5,'NON_ANCHOR_TRANSLATION','Only the reviewed source anchor can translate')
+            if values:
+                largest_non_anchor_span_m = max(largest_non_anchor_span_m,
+                    check_span(values, policy, f'{c.data_path}[{c.array_index}]'))
     original_world=source.matrix_world.copy(); origin=None; maximum=0.
     for i in range(count):
         f = start+(end-start)*i/(count-1)
@@ -166,6 +171,7 @@ def source_checks(source, action, anchor, start, end, count):
         if origin is None: origin=p.copy()
         maximum=max(maximum,(p-origin).length)
     return {'curve_signature':signature,'checkpoints':count,'max_anchor_displacement_source_units':maximum,
+            'non_anchor_translation_precision': policy, 'max_non_anchor_span_m': largest_non_anchor_span_m,
             'scope':'all key values/channel restrictions plus bounded evaluated times; no swept-extrema guarantee'}
 
 
@@ -212,7 +218,7 @@ def propose(lib, spec):
         facing_evidence=o['facing']['evidence']
     yaw=math.atan2(sf.cross(tf).z,sf.dot(tf)); world=Matrix.Rotation(yaw,3,'Z')
     source_world=flat(source.matrix_world);target_world=flat(target.matrix_world)
-    evidence=source_checks(source,action,s_roles['hips'],start,end,o.get('check_count',65))
+    evidence=source_checks(source,action,s_roles['hips'],start,end,o.get('check_count',65),o['source_meters_per_unit'])
     role_for={t_roles[r]:r for r in common};alignment={}; alignment_evidence=[];solved={}
     inv_rotation=target.matrix_world.to_quaternion().to_matrix().inverted()
     # Topological rest order with unchanged helper reference bases.
@@ -253,7 +259,8 @@ def propose(lib, spec):
         'start':start,'end':end,'mapping':pairs,'alignment':alignment,
         'max_output_intervals':o.get('max_output_intervals', 360),
         'pose_space':{'rotation':flat(world),'translation_bone':t_roles['hips'],
-                      'translation_scale':scale,'target_origin':list(origin)}}
+                      'translation_scale':scale,'target_origin':list(origin),
+                      'source_meters_per_unit':o['source_meters_per_unit']}}
     ground_evidence = None
     if 'ground_contact' in o:
         from .ground_contact import GroundContact
@@ -341,6 +348,6 @@ def contact_check(options):
                     sample[side]={'minimum_z':min(p.z for p in points),'centroid':list(sum(points,Vector())/len(points))}
                 samples.append(sample)
             finally:evaluated.to_mesh_clear()
-    return summarize(samples,options)|{'read_only':True,'fps':fps,'target_fingerprint':ops.rig_report(target)['fingerprint'],
+    return summarize(samples,options)|{'read_only':True,'fps':scene.render.fps/scene.render.fps_base,'target_fingerprint':ops.rig_report(target)['fingerprint'],
         'meters_per_unit':options['meters_per_unit'],'ground_z_scene_units':options['ground_z'],
         'selected_vertices':{s:len(p.indices) for s,p in probes.items()},'topology':probes['left'].topology}

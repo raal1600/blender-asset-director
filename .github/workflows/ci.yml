@@ -112,6 +112,10 @@ jobs:
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/ground_contact_fixture.py -- "$RUNNER_TEMP/ground-contact"
           cp "$RUNNER_TEMP/ground-contact/ground_contact_report.json" evidence/
+      - name: Physical source-translation precision and genuine extra-motion rejection
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/translation_precision_fixture.py -- "$RUNNER_TEMP/translation-precision"
+          cp "$RUNNER_TEMP/translation-precision/translation_precision_report.json" evidence/
       - name: Full long-take sequence, root alignment, bridge and reviewed-role QA
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/sequence_fixture.py -- "$RUNNER_TEMP/sequence" "$RUNNER_TEMP/bad-library"
