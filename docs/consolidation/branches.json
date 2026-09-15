@@ -2,18 +2,60 @@
   "schema": "asset-director.branch-cleanup/1",
   "repository": "raal1600/blender-asset-director",
   "branches": [
-    {"name": "docs/local-motion-session-handoff-20260914", "sha": "4c6087b62f7dab2d989b2cd9ab6ce04d6b085d0f"},
-    {"name": "feature/local-motion-library", "sha": "c11248c7ff83e1dc48aef949fdb50d97cac5336b"},
-    {"name": "feature/motion-foundation", "sha": "6db5439445755cb21ea5255fcec5a9233c2002c8"},
-    {"name": "feature/reviewed-bone-display-20260915", "sha": "12ea844da1936bb82264011c8c5bd467a78a8f08"},
-    {"name": "feature/reviewed-sequence-integration-20260915", "sha": "389e8f28689e228370334b7cf4c529bead87a7d3"},
-    {"name": "feature/reviewed-sequences-20260915", "sha": "943286fefd99253eec27be5de28b977001406c59"},
-    {"name": "feature/reviewed-transfer-planning", "sha": "8c11012dda3f706a80763d0cb6ee8a94d836a968"},
-    {"name": "feature/transition-lab-pages-20260915", "sha": "a52eaf72651cc82455f182f59a9cb5be2095ce3d"},
-    {"name": "fix/evaluated-pose-retarget", "sha": "7820ec90c215ce2a16cf8fa8e975643202143371"},
-    {"name": "fix/private-mixamo-action-collision-20260915", "sha": "d61f56f90aad0c604b03720464f7d057bc987112"},
-    {"name": "fix/private-mixamo-alignment-20260915", "sha": "ed0f4e7265ca376695676f373a47cebf9cb8848e"}
+    {
+      "name": "docs/local-motion-session-handoff-20260914",
+      "sha": "4c6087b62f7dab2d989b2cd9ab6ce04d6b085d0f"
+    },
+    {
+      "name": "feature/local-motion-library",
+      "sha": "c11248c7ff83e1dc48aef949fdb50d97cac5336b"
+    },
+    {
+      "name": "feature/motion-foundation",
+      "sha": "6db5439445755cb21ea5255fcec5a9233c2002c8"
+    },
+    {
+      "name": "feature/reviewed-bone-display-20260915",
+      "sha": "12ea844da1936bb82264011c8c5bd467a78a8f08"
+    },
+    {
+      "name": "feature/reviewed-sequence-integration-20260915",
+      "sha": "389e8f28689e228370334b7cf4c529bead87a7d3"
+    },
+    {
+      "name": "feature/reviewed-sequences-20260915",
+      "sha": "943286fefd99253eec27be5de28b977001406c59"
+    },
+    {
+      "name": "feature/reviewed-transfer-planning",
+      "sha": "8c11012dda3f706a80763d0cb6ee8a94d836a968"
+    },
+    {
+      "name": "feature/transition-lab-pages-20260915",
+      "sha": "a52eaf72651cc82455f182f59a9cb5be2095ce3d"
+    },
+    {
+      "name": "fix/evaluated-pose-retarget",
+      "sha": "7820ec90c215ce2a16cf8fa8e975643202143371"
+    },
+    {
+      "name": "fix/private-mixamo-action-collision-20260915",
+      "sha": "d61f56f90aad0c604b03720464f7d057bc987112"
+    },
+    {
+      "name": "fix/private-mixamo-alignment-20260915",
+      "sha": "ed0f4e7265ca376695676f373a47cebf9cb8848e"
+    },
+    {
+      "name": "chore/consolidate-main-20260915",
+      "sha": "1757db8e8bde0136ddc461a64ebfcc3c346f4322"
+    }
   ],
-  "integration_branch": "chore/consolidate-main-20260915",
-  "required_workflows": ["Asset Director Tests", "Transition Lab · Build and publish", "Source package"]
+  "integration_branch": "fix/published-installer-defaults-20260916",
+  "required_workflows": [
+    "Asset Director Tests",
+    "Transition Lab \u00b7 Build and publish",
+    "Source package",
+    "Published installer defaults"
+  ]
 }
