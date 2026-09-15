@@ -1,4 +1,240 @@
-# Local animation library and cross-character retarget: development handoff
+# Current motion harness handoff — 2026-09-15
+
+## Read this first: current state and user request
+
+This section supersedes the dated 2026-09-14 implementation recommendations
+below. Those historical findings remain evidence, not instructions to redo work.
+The user now wants the SAME existing Adventurer character to perform the acquired
+Moonwalk and then transition smoothly into the newly downloaded Thriller dance.
+
+The user explicitly requested that the receiving agent review the code, investigate
+the best solution, and perform all further automated testing in GitHub Actions.
+Do not request access to the Windows desktop to run your development tests. Do not
+claim CI establishes artistic/temporal quality of private assets it cannot access.
+
+Repository: `raal1600/blender-asset-director`.
+Pull branch: `feature/reviewed-bone-display-20260915` (NOT main).
+Runtime remains `0.6.0-dev.3`; identify builds by exact commit, not version alone.
+This handoff's commit sits above these completed implementation commits:
+
+| Commit | Change |
+| --- | --- |
+| `5b7a4bb4117daadb39567f27125639ce1f6e4068` | Bounded subframe ground-contact correction and independent diagnostics |
+| `4ed2397beb0fd12bec4d8f6802d875c5a43730f4` | Carry exact reviewed semantic roles through transfer execution and QA |
+| `fd21202708cf53ae1bbe80e2951e997f2e3c26f0` | Reviewed bone-display audit, standard styling and explicit widget hiding |
+
+All three are ancestors of this branch; do not cherry-pick duplicates. They were
+developed in separate clean worktrees. Discover remote/current worktree state
+before editing: other agents may be active. Preserve all uncommitted work.
+No installed skill, configuration, production project or existing live session
+was replaced by these changes. No merge or release is authorized by this handoff.
+
+Read `AGENTS.md`, `docs/REVIEWED_TRANSFER_PLANNING.md`,
+`docs/REVIEWED_ROLE_QA_FIX.md`, `docs/BONE_DISPLAY_ACCEPTANCE.md`, and the skill
+references `transfer-planning.md`, `bone-display.md`, `local-motion-library.md`.
+
+## Completed changes and evidence
+
+### Grounding
+
+The independent half-frame defect was addressed using bounded subframe correction,
+not horizontal foot locking. `ground_contact.subdivisions` is explicit and bounded.
+The real mannequin check sampled 249 eighth-frame points; maximum remaining
+penetration was approximately 0.0983 mm, below the 1 mm test tolerance. Corrections
+preserved rotation curves, horizontal travel, rig/skin and timing. Do not reuse the
+case's correction cap or infer perfect continuous contact from bounded samples.
+Read the source/fixture and corresponding local report for scope.
+
+### Another character: actual acquisition and transfer
+
+The user asked to transfer to a different Sketchfab character. A first acquired
+Bulky Knight package advertised rigging but its downloaded glTF contained no rig
+or skin weights; it was rejected and preserved as failed-candidate evidence.
+
+The selected replacement is **Male Adventurer**, author
+`manoeldarochadeoliveira`, Sketchfab ID `3f5f7d12c07445fe9b8c4958935970e2`.
+Official API detail supplied CC BY 4.0 evidence. No model bytes accompany this
+handoff. The source has rig `Rig`, skinned mesh `corpo_0`, 69 bones, 2014 weighted
+vertices, and 21 pre-existing actions. Names are actual observations, not defaults.
+
+The proposal mapped 50 joints: 22 body roles and 28 finger roles. The target has
+two thumb segments per side; a third was not invented. Stationary root and facial
+controls remained unmapped. World-facing alignment was nearly zero yaw, not the
+mannequin's previous 180-degree choice. The measured root scale was approximately
+0.92479756. Source duration was 31/30 seconds, frames 1–32 at 30 FPS.
+
+Execution originally crashed because post-transfer QA discarded explicit roles,
+re-inferred names, and passed `None` anatomical height into `quality()`. Commit
+4ed2397 passes roles ONLY after immutable proposal/world/fingerprint/action checks,
+uses them in preflight and evaluated QA, and records the actual QA roles/height.
+Unreviewed missing anatomy is refused before action creation; invalid QA scale
+inputs now produce a structured error. No bone rename or semantic-property write
+was used to get a pass.
+
+The real retry preserved mesh vertices, skin weights/groups, rest fingerprint,
+all 21 previous action curves and object inventory; it added one Moonwalk action.
+Pose scales remained one and the final key was covered. This is technical transfer
+evidence, not full IK, skin fitting or a performance-quality guarantee.
+
+### Bone display: fix the cause, not the explanation
+
+The rig used an **Icosphere custom shape** on its pose bones. Armature OCTAHEDRAL
+alone did not suppress that override. The host initially described spheres as
+joint markers without inspecting those references; that explanation was wrong.
+The same widget object also appeared as a large mesh obstructing the render.
+
+Commit fd21202 adds `bone-display-audit` and `bone-display`. Normal inspect includes
+display evidence. The new operation toggles custom-shape drawing OFF while
+preserving all shape references, resets per-bone styles, and supports explicitly
+named visible bones and widget hiding. It refuses stale, linked, shared, unrelated
+or skinned targets where applicable before mutation. It does NOT delete a root,
+reshape bones, rewrite materials/actions, or provide a generic object-delete API.
+
+The saved real result has 23 body/root bones visible and the reviewed widget hidden
+in the viewport and render. Independent reopen checks preserved references,
+rest/skin/actions/transforms/scales and evaluated mesh coordinates at three times.
+A CPU still actually showed an unobstructed Adventurer. Beauty renders do not show
+bone overlays, so that is not automatic viewport-bone visual acceptance.
+
+Interactive presentation used a separate, hash-bound, one-shot no-save launcher.
+The latest launcher only set viewport/selection/pose mode and playback; the bone
+display changes came from the saved harness result. Native computer control failed
+with `Computer Use native pipe is unavailable ... os error 2`; MCP also failed to
+connect when tried. No ports/configuration were changed or command service added.
+The user gave positive informal feedback after the corrected pointed-bone view.
+Keep this scoped to that view; no generalized PERFORMANCE PASS was established.
+
+## Existing validation — do not represent as new CI results
+
+- Grounding revision: 420 offline tests, one skipped; installer checks PASS;
+  relevant Blender fixture/real checks passed locally.
+- Reviewed-role revision: 421 offline tests, one skipped; installer checks PASS;
+  Blender 5.2.1 normal transfer fixture 11 groups and custom-name variant 12 groups
+  PASS. The first new custom-name test compared the wrong frame in its oracle;
+  it was corrected to compare evaluated frame one, with failed evidence retained.
+- Bone-display revision: 427 offline tests, one skipped; temporary installer checks
+  PASS; Blender 5.2.1 bone-display fixture five gate groups PASS, plus real reopen
+  verification. One non-fatal fixture thumbnail-write warning was recorded.
+
+These are local observations from the prior session. The next agent must review
+the changes and establish fresh GitHub Actions results, including older Blender
+compatibility. A push triggers existing CI but is not a green test result.
+
+## New Thriller intake and concrete blockers
+
+Found the user's `Thriller Part 4.fbx` in their configured Mixamo folder. Read-only
+sync and controlled-copy index observed ONE original action with 67 bones, 7825
+weighted vertices, 30 FPS, frames 1–1113, duration 37.0666666667 seconds. The actual
+skeleton fingerprint differs from the 65-bone Moonwalk source: re-audit and review
+the new source mapping rather than reuse the previous source fingerprint blindly.
+Its action label happens to match the Moonwalk's generic Mixamo action label;
+identity must be asset/hash/slot-bound, not based on that name alone.
+
+No Thriller retarget, sequence, render or motion-quality acceptance was performed.
+Original hash/mtime were unchanged. The user has now explicitly confirmed this
+download came from official Adobe Mixamo, in response to the question about
+downloading it using their account: "Yes, from official Mixamo". This is actual
+user attestation for this file, not independent provider verification. Record its
+file-specific review through the existing policy/evidence workflow before project
+use; the grant has NOT yet been created for Thriller. Do not extend a previous
+current-files-only review or approve future downloads implicitly. The filename/
+folder is not a license or observed choreography judgment.
+
+The existing code has basic `assemble` NLA blending, but cannot yet be called a
+complete smooth-transition solution for this case:
+
+1. `assemble` re-runs `rig_report` without the reviewed semantic roles. The explicit
+   role repair currently covers retarget QA, not standalone sequence QA. The new
+   character still lacks auto-inferred anatomy; do not bypass the check or rename
+   its bones. Establish a provenance/fingerprint-bound role route for sequencing.
+2. `blend_in` does not align root placement between clips. Moonwalk moves roughly
+   0.93 m on this target. Both independently transferred clips start at their own
+   reference origin; a naive blend can visibly pull the character back. Need
+   reviewed spatial alignment and transition diagnostics, not blind cross-fading.
+3. `bake_samples` caps transfer at 360 output intervals; `retained_range`/assemble
+   cap at frame 361. Full Thriller alone lasts over 37 seconds. Do not falsify FPS,
+   silently crop, speed up, or just delete bounds to fit it into a 12-second path.
+
+## Receiving agent: review, investigate, then implement and test in Actions
+
+Investigate the best bounded sequence design before choosing an implementation.
+Use actual code and primary Blender documentation when researching; distinguish
+NLA influence blending, clip placement, root ownership and actual contact quality.
+Do not assume a blend duration, pivot, yaw or floor height from this local scene.
+
+Recommended questions/acceptance requirements:
+
+- Bind each source/derived action by immutable identity, owner/slot, exact timebase,
+  target fingerprint and reviewed semantic context; preserve license lineage for
+  BOTH sources and the independent character. Avoid same-name action collisions.
+- Propose a reviewed sequence plan: ordered clips, source ranges, desired native
+  speed, blend interval, world/root anchor, origin/yaw alignment and bounded work.
+  Show changes requiring review. Do not mutate source actions to place a clip.
+- Compare feasible clip-placement strategies (e.g. derived root-offset action,
+  explicit trajectory composition, or constrained NLA composition) against the
+  actual solver and serialization. Select and explain the smallest robust method.
+- Account for translated/rotated/non-origin rigs, a stationary root with traveling
+  hips, differing units/FPS, turns and non-looping takes. Do not add a second root
+  owner or flatten intentional Moonwalk gliding.
+- Support the full requested take through explicit bounded duration/sample/work
+  budgets or chunking with exact boundary continuity. Preserve fractional last
+  keys and covered playback endpoints. No unbounded evaluation or hidden retiming.
+- Check position/orientation continuity, velocity changes, pose discontinuities,
+  mesh penetration and foot/toe behavior at integer and subframe transition times.
+  Numeric smoothness is not artistic acceptance; full IK is not implied.
+- Preserve original files/actions, all target geometry/weights/rest proportions,
+  bone scales, existing display settings and previous result lineage. Provide
+  separate results and repeat-job reuse. No production/live-window inputs.
+
+All NEW automated tests should run in GitHub Actions. Existing `.github/workflows/ci.yml`
+triggers on feature/fix pushes and has offline/installer/bootstrap jobs plus Blender
+4.5.3, 5.0.0 and 5.2.1. Review the workflow itself, especially API compatibility of
+new display fields across that matrix. The currently committed CI already invokes
+ground_contact_fixture.py and the normal transfer_planning_fixture.py, but **does
+not yet invoke** these new cases: wire them in before claiming full coverage:
+
+- `tools/transfer_planning_fixture.py -- NEW_OUTPUT NEW_LIBRARY custom`
+  (existing verified pinned backend, isolated outputs; see normal fixture usage).
+- `tools/bone_display_fixture.py -- NEW_OUTPUT NEW_LIBRARY` (no backend required).
+- New synthetic sequence tests for translated clip joins, rotation/turns, custom
+  roles, different FPS/units, long duration/chunk boundaries, fractional endpoints,
+  stale review rejection, duplicate action names, idempotence and preservation.
+
+Keep controlled public smoke tests distinct from offline gates and private-asset
+acceptance. Do not put Mixamo/Sketchfab originals, restricted motion, tokens or
+private logs into commits or Actions artifacts. CI should generate its own fixtures;
+it cannot inspect this Windows library. Upload bounded diagnostic reports, and
+state exact commit/run URLs and which gates actually ran. User-specific continuous
+Moonwalk-to-Thriller evaluation remains a later local acceptance, not a CI fiction.
+
+Do not merge, publish a release, replace the user's installed skill, change
+Codex/DeepSeek/MCP/Blender settings, start GPU/full-IK work, or send external messages.
+Return the code review, selected design with tradeoffs, exact implementation commits,
+Actions results, remaining gaps and a concrete bounded local acceptance procedure.
+
+## Current private evidence pointers
+
+Relative to configured CGI-Library; do not upload these directories to GitHub:
+
+- `reports/subframe-ground-fix-20260915-01/REPORT.md`
+- `reports/sketchfab-character-transfer-20260915-004214/REPORT.md` (original failure)
+- `reports/reviewed-role-fix-20260915-01/REPORT.md` and `BONE_DISPLAY_FOLLOWUP.md`
+- `reports/bone-display-harness-20260915-01/REPORT.md`, `working-output.json`,
+  `real-verification.json`, `harness-show-01/playback.json`
+- `reports/thriller-intake-20260915-01/FEASIBILITY.md`, `inspection.json`,
+  `source-before.json`, `index-job.json`, `USER_SOURCE_ATTESTATION.md`
+  (no sequence has been produced; attestation arrived after the feasibility report)
+
+Recent protected-file comparisons checked 1397 paths. Original assets, previous
+results, installed skill and protected production file matched the retained baseline.
+Two shared-state differences persist relative to that older baseline: Codex config
+and Blender recent-files history. Their cause was not attributed; no restoration
+was attempted. Preserve the earlier unresolved finding. Historical unsaved live
+state remains UNVERIFIED. Do not replace missing historical evidence with new tests.
+
+---
+
+## Archived 2026-09-14 handoff — historical context only
 
 This is a sanitized summary of local Windows validation and subsequent production
 work on 2026-09-14. It is development input, not a release announcement or a claim
