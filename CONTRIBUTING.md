@@ -37,7 +37,9 @@ build identity: include `git rev-parse HEAD` in bug reports and handoffs.
 2. Open a pull request. **Asset Director Tests** must pass all ten matrix jobs.
    **Transition Lab · Build and publish** must pass build and browser validation;
    deployment is deliberately skipped on pull requests. Review logs and uploaded
-   JSON evidence, not just a green job name. Do not ignore unexpected skips.
+   JSON evidence, not just a green job name. **Published installer defaults** must
+   pass all five real no-version HTTPS installation jobs; see
+   [the installer-default follow-up](docs/INSTALLER_DEFAULTS.md). Do not ignore unexpected skips.
 3. For source/runtime changes affecting licensed inputs, a maintainer updates the
    private test repository's `harness-ref.txt` to this exact public commit and
    runs its complete integration/recording workflow before merging. Public CI

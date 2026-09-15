@@ -6,7 +6,7 @@ the released installer remains v0.5.0 until a separately approved release.
 
 | Topic | Read |
 |---|---|
-| Installation and troubleshooting | [Installation](INSTALL.md) |
+| Installation and troubleshooting | [Installation](INSTALL.md), [default-version regression and live checks](INSTALLER_DEFAULTS.md) |
 | Runtime and role architecture | [Design](DESIGN.md), [harness contract](HARNESS_HANDOFF.md) |
 | Local sources and policy | [Local motion library](LOCAL_MOTION_LIBRARY.md) |
 | Canonical motion and proxies | [Motion foundation](MOTION_FOUNDATION.md), [proxy fixes](PROXY_VISUAL_FIX.md) |
