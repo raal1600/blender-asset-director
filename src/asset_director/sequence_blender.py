@@ -15,6 +15,7 @@ import re
 import bpy
 from mathutils import Matrix, Vector, Quaternion
 from .core import require, digest, atomic_json, load_json
+from .contact_status import sequence_status
 from . import blender_ops as ops, sequence_math as sm, sequence_contract as sc
 from . import sequence_review as reviews, transfer_blender as tb, frame_precision as fp32
 
@@ -452,8 +453,7 @@ def check(target,manifest):
             'duration_seconds':manifest['duration_seconds'],'final_key_frame':manifest['final_key_frame'],
             'scene_frame_end':scene.frame_end,'seams':seams,'endpoint_errors':endpoint_errors,
             'sparse_global_samples':samples,
-            'contact_batches':contact,'contact_status':('NOT_MEASURED' if cfg is None else
-                'SAMPLED_PENETRATION' if any(c['status']=='PENETRATION_DETECTED' for c in contact) else 'REVIEW_MEASURED_EXTREMA'),
+            'contact_batches':contact,'contact_status':sequence_status(contact, cfg is not None),
             'performance':'PENDING','human':'NOT_ESTABLISHED',
             'scope':'finite seam differences and bounded mesh samples, not continuous C1/contact or artistic proof'}
 

@@ -12,6 +12,7 @@ the released installer remains v0.5.0 until a separately approved release.
 | Canonical motion and proxies | [Motion foundation](MOTION_FOUNDATION.md), [proxy fixes](PROXY_VISUAL_FIX.md) |
 | Reviewed character transfer | [Transfer planning](REVIEWED_TRANSFER_PLANNING.md), [role QA](REVIEWED_ROLE_QA_FIX.md) |
 | Contact and rig presentation | [Subframe grounding](SUBFRAME_GROUND_CONTACT_FIX.md), [bone-display evidence](BONE_DISPLAY_ACCEPTANCE.md) |
+| Contact warning regression | [Measured status aggregation and tests](CONTACT_REPORTING_FIX.md) |
 | Full-length clips and transitions | [Sequence design](REVIEWED_SEQUENCES.md), [bounded local acceptance](SEQUENCE_LOCAL_ACCEPTANCE.md) |
 | Public video demo | [Transition Lab](TRANSITION_LAB.md) |
 | Security and licensing | [Security](../SECURITY.md), [third-party notices](../THIRD_PARTY_NOTICES.md) |

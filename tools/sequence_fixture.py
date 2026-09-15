@@ -232,6 +232,16 @@ def main(out,library):
         assert check['scene_frame_end']==math.ceil(manifest['final_key_frame'])
         passed('bound reviewed roles and dense transition contact diagnostics never lock deliberate gliding',
                endpoints=check['endpoint_errors'],seams=check['seams'],contact_states=sorted(states))
+        # Read-only diagnostic with a deliberately raised floor must retain its warning.
+        penetrating = copy.deepcopy(manifest)
+        penetrating['request']['contact']['ground_z'] += 10
+        penetrating['contact_frames'] = manifest['contact_frames'][:3]
+        before_contact = sb.snapshot(target)
+        warned = sb.check(target, penetrating)
+        assert warned['contact_batches'] and all(c['status'] == 'SAMPLED_PENETRATION' for c in warned['contact_batches'])
+        assert warned['contact_status'] == 'SAMPLED_PENETRATION'
+        assert sb.snapshot(target) == before_contact
+        passed('actual penetrating mesh samples retain the aggregate warning without modifying the sequence')
         track=target.animation_data.nla_tracks.get(manifest['strips'][0]['track']);track.strips[0].influence=.5
         fail(lambda:sb.check(target,manifest),'SEQUENCE_STATE_CHANGED');track.strips[0].influence=1
         track.is_solo=True;fail(lambda:sb.check(target,manifest),'SEQUENCE_STATE_CHANGED');track.is_solo=False
