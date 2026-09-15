@@ -44,7 +44,7 @@ def snapshot(target):
                             'polygons':[list(p.vertices) for p in o.data.polygons],
                             'materials':[m.name if m else None for m in o.data.materials]} for o in meshes]),
             'display': ops.rig_report(target)['bone_display'],
-            'object_inventory': sorted((o.name, o.type) for o in bpy.data.objects),
+            'object_inventory': sorted([o.name, o.type] for o in bpy.data.objects),
             'actions': {a.name: signature(a, None) for a in bpy.data.actions}}
 
 
@@ -60,15 +60,13 @@ def preserve(before, target):
 
 def append_clip(lib, descriptor, target):
     path = lib.verify_file(descriptor['file'])
-    existing = bpy.data.actions.get(descriptor['action'])
-    if existing and existing.get('bad_job') == descriptor['job_id']:
-        action = existing
-    else:
-        with bpy.data.libraries.load(str(path), link=False) as (source, dest):
-            require(descriptor['action'] in source.actions, 'SEQUENCE_CLIP_INVALID', 'Bound action absent from result')
-            dest.actions = [descriptor['action']]
-        action = dest.actions[0]
-        action.use_fake_user = True  # Newly appended original, not an existing user action.
+    # Always read the authoritative hashed result, not an existing same-name
+    # Action or caller-editable custom property that claims the same job.
+    with bpy.data.libraries.load(str(path), link=False) as (source, dest):
+        require(descriptor['action'] in source.actions, 'SEQUENCE_CLIP_INVALID', 'Bound action absent from result')
+        dest.actions = [descriptor['action']]
+    action = dest.actions[0]
+    action.use_fake_user = True
     require(action and action.get('bad_job') == descriptor['job_id']
             and action.get('bad_target_fingerprint') == descriptor['target_fingerprint'],
             'SEQUENCE_CLIP_INVALID', 'Action job/target identity mismatch')
@@ -112,6 +110,7 @@ class Reader:
     def __init__(self, target, limit):
         self.target = target; self.limit = limit; self.count = 0
         self.basis = {p.name:p.matrix_basis.copy() for p in target.pose.bones}
+        self.world = flat(target.matrix_world)
 
     def read(self, action, slot, f):
         self.count += 1
@@ -121,6 +120,8 @@ class Reader:
         for track in target.animation_data.nla_tracks: track.mute = True
         for p in target.pose.bones: p.matrix_basis = self.basis[p.name]
         frame(f)
+        require(flat(target.matrix_world) == self.world, 'SEQUENCE_ROOT_OWNERSHIP',
+                'Animated object placement conflicts with pose-anchor ownership')
         ev = target.evaluated_get(bpy.context.evaluated_depsgraph_get())
         result = {}
         for pb in target.pose.bones:
@@ -175,7 +176,13 @@ def load_clips(lib, request, target, reader):
         paths, times = validate_action(target, action, slot, anchor)
         d['curve_signature'] = signature(action, slot); d['bones'] = sorted(paths)
         d['anchor_key_times'] = times
+        require(not descriptors or sorted(paths) == descriptors[0]['bones'],
+                'SEQUENCE_CHANNEL_COVERAGE', 'Clips must cover the same keyed bones; missing channels need an explicit pose-fill review')
         descriptors.append(d); actions.append((action, slot))
+    for pb in target.pose.bones:
+        if pb.name not in descriptors[0]['bones']:
+            require(max(abs(pb.matrix_basis[r][c]-(r==c)) for r in range(4) for c in range(4)) < 1e-5,
+                    'SEQUENCE_REFERENCE_REVIEW', 'Unkeyed controls must retain the retargeter rest reference')
     from .transfer_contract import role_map
     role_map(roles)
     report = ops.rig_report(target, roles)
@@ -188,10 +195,13 @@ def plan(lib, spec):
     tb.guard(); request = spec['options']; sc.validate('sequence-plan', request)
     target = bpy.data.objects.get(request['target_object']); tb.rigid_object(target)
     target.animation_data_create()
+    require(not target.animation_data.use_tweak_mode, 'SEQUENCE_STATE_CHANGED', 'Exit NLA tweak mode before planning')
     before = snapshot(target)
     reader = Reader(target, request['budget']['max_pose_samples'])
     descriptors, actions, roles, anchor = load_clips(lib, request, target, reader)
     fps = request['fps']; timeline = []; joins = []; cursor = 1.0
+    for pb in target.pose.bones:
+        require(max(abs(v-1) for v in pb.scale) < 1e-5, 'SEQUENCE_SCALE_UNSUPPORTED', 'Pose scales must remain one')
     transforms = [Matrix.Identity(4)]
     created_keys = sum(sum(len(c.keyframe_points) for c in ops.curves(a,s)) for a,s in actions)
     for i, d in enumerate(descriptors):
@@ -225,6 +235,9 @@ def plan(lib, spec):
                           'max_local_joint_angle_degrees':math.degrees(angle),
                           'anchor_velocity_difference_m_s':(va-vb).length*request['meters_per_unit'],
                           'bone_names':names,'sample_frames':times,
+                          'boundary_poses':{key:{r:{'position':list(state[n]['world'].translation),
+                              'rotation':list(state[n]['world'].to_quaternion().normalized())} for r,n in roles.items()}
+                              for key,state in (('start',A),('end',Bt))},
                           'method':'quintic_hermite_log_quaternion_exact_endpoints',
                           'contact_policy':'DIAGNOSE_ONLY','performance':'PENDING'})
             cursor = bridge_end
@@ -237,22 +250,31 @@ def plan(lib, spec):
     total = (cursor-1)/fps; budget = request['budget']
     require(total <= budget['max_duration_seconds'] and created_keys <= budget['max_created_keys'],
             'RESOURCE_LIMIT', 'Sequence duration or created-key budget exceeded')
+    require(cursor-1 <= 10000, 'RESOURCE_LIMIT', 'Sequence exceeds the bounded global frame-coordinate sampling span')
+    estimated_pose_samples = 129+sum(len(d['anchor_key_times']['location'])+len(d['anchor_key_times']['rotation_quaternion'])
+                                     for d in descriptors[1:])+24*len(joins)
+    require(estimated_pose_samples <= budget['max_pose_samples'], 'RESOURCE_LIMIT',
+            'Alignment, seam and sparse-global pose work exceeds the reviewed budget')
+    require(reader.count <= budget['max_pose_samples'], 'RESOURCE_LIMIT', 'Planning pose work exceeds budget')
     contact_frames = sorted(set([1+(cursor-1)*i/64 for i in range(65)] +
                                 [f for j in joins for f in sm.grid(j['start'],j['end'],.5/j['subdivisions'],2049)]))
-    require(len(contact_frames) <= budget['max_contact_samples'], 'RESOURCE_LIMIT', 'Sequence contact checkpoint budget exceeded')
+    measured_contact_samples = len(contact_frames) + (len(contact_frames)-2)//256
+    require(measured_contact_samples <= budget['max_contact_samples'], 'RESOURCE_LIMIT', 'Sequence contact checkpoint budget exceeded')
     if request['contact'] is not None:
         mesh = bpy.data.objects.get(request['contact']['mesh'])
         require(mesh and mesh.type == 'MESH', 'TARGET_REQUIRED', 'Contact mesh is absent')
         # GroundContact evaluates twice per checkpoint (left/right) and verifies
         # topology. Bound that actual work across batches, not just each batch.
-        require(2*len(contact_frames)*len(mesh.data.vertices) <= budget['max_mesh_evaluations'],
+        require(2*measured_contact_samples*len(mesh.data.vertices) <= budget['max_mesh_evaluations'],
                 'RESOURCE_LIMIT', 'Total sequence contact mesh-evaluation budget exceeded')
     # Planning only owns a disposable process and never publishes a target blend.
     result = {'schema':sc.SCHEMA,'status':'REVIEW_REQUIRED','request':copy.deepcopy(request),
               'target_fingerprint':before['rig'],'target_world':before['world'], 'roles':roles,'anchor':anchor,
               'clips':descriptors,'timeline':timeline,'joins':joins,'fps':fps,'duration_seconds':total,
               'final_key_frame':cursor,'contact_frames':contact_frames,'preservation_baseline':before,
-              'estimated_created_keys':created_keys,'planning_pose_evaluations':reader.count,
+              'estimated_created_keys':created_keys,'estimated_pose_samples':estimated_pose_samples,
+              'estimated_contact_samples_including_batch_boundaries':measured_contact_samples,
+              'planning_pose_evaluations':reader.count,
               'root_owner':'existing target pose-bone anchor; no added object controller',
               'full_clips':True,'source_time_warp':False,'performance':'PENDING',
               'limits':['not full inertialization, IK, foot locking or a naturalness guarantee',
@@ -341,17 +363,22 @@ def nla(target, action, slot, source_range, source_fps, fps, start, label, final
     strip.blend_type='REPLACE';strip.blend_in=0;strip.blend_out=0;strip.use_auto_blend=False;strip.influence=1
     end=start+(source_range[1]-source_range[0])*fps/source_fps
     require(abs(strip.frame_start-start)<1e-4 and abs(strip.frame_end-end)<1e-4,
-            'SEQUENCE_TIMING_FAILED','Blender NLA did not retain the declared exact placement')
-    return {'track':track.name,'action':action.name,'slot':slot.identifier,'signature':signature(action,slot),
+            'SEQUENCE_TIMING_FAILED','NLA strip timing differs from the exact plan')
+    return {'track':track.name,'action':action.name,'slot':slot.identifier,
             'start':float(strip.frame_start),'end':float(strip.frame_end),'source_range':source_range,
-            'scale':float(strip.scale),'extrapolation':strip.extrapolation}
+            'scale':float(strip.scale),'signature':signature(action,slot),'extrapolation':strip.extrapolation}
 
 
-def check(target, manifest):
+def check(target,manifest):
+    tb.rigid_object(target)
     require(ops.rig_report(target)['fingerprint']==manifest['target_fingerprint']
             and flat(target.matrix_world)==manifest['target_world'],
-            'STALE_SEQUENCE_BINDING','Sequence target changed')
+            'SEQUENCE_STATE_CHANGED','Target rest or world placement changed')
     require(target.animation_data.action is None,'SEQUENCE_STATE_CHANGED','An active action overrides sequence NLA')
+    expected_tracks = {x['track'] for x in manifest['strips']}
+    require({t.name for t in target.animation_data.nla_tracks if not t.mute} == expected_tracks
+            and target.animation_data.use_nla and not any(t.is_solo for t in target.animation_data.nla_tracks),
+            'SEQUENCE_STATE_CHANGED', 'Another track, solo setting or disabled NLA changes the reviewed composition')
     for item in manifest['strips']:
         track=target.animation_data.nla_tracks.get(item['track'])
         require(track and not track.mute and len(track.strips)==1,'SEQUENCE_STATE_CHANGED','Sequence track missing or muted')
@@ -360,14 +387,41 @@ def check(target, manifest):
                 and signature(strip.action,strip.action_slot)==item['signature']
                 and abs(strip.frame_start-item['start'])<1e-5 and abs(strip.frame_end-item['end'])<1e-5
                 and abs(strip.scale-item['scale'])<1e-6 and strip.repeat==1 and strip.blend_in==0 and strip.blend_out==0
-                and strip.blend_type=='REPLACE' and not strip.use_animated_time and not strip.use_animated_influence,
+                and strip.blend_type=='REPLACE' and not strip.use_animated_time and not strip.use_animated_influence
+                and not strip.mute and abs(strip.influence-1)<1e-7 and not strip.use_auto_blend
+                and strip.extrapolation==item['extrapolation']
+                and abs(strip.action_frame_start-item['source_range'][0])<1e-5
+                and abs(strip.action_frame_end-item['source_range'][1])<1e-5,
                 'SEQUENCE_STATE_CHANGED','Action, slot, placement or influence changed')
+    for original in manifest['source_original_signatures']:
+        action = bpy.data.actions.get(original['imported_action'])
+        require(action is not None, 'SEQUENCE_STATE_CHANGED', 'Original clip action disappeared')
+        slots = [s for s in action.slots if s.identifier == original['slot']]
+        require(len(slots)==1 and signature(action, slots[0])==original['curve_signature'],
+                'SEQUENCE_STATE_CHANGED', 'Original clip curves changed')
+    preserve(manifest['preservation_baseline'], target)
     report=ops.rig_report(target,manifest['roles']);fps=manifest['fps'];meters=manifest['meters_per_unit']
     scene=bpy.context.scene
     require(abs(scene.render.fps/scene.render.fps_base-fps)<1e-6,'SEQUENCE_STATE_CHANGED','Sequence FPS changed')
+    from .motion_morph import inclusive_scene_end
+    expected_end, _ = inclusive_scene_end(1, manifest['duration_seconds'], fps)
+    require(scene.frame_start==1 and scene.frame_end==expected_end, 'SEQUENCE_STATE_CHANGED', 'Sequence playback range changed')
     boundaries=sorted(set(f for j in manifest['joins'] for f in (j['start'],j['end'])))
-    seams=[]
+    seams=[]; endpoint_errors=[]
     with ops.restore_context():
+        for join in manifest['joins']:
+            for key in ('start','end'):
+                frame(join[key]);ev=target.evaluated_get(bpy.context.evaluated_depsgraph_get())
+                pos_error=0.;rot_error=0.
+                for role,name in manifest['roles'].items():
+                    measured=ev.matrix_world@ev.pose.bones[name].matrix
+                    expected=join['boundary_poses'][key][role]
+                    pos_error=max(pos_error,(measured.translation-Vector(expected['position'])).length*meters)
+                    rot_error=max(rot_error,1-abs(measured.to_quaternion().normalized().dot(Quaternion(expected['rotation']))))
+                require(pos_error <= 1e-4 and rot_error <= 1e-6, 'SEQUENCE_ENDPOINT_MISMATCH',
+                        'Evaluated NLA boundary differs from the reviewed source pose')
+                endpoint_errors.append({'frame':join[key], 'position_error_m':pos_error,
+                                        'quaternion_one_minus_abs_dot':rot_error, 'status':'PASS'})
         for f in boundaries:
             eps=1/32; points=[]
             for t in (f-eps,f,f+eps):
@@ -378,7 +432,10 @@ def check(target, manifest):
             seams.append({'frame':f,'probe_half_width_frames':eps,
                           'anchor_velocity_change_m_s':(right-left).length*meters,
                           'max_joint_displacement_across_probe_m':max((points[2][r].translation-points[0][r].translation).length for r in points[0])*meters,
-                          'max_rotation_across_probe_degrees':max(math.degrees(points[0][r].to_quaternion().rotation_difference(points[2][r].to_quaternion()).angle) for r in points[0])})
+                          'max_rotation_across_probe_degrees':max(math.degrees(sm.norm(sm.qlog(sm.qmul(sm.inverse(list(points[0][r].to_quaternion().normalized())),list(points[2][r].to_quaternion().normalized()))))) for r in points[0]),
+                          'max_joint_angular_velocity_change_rad_s':max(sm.norm(sm.sub(
+                              sm.angular_velocity(list(points[1][r].to_quaternion()),list(points[2][r].to_quaternion()),eps/fps),
+                              sm.angular_velocity(list(points[0][r].to_quaternion()),list(points[1][r].to_quaternion()),eps/fps))) for r in points[0])})
         samples=ops.samples_for(target,report,1,manifest['final_key_frame'],max_samples=129)
     contact=[];cfg=manifest['request']['contact']
     if cfg is not None:
@@ -388,7 +445,8 @@ def check(target, manifest):
             contact.append(tb.contact_check({**cfg,'target_object':target.name,'meters_per_unit':meters,'frames':batch}))
     return {'qa_roles':manifest['roles'],'qa_anatomical_height':report['anatomical_height'],
             'duration_seconds':manifest['duration_seconds'],'final_key_frame':manifest['final_key_frame'],
-            'scene_frame_end':scene.frame_end,'seams':seams,'sparse_global_samples':samples,
+            'scene_frame_end':scene.frame_end,'seams':seams,'endpoint_errors':endpoint_errors,
+            'sparse_global_samples':samples,
             'contact_batches':contact,'contact_status':('NOT_MEASURED' if cfg is None else
                 'SAMPLED_PENETRATION' if any(c['status']=='PENETRATION_DETECTED' for c in contact) else 'REVIEW_MEASURED_EXTREMA'),
             'performance':'PENDING','human':'NOT_ESTABLISHED',
@@ -408,7 +466,10 @@ def execute(lib,spec,directory,owner):
     for i in range(1,len(actions)):
         actual.append(align_action(reader,*actions[i],descriptors[i],anchor,transforms[i],f'BAD_SEQ_{owner}_ALIGNED_{i}'))
     bridges=[bridge_action(reader,actions,descriptors,p['joins'],i,anchor,transforms,fps,f'BAD_SEQ_{owner}_BRIDGE_{i}') for i in range(len(actions)-1)]
-    for track in target.animation_data.nla_tracks:track.mute=True
+    for track in target.animation_data.nla_tracks:
+        track.mute=True
+        track.is_solo=False
+    target.animation_data.use_nla=True
     target.animation_data.action=None
     # Restore non-animated target channels to their captured baseline. Do not
     # leave the final sampled incoming pose as a new reference for other bones.

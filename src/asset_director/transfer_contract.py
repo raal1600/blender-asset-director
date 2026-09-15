@@ -4,7 +4,7 @@ from .core import fields, require, text
 from .motion_assets import finite, vector, sha
 
 PLAN_FIELDS = {'target_object', 'source_meters_per_unit', 'target_meters_per_unit',
-               'target_fps', 'root_mode', 'facing', 'source_roles', 'target_roles', 'check_count', 'ground_contact', 'start', 'end'}
+               'target_fps', 'root_mode', 'facing', 'source_roles', 'target_roles', 'check_count', 'ground_contact', 'start', 'end', 'max_output_intervals'}
 CONTACT_FIELDS = {'target_object', 'mesh', 'feet', 'ground_z', 'meters_per_unit',
                   'tolerance_m', 'near_ground_m', 'glide_speed_m_s', 'frames', 'sample'}
 
@@ -45,7 +45,7 @@ def checkpoints(options, limit=257):
 
 
 def plan(options):
-    fields(options, PLAN_FIELDS, PLAN_FIELDS-{'source_roles', 'target_roles', 'check_count', 'ground_contact', 'start', 'end'})
+    fields(options, PLAN_FIELDS, PLAN_FIELDS-{'source_roles', 'target_roles', 'check_count', 'ground_contact', 'start', 'end', 'max_output_intervals'})
     require(('start' in options) == ('end' in options), 'SOURCE_RANGE_REVIEW', 'Provide both start and end for an excerpt')
     if 'start' in options:
         finite(options['start'], -10000, 10000); finite(options['end'], -10000, 10000)
@@ -53,6 +53,9 @@ def plan(options):
     name(options['target_object'])
     for k in ('source_meters_per_unit', 'target_meters_per_unit'): finite(options[k], 1e-6, 1e3)
     finite(options['target_fps'], 1, 120)
+    limit = options.get('max_output_intervals', 360)
+    require(type(limit) is int and 1 <= limit <= 7200, 'RESOURCE_LIMIT',
+            'max_output_intervals must be an explicit integer in 1..7200')
     require(options['root_mode'] in ('preserve_world', 'morphology_scaled'), 'INVALID_PROFILE', 'Declare root displacement policy')
     count = options.get('check_count', 65)
     require(type(count) is int and 2 <= count <= 257, 'RESOURCE_LIMIT', 'Use 2..257 planning checkpoints')

@@ -24,6 +24,8 @@ def completed(lib, jid, operations):
             and job.get('state') == 'SUCCEEDED' and spec['operation'] in operations,
             'SEQUENCE_CLIP_INVALID', 'Need an immutable successful result of the supported operation')
     outputs = job['outputs']
+    require(isinstance(outputs, list) and 1 <= len(outputs) <= 256,
+            'SEQUENCE_CLIP_INVALID', 'Historical output inventory is missing or exceeds its bound')
     for f in outputs: lib.verify_file(f)
     result_path = path.parent/'result.json'
     require(any(f['path'] == result_path.relative_to(lib.root).as_posix() for f in outputs),
@@ -50,6 +52,16 @@ def clip(lib, jid):
             'STALE_SEQUENCE_CLIP', 'Transfer result lost its exact reviewed semantic context')
     from .transfer_review import validate_review
     validate_review(review)
+    require(spec['asset_id'] == pjob['specification']['asset_id']
+            and spec['inputs'] == pjob['specification']['inputs']
+            and data['target'] == proposal['retarget_options']['target_object']
+            and data['target_fingerprint'] == proposal['target_fingerprint']
+            and data['fps'] == proposal['retarget_options']['target_fps']
+            and data['qa_roles'].get('hips') == spec['options']['pose_space']['translation_bone'],
+            'STALE_SEQUENCE_CLIP', 'Historical owner, source, target, timebase or anchor binding changed')
+    require(data['frame_range'][1] > data['frame_range'][0]
+            and abs((data['frame_range'][1]-data['frame_range'][0])/data['fps']-data['duration_seconds']) < 1e-6,
+            'STALE_SEQUENCE_CLIP', 'Historical duration does not match its exact timebase')
     blend = directory/'result.blend'
     f = ref(lib, blend)
     require(f in job['outputs'], 'SEQUENCE_CLIP_INVALID', 'Clip blend is not a verified output')
@@ -99,6 +111,11 @@ def dependencies(lib, operation, options, input_file):
         grants.update(job['specification']['license_grants'])
     else:
         job, data, directory, deps, scope = completed(lib, options['sequence_job_id'], {'sequence-execute'})
+        selected = Path(input_file).resolve()
+        expected = ref(lib, directory/'result.blend')
+        require(selected.is_file() and expected in job['outputs']
+                and file_hash(selected) == expected['sha256'],
+                'STALE_SEQUENCE_BINDING', 'Check the exact published sequence bytes; check before further presentation edits')
         files += deps + [ref(lib, directory/'sequence.json')]
         grants.update(scope)
     unique = {f['path']:f for f in files}

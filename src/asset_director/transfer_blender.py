@@ -190,7 +190,7 @@ def propose(lib, spec):
             'STALE_SOURCE_INDEX','Reimported action/rig differs from indexed evidence')
     start, end = o.get('start', start), o.get('end', end)
     from .motion_timing import bake_samples
-    bake_samples(start, end, sfps, o['target_fps'])
+    bake_samples(start, end, sfps, o['target_fps'], o.get('max_output_intervals', 360))
     # Own the scratch state only. Planning never saves either input file.
     bpy.context.scene.frame_set(math.floor(start),subframe=start-math.floor(start))
     if target.animation_data:
@@ -251,6 +251,7 @@ def propose(lib, spec):
     retarget={'target_object':target.name,'source_object':asset.metadata['source_object'],
         'action':asset.metadata['action'],'source_fps':sfps,'target_fps':o['target_fps'],
         'start':start,'end':end,'mapping':pairs,'alignment':alignment,
+        'max_output_intervals':o.get('max_output_intervals', 360),
         'pose_space':{'rotation':flat(world),'translation_bone':t_roles['hips'],
                       'translation_scale':scale,'target_origin':list(origin)}}
     ground_evidence = None

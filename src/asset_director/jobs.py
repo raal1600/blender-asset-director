@@ -12,8 +12,10 @@ from . import look_contract
 from . import motion_contract
 from . import transfer_contract
 from . import bone_display_contract
+from . import sequence_contract
 
 OPS = {
+    **sequence_contract.OPS,
     "bone-display-audit": bone_display_contract.AUDIT_FIELDS,
     "bone-display": bone_display_contract.DISPLAY_FIELDS,
     "transfer-plan": transfer_contract.PLAN_FIELDS,
@@ -32,14 +34,14 @@ OPS = {
     "light-rig": {"subjects", "lights"},
     "index": {"max_clips", "sample"},
     "import": {"collection", "selection"},
-    "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture", "transfer_binding"},
+    "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture", "transfer_binding", "max_output_intervals"},
     "assemble": {"target_object", "clips", "fps", "controller_speed", "direction", "terrain_object", "travel_frames"},
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage"},
 }
-MUTATIONS = {"bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
+MUTATIONS = {"sequence-execute", "bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
              "light-adjust", "world-adjust", "look-adjust", "light-rig"}
-TARGET_REQUIRED = {"bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
+TARGET_REQUIRED = {"sequence-plan", "sequence-execute", "sequence-check", "bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
                    "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 
 OPS.update(motion_contract.OPS)
@@ -55,6 +57,15 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
     options = copy.deepcopy(options or {})
     fields(options, OPS[operation])
+    if operation in sequence_contract.OPS:
+        sequence_contract.validate(operation, options)
+        require(input_file is not None and asset_id is None, "TARGET_REQUIRED",
+                "Sequence jobs require a saved target and reviewed result IDs, not asset IDs")
+    if operation == "retarget":
+        limit = options.get("max_output_intervals", 360)
+        require(type(limit) is int and 1 <= limit <= 7200, "RESOURCE_LIMIT", "Invalid retarget interval budget")
+        require(limit <= 360 or "transfer_binding" in options, "TRANSFER_REVIEW_REQUIRED",
+                "Long retargets require an explicitly approved transfer-plan")
     if operation in {'bone-display-audit', 'bone-display'}: bone_display_contract.validate(operation, options)
     if operation == "transfer-plan": transfer_contract.plan(options)
     if operation == "contact-check": transfer_contract.contact(options)
@@ -120,7 +131,7 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
                 and asset.metadata.get("fps"), "INDEX_REQUIRED", "Planning requires one indexed animation clip")
         from .motion_timing import bake_samples
         start, end = options.get("start", asset.metadata.get("frame_start")), options.get("end", asset.metadata.get("frame_end"))
-        bake_samples(start, end, asset.metadata["fps"], options["target_fps"])
+        bake_samples(start, end, asset.metadata["fps"], options["target_fps"], options.get("max_output_intervals", 360))
         require(start >= asset.metadata["frame_start"]-1e-5 and end <= asset.metadata["frame_end"]+1e-5,
                 "SOURCE_RANGE_REVIEW", "Excerpt leaves the actual indexed action")
     if operation == "contact-check": require(asset_id is None, "INVALID_SCHEMA", "Contact diagnostics use the saved target only")
@@ -129,7 +140,13 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
         _, dependency = checked_binding(lib, options, input_file, asset_id)
         source_files = list(source_files) + [dependency]
     from . import license_policy as lp
-    grants = set()
+    if operation in sequence_contract.OPS:
+        from . import sequence_review
+        deps, scopes = sequence_review.dependencies(lib, operation, options, input_file)
+        source_files = list(source_files) + deps
+    else:
+        scopes = []
+    grants = set(scopes)
     if asset and operation != "index" and asset.metadata.get("license_grant"):
         grants.add(asset.metadata["license_grant"])
     for f in inputs: grants.update(lp.derivation(lib, f["sha256"]))

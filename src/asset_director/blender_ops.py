@@ -301,7 +301,9 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
     require(end > start, "EMPTY_ACTION", "Invalid source range")
     sfps = options.get("source_fps", bpy.context.scene.render.fps / bpy.context.scene.render.fps_base)
     tfps = options.get("target_fps", bpy.context.scene.render.fps / bpy.context.scene.render.fps_base)
-    bake = motion_timing.bake_samples(start, end, sfps, tfps)
+    bake = motion_timing.bake_samples(start, end, sfps, tfps, options.get('max_output_intervals', 360))
+    require(len(bake)*len(pairs)*7 <= 500_000, 'RESOURCE_LIMIT',
+            'Retarget exceeds the retained 500,000 scalar-key/action inspection cap')
     n, last_frame = len(bake), bake[-1][0]
     for c in curves(action, slot):
         if c.data_path in {"location", "rotation_euler", "rotation_quaternion", "scale"}:
@@ -336,6 +338,8 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
             from .ground_contact import GroundContact
             ground_contact = GroundContact(target, options['pose_space']['translation_bone'],
                                            options['pose_space']['ground_contact'])
+    if ground_contact:
+        ground_contact.check_work([f for f, _ in bake], options.get('max_output_intervals', 360)+1)
     new = bpy.data.actions.new(f"BAD_{job_id}_{action.name}")
     target.animation_data.action = new
     previous_q = {}
@@ -366,7 +370,7 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
     for c in curves(new, getattr(target.animation_data, "action_slot", None)):
         for k in c.keyframe_points: k.interpolation = "LINEAR"
     if ground_contact:
-        ground_contact.correct([frame for frame, _ in bake])
+        ground_contact.correct([frame for frame, _ in bake], max_frames=options.get('max_output_intervals', 360)+1)
     bpy.context.scene.render.fps = int(tfps); bpy.context.scene.render.fps_base = int(tfps) / tfps
     bpy.context.scene.frame_start = 1; bpy.context.scene.frame_end = max(1, math.floor(last_frame))
     bpy.context.scene.frame_set(1)

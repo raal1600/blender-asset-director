@@ -59,6 +59,7 @@ def validate(operation, o):
         require(type(join['subdivisions']) is int and 1 <= join['subdivisions'] <= 8,
                 'RESOURCE_LIMIT', 'Bridge subdivisions must be 1..8')
     if o['contact'] is not None:
+        require(isinstance(o['contact'], dict), 'INVALID_SEQUENCE', 'Contact must be an explicit object or null')
         from .transfer_contract import contact
         contact({**o['contact'], 'target_object': o['target_object'],
                  'meters_per_unit': o['meters_per_unit'], 'frames': [1, 2]})

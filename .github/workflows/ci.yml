@@ -100,10 +100,26 @@ jobs:
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/transfer_planning_fixture.py -- "$RUNNER_TEMP/transfer-planning" "$RUNNER_TEMP/bad-library"
           cp "$RUNNER_TEMP/transfer-planning/transfer_planning_report.json" evidence/
+      - name: Reviewed transfer with custom target roles
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/transfer_planning_fixture.py -- "$RUNNER_TEMP/transfer-custom" "$RUNNER_TEMP/bad-library" custom
+          cp "$RUNNER_TEMP/transfer-custom/transfer_planning_report.json" evidence/transfer_custom_report.json
+      - name: Reviewed bone display and widget preservation
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/bone_display_fixture.py -- "$RUNNER_TEMP/bone-display" "$RUNNER_TEMP/bad-library"
+          cp "$RUNNER_TEMP/bone-display/REPORT.json" evidence/bone_display_report.json
       - name: Bounded subframe grounding, rotation preservation and total correction cap
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/ground_contact_fixture.py -- "$RUNNER_TEMP/ground-contact"
           cp "$RUNNER_TEMP/ground-contact/ground_contact_report.json" evidence/
+      - name: Full long-take sequence, root alignment, bridge and reviewed-role QA
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/sequence_fixture.py -- "$RUNNER_TEMP/sequence" "$RUNNER_TEMP/bad-library"
+          cp "$RUNNER_TEMP/sequence/sequence_report.json" evidence/
+      - name: Preserve sequence progress on failure
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/sequence/sequence_progress.json" ]; then cp "$RUNNER_TEMP/sequence/sequence_progress.json" evidence/; fi
       - name: Live free asset acquisition and real-motion retarget
         if: matrix.blender == '5.0.0'
         run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence

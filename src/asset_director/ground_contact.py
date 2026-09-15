@@ -92,16 +92,20 @@ class GroundContact:
                     'GROUND_CONTACT_FAILED','Vertical repair changed sampled horizontal anchor travel')
         self.corrections.append(total)
 
-    def correct(self, baked_frames):
+    def check_work(self, baked_frames, max_frames=361):
+        from .ground_sampling import correction_frames
+        frames = correction_frames(baked_frames, self.config.get('subdivisions', 1), max_frames)
+        require(len(frames)*len(self.mesh.data.vertices)*3 <= 50_000_000,
+                'RESOURCE_LIMIT', 'Ground-contact evaluation budget exceeded')
+        return frames
+
+    def correct(self, baked_frames, max_frames=361):
         """Correct the finished action, then verify all declared checkpoints.
 
         Capture the uncorrected anchor first. Neighboring repair keys influence
         later evaluations, so the residual correction alone is not a cap bound.
         """
-        from .ground_sampling import correction_frames
-        frames=correction_frames(baked_frames,self.config.get('subdivisions',1))
-        require(len(frames)*len(self.mesh.data.vertices)*3 <= 50_000_000,
-                'RESOURCE_LIMIT','Ground-contact evaluation budget exceeded')
+        frames = self.check_work(baked_frames, max_frames)
         scene=bpy.context.scene;original={}
         for f in frames:
             scene.frame_set(math.floor(f),subframe=f-math.floor(f));bpy.context.view_layer.update()

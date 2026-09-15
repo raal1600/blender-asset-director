@@ -15,8 +15,8 @@ def bake_samples(start, end, source_fps, target_fps, max_intervals=360):
     require(type(max_intervals) is int and 1 <= max_intervals <= 7200, 'RESOURCE_LIMIT',
             'Retarget bake interval budget must be 1..7200')
     span = (end-start) * target_fps / source_fps
-    require(span <= max_intervals, 'RESOURCE_LIMIT',
-            'Retarget duration exceeds the explicitly reviewed output-interval budget')
+    require(span <= max_intervals and (end-start)/source_fps <= 180, 'RESOURCE_LIMIT',
+            'Retarget exceeds its reviewed interval budget or 180-second absolute cap')
     if abs(span-round(span)) < 1e-8:
         span = float(round(span))
     # Preserve the true endpoint; rounding duration used to truncate or stretch it.

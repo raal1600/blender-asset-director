@@ -61,7 +61,12 @@ def execute(job_path, *, live=False):
             require(isinstance(embedded, list) and set(embedded) <= set(spec.get("license_grants", [])),
                     "LICENSE_SCOPE_MISMATCH", "Restricted working scene needs its originating library lineage")
             files = spec["source_files"]
-            if op in {'bone-display-audit', 'bone-display'}:
+            if op in {'sequence-plan', 'sequence-execute', 'sequence-check'}:
+                from asset_director import sequence_blender
+                if op == 'sequence-plan': data = sequence_blender.plan(lib, spec)
+                elif op == 'sequence-execute': data = sequence_blender.execute(lib, spec, directory, job['id'])
+                else: data = sequence_blender.check_job(lib, options)
+            elif op in {'bone-display-audit', 'bone-display'}:
                 from asset_director import bone_display
                 data = bone_display.inspect(options) if op == 'bone-display-audit' else bone_display.apply(options)
             elif op == "transfer-plan":
@@ -198,8 +203,9 @@ def execute(job_path, *, live=False):
                 lp.retain_derivation(lib, dest, spec.get("license_grants", []))
             if spec.get("license_grants"):
                 data["project_rights"] = {"grants": spec["license_grants"], "raw_redistribution": "DENIED", "scope": lp.SCOPE}
-        if op == "transfer-plan":
-            data["id"] = "tp_" + digest({k:v for k,v in data.items() if k != "id"})
+        if op in {"transfer-plan", "sequence-plan"}:
+            prefix = "tp_" if op == "transfer-plan" else "sq_"
+            data["id"] = prefix + digest({k:v for k,v in data.items() if k != "id"})
         summary = {"operation": op, "blender_version": bpy.app.version_string, "clips": len(data.get("clips", [])), "visual_acceptance": "PENDING"}
         atomic_json(directory / "result.json", {"status": "OK", "job_id": job["id"], "summary": summary, "data": data})
         return summary
