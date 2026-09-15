@@ -48,39 +48,61 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg fonts-dejavu-core
           python tools/build_transition_site.py "$RUNNER_TEMP/showcase-render" "$RUNNER_TEMP/web/blender-asset-director"
-      - name: Test actual playback and responsive site in Chromium
-        run: |
-          python -m pip install playwright==1.55.0
-          python -m playwright install --with-deps chromium
-          python -m http.server 8765 --bind 127.0.0.1 --directory "$RUNNER_TEMP/web" > "$RUNNER_TEMP/http.log" 2>&1 &
-          python tools/test_transition_page.py http://127.0.0.1:8765/blender-asset-director/ "$RUNNER_TEMP/page-evidence"
-      - name: Keep website and diagnostic screenshots
+      - name: Retain encoded public website before browser validation
         uses: actions/upload-artifact@v4
         with:
-          name: transition-lab-preview
-          path: |
-            ${{ runner.temp }}/web/blender-asset-director/
-            ${{ runner.temp }}/page-evidence/
+          name: transition-lab-render
+          path: ${{ runner.temp }}/web/blender-asset-director/
           if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+      - name: Keep bounded render failure reports (never source animations)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: transition-lab-render-failure
+          path: |
+            ${{ runner.temp }}/showcase-fixture/sequence_failure.json
+            ${{ runner.temp }}/showcase-fixture/sequence_progress.json
+            ${{ runner.temp }}/showcase-render/metrics.json
+          if-no-files-found: warn
+          retention-days: 7
+  validate:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Reuse this run's completed render (no additional Blender work)
+        uses: actions/download-artifact@v4
+        with:
+          name: transition-lab-render
+          path: ${{ runner.temp }}/web/blender-asset-director
+      - name: Test actual H.264 playback and responsive site in Chrome
+        run: |
+          python -m pip install playwright==1.55.0
+          python -m playwright install --with-deps chrome
+          python -m http.server 8765 --bind 127.0.0.1 --directory "$RUNNER_TEMP/web" > "$RUNNER_TEMP/http.log" 2>&1 &
+          python tools/test_transition_page.py http://127.0.0.1:8765/blender-asset-director/ "$RUNNER_TEMP/page-evidence"
+      - name: Retain browser evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: transition-lab-browser-evidence
+          path: ${{ runner.temp }}/page-evidence/
+          if-no-files-found: warn
           retention-days: 14
       - name: Upload only the validated public website
         uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ runner.temp }}/web/blender-asset-director
-      - name: Keep bounded failure reports (never source animations)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: transition-lab-failure-evidence
-          path: |
-            ${{ runner.temp }}/showcase-fixture/sequence_failure.json
-            ${{ runner.temp }}/showcase-fixture/sequence_progress.json
-            ${{ runner.temp }}/showcase-render/metrics.json
-            ${{ runner.temp }}/page-evidence/
-          if-no-files-found: warn
-          retention-days: 7
   deploy:
-    needs: build
+    needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
