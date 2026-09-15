@@ -106,7 +106,6 @@ def execute(job_path, *, live=False):
             elif op == "index":
                 data = {"clips": [], "rigs": [], "unassigned_actions": [], "files_indexed": []}
                 candidates = [f for f in files if Path(f["path"]).suffix.lower() in {".glb", ".gltf", ".fbx", ".bvh", ".blend"}]
-                # Pick the highest fidelity self-contained interchange representation, retaining all files of that representation.
                 for extension in (".glb", ".gltf", ".fbx", ".bvh", ".blend"):
                     subset = [f for f in candidates if Path(f["path"]).suffix.lower() == extension]
                     if subset: candidates = subset; break
@@ -187,8 +186,6 @@ def execute(job_path, *, live=False):
                         data["terrain_qa"] = ops.terrain_quality(sampled,report["anatomical_height"],options["terrain_object"],options.get("sole_offsets"))
             else: raise DirectorError("UNKNOWN_OPERATION", "Unsupported operation")
             if op in {"retarget", "motion-retarget"}:
-                # Deliver direct actions with their exact final key covered. This
-                # is not the NLA strip rule (which rejects uncovered end frames).
                 from asset_director.motion_morph import inclusive_scene_end
                 scene = bpy.context.scene
                 scene.frame_end, _ = inclusive_scene_end(data["frame_range"][0], data["duration_seconds"], data["fps"])
@@ -212,8 +209,20 @@ def execute(job_path, *, live=False):
 
 
 def re_original(name):
+    """Normalize Blender collision suffixes in an imported action label.
+
+    FBX actions can embed their object owner before the first '|'. Importing
+    another Armature yields Armature.001|Take, not necessarily Take.001.
+    This is only a candidate-label comparison. Callers still restrict to new
+    imports, require one candidate, and verify indexed rig/timebase/slot and
+    reviewed curve hashes. Do not use this label as asset identity.
+    """
     import re
-    return re.sub(r"\.\d{3}$", "", name)
+    owner, separator, take = name.partition('|')
+    if separator:
+        owner = re.sub(r"\.\d{3,}$", "", owner)
+        return owner + separator + re.sub(r"\.\d{3,}$", "", take)
+    return re.sub(r"\.\d{3,}$", "", name)
 
 
 if __name__ == "__main__":

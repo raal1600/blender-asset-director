@@ -1,0 +1,34 @@
+name: Imported action collision regression
+on:
+  push:
+    branches: ['fix/private-mixamo-action-collision-20260915']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  collision:
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['4.5.3', '5.0.0', '5.2.1']
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Fetch verified Blender and run real synthetic FBX collision
+        run: |
+          python tools/fetch_blender.py '${{ matrix.version }}' "$RUNNER_TEMP/blender" > "$RUNNER_TEMP/bpath"
+          BLENDER=$(tail -n 1 "$RUNNER_TEMP/bpath")
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/action_collision_fixture.py -- "$RUNNER_TEMP/collision"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: action-collision-${{ matrix.version }}
+          path: ${{ runner.temp }}/collision/action_collision_report.json
+          if-no-files-found: warn
+          retention-days: 14
