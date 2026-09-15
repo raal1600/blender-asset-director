@@ -18,6 +18,25 @@ class ImportedSlotTests(unittest.TestCase):
         self.assertIs(obj.animation_data.action_slot, slot)
         self.assertEqual(slot.identifier, "OBArmature.001")
 
+    def test_blender_45_take_suffix_is_preserved_exactly(self):
+        for suffix in ("|Scene", "|Scene.002", "|Armature|Scene"):
+            obj, action, slot = self.fixture()
+            slot.identifier += suffix
+            with self.subTest(suffix=suffix):
+                self.assertEqual(imported_slot(obj, action, "OBArmature" + suffix, "Armature"), slot.identifier)
+                self.assertIs(obj.animation_data.action_slot, slot)
+                self.assertIs(obj.animation_data.action, action)
+
+    def test_changed_take_suffix_and_malformed_prefix_are_rejected(self):
+        for indexed, runtime in (("OBArmature|Scene", "OBArmature.001|Other"),
+                ("OBArmature|Scene", "OBArmature.001|Scene.001"),
+                ("OBArmature|", "OBArmature.001|"),
+                ("OBArmatureOther|Scene", "OBArmature.001Other|Scene"),
+                ("OBArmature.001|Scene", "OBArmature.001|Other")):
+            obj, action, slot = self.fixture(); slot.identifier = runtime
+            with self.subTest(indexed=indexed, runtime=runtime), self.assertRaises(DirectorError):
+                imported_slot(obj, action, indexed, "Armature")
+
     def test_exact_slot_and_legacy_paths_remain_strict_assign_inputs(self):
         obj, action, slot = self.fixture()
         self.assertEqual(imported_slot(obj, action, slot.identifier, "Armature"), slot.identifier)

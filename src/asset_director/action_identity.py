@@ -20,14 +20,23 @@ def imported_slot(obj, action, indexed_slot, indexed_owner):
     assigned = getattr(data, "action_slot", None)
     renamed_owner = (isinstance(indexed_owner, str) and isinstance(obj.name, str)
         and re.fullmatch(re.escape(indexed_owner) + r"\.[0-9]{3,}", obj.name) is not None)
+    # Blender 4.5 FBX slots include the take suffix, e.g. OBArmature|Scene.
+    # Substitute only the proven owner prefix; preserve the entire take suffix.
+    suffix = None
+    if isinstance(indexed_owner, str) and isinstance(indexed_slot, str):
+        prefix = "OB" + indexed_owner
+        if indexed_slot == prefix:
+            suffix = ""
+        elif indexed_slot.startswith(prefix + "|") and len(indexed_slot) > len(prefix) + 1:
+            suffix = indexed_slot[len(prefix):]
     evidence = {"indexed_owner": indexed_owner, "indexed_slot": indexed_slot,
                 "imported_owner": obj.name, "action_is_bound": getattr(data, "action", None) == action,
                 "assigned_slot": getattr(assigned, "identifier", None),
                 "slots": [{"identifier": s.identifier, "target_id_type": getattr(s, "target_id_type", None)} for s in slots]}
-    require(renamed_owner and indexed_slot == "OB" + indexed_owner
+    require(renamed_owner and suffix is not None
         and len(slots) == 1 and getattr(data, "action", None) == action
         and assigned is not None and assigned == slots[0]
-        and assigned.identifier == "OB" + obj.name
+        and assigned.identifier == "OB" + obj.name + suffix
         and getattr(assigned, "target_id_type", None) == "OBJECT",
         "SLOT_AMBIGUOUS", "Indexed slot is absent; no uniquely bound import-owner rename was proven: " + json.dumps(evidence))
     return assigned.identifier
