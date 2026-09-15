@@ -80,8 +80,13 @@ DIAGNOSE_ONLY; deliberate horizontal gliding is never automatically locked.
 
 Default retarget stays at 360 output intervals. transfer-plan can explicitly
 request max_output_intervals up to 7200, with absolute duration <=180 seconds.
-Execution above 360 requires an approved transfer binding. The 500,000 scalar-key
-per-action bound remains. A 1113-frame 30 FPS take needs 1112 intervals at 30 FPS;
+Execution above 360 requires an approved transfer binding. The 500,000 generated scalar-key
+per-action bound remains. Source signature inspection defaults to 500,000 keys;
+transfer-plan may explicitly request max_source_keys up to 1,000,000 for a long
+import containing baked location, rotation and scale channels. The approved
+proposal records both the allowance and actual source count, and execution
+revalidates the same signature and allowance. This does not increase the generated
+output key budget, crop source channels or alter native timing. A 1113-frame 30 FPS take needs 1112 intervals at 30 FPS;
 at 24 FPS it ends at frame 890.6 (891 samples, 890 intervals including the partial
 last one). The seconds remain 1112/30. Do not crop or reduce FPS to evade a budget.
 

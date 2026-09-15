@@ -4,7 +4,7 @@ from .core import fields, require, text
 from .motion_assets import finite, vector, sha
 
 PLAN_FIELDS = {'target_object', 'source_meters_per_unit', 'target_meters_per_unit',
-               'target_fps', 'root_mode', 'facing', 'source_roles', 'target_roles', 'check_count', 'ground_contact', 'start', 'end', 'max_output_intervals'}
+               'target_fps', 'root_mode', 'facing', 'source_roles', 'target_roles', 'check_count', 'ground_contact', 'start', 'end', 'max_output_intervals', 'max_source_keys'}
 CONTACT_FIELDS = {'target_object', 'mesh', 'feet', 'ground_z', 'meters_per_unit',
                   'tolerance_m', 'near_ground_m', 'glide_speed_m_s', 'frames', 'sample'}
 
@@ -45,11 +45,14 @@ def checkpoints(options, limit=257):
 
 
 def plan(options):
-    fields(options, PLAN_FIELDS, PLAN_FIELDS-{'source_roles', 'target_roles', 'check_count', 'ground_contact', 'start', 'end', 'max_output_intervals'})
+    fields(options, PLAN_FIELDS, PLAN_FIELDS-{'source_roles', 'target_roles', 'check_count', 'ground_contact', 'start', 'end', 'max_output_intervals', 'max_source_keys'})
     require(('start' in options) == ('end' in options), 'SOURCE_RANGE_REVIEW', 'Provide both start and end for an excerpt')
     if 'start' in options:
         finite(options['start'], -10000, 10000); finite(options['end'], -10000, 10000)
         require(options['end'] > options['start'], 'SOURCE_RANGE_REVIEW', 'Excerpt must increase')
+    source_limit = options.get('max_source_keys', 500000)
+    require(type(source_limit) is int and 1 <= source_limit <= 1000000, 'RESOURCE_LIMIT',
+            'max_source_keys must be an explicit integer in 1..1000000')
     name(options['target_object'])
     for k in ('source_meters_per_unit', 'target_meters_per_unit'): finite(options[k], 1e-6, 1e3)
     finite(options['target_fps'], 1, 120)

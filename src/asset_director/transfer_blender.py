@@ -130,19 +130,22 @@ def direction(obj, role, r):
     return v.normalized(), evidence
 
 
-def action_signature(action, slot):
+def action_signature(action, slot, max_keys=500000):
     curves = ops.curves(action,slot)
-    require(len(curves)<=4096 and sum(len(c.keyframe_points) for c in curves)<=500000,
-            'RESOURCE_LIMIT', 'Planning curve/key budget exceeded')
+    key_count = sum(len(c.keyframe_points) for c in curves)
+    require(type(max_keys) is int and 1 <= max_keys <= 1000000,
+            'RESOURCE_LIMIT', 'Invalid explicit source-key budget')
+    require(len(curves)<=4096 and key_count<=max_keys,
+            'RESOURCE_LIMIT', f'Planning source budget exceeded: {len(curves)} curves, {key_count} keys; max_source_keys={max_keys}')
     return digest([{'path':c.data_path,'index':c.array_index,
                     'keys':[[float(k.co.x),float(k.co.y),k.interpolation,
                              list(k.handle_left),list(k.handle_right)] for k in c.keyframe_points]}
                    for c in curves])
 
 
-def source_checks(source, action, anchor, start, end, count, meters_per_unit=1):
+def source_checks(source, action, anchor, start, end, count, meters_per_unit=1, max_source_keys=500000):
     slot=source.animation_data.action_slot
-    signature=action_signature(action,slot)
+    signature=action_signature(action,slot,max_source_keys)
     from .translation_precision import precision, check_span
     policy = precision(meters_per_unit, max(source.matrix_world.to_scale()))
     largest_non_anchor_span_m = 0.0
@@ -174,7 +177,8 @@ def source_checks(source, action, anchor, start, end, count, meters_per_unit=1):
         p = source.matrix_world @ source.pose.bones[anchor].head
         if origin is None: origin=p.copy()
         maximum=max(maximum,(p-origin).length)
-    return {'curve_signature':signature,'checkpoints':count,'max_anchor_displacement_source_units':maximum,
+    return {'curve_signature':signature,'max_source_keys':max_source_keys,
+            'source_key_count':sum(len(c.keyframe_points) for c in ops.curves(action,slot)),'checkpoints':count,'max_anchor_displacement_source_units':maximum,
             'non_anchor_translation_precision': policy, 'max_non_anchor_span_m': largest_non_anchor_span_m,
             'scope':'all key values/channel restrictions plus bounded evaluated times; no swept-extrema guarantee'}
 
@@ -221,7 +225,7 @@ def propose(lib, spec):
         facing_evidence=o['facing']['evidence']
     yaw=math.atan2(sf.cross(tf).z,sf.dot(tf)); world=Matrix.Rotation(yaw,3,'Z')
     source_world=flat(source.matrix_world);target_world=flat(target.matrix_world)
-    evidence=source_checks(source,action,s_roles['hips'],start,end,o.get('check_count',65),o['source_meters_per_unit'])
+    evidence=source_checks(source,action,s_roles['hips'],start,end,o.get('check_count',65),o['source_meters_per_unit'],o.get('max_source_keys',500000))
     role_for={t_roles[r]:r for r in common};alignment={}; alignment_evidence=[];solved={}
     from .translation_precision import precision, check_reference_residual
     alignment_precision = precision(o['target_meters_per_unit'], max(target.matrix_world.to_scale()))
@@ -319,7 +323,7 @@ def verify_execution(lib, source, target, action, slot_id, options):
         require(max(abs(a-b) for a,b in zip(actual,expected))<1e-5,
                 'STALE_TRANSFER_BINDING','Rig placement/orientation changed since review')
     ops.assign(source,action,slot_id)
-    require(action_signature(action,source.animation_data.action_slot)==proposal['source_checks']['curve_signature'],
+    require(action_signature(action,source.animation_data.action_slot,proposal['source_checks'].get('max_source_keys',500000))==proposal['source_checks']['curve_signature'],
             'STALE_TRANSFER_BINDING','Selected action curves/slot changed since review')
     return {key: dict(proposal[key+'_roles']) for key in ('source', 'target')}
 
