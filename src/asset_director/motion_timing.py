@@ -7,13 +7,16 @@ def number(value, low, high):
     return type(value) in (int, float) and math.isfinite(value) and low <= value <= high
 
 
-def bake_samples(start, end, source_fps, target_fps):
+def bake_samples(start, end, source_fps, target_fps, max_intervals=360):
     require(number(start, -10000, 10000) and number(end, -10000, 10000) and end > start,
             'INVALID_TIMING', 'Source frame range must be finite and increasing')
     require(number(source_fps, 1, 240) and number(target_fps, 1, 120),
             'INVALID_TIMING', 'Unsupported source/target frame rate')
+    require(type(max_intervals) is int and 1 <= max_intervals <= 7200, 'RESOURCE_LIMIT',
+            'Retarget bake interval budget must be 1..7200')
     span = (end-start) * target_fps / source_fps
-    require(span <= 360, 'RESOURCE_LIMIT', 'At most 360 output-frame intervals')
+    require(span <= max_intervals, 'RESOURCE_LIMIT',
+            'Retarget duration exceeds the explicitly reviewed output-interval budget')
     if abs(span-round(span)) < 1e-8:
         span = float(round(span))
     # Preserve the true endpoint; rounding duration used to truncate or stretch it.
@@ -22,7 +25,7 @@ def bake_samples(start, end, source_fps, target_fps):
         result[-1] = (float(round(span)+1), end)
     else:
         result.append((1+span, end))
-    require(2 <= len(result) <= 361, 'RESOURCE_LIMIT', 'Invalid bounded bake sample count')
+    require(2 <= len(result) <= max_intervals+1, 'RESOURCE_LIMIT', 'Invalid bounded bake sample count')
     return result
 
 
