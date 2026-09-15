@@ -223,6 +223,18 @@ def propose(lib, spec):
     source_world=flat(source.matrix_world);target_world=flat(target.matrix_world)
     evidence=source_checks(source,action,s_roles['hips'],start,end,o.get('check_count',65),o['source_meters_per_unit'])
     role_for={t_roles[r]:r for r in common};alignment={}; alignment_evidence=[];solved={}
+    # An identical observed reference needs exactly zero reference deformation.
+    # Avoid accumulating float32 inverse/compose residuals through deep chains.
+    # Unlike rigs, mappings, facing and object orientation use the existing solver.
+    same_reference = (sr['fingerprint'] == tr['fingerprint']
+        and all(s == t for s,t in pairs.items()) and abs(yaw) < 1e-8
+        and max(abs(source.matrix_world[r][c]-target.matrix_world[r][c])
+                for r in range(3) for c in range(3)) < 1e-8)
+    if same_reference:
+        alignment={n:flat(Matrix.Identity(4)) for n in pairs.values()}
+        alignment_evidence=[{'role':role,'source':s_roles[role],'target':t_roles[role],
+            'swing_degrees':0.0,'source_basis':'matching observed reference fingerprint and world linear transform',
+            'target_basis':'unchanged target rest; exact identity basis'} for role in common]
     inv_rotation=target.matrix_world.to_quaternion().to_matrix().inverted()
     ordered=[];remaining=list(target.data.bones)
     while remaining:
@@ -235,7 +247,7 @@ def propose(lib, spec):
         inherited=(b.convert_local_to_pose(Matrix.Identity(4),b.matrix_local,parent_matrix=solved[parent.name],parent_matrix_local=parent.matrix_local)
                    if parent else b.matrix_local.copy())
         desired=inherited.copy()
-        if b.name in role_for:
+        if b.name in role_for and not same_reference:
             role=role_for[b.name];sd,se=direction(source,role,s_roles);td,te=direction(target,role,t_roles)
             wanted=(world@sd).normalized(); dot=td.dot(wanted)
             require(dot>-.9999,'ALIGNMENT_REVIEW_REQUIRED','Antiparallel anatomical directions need explicit twist review')
@@ -246,7 +258,7 @@ def propose(lib, spec):
                    if parent else b.convert_local_to_pose(desired,b.matrix_local,invert=True))
             loc,q,scale=local.decompose()
             require(max(abs(v-1) for v in scale)<1e-5 and loc.length<1e-5,
-                    'ALIGNMENT_REVIEW_REQUIRED','Reference would stretch/translate target bones')
+                    'ALIGNMENT_REVIEW_REQUIRED',f'Reference would stretch/translate target bone {b.name}: local_translation={loc.length:.9g}, scale_error={max(abs(v-1) for v in scale):.9g}')
             local=q.normalized().to_matrix().to_4x4();alignment[b.name]=flat(local)
             alignment_evidence.append({'role':role,'source':s_roles[role],'target':b.name,
                 'source_direction':list(sd),'target_direction':list(td),'aligned_source_direction':list(wanted),
@@ -294,7 +306,8 @@ def propose(lib, spec):
             'target_meters_per_unit':o['target_meters_per_unit'],'unit_conversion':unit_conversion,
             'morphology_ratio':morphology,'runtime_translation_scale':scale},
         'facing':{'yaw_degrees':math.degrees(yaw),'source_forward':list(sf),'target_forward':list(tf),'evidence':facing_evidence},
-        'alignment_method':'minimal anatomical swing; nearest target-rest twist; host must review terminal axes',
+        'alignment_method':('exact identity for identical observed references' if same_reference else
+            'minimal anatomical swing; nearest target-rest twist; host must review terminal axes'),
         'alignment_evidence':alignment_evidence,'retarget_options':retarget,'grounding':ground_evidence,
         'duration_seconds':(end-start)/sfps,'performance':'PENDING',
         'limitations':['not full IK, retiming, foot locking or volume fitting','terminal bone axes require review',

@@ -1,4 +1,4 @@
-name: Imported action collision regression
+name: Imported action and reference regression
 on:
   push:
     branches: ['fix/private-mixamo-action-collision-20260915']
@@ -20,15 +20,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Fetch verified Blender and run real synthetic FBX collision
+      - name: Fetch verified Blender and run actual synthetic regressions
         run: |
           python tools/fetch_blender.py '${{ matrix.version }}' "$RUNNER_TEMP/blender" > "$RUNNER_TEMP/bpath"
           BLENDER=$(tail -n 1 "$RUNNER_TEMP/bpath")
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/action_collision_fixture.py -- "$RUNNER_TEMP/collision"
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/reference_identity_fixture.py -- "$RUNNER_TEMP/reference"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: action-collision-${{ matrix.version }}
-          path: ${{ runner.temp }}/collision/action_collision_report.json
+          name: action-reference-${{ matrix.version }}
+          path: |
+            ${{ runner.temp }}/collision/action_collision_report.json
+            ${{ runner.temp }}/reference/reference_identity_report.json
           if-no-files-found: warn
           retention-days: 14
