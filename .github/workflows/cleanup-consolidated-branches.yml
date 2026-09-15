@@ -1,0 +1,43 @@
+name: Cleanup consolidated branches
+on:
+  workflow_run:
+    workflows: ['Asset Director Tests', 'Transition Lab · Build and publish', 'Source package']
+    types: [completed]
+permissions:
+  contents: read
+concurrency:
+  group: manifest-bound-main-cleanup
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    if: >-
+      github.repository == 'raal1600/blender-asset-director' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check exact main gates and delete only unchanged merged inventory refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTED_MAIN: ${{ github.event.workflow_run.head_sha }}
+        run: python tools/cleanup_merged_branches.py --target-sha "$TESTED_MAIN"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: branch-cleanup-${{ github.run_id }}
+          path: cleanup-evidence/
+          retention-days: 30
+          if-no-files-found: error
