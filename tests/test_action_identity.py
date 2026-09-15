@@ -24,6 +24,11 @@ class ImportedSlotTests(unittest.TestCase):
         self.assertIsNone(imported_slot(obj, action, None, "Armature"))
         self.assertEqual(imported_slot(obj, NS(slots=[]), "legacy", "Armature"), "legacy")
 
+    def test_exact_unrenamed_owner_slot_is_not_a_collision(self):
+        obj, action, slot = self.fixture()
+        obj.name = "Armature"; slot.identifier = "OBArmature"
+        self.assertEqual(imported_slot(obj, action, "OBArmature", "Armature"), "OBArmature")
+
     def test_wrong_owner_or_slot_is_not_normalized(self):
         for owner, name in [("Other", "OBArmature"), ("Armature", "OBElse"), (None, "OBArmature")]:
             obj, action, _ = self.fixture()
@@ -47,7 +52,7 @@ class ImportedSlotTests(unittest.TestCase):
                 imported_slot(obj, action, "OBArmature", "Armature")
 
     def test_noncollision_owner_is_rejected(self):
-        for name in ("Other.001", "Armature", "Armature.1", "Armature.001.extra"):
+        for name in ("Other.001", "Armature.1", "Armature.001.extra"):
             obj, action, slot = self.fixture()
             obj.name = name; slot.identifier = "OB" + name
             with self.subTest(name=name), self.assertRaises(DirectorError):
