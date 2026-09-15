@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Four animation joins. One Blender-evaluated benchmark. Explore spatial alignment and a velocity-aware transition bridge in Blender Asset Director.">
+  <link rel="icon" href="data:,">
+  <meta name="theme-color" content="#10161c">
+  <title>Transition Lab — Blender Asset Director</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+<header class="topbar wrap"><a class="brand" href="./" aria-label="Transition Lab home"><span class="brand-mark">ad</span><span>BLENDER<br><strong>ASSET DIRECTOR</strong></span></a><nav aria-label="Main"><a href="#lab">The experiment</a><a href="#method">Method</a><a href="https://github.com/raal1600/blender-asset-director" target="_blank" rel="noopener">GitHub ↗</a></nav></header>
+<main>
+<section class="hero wrap">
+  <p class="eyebrow"><span class="dot"></span> TRANSITION LAB / EXPERIMENT 01</p>
+  <h1>Two clips.<br><span class="muted">One continuous move?</span></h1>
+  <div class="hero-bottom"><p>Watch what changes when a travelling animation meets a new one. Four methods, the same source motions, evaluated in Blender—not an artist’s before-and-after edit.</p><a class="button primary" href="#lab">Inspect the transition <span>↓</span></a></div>
+  <div class="disclosure"><span class="tag">SYNTHETIC BENCHMARK</span><span>Generated glide + arm gesture. Not Moonwalk, Thriller, motion capture, or a realism guarantee.</span></div>
+</section>
+<section id="lab" class="lab wrap" aria-labelledby="lab-title">
+  <div class="section-heading"><div><p class="eyebrow">01 / SEE THE DIFFERENCE</p><h2 id="lab-title">Same inputs. Different joins.</h2></div><span class="mono">BLENDER / CPU / 30 FPS</span></div>
+  <div class="video-shell">
+    <video id="comparison" controls playsinline preload="metadata" poster="./media/poster.jpg" aria-label="Four-panel synthetic Blender animation comparison"><source src="./media/comparison.mp4" type="video/mp4">Your browser cannot play the video. <a href="./media/comparison.mp4">Open the MP4.</a></video>
+  </div>
+  <div class="transport" aria-label="Additional playback controls"><div><button id="restart" type="button">↺ Restart</button><button id="join" type="button">Inspect join</button></div><div class="speed"><span class="mono">PLAYBACK</span><button type="button" data-rate="0.25" aria-pressed="false">0.25×</button><button type="button" data-rate="0.5" aria-pressed="false">0.5×</button><button type="button" data-rate="1" class="selected" aria-pressed="true">1×</button></div></div>
+  <p class="caption">A <strong>4-second viewing excerpt</strong> from the generated benchmark. One combined recording keeps every panel on the same scene clock. The full incoming clip is retained in the tested Director sequence.</p>
+  <div class="method-cards">
+    <article><span class="method-number">01</span><h3>Hard cut</h3><p>Place B immediately after A, without position alignment. Watch the return toward B’s original origin.</p><span class="badge">NO ALIGNMENT</span></article>
+    <article><span class="method-number">02</span><h3>Unaligned NLA</h3><p>Native Blender NLA crossfade. Smooth influence does not remove the underlying position mismatch.</p><span class="badge">OVERLAP</span></article>
+    <article><span class="method-number">03</span><h3>Aligned NLA</h3><p>The stronger control: B is aligned to A at the overlap’s start, then Blender crossfades the poses.</p><span class="badge">ALIGN + OVERLAP</span></article>
+    <article class="featured"><span class="method-number">04</span><h3>Director bridge</h3><p>Align the incoming clip and add a pose/velocity-aware bridge. Both complete source clips keep their native speed.</p><span class="badge">ALIGN + EXTRA BRIDGE</span></article>
+  </div>
+</section>
+<section class="evidence wrap" aria-labelledby="evidence-title">
+  <div class="section-heading"><div><p class="eyebrow">02 / FOLLOW THE EVIDENCE</p><h2 id="evidence-title">Measured, not assumed.</h2></div><a href="./metrics.json">View the generated data ↗</a></div>
+  <div class="stats"><div><span>Unaligned endpoint gap</span><strong id="gap">—</strong><small>Measured before Director placement</small></div><div><span>Additional bridge</span><strong id="bridge">—</strong><small>Not a change to source speed</small></div><div><span>Full incoming clip</span><strong id="full-clip">—</strong><small>Retained, beyond this video excerpt</small></div><div><span>Source result bytes</span><strong id="preserved">—</strong><small>Rechecked after capture and rendering</small></div></div>
+  <div class="chart-card"><div class="chart-head"><h3>Where the hips actually go</h3><span class="mono">HORIZONTAL X / METRES</span></div><canvas id="trajectory" height="230" aria-label="Measured horizontal hip position against scene time for all four methods" role="img"></canvas><div id="legend" class="legend"></div><p class="caption">Local stage coordinates with one constant reference for every method. The green floor trace in the video is the projected hip trajectory, <strong>not a foot-contact classification</strong>.</p></div>
+  <div class="timeline-card"><h3>The timing tradeoff</h3><p>Crossfades overlap A’s ending and B’s opening. The Director inserts time between complete clips. After the join, identical scene time does <strong>not</strong> mean identical source phase.</p><div id="timelines" aria-label="Per-method source and transition timing"></div></div>
+</section>
+<section id="method" class="wrap methodology" aria-labelledby="method-title"><div><p class="eyebrow">03 / UNDER THE HOOD</p><h2 id="method-title">Continuity is the start.<br>Naturalness is the next test.</h2><p>The Director reads the outgoing endpoint, measures position and velocity, aligns the incoming motion in the target’s space, and creates a separate reversible transition action.</p><p>Its quintic position and quaternion-log bridge is kinematic interpolation. It does not understand weight shifts, enforce balance, solve full-body IK, or guarantee believable choreography.</p><a id="architecture" href="https://github.com/raal1600/blender-asset-director/blob/389e8f28689e228370334b7cf4c529bead87a7d3/docs/REVIEWED_SEQUENCES.md">Read the engine design ↗</a></div><div class="notes"><h3>What this demonstration establishes</h3><p><strong>Actual engine output.</strong> The Director panel uses the sequence produced by the reviewed executor. The controls use actual Blender Actions and NLA, not a JavaScript recreation of blending.</p><p><strong>Identical presentation.</strong> Every view uses the same locked camera, lighting, joint geometry and elapsed clock. Only the animation composition changes.</p><p><strong>An honest stronger baseline.</strong> Aligned NLA may also look good. This benchmark does not claim the Director wins for every pose pair.</p><p><strong>Limited motion.</strong> The generated rig glides and moves its arms; it is not a skilled dancer. Smooth sampled boundaries are not proof of natural human performance.</p><p><strong>No private assets.</strong> No Adventurer, private Mixamo file, user configuration or production scene is published.</p></div></section>
+<section class="wrap provenance"><span class="tag">REPRODUCIBLE BUILD</span><div><p id="build-status" role="status">Loading measured build information…</p><p class="mono"><a id="build-source" href="https://github.com/raal1600/blender-asset-director">Source commit</a> <span> / </span><a id="build-run" href="https://github.com/raal1600/blender-asset-director/actions">Build & test evidence</a> <span> / </span><a href="./media/comparison.mp4">MP4</a></p></div></section>
+</main>
+<footer class="wrap"><span>BLENDER ASSET DIRECTOR <span class="muted">/ TRANSITION LAB</span></span><span>TECHNICAL EVIDENCE ≠ ARTISTIC ACCEPTANCE</span></footer>
+<noscript><p class="wrap">The video works without JavaScript. Open <a href="./metrics.json">metrics.json</a> for the numerical evidence.</p></noscript>
+</body></html>
