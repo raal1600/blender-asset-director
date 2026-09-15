@@ -1,13 +1,13 @@
 # Blender Asset Director
 
-> **Development branch: `feature/reviewed-transfer-planning`, runtime `0.6.0-dev.3`.**
-> Adds hierarchy-checked torso/finger proposals, read-only alignment planning,
-> approval-bound retargeting and evaluated integer/subframe contact diagnostics.
-> Builds on local animation folders and reviewed Mixamo intake. No new downloader,
-> GPU dependency, addon or arbitrary-code endpoint. Multi-window UI control is
-> explicitly deferred.
-> [Planning contracts and local acceptance](docs/REVIEWED_TRANSFER_PLANNING.md) ·
-> [Local library setup](docs/LOCAL_MOTION_LIBRARY.md).
+> **Development branch: `feature/reviewed-sequence-integration-20260915`, runtime `0.6.0-dev.4`.**
+> Adds reviewed full-clip sequencing, planar alignment and a pose/velocity-aware
+> extra transition bridge. Explicit long-take budgets preserve native timing.
+> Builds on local animation folders, reviewed transfer roles, subframe grounding
+> and bone-display audit. No new downloader, GPU, addon or arbitrary-code endpoint.
+> [Sequence design](docs/REVIEWED_SEQUENCES.md) ·
+> [Executed Actions evidence](docs/SEQUENCE_ACCEPTANCE.md) ·
+> [Bounded local acceptance](docs/SEQUENCE_LOCAL_ACCEPTANCE.md).
 > The published installer below still selects **v0.5.0**. No v0.6 release exists.
 
 **Give Codex a small Blender production team, not another Blender harness.**
@@ -27,10 +27,10 @@ staging. It fixes glTF retarget import timebases and fractional NLA endpoints,
 adds separate `playback_speed`, and includes the new Blender component and
 end-to-end job tests in CI. Legacy retargeting stays the default.
 
-**Technical transfer is not proof of natural performance.** The current source
-moonwalk has not been turned into authentic human footwork by these fixes.
-Video-to-mocap and live streaming are **not implemented**. The researched next
-steps are in [Real-performance capture roadmap](docs/CAPTURE_ROADMAP.md).
+**Technical transfer is not proof of natural performance.** These fixes do not
+turn an unsuitable source into convincing human footwork. Video-to-mocap and live
+streaming are **not implemented**. The researched next steps are in
+[Real-performance capture roadmap](docs/CAPTURE_ROADMAP.md).
 
 [Retarget validation and limitations](docs/RETARGET_ACCEPTANCE.md) identifies the
 exact tested runtime. Release publication is gated by the complete CI suite;
@@ -163,9 +163,9 @@ and happens only for an authorized relevant task.
   remain restrictions. Optional ground correction is vertical-only, not foot IK.
 - `stage-floor` adds one explicitly sized horizontal mesh and two new matte
   materials. The production-design `set` role owns this scoped creation.
-- NLA clips accept `playback_speed`; a 0.8 speed plays a one-second take over
+- Legacy NLA clips accept `playback_speed`; a 0.8 speed plays a one-second take over
   1.25 seconds. Frame-coordinate FPS is not a speed control. Fractional end keys
-  remain intact, but the scene range excludes uncovered integer rest frames.
+  remain intact, but legacy scene range excludes uncovered integer rest frames.
 - Bounded CPU previews restore production render settings and are labelled
   `PREVIEW_ARTIFACT`, never a delivery master.
 
@@ -174,42 +174,51 @@ and happens only for an authorized relevant task.
 [Motion source/transfer policy](skills/blender-asset-director/references/motion.md).
 
 Naturalness, timing, footwork, seamless loops and semantic action suitability
-require motion review. The new retarget/NLA reports explicitly leave performance
+require motion review. Retarget/NLA reports explicitly leave performance
 acceptance unevaluated. Eight still images cannot prove temporal smoothness.
 No paid calls, local AI inference, new capture service or device streaming is
 silently introduced. Default production limits remain eight CPU preview frames
 and two repairs, tracked across jobs by the host.
 
-## Development transfer planning
+## Development transfer planning and sequences
 
-This branch additionally provides `transfer-plan`, `transfer-prepare` and
-`contact-check`. An eligible indexed source and saved existing target produce a
-read-only alignment proposal. A host reviews the exact mapping, action, units,
-facing, proportions and target anchor before the existing executor transfers it.
-Contact diagnostics report integer and fractional-frame evidence separately and
-never automatically lock a sliding foot. Target mesh/rest anatomy is preserved.
+This branch provides `transfer-plan`, `transfer-prepare` and `contact-check`.
+An eligible indexed source and saved existing target produce a read-only alignment
+proposal. A host reviews mapping, action, units, facing, proportions and the target
+anchor before execution. Reviewed roles survive into QA, including custom names.
+Subframe grounding is bounded and optional. Bone-display audit/styling preserves
+custom-shape references; it is not live viewport/playback control.
 
-Read [the contracts](docs/REVIEWED_TRANSFER_PLANNING.md) and selectively load
-[the agent reference](skills/blender-asset-director/references/transfer-planning.md).
-Use a separate worktree/disposable library for testing; do not replace an installed
-working release or merge automatically. A proposal is not a performance verdict.
-No safe multi-window playback controller, full IK or GPU reconstruction is included.
+`sequence-plan`, `sequence-prepare`, `sequence-execute` and `sequence-check` join
+complete reviewed target clips: full A, extra bridge, full aligned B at native
+speed. Source actions remain unchanged. A derived anchor-aligned copy and an
+endpoint velocity-aware bridge prevent a naive return to the source origin.
+Explicit long-take and work budgets replace neither safety limits nor timing.
+The bridge is kinematic and may still need artistic review; it is not full IK or
+proprietary inertialization. No user-specific bone names or dance values are presets.
+
+Read [sequence contracts](docs/REVIEWED_SEQUENCES.md),
+[Actions evidence](docs/SEQUENCE_ACCEPTANCE.md) and
+[the local procedure](docs/SEQUENCE_LOCAL_ACCEPTANCE.md). Selectively load
+[sequences.md](skills/blender-asset-director/references/sequences.md).
+For transfer details see [REVIEWED_TRANSFER_PLANNING.md](docs/REVIEWED_TRANSFER_PLANNING.md).
+Use an isolated worktree and private library. Do not replace an installed working
+release or merge automatically. No multi-window controller, full IK or GPU capture
+is included. CI uses synthetic data and cannot certify private dance performance.
 
 ## Tests, maintenance and removal
 
 The published v0.5.0 runtime passed 223 unit tests and ten CI jobs: three Python/OS
 configurations, three real Blender versions (4.5.3, 5.0.0, 5.2.1) and four bootstrap
-configurations. New CI steps run evaluated-pose, sole-topology/floor, and full
-retarget/ground/NLA/floor/camera/preview regressions. Live free-provider/source-motion
-checks run on Blender 5.0.0. [Published-release evidence](docs/RETARGET_ACCEPTANCE.md).
-Development validation is separate from that release and your local acceptance.
+configurations. [Published-release evidence](docs/RETARGET_ACCEPTANCE.md).
+Development validation is separate from that release and local acceptance.
+The development matrix also exercises full-length sequences, custom semantic roles,
+bone-display preservation, physical-unit checks and actual FBX travel round trips.
 
-From a source checkout:
-
-```sh
-python tools/run_checks.py --offline
-python tools/install_skill.py --configure
-```
+For this milestone, all automated development tests run in GitHub Actions.
+The existing source-check command is `python tools/run_checks.py --offline`;
+do not run workstation development tests or configure/install globally as part of
+the bounded local real-source acceptance. Use its documented isolated procedure.
 
 From the installed runtime (substitute its actual path and working interpreter):
 
