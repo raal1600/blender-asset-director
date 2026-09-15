@@ -32,3 +32,15 @@ def check_span(values, policy, label='non-anchor channel'):
             f'{label}: non-anchor translation span {physical:.9g} m exceeds '
             f'{policy["tolerance_m_per_component"]:.9g} m; only the reviewed source anchor may translate')
     return physical
+
+
+def check_reference_residual(values, policy, label='reference alignment'):
+    """Measure matrix round-trip translation in metres; never change the matrix."""
+    require(isinstance(values, (list, tuple)) and len(values) == 3
+            and all(type(v) in (int, float) and math.isfinite(v) for v in values),
+            'ALIGNMENT_REVIEW_REQUIRED', 'Nonfinite or invalid reference translation')
+    residual_m = math.sqrt(sum(v*v for v in values))*policy['meters_per_local_unit']
+    require(residual_m <= TOLERANCE_M, 'ALIGNMENT_REVIEW_REQUIRED',
+            f'{label}: reference translation residual {residual_m:.9g} m exceeds '
+            f'{TOLERANCE_M:.9g} m; review target reference alignment')
+    return residual_m

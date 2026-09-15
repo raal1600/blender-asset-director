@@ -223,6 +223,8 @@ def propose(lib, spec):
     source_world=flat(source.matrix_world);target_world=flat(target.matrix_world)
     evidence=source_checks(source,action,s_roles['hips'],start,end,o.get('check_count',65),o['source_meters_per_unit'])
     role_for={t_roles[r]:r for r in common};alignment={}; alignment_evidence=[];solved={}
+    from .translation_precision import precision, check_reference_residual
+    alignment_precision = precision(o['target_meters_per_unit'], max(target.matrix_world.to_scale()))
     inv_rotation=target.matrix_world.to_quaternion().to_matrix().inverted()
     ordered=[];remaining=list(target.data.bones)
     while remaining:
@@ -245,12 +247,14 @@ def propose(lib, spec):
             local=(b.convert_local_to_pose(desired,b.matrix_local,parent_matrix=solved[parent.name],parent_matrix_local=parent.matrix_local,invert=True)
                    if parent else b.convert_local_to_pose(desired,b.matrix_local,invert=True))
             loc,q,scale=local.decompose()
-            require(max(abs(v-1) for v in scale)<1e-5 and loc.length<1e-5,
-                    'ALIGNMENT_REVIEW_REQUIRED',f'Reference would stretch/translate target bone {b.name}: local_translation={list(loc)}, scale={list(scale)}, swing_degrees={math.degrees(swing.angle)}, object_scale={list(target.matrix_world.to_scale())}')
+            require(max(abs(v-1) for v in scale)<1e-5,
+                    'ALIGNMENT_REVIEW_REQUIRED',f'Reference would stretch target bone {b.name}: scale={list(scale)}')
+            residual_m = check_reference_residual(list(loc), alignment_precision, b.name)
             local=q.normalized().to_matrix().to_4x4();alignment[b.name]=flat(local)
             alignment_evidence.append({'role':role,'source':s_roles[role],'target':b.name,
                 'source_direction':list(sd),'target_direction':list(td),'aligned_source_direction':list(wanted),
-                'swing_degrees':math.degrees(swing.angle),'source_basis':se,'target_basis':te})
+                'swing_degrees':math.degrees(swing.angle),'source_basis':se,'target_basis':te,
+                'translation_residual_m':residual_m,'translation_tolerance_m':alignment_precision['tolerance_m_per_component']})
         solved[b.name]=desired
     morphology=profile['suggested_translation_scale_xyz'][0]
     unit_conversion=o['source_meters_per_unit']/o['target_meters_per_unit']

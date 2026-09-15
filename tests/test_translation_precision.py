@@ -1,6 +1,6 @@
 import unittest
 from asset_director.core import DirectorError
-from asset_director.translation_precision import precision, check_span, TOLERANCE_M
+from asset_director.translation_precision import precision, check_span, check_reference_residual, TOLERANCE_M
 
 
 class PhysicalTranslationTests(unittest.TestCase):
@@ -38,3 +38,33 @@ class PhysicalTranslationTests(unittest.TestCase):
                  translation_scale=1, target_origin=[0,0,0], source_meters_per_unit=.01)
         validate(cfg)
         with self.assertRaises(DirectorError): validate(cfg | {'source_meters_per_unit':True})
+
+class ReferenceAlignmentPrecisionTests(unittest.TestCase):
+    def test_recorded_zero_swing_roundtrip_is_submicrometre(self):
+        residual = [4.76837158203125e-7, 1.9073486328125e-6, -1.52587890625e-5]
+        before = list(residual)
+        physical = check_reference_residual(residual, precision(1, .01))
+        self.assertGreater(physical, 1e-7)
+        self.assertLess(physical, 2e-7)
+        self.assertEqual(residual, before)
+
+    def test_equivalent_physical_errors_have_identical_decisions(self):
+        for metres, scale in ((1, 1), (1, .01), (.01, 1), (.001, 10)):
+            factor = metres*scale
+            for error_m in (0, 2e-7, 5e-6):
+                with self.subTest(metres=metres, scale=scale, error=error_m):
+                    self.assertAlmostEqual(check_reference_residual(
+                        [error_m/factor, 0, 0], precision(metres, scale)), error_m)
+            with self.assertRaises(DirectorError) as caught:
+                check_reference_residual([.001/factor, 0, 0], precision(metres, scale))
+            self.assertEqual(caught.exception.code, 'ALIGNMENT_REVIEW_REQUIRED')
+
+    def test_combined_vector_error_cannot_hide_in_individual_components(self):
+        with self.assertRaises(DirectorError):
+            check_reference_residual([8e-6, 8e-6, 0], precision(1))
+
+    def test_nonfinite_or_malformed_reference_is_rejected(self):
+        for values in ([], [0, 0], [0, 0, 0, 0], [True, 0, 0],
+                       [float('nan'), 0, 0], [float('inf'), 0, 0]):
+            with self.subTest(values=values), self.assertRaises(DirectorError):
+                check_reference_residual(values, precision(1))
