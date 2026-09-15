@@ -1,0 +1,86 @@
+name: Transition Lab · Deploy validated artifact
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/transition-lab-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: transition-lab-pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download validated site from Transition Lab run
+        uses: actions/download-artifact@v4
+        with:
+          name: transition-lab-render
+          path: ${{ runner.temp }}/site
+          repository: raal1600/blender-asset-director
+          run-id: '34930826059'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download browser validation evidence from same run
+        uses: actions/download-artifact@v4
+        with:
+          name: transition-lab-browser-evidence
+          path: ${{ runner.temp }}/browser
+          repository: raal1600/blender-asset-director
+          run-id: '34930826059'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Bind deployment to exact green evidence
+        env:
+          SITE: ${{ runner.temp }}/site
+          BROWSER: ${{ runner.temp }}/browser
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          site=Path(os.environ['SITE']); browser=Path(os.environ['BROWSER'])
+          metrics=json.loads((site/'metrics.json').read_text())
+          report=json.loads((browser/'browser-report.json').read_text())
+          assert metrics['schema']=='asset-director.transition-showcase/1'
+          assert metrics['synthetic'] is True and metrics['private_assets_used'] is False
+          assert metrics['commit']=='a52eaf72651cc82455f182f59a9cb5be2095ce3d'
+          assert metrics['fixture_status']=='PASS' and metrics['original_result_unchanged'] is True
+          video=site/'media'/'comparison.mp4'
+          assert hashlib.sha256(video.read_bytes()).hexdigest()==metrics['media']['sha256']
+          assert metrics['media']['width']==960 and metrics['media']['height']==720
+          assert metrics['media']['fps']==30 and metrics['media']['frames']==120
+          assert report['status']=='PASS' and report['artistic_acceptance']=='NOT_ESTABLISHED'
+          assert not report['javascript_errors']
+          required={'index.html','style.css','app.js','metrics.json','.nojekyll','media/comparison.mp4','media/poster.jpg'}
+          actual={p.relative_to(site).as_posix() for p in site.rglob('*') if p.is_file()}
+          assert actual==required,(actual,required)
+          print('VALIDATED_TRANSITION_LAB_DEPLOYMENT', metrics['commit'], metrics['media']['sha256'])
+          PY
+      - name: Upload exact validated site as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/site
+
+  deploy:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy validated Transition Lab
+        id: deployment
+        uses: actions/deploy-pages@v4
