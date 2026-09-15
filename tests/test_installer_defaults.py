@@ -39,6 +39,9 @@ class InstallerDefaultTests(unittest.TestCase):
         readme = (ROOT / 'README.md').read_text(encoding='utf-8')
         self.assertIn('## Current published preview: v' + PIN['version'], readme)
         self.assertIn('Development source: `main`', readme)
+        installation = (ROOT / 'docs' / 'INSTALL.md').read_text(encoding='utf-8')
+        self.assertIn('[Windows](../README.md#windows-install-or-update)', installation)
+        self.assertIn('[macOS / Linux](../README.md#macos--linux)', installation)
 
     def exercise_online_selection(self, argv, version):
         """Use a tiny inert package; no network, installed files or Blender."""

@@ -8,7 +8,10 @@ Install these separately, in the same OS environment where you will run Codex:
 2. [Local Codex](https://developers.openai.com/codex/quickstart). Sign in or configure your preferred supported provider. This skill does not require a particular model or extra API account. It does not configure DeepSeek.
 3. [Blender](https://www.blender.org/download/) and your reviewed [Blender MCP setup](https://github.com/ahujasid/blender-mcp). Follow the upstream add-on and Codex MCP configuration instructions. Open Blender and start the connection. In Codex, `/mcp` lists the actual active servers. A teaching overlay is optional.
 
-Now run the [README installer](../README.md#windows-install-or-update), start a fresh Codex session, and invoke `$blender-asset-director` for a first-run check. You do not need Git, Node or uv for **this skill installer**; your chosen MCP may have its own prerequisites.
+Now use the README instructions for [Windows](../README.md#windows-install-or-update)
+or [macOS / Linux](../README.md#macos--linux), then start a fresh Codex session
+and invoke `$blender-asset-director` for a first-run check. You do not need Git,
+Node or uv for **this skill installer**; your chosen MCP may have its own prerequisites.
 
 The downloaded PowerShell/shell script and Python bootstrap are executable code from this repository. Read them before running. They select an explicit release tag, not arbitrary moving main. SHA256 downloaded from the same release is an integrity check, not independent proof of publisher identity. No global execution-policy change, administrator prompt or secret is needed.
 
