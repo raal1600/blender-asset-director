@@ -1,0 +1,61 @@
+name: Consolidation audit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Preserve public source history and compact audit evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p consolidation-audit
+          git bundle create consolidation-audit/repository.bundle --all
+          git log --all --graph --decorate --oneline > consolidation-audit/history.txt
+          python - <<'PY'
+          import json, os, subprocess, urllib.request
+          from pathlib import Path
+          root = Path('consolidation-audit')
+          repo = os.environ['GITHUB_REPOSITORY']
+          def api(path):
+              req = urllib.request.Request('https://api.github.com/repos/' + repo + '/' + path,
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+          branches = api('branches?per_page=100')
+          inventory = []
+          for branch in branches:
+              sha = branch['commit']['sha']
+              counts = subprocess.check_output(['git', 'rev-list', '--left-right', '--count', 'origin/main...' + sha], text=True).split()
+              inventory.append({'branch': branch['name'], 'sha': sha, 'protected': branch['protected'], 'behind_main': int(counts[0]), 'ahead_main': int(counts[1])})
+          (root/'branches.json').write_text(json.dumps(inventory, indent=2))
+          runs = []
+          for page in (1, 2, 3):
+              batch = api(f'actions/runs?per_page=100&page={page}')['workflow_runs']
+              runs.extend({k: run.get(k) for k in ('id','name','head_branch','head_sha','event','status','conclusion','html_url','created_at','updated_at','run_attempt')} for run in batch)
+              if len(batch) < 100:
+                  break
+          (root/'actions.json').write_text(json.dumps(runs, indent=2))
+          prs = api('pulls?state=all&per_page=100')
+          (root/'pull-requests.json').write_text(json.dumps([{'number': p['number'], 'title': p['title'], 'state': p['state'], 'merged_at': p['merged_at'], 'head': p['head']['ref'], 'head_sha': p['head']['sha'], 'base': p['base']['ref'], 'url': p['html_url']} for p in prs], indent=2))
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('# Pre-consolidation audit\n\nRead-only inventory; no branches were merged or deleted.\n\n')
+              summary.write('| Branch | SHA | Ahead of main | Behind main |\n|---|---|---:|---:|\n')
+              for b in inventory:
+                  summary.write(f"| {b['branch']} | `{b['sha']}` | {b['ahead_main']} | {b['behind_main']} |\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: consolidation-audit-${{ github.sha }}
+          path: consolidation-audit/
+          retention-days: 30
+          if-no-files-found: error

@@ -22,6 +22,8 @@ def parser():
     p = argparse.ArgumentParser(prog="asset-director", description="Search, acquire, index and adapt existing Blender assets; JSON output.")
     p.add_argument("--library", default=settings.library_path())
     s = p.add_subparsers(dest="command", required=True)
+    q=s.add_parser("sequence-prepare"); q.add_argument("--review", required=True, help="Approval of an exact sequence-plan")
+    q=s.add_parser("transfer-prepare"); q.add_argument("--review",required=True,help="Explicit approval of a completed transfer-plan job")
     q=s.add_parser("configure"); q.add_argument("--blender"); q.add_argument("--skill-path")
     s.add_parser("doctor"); s.add_parser("providers"); s.add_parser("report"); s.add_parser("rebuild-catalog")
     q=s.add_parser("plan"); q.add_argument("brief")
@@ -39,6 +41,8 @@ def parser():
     q=s.add_parser("job-show"); q.add_argument("job_id")
     q=s.add_parser("job-retry"); q.add_argument("job_id")
     q=s.add_parser("index-collect"); q.add_argument("asset_id"); q.add_argument("job_id")
+    from .motion_cli import add_parsers
+    add_parsers(s)
     return p
 
 
@@ -47,7 +51,10 @@ def main(argv=None):
         args = parser().parse_args(argv)
         with Library(args.library) as lib:
             command=args.command
-            if command == "configure":
+            if command.startswith("motion-") or command == "retarget-profile":
+                from .motion_cli import dispatch
+                result = dispatch(lib, args)
+            elif command == "configure":
                 result=settings.configure(library=args.library,blender=args.blender,skill_path=args.skill_path)
             elif command == "doctor":
                 from .backend import verify
@@ -58,6 +65,12 @@ def main(argv=None):
                         "providers":capabilities(), "extra_model_calls":False, "runtime_gpu_ai":False,
                         "mcp_connection":"Host must verify its existing Blender MCP; this CLI does not replace or configure it",
                         "environment":settings.health()}
+            elif command == "sequence-prepare":
+                from .sequence_review import prepare
+                result=prepare(lib,load_json(Path(args.review)))
+            elif command == "transfer-prepare":
+                from .transfer_review import prepare
+                result=prepare(lib,load_json(Path(args.review)))
             elif command == "providers": result=capabilities()
             elif command == "plan": result=plan(args.brief)
             elif command == "studio-plan":

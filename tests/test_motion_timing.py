@@ -70,3 +70,47 @@ class MotionTimingTests(unittest.TestCase):
         for names in (['foot','foot'],[[]]):
             with self.subTest(names=names),self.assertRaises(DirectorError):
                 pose({**base,'ground_contact':dict(mesh='skin',vertex_groups=names,height=0,max_correction=.1)})
+
+
+class CanonicalSamplingTests(unittest.TestCase):
+    def test_fbx_31_intervals_does_not_duplicate_endpoint(self):
+        duration = 31 / 30
+        self.assertGreater(duration * 30, 31)
+        points = t.capture_times(duration, 30)
+        self.assertEqual(len(points), 32)
+        self.assertEqual(points[0], 0)
+        self.assertEqual(points[-1], duration)
+        self.assertEqual(points.count(duration), 1)
+        self.assertTrue(all(a < b for a, b in zip(points, points[1:])))
+
+    def test_integral_duration_preserves_sample_grid(self):
+        for fps in (24, 30, 60):
+            self.assertEqual(t.capture_times(1, fps), [i / fps for i in range(fps + 1)])
+
+    def test_near_integral_endpoint_preserves_exact_duration(self):
+        for duration in (math.nextafter(1.0, 0.0), math.nextafter(1.0, 2.0)):
+            points = t.capture_times(duration, 30)
+            self.assertEqual(len(points), 31)
+            self.assertEqual(points[-1], duration)
+            self.assertLess(points[-2], duration)
+
+    def test_real_fractional_endpoint_is_not_snapped_or_dropped(self):
+        points = t.capture_times(1.0123, 30)
+        self.assertEqual(points[-2:], [1.0, 1.0123])
+        self.assertEqual(len(points), 32)
+
+    def test_shortest_capture_has_two_samples(self):
+        self.assertEqual(t.capture_times(1e-7, 240), [0.0, 1e-7])
+
+    def test_exact_sample_budget_and_one_extra(self):
+        self.assertEqual(len(t.capture_times(31/30, 30, 32)), 32)
+        with self.assertRaises(DirectorError): t.capture_times(32/30, 30, 32)
+        with self.assertRaises(DirectorError): t.capture_times(600, 240)
+
+    def test_bad_timebase_or_unbounded_allocation_refused(self):
+        for duration, rate in ((0, 30), (-1, 30), (601, 30), (True, 30),
+                               (1, 0), (1, True), (1, 241), (float('nan'), 30)):
+            with self.subTest(duration=duration, rate=rate), self.assertRaises(DirectorError):
+                t.capture_times(duration, rate)
+        for bound in (1, True, 10001):
+            with self.assertRaises(DirectorError): t.capture_times(1, 30, bound)

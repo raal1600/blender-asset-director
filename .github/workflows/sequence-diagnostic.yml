@@ -1,0 +1,37 @@
+name: Sequence source diagnostics
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-precision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Fetch verified Blender
+        run: |
+          python tools/fetch_blender.py '5.2.1' "$RUNNER_TEMP/blender" > blender-path.txt
+          echo "BLENDER=$(tail -n 1 blender-path.txt)" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/src" >> "$GITHUB_ENV"
+      - name: Inspect same synthetic motion in metre and centimetre units
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/source_precision_probe.py -- "$RUNNER_TEMP/source-probe"
+      - name: Acquire pinned retarget backend in disposable library
+        run: python -m asset_director --library "$RUNNER_TEMP/probe-library" backend-install
+      - name: Compare indexed, transferred and direct versus planner sample state
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/sequence_state_probe.py -- "$RUNNER_TEMP/state-probe" "$RUNNER_TEMP/probe-library"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sequence-source-precision
+          path: |
+            ${{ runner.temp }}/source-probe/source_precision_report.json
+            ${{ runner.temp }}/state-probe/state_probe.json
+          retention-days: 14

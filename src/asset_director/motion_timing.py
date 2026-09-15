@@ -7,13 +7,16 @@ def number(value, low, high):
     return type(value) in (int, float) and math.isfinite(value) and low <= value <= high
 
 
-def bake_samples(start, end, source_fps, target_fps):
+def bake_samples(start, end, source_fps, target_fps, max_intervals=360):
     require(number(start, -10000, 10000) and number(end, -10000, 10000) and end > start,
             'INVALID_TIMING', 'Source frame range must be finite and increasing')
     require(number(source_fps, 1, 240) and number(target_fps, 1, 120),
             'INVALID_TIMING', 'Unsupported source/target frame rate')
+    require(type(max_intervals) is int and 1 <= max_intervals <= 7200, 'RESOURCE_LIMIT',
+            'Retarget bake interval budget must be 1..7200')
     span = (end-start) * target_fps / source_fps
-    require(span <= 360, 'RESOURCE_LIMIT', 'At most 360 output-frame intervals')
+    require(span <= max_intervals and (end-start)/source_fps <= 180, 'RESOURCE_LIMIT',
+            'Retarget exceeds its reviewed interval budget or 180-second absolute cap')
     if abs(span-round(span)) < 1e-8:
         span = float(round(span))
     # Preserve the true endpoint; rounding duration used to truncate or stretch it.
@@ -22,7 +25,7 @@ def bake_samples(start, end, source_fps, target_fps):
         result[-1] = (float(round(span)+1), end)
     else:
         result.append((1+span, end))
-    require(2 <= len(result) <= 361, 'RESOURCE_LIMIT', 'Invalid bounded bake sample count')
+    require(2 <= len(result) <= max_intervals+1, 'RESOURCE_LIMIT', 'Invalid bounded bake sample count')
     return result
 
 
@@ -68,3 +71,27 @@ def horizontal_span(samples):
     """Hips can travel under a stationary root; check both, including out-and-back."""
     return max((max(s[role][axis] for s in samples)-min(s[role][axis] for s in samples)
                 for role in ('root', 'hips') if all(role in s for s in samples) for axis in (0, 1)), default=0)
+
+
+def capture_times(duration_seconds, sample_fps, max_samples=10000):
+    """Bounded canonical seconds, including the exact endpoint only once.
+
+    A floating product such as (31/30)*30 can lie just above an integer.
+    ceil(product) followed by an appended endpoint would then duplicate the
+    final timestamp. Discard only ULP-near endpoint grid values and append the
+    supplied duration, without rounding the capture's duration or changing FPS.
+    """
+    require(number(duration_seconds, 1e-7, 600) and number(sample_fps, 1, 240),
+            'INVALID_TIMING', 'Invalid canonical duration or sampling rate')
+    require(type(max_samples) is int and 2 <= max_samples <= 10000,
+            'RESOURCE_LIMIT', 'Canonical sample bound must be 2..10000')
+    intervals = math.floor(duration_seconds * sample_fps)
+    require(intervals <= max_samples, 'RESOURCE_LIMIT', 'Export sample budget exceeded')
+    tolerance = 8 * max(math.ulp(float(duration_seconds)), math.ulp(1.0 / sample_fps))
+    times = [i / sample_fps for i in range(intervals + 1)
+             if i / sample_fps < duration_seconds - tolerance]
+    times.append(float(duration_seconds))
+    require(2 <= len(times) <= max_samples and times[0] == 0.0
+            and all(a < b for a, b in zip(times, times[1:])),
+            'RESOURCE_LIMIT', 'Invalid bounded canonical sample count')
+    return times

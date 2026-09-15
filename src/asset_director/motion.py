@@ -27,7 +27,25 @@ def identify_roles(bones: list[dict]) -> dict:
         matches = [b["name"] for b in bones if norm_bone(b["name"]) in aliases]
         if len(matches) == 1: assigned[role] = matches[0]
         elif matches: ambiguous[role] = sorted(matches)
-    return {"roles": assigned, "ambiguous": ambiguous, "missing": sorted(REQUIRED - assigned.keys()), "evidence": "name aliases; hierarchy/geometry still require validation"}
+    # Resolve only an exact observed Mixamo-compatible torso hierarchy.
+    # Spine/Spine1/Spine2 are distinct joints, not synonyms. No provider guess.
+    by_name = {b['name']: b for b in bones}
+    matches = {n: [b for b in bones if norm_bone(b['name']) == n]
+               for n in ('hips', 'spine', 'spine1', 'spine2')}
+    torso = None
+    if len(by_name) == len(bones) and all(len(v) == 1 for v in matches.values()):
+        chain = [matches[n][0] for n in ('hips', 'spine', 'spine1', 'spine2')]
+        if all(child.get('parent') == parent['name'] for parent, child in zip(chain, chain[1:])):
+            assigned.update(spine=chain[1]['name'], spine_mid=chain[2]['name'], chest=chain[3]['name'])
+            ambiguous.pop('spine', None)
+            torso = {'method': 'observed Mixamo-compatible torso hierarchy',
+                     'chain': [b['name'] for b in chain], 'provider_identity_proven': False}
+    from .skeleton_chains import extend
+    torso, fingers, notes = extend(bones, assigned, ambiguous, torso)
+    return {"roles": assigned, "ambiguous": ambiguous, "missing": sorted(REQUIRED - assigned.keys()),
+            "evidence": "name candidates with verified chains; geometry/rest pose still require review",
+            "torso_chain": torso, "finger_chains": fingers, "chain_notes": notes,
+            "unmapped_bones": sorted(b["name"] for b in bones if b["name"] not in assigned.values())}
 
 def rig_fingerprint(bones: list[dict], object_scale=(1, 1, 1)) -> str:
     return digest({"bones": sorted([{k: b[k] for k in ("name", "parent", "rest")} for b in bones], key=lambda b: b["name"]),
@@ -52,7 +70,9 @@ def frame_convert(frame: float, source_fps: float, target_fps: float, source_sta
     return target_start + (frame-source_start) * target_fps / source_fps
 
 def quality(samples: list[dict], height: float, fps: float, *, ground_z: float | None = None, sole_offsets: dict | None = None) -> dict:
-    require(0 < height < 1e7 and math.isfinite(height) and 0 < fps <= 240, "INVALID_SCALE", "Invalid anatomical height or FPS")
+    require(type(height) in (int, float) and type(fps) in (int, float) and
+            0 < height < 1e7 and math.isfinite(height) and 0 < fps <= 240 and math.isfinite(fps),
+            "INVALID_SCALE", "Invalid anatomical height or FPS")
     require(2 <= len(samples) <= 10000, "INVALID_MOTION", "Need at least two bounded motion samples")
     times = [s["frame"] / fps for s in samples]
     require(all(b > a for a, b in zip(times, times[1:])), "INVALID_MOTION", "Frames must increase")

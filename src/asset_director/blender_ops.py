@@ -48,11 +48,31 @@ def action_range(action, slot=None):
     return min(times), max(times)
 
 
-def rig_report(obj):
+def rig_report(obj, reviewed_roles=None):
     require(obj.type == "ARMATURE", "NOT_ARMATURE", "Target is not an armature")
     bones = [{"name": b.name, "parent": b.parent.name if b.parent else None, "rest": flatten(b.matrix_local),
               "head": vector(b.head_local), "tail": vector(b.tail_local), "deform": b.use_deform} for b in obj.data.bones]
     roles = identify_roles(bones)
+    if obj.get("bad_semantic_roles") is not None:
+        raw = obj["bad_semantic_roles"]
+        require(isinstance(raw, str) and len(raw) <= 65536, "MAPPING_REVIEW_REQUIRED", "Invalid semantic role record")
+        try: declared = json.loads(raw)
+        except (ValueError, TypeError): raise DirectorError("MAPPING_REVIEW_REQUIRED", "Invalid semantic role JSON")
+        from .motion import REQUIRED
+        require(isinstance(declared, dict) and len(declared) <= 256 and
+                all(isinstance(k,str) and isinstance(v,str) and v in obj.data.bones for k,v in declared.items()) and
+                len(set(declared.values())) == len(declared), "MAPPING_REVIEW_REQUIRED", "Semantic roles must be one-to-one observed bones")
+        roles = {"roles": declared, "ambiguous": {}, "missing": sorted(REQUIRED-set(declared)),
+                 "evidence": "explicit host-reviewed roles; anatomy still needs validation"}
+    if reviewed_roles is not None:
+        from .transfer_contract import role_map
+        from .motion import REQUIRED
+        role_map(reviewed_roles)
+        require(all(n in obj.data.bones for n in reviewed_roles.values()),
+                "MAPPING_REVIEW_REQUIRED", "Reviewed role names an absent bone")
+        roles = {"roles": dict(reviewed_roles), "ambiguous": {},
+                 "missing": sorted(REQUIRED-set(reviewed_roles)),
+                 "evidence": "explicit reviewed roles supplied for this inspection"}
     meshes = [o for o in bpy.data.objects if o.type == "MESH" and any(m.type == "ARMATURE" and m.object == obj for m in o.modifiers)]
     weighted = 0
     for mesh in meshes:
@@ -72,6 +92,8 @@ def rig_report(obj):
               "constrained_bones": constrained, "drivers": len(obj.animation_data.drivers) if obj.animation_data else 0,
               "attachments": [{"name": o.name, "parent_type": o.parent_type, "bone": o.parent_bone} for o in bpy.data.objects if o.parent == obj and o not in meshes]}
     report["readiness"] = "NEEDS_RIGGING" if not weighted else "MAPPING_REVIEW_REQUIRED" if roles["missing"] or roles["ambiguous"] or constrained else "RETARGETABLE"
+    from .bone_display import audit as display_audit
+    report['bone_display'] = display_audit(obj)
     return report
 
 
@@ -125,7 +147,7 @@ def import_file(path: Path, package_root: Path, *, selection=None, frame_fps=Non
         finally:
             scene.render.fps, scene.render.fps_base = saved
     elif extension == ".fbx":
-        bpy.ops.import_scene.fbx(filepath=str(path), automatic_bone_orientation=False, use_custom_props=False)
+        bpy.ops.import_scene.fbx(filepath=str(path), automatic_bone_orientation=False, use_custom_props=False, use_image_search=False)
     elif extension == ".obj": bpy.ops.wm.obj_import(filepath=str(path))
     elif extension == ".bvh": bpy.ops.import_anim.bvh(filepath=str(path))
     elif extension == ".blend":
@@ -240,8 +262,9 @@ def load_backend(root: Path):
     return module
 
 
-def safe_mapping(source, target, explicit=None, alignment=None):
-    sr, tr = rig_report(source), rig_report(target)
+def safe_mapping(source, target, explicit=None, alignment=None, reviewed_roles=None):
+    reviewed_roles = reviewed_roles or {}
+    sr, tr = rig_report(source, reviewed_roles.get('source')), rig_report(target, reviewed_roles.get('target'))
     proposal = mapping_plan(sr, tr)
     pairs = explicit or proposal["pairs"]
     require(isinstance(pairs, dict) and pairs and len(set(pairs.values())) == len(pairs), "MAPPING_REVIEW_REQUIRED", "Mapping must be one-to-one")
@@ -262,9 +285,11 @@ def safe_mapping(source, target, explicit=None, alignment=None):
     return pairs, sr, tr
 
 
-def retarget(source, target, action, slot_id, options, backend_root: Path, job_id: str):
+def retarget(source, target, action, slot_id, options, backend_root: Path, job_id: str, *, reviewed_roles=None):
     require(source != target, "INVALID_TARGET", "Source and target must differ")
-    pairs, sr, tr = safe_mapping(source, target, options.get("mapping"), options.get("alignment"))
+    pairs, sr, tr = safe_mapping(source, target, options.get("mapping"), options.get("alignment"), reviewed_roles)
+    require(tr['anatomical_height'] is not None and math.isfinite(tr['anatomical_height']) and tr['anatomical_height'] > 0,
+            'MAPPING_REVIEW_REQUIRED', 'Target QA requires reviewed head and foot roles with measurable height')
     backend = load_backend(backend_root)
     if target.animation_data:
         for track in target.animation_data.nla_tracks: track.mute = True
@@ -276,7 +301,9 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
     require(end > start, "EMPTY_ACTION", "Invalid source range")
     sfps = options.get("source_fps", bpy.context.scene.render.fps / bpy.context.scene.render.fps_base)
     tfps = options.get("target_fps", bpy.context.scene.render.fps / bpy.context.scene.render.fps_base)
-    bake = motion_timing.bake_samples(start, end, sfps, tfps)
+    bake = motion_timing.bake_samples(start, end, sfps, tfps, options.get('max_output_intervals', 360))
+    require(len(bake)*len(pairs)*7 <= 500_000, 'RESOURCE_LIMIT',
+            'Retarget exceeds the retained 500,000 scalar-key/action inspection cap')
     n, last_frame = len(bake), bake[-1][0]
     for c in curves(action, slot):
         if c.data_path in {"location", "rotation_euler", "rotation_quaternion", "scale"}:
@@ -311,6 +338,8 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
             from .ground_contact import GroundContact
             ground_contact = GroundContact(target, options['pose_space']['translation_bone'],
                                            options['pose_space']['ground_contact'])
+    if ground_contact:
+        ground_contact.check_work([f for f, _ in bake], options.get('max_output_intervals', 360)+1)
     new = bpy.data.actions.new(f"BAD_{job_id}_{action.name}")
     target.animation_data.action = new
     previous_q = {}
@@ -335,17 +364,17 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
             pb.scale = (1,1,1)
             pb.keyframe_insert("location", frame=output_frame, group=name)
             pb.keyframe_insert("rotation_quaternion", frame=output_frame, group=name)
-        if ground_contact:
-            ground_contact.apply(output_frame)
     new.use_fake_user = True
     new["bad_job"] = job_id; new["bad_source_action"] = action.name; new["bad_source_fps"] = sfps; new["bad_target_fps"] = tfps
     new["bad_target_fingerprint"] = tr["fingerprint"]
     for c in curves(new, getattr(target.animation_data, "action_slot", None)):
         for k in c.keyframe_points: k.interpolation = "LINEAR"
+    if ground_contact:
+        ground_contact.correct([frame for frame, _ in bake], max_frames=options.get('max_output_intervals', 360)+1)
     bpy.context.scene.render.fps = int(tfps); bpy.context.scene.render.fps_base = int(tfps) / tfps
     bpy.context.scene.frame_start = 1; bpy.context.scene.frame_end = max(1, math.floor(last_frame))
     bpy.context.scene.frame_set(1)
-    after = rig_report(target)
+    after = rig_report(target, (reviewed_roles or {}).get('target'))
     require(after["fingerprint"] == tr["fingerprint"], "REST_POSE_CHANGED", "Retarget unexpectedly changed the target rest data")
     samples = samples_for(target, after, 1, last_frame, max_samples=361)
     qa = quality(samples, after["anatomical_height"], tfps)
@@ -359,7 +388,7 @@ def retarget(source, target, action, slot_id, options, backend_root: Path, job_i
             "source_fingerprint": sr["fingerprint"], "frames": n, "frame_range": [1, last_frame], "fps": tfps,
             "duration_seconds": (end-start)/sfps, "source_frame_coordinate_fps": sfps,
             "performance_acceptance": "NOT_EVALUATED", "temporal_visual_review": "REQUIRED",
-            "qa": qa, "samples": samples,
+            "qa": qa, "samples": samples, "qa_roles": after['roles'], "qa_anatomical_height": after['anatomical_height'],
             "ground_contact": ground_contact.report() if ground_contact else None,
             "backend": "evaluated world-pose transfer; explicit alignment and translation anchor" if pose_transfer else "Mwni 2.4.0 direct matrix-transfer adapter; no scripted drivers", "visual_acceptance": "PENDING"}
 

@@ -24,3 +24,28 @@ or authorized bounded temporal-evidence route; do not exceed the still-preview
 budget or pretend an image-only host watched a video. For sliding dance moves,
 distinguish deliberately gliding feet from planted support before any cleanup.
 No video-to-mocap or real-time capture provider is implemented by this release.
+
+For skeleton presentation load `../bone-display.md`. Inspect custom bone widgets
+before describing spherical shapes as anatomical joints. Use reviewed display
+operations and preserve custom-shape references, rest data, skinning and actions.
+Never equate a configured style with an actually inspected viewport.
+
+## Canonical motion / body fitting
+
+Load `../motion-foundation.md` for the new contracts. Use motion-scout before
+asking the user for files; preserve explicit external search/auth/format blockers.
+Use motion-export and motion-collect for a verified source action, body-audit and
+retarget-profile for anatomy, and motion-retarget for the existing v0.5 solver.
+A profile is a mapping/root-scale proposal requiring explicit reviewed alignment,
+not an IK solution. Clay geometry is fitted once in rest space and kept separate
+from the final character. Kinematic contact candidates are not intended contact
+states; do not lock a deliberate slide. Temporal acceptance needs actual temporal
+evidence, not a filename, still image or numeric score.
+
+## Local source-first workflow
+
+Load `../local-motion-library.md`. Refresh approved roots once per motion task,
+search local clips, and inspect `motion-preflight`. Prefer `native-clip` to inspect
+the original character/action before proxy or retarget work. Names and copying do
+not prove rights. A verified torso chain resolves distinct joints, not by inventing
+a spine. Keep gliding, root travel, native timebase and loop acceptance explicit.

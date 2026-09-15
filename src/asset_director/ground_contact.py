@@ -41,6 +41,7 @@ class GroundContact:
         self.check_modifiers()
         self.topology = topology(self.mesh.data)
         self.corrections=[]
+        self.verification={}
 
     def check_modifiers(self):
         active = [m for m in self.mesh.modifiers if m.show_viewport or m.show_render]
@@ -60,26 +61,75 @@ class GroundContact:
         finally:
             evaluated.to_mesh_clear()
 
-    def apply(self, frame):
+    def apply(self, frame, original_anchor=None):
         bpy.context.scene.frame_set(math.floor(frame), subframe=frame-math.floor(frame))
         bpy.context.view_layer.update()
         delta=self.config['height']-self.minimum()
-        require(abs(delta)<=self.config['max_correction'],'GROUND_CORRECTION_LIMIT',
+        target=self.target;pb=target.pose.bones[self.anchor]
+        before=target.matrix_world@pb.head
+        total=delta if original_anchor is None else before.z+delta-original_anchor.z
+        require(math.isfinite(total) and abs(total)<=self.config['max_correction'],'GROUND_CORRECTION_LIMIT',
                 'Required vertical correction exceeds reviewed cap')
-        target=self.target;pb=target.pose.bones[self.anchor];pose=pb.matrix.copy()
+        pose=pb.matrix.copy()
         pose.translation+=target.matrix_world.inverted().to_3x3()@Vector((0,0,delta))
         bone=pb.bone;parent=pb.parent
         local=(bone.convert_local_to_pose(pose,bone.matrix_local,parent_matrix=parent.matrix,
                  parent_matrix_local=parent.bone.matrix_local,invert=True) if parent
                else bone.convert_local_to_pose(pose,bone.matrix_local,invert=True))
         pb.location=local.to_translation();pb.keyframe_insert('location',frame=frame,group=pb.name)
+        # Newly inserted fractional keys must not introduce automatic Bezier
+        # handles. Only anchor-location curves are touched; rotations stay intact.
+        from .blender_ops import curves
+        for curve in curves(target.animation_data.action, target.animation_data.action_slot):
+            if curve.data_path == pb.path_from_id('location'):
+                for key in curve.keyframe_points: key.interpolation='LINEAR'
         bpy.context.view_layer.update()
         require(abs(self.minimum()-self.config['height'])<1e-4,'GROUND_CONTACT_FAILED',
                 'Vertical correction did not resolve the measured sole height')
-        self.corrections.append(delta)
+        after=target.matrix_world@pb.head
+        if original_anchor is not None:
+            require(math.hypot(after.x-original_anchor.x, after.y-original_anchor.y)<1e-5,
+                    'GROUND_CONTACT_FAILED','Vertical repair changed sampled horizontal anchor travel')
+        self.corrections.append(total)
+
+    def check_work(self, baked_frames, max_frames=361):
+        from .ground_sampling import correction_frames
+        frames = correction_frames(baked_frames, self.config.get('subdivisions', 1), max_frames)
+        require(len(frames)*len(self.mesh.data.vertices)*3 <= 50_000_000,
+                'RESOURCE_LIMIT', 'Ground-contact evaluation budget exceeded')
+        return frames
+
+    def correct(self, baked_frames, max_frames=361):
+        """Correct the finished action, then verify all declared checkpoints.
+
+        Capture the uncorrected anchor first. Neighboring repair keys influence
+        later evaluations, so the residual correction alone is not a cap bound.
+        """
+        frames = self.check_work(baked_frames, max_frames)
+        scene=bpy.context.scene;original={}
+        for f in frames:
+            scene.frame_set(math.floor(f),subframe=f-math.floor(f));bpy.context.view_layer.update()
+            original[f]=(self.target.matrix_world@self.target.pose.bones[self.anchor].head).copy()
+        for f in frames:self.apply(f,original[f])
+        extrema={'integer_frames':[],'subframes':[]}
+        for f in frames:
+            scene.frame_set(math.floor(f),subframe=f-math.floor(f));bpy.context.view_layer.update()
+            clearance=self.minimum()-self.config['height']
+            anchor=self.target.matrix_world@self.target.pose.bones[self.anchor].head
+            require(math.isfinite(clearance) and abs(clearance)<1e-4,
+                    'GROUND_CONTACT_FAILED','Finished action failed a declared contact checkpoint')
+            require(abs(anchor.z-original[f].z)<=self.config['max_correction']+1e-6 and
+                    math.hypot(anchor.x-original[f].x,anchor.y-original[f].y)<1e-5,
+                    'GROUND_CONTACT_FAILED','Finished correction exceeded cap or changed horizontal travel')
+            extrema['integer_frames' if abs(f-round(f))<1e-6 else 'subframes'].append(clearance)
+        self.verification={name:{'count':len(values),'max_abs_clearance':max(map(abs,values),default=None)}
+                           for name,values in extrema.items()}
 
     def report(self):
         return {'method':'vertical anchor offset from weighted sole vertices; no horizontal IK',
                 'floor_z':self.config['height'],'vertices':len(self.indices),'frames':len(self.corrections),
                 'max_abs_correction':max(map(abs,self.corrections),default=0),'topology_sha256':self.topology,
-                'topology_policy':'one active Armature modifier plus index/connectivity fingerprint','not_measured':['pressure','horizontal foot lock','naturalness']}
+                'subdivisions':self.config.get('subdivisions',1),'verification':self.verification,
+                'cap_basis':'total vertical displacement from the uncorrected action at each checkpoint',
+                'topology_policy':'one active Armature modifier plus index/connectivity fingerprint',
+                'not_measured':['between-checkpoint extrema','pressure','horizontal foot lock','naturalness']}

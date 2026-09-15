@@ -1,7 +1,7 @@
 name: Source package
 on:
   push:
-    branches: [main, 'fix/**']
+    branches: [main, 'fix/**', 'feature/**', 'chore/**', 'docs/**']
   workflow_dispatch:
 permissions:
   contents: read
