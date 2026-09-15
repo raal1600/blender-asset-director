@@ -1,3 +1,7 @@
+> **Historical session record.** For the current branch, contributor workflow and
+> acceptance gates, read [the current handoff](CONSOLIDATION.md). The dated
+> instructions below are preserved as evidence, not current merge restrictions.
+
 # Current motion harness handoff — 2026-09-15
 
 ## Read this first: current state and user request

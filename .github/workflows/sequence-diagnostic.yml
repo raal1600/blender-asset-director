@@ -1,8 +1,5 @@
 name: Sequence source diagnostics
 on:
-  push:
-    branches: ['feature/reviewed-sequence-integration-20260915']
-    paths: ['tools/source_precision_probe.py', 'tools/sequence_state_probe.py', '.github/workflows/sequence-diagnostic.yml']
   workflow_dispatch:
 permissions:
   contents: read

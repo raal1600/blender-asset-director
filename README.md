@@ -1,14 +1,18 @@
 # Blender Asset Director
 
-> **Development branch: `feature/reviewed-sequence-integration-20260915`, runtime `0.6.0-dev.4`.**
-> Adds reviewed full-clip sequencing, planar alignment and a pose/velocity-aware
-> extra transition bridge. Explicit long-take budgets preserve native timing.
-> Builds on local animation folders, reviewed transfer roles, subframe grounding
-> and bone-display audit. No new downloader, GPU, addon or arbitrary-code endpoint.
-> [Sequence design](docs/REVIEWED_SEQUENCES.md) ·
-> [Executed Actions evidence](docs/SEQUENCE_ACCEPTANCE.md) ·
-> [Bounded local acceptance](docs/SEQUENCE_LOCAL_ACCEPTANCE.md).
-> The published installer below still selects **v0.5.0**. No v0.6 release exists.
+**Development source: `main` · runtime `0.6.0-dev.4`.** The published installer
+still installs **v0.5.0**; merging source does not publish a release or update an
+installed skill. Identify development builds by their full Git commit SHA.
+
+[Contributor quick start](CONTRIBUTING.md) · [Current handoff and test gates](docs/CONSOLIDATION.md) ·
+[Documentation index](docs/README.md) · [Synthetic Transition Lab](https://raal1600.github.io/blender-asset-director/)
+
+Main brings together local animation intake, canonical motion and clay proxies,
+reviewed transfer planning, custom semantic roles, bone-display controls,
+subframe grounding, full-clip sequencing, physical-unit precision and imported
+action identity fixes. The sequence bridge adds an explicitly reviewed interval;
+it does not silently shorten either source clip. Technical tests and human
+performance review remain separate.
 
 **Give Codex a small Blender production team, not another Blender harness.**
 
@@ -182,7 +186,7 @@ and two repairs, tracked across jobs by the host.
 
 ## Development transfer planning and sequences
 
-This branch provides `transfer-plan`, `transfer-prepare` and `contact-check`.
+Main provides `transfer-plan`, `transfer-prepare` and `contact-check`.
 An eligible indexed source and saved existing target produce a read-only alignment
 proposal. A host reviews mapping, action, units, facing, proportions and the target
 anchor before execution. Reviewed roles survive into QA, including custom names.
@@ -203,22 +207,23 @@ Read [sequence contracts](docs/REVIEWED_SEQUENCES.md),
 [sequences.md](skills/blender-asset-director/references/sequences.md).
 For transfer details see [REVIEWED_TRANSFER_PLANNING.md](docs/REVIEWED_TRANSFER_PLANNING.md).
 Use an isolated worktree and private library. Do not replace an installed working
-release or merge automatically. No multi-window controller, full IK or GPU capture
+release; merge only after the documented test gates. No multi-window controller, full IK or GPU capture
 is included. CI uses synthetic data and cannot certify private dance performance.
 
 ## Tests, maintenance and removal
 
-The published v0.5.0 runtime passed 223 unit tests and ten CI jobs: three Python/OS
-configurations, three real Blender versions (4.5.3, 5.0.0, 5.2.1) and four bootstrap
-configurations. [Published-release evidence](docs/RETARGET_ACCEPTANCE.md).
-Development validation is separate from that release and local acceptance.
-The development matrix also exercises full-length sequences, custom semantic roles,
-bone-display preservation, physical-unit checks and actual FBX travel round trips.
+Every pull request runs portable tests and installation checks, the real Blender
+matrix (4.5.3, 5.0.0 and 5.2.1), and four bootstrap configurations. The normal
+matrix now includes imported-action collisions and reviewed identity-reference
+execution, rather than leaving these in an easy-to-miss branch-only workflow.
+The Transition Lab separately tests rendering, encoding and desktop/mobile video
+playback. Results and diagnostic artifacts are attached to each Actions run.
 
-For this milestone, all automated development tests run in GitHub Actions.
-The existing source-check command is `python tools/run_checks.py --offline`;
-do not run workstation development tests or configure/install globally as part of
-the bounded local real-source acceptance. Use its documented isolated procedure.
+Read [current gates and consolidation evidence](docs/CONSOLIDATION.md) for the
+exact acceptance process. Older acceptance documents describe their named
+commits; their test counts are not claims about the latest main revision.
+Private licensed-input validation is separate and never uploads source assets to
+this public repository. CI cannot certify a user's live GUI or artistic result.
 
 From the installed runtime (substitute its actual path and working interpreter):
 

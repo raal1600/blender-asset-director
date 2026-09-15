@@ -1,12 +1,14 @@
 name: Asset Director Tests
 on:
   push:
-    branches: [main, 'fix/**', 'feature/**']
+    branches: [main, 'fix/**', 'feature/**', 'chore/**', 'docs/**']
   pull_request:
   workflow_dispatch:
   workflow_call:
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 concurrency:
   group: asset-director-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -34,8 +36,27 @@ jobs:
         env:
           PYTHONPATH: src
         run: python -m unittest discover -s tests -v
+      - name: Current documentation and unit gate summary
+        if: always()
+        shell: bash
+        run: |
+          echo '## Portable tests and contributor documentation' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Commit: `${{ github.sha }}` · OS: `${{ matrix.os }}` · Python: `${{ matrix.python }}`' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Result so far: **${{ job.status }}**. Exact totals and skips are in the unit-test log.' >> "$GITHUB_STEP_SUMMARY"
       - name: Skill installation round trip
         run: python tools/install_skill.py --self-test
+      - name: Dry-run manifest-bound branch cleanup
+        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.11' && github.repository == 'raal1600/blender-asset-director'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/cleanup_merged_branches.py --target-sha "${{ github.sha }}" --dry-run
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.os == 'ubuntu-latest' && matrix.python == '3.11'
+        with:
+          name: branch-cleanup-dry-run
+          path: cleanup-evidence/
+          retention-days: 30
+          if-no-files-found: warn
   blender:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -120,6 +141,12 @@ jobs:
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/fbx_anchor_fixture.py -- "$RUNNER_TEMP/fbx-anchor"
           cp "$RUNNER_TEMP/fbx-anchor/fbx_anchor_report.json" evidence/
+      - name: Imported action labels, owned slots and identical reference preservation
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/action_collision_fixture.py -- "$RUNNER_TEMP/collision"
+          cp "$RUNNER_TEMP/collision/action_collision_report.json" evidence/
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/reference_identity_fixture.py -- "$RUNNER_TEMP/reference" "$RUNNER_TEMP/bad-library"
+          cp "$RUNNER_TEMP/reference/reference_identity_report.json" evidence/
       - name: Full long-take sequence, root alignment, bridge and reviewed-role QA
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/sequence_fixture.py -- "$RUNNER_TEMP/sequence" "$RUNNER_TEMP/bad-library"
