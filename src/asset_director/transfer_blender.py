@@ -246,7 +246,7 @@ def propose(lib, spec):
                    if parent else b.convert_local_to_pose(desired,b.matrix_local,invert=True))
             loc,q,scale=local.decompose()
             require(max(abs(v-1) for v in scale)<1e-5 and loc.length<1e-5,
-                    'ALIGNMENT_REVIEW_REQUIRED','Reference would stretch/translate target bones')
+                    'ALIGNMENT_REVIEW_REQUIRED',f'Reference would stretch/translate target bone {b.name}: local_translation={list(loc)}, scale={list(scale)}, swing_degrees={math.degrees(swing.angle)}, object_scale={list(target.matrix_world.to_scale())}')
             local=q.normalized().to_matrix().to_4x4();alignment[b.name]=flat(local)
             alignment_evidence.append({'role':role,'source':s_roles[role],'target':b.name,
                 'source_direction':list(sd),'target_direction':list(td),'aligned_source_direction':list(wanted),
