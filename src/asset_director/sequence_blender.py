@@ -16,7 +16,7 @@ import bpy
 from mathutils import Matrix, Vector, Quaternion
 from .core import require, digest, atomic_json, load_json
 from . import blender_ops as ops, sequence_math as sm, sequence_contract as sc
-from . import sequence_review as reviews, transfer_blender as tb
+from . import sequence_review as reviews, transfer_blender as tb, frame_precision as fp32
 
 PATH = re.compile(r'^pose\.bones\[("(?:[^"\\]|\\.)*")\]\.(location|rotation_quaternion)$')
 
@@ -72,8 +72,7 @@ def append_clip(lib, descriptor, target):
             'SEQUENCE_CLIP_INVALID', 'Action job/target identity mismatch')
     ops.assign(target, action, descriptor['slot'])
     slot = target.animation_data.action_slot
-    require(all(abs(a-b) < 1e-5 for a,b in zip(ops.action_range(action,slot), descriptor['range'])),
-            'SEQUENCE_CLIP_INVALID', 'Action range differs from receipt')
+    descriptor['frame_storage'] = fp32.action_range(ops.action_range(action,slot), descriptor['range'])
     return action, slot
 
 
@@ -92,8 +91,6 @@ def validate_action(target, action, slot, anchor):
         if prop == 'location' and bone != anchor:
             require(max(vals)-min(vals) < 1e-5, 'SEQUENCE_ROOT_OWNERSHIP', 'A second bone has animated translation')
         if bone == anchor: times[prop].update(float(k.co.x) for k in c.keyframe_points)
-        # Every animated bone must belong to the same anatomical subtree. A
-        # stationary floor-level root remains unmapped and is not another owner.
         b = target.data.bones[bone]
         while b and b.name != anchor: b = b.parent
         require(b is not None, 'SEQUENCE_ROOT_OWNERSHIP', 'Animated bone is outside the declared anchor subtree')
@@ -225,7 +222,7 @@ def plan(lib, spec):
             bridge_end = cursor+cfg['duration_seconds']*fps
             times = sm.grid(cursor,bridge_end,1/cfg['subdivisions'],2049)
             created_keys += len(times)*len(names)*7
-            created_keys += sum(len(c.keyframe_points) for c in ops.curves(a,s))  # aligned copy
+            created_keys += sum(len(c.keyframe_points) for c in ops.curves(a,s))
             joins.append({'from':i-1,'to':i,'start':cursor,'end':bridge_end,
                           'duration_seconds':cfg['duration_seconds'],'subdivisions':cfg['subdivisions'],
                           'derivative_dt_seconds':dt,'alignment':flat(transform), 'yaw_degrees':cfg['yaw_degrees'],
@@ -263,11 +260,8 @@ def plan(lib, spec):
     if request['contact'] is not None:
         mesh = bpy.data.objects.get(request['contact']['mesh'])
         require(mesh and mesh.type == 'MESH', 'TARGET_REQUIRED', 'Contact mesh is absent')
-        # GroundContact evaluates twice per checkpoint (left/right) and verifies
-        # topology. Bound that actual work across batches, not just each batch.
         require(2*measured_contact_samples*len(mesh.data.vertices) <= budget['max_mesh_evaluations'],
                 'RESOURCE_LIMIT', 'Total sequence contact mesh-evaluation budget exceeded')
-    # Planning only owns a disposable process and never publishes a target blend.
     result = {'schema':sc.SCHEMA,'status':'REVIEW_REQUIRED','request':copy.deepcopy(request),
               'target_fingerprint':before['rig'],'target_world':before['world'], 'roles':roles,'anchor':anchor,
               'clips':descriptors,'timeline':timeline,'joins':joins,'fps':fps,'duration_seconds':total,
@@ -334,8 +328,6 @@ def bridge_action(reader, actions, descriptors, joins, index, anchor, transforms
             pb.location=p;pb.rotation_quaternion=q
             pb.keyframe_insert('location',frame=local_frame,group=n)
             pb.keyframe_insert('rotation_quaternion',frame=local_frame,group=n)
-    # Tangent-aware Bezier handles preserve endpoint slope far better than a
-    # piecewise linear bake. Internal interpolation is still an approximation.
     slot=target.animation_data.action_slot
     for c in ops.curves(result,slot):
         match=PATH.fullmatch(c.data_path); n=json.loads(match[1]); prop=match[2]
@@ -359,13 +351,21 @@ def nla(target, action, slot, source_range, source_fps, fps, start, label, final
     strip=track.strips.new(label,math.floor(start),action)
     strip.action_slot=slot;strip.action_frame_start=source_range[0];strip.action_frame_end=source_range[1]
     strip.scale=fps/source_fps;strip.repeat=1;strip.frame_start_ui=start
-    strip.extrapolation='HOLD_FORWARD' if final else 'NOTHING'
+    # Later full-channel REPLACE tracks take ownership when they start. Forward
+    # hold prevents a binary32-sized gap from exposing a rest pose. No looping,
+    # second trajectory owner, or omission of incoming clip frames is introduced.
+    strip.extrapolation='HOLD_FORWARD'
     strip.blend_type='REPLACE';strip.blend_in=0;strip.blend_out=0;strip.use_auto_blend=False;strip.influence=1
     end=start+(source_range[1]-source_range[0])*fps/source_fps
-    require(abs(strip.frame_start-start)<1e-4 and abs(strip.frame_end-end)<1e-4,
-            'SEQUENCE_TIMING_FAILED','NLA strip timing differs from the exact plan')
+    bound=fp32.strip_error_bound(start,source_range,fps/source_fps)
+    actual_range=[float(strip.action_frame_start),float(strip.action_frame_end)]
+    storage=fp32.action_range(actual_range,source_range)
+    require(strip.frame_start==fp32.stored(start) and abs(strip.frame_end-end)<=bound,
+            'SEQUENCE_TIMING_FAILED','NLA timing differs beyond binary32 operation rounding')
     return {'track':track.name,'action':action.name,'slot':slot.identifier,
-            'start':float(strip.frame_start),'end':float(strip.frame_end),'source_range':source_range,
+            'start':float(strip.frame_start),'end':float(strip.frame_end),'source_range':actual_range,
+            'intended_start':start,'intended_end':end,'source_frame_storage':storage,
+            'end_rounding_bound_frames':bound,'end_error_seconds':(float(strip.frame_end)-end)/fps,
             'scale':float(strip.scale),'signature':signature(action,slot),'extrapolation':strip.extrapolation}
 
 
@@ -471,8 +471,6 @@ def execute(lib,spec,directory,owner):
         track.is_solo=False
     target.animation_data.use_nla=True
     target.animation_data.action=None
-    # Restore non-animated target channels to their captured baseline. Do not
-    # leave the final sampled incoming pose as a new reference for other bones.
     for pb in target.pose.bones:pb.matrix_basis=reader.basis[pb.name]
     strips=[]
     for i,(action,slot) in enumerate(actual):
