@@ -1,0 +1,32 @@
+name: Sequence source diagnostics
+on:
+  push:
+    branches: ['feature/reviewed-sequence-integration-20260915']
+    paths: ['tools/source_precision_probe.py', '.github/workflows/sequence-diagnostic.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-precision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Fetch verified Blender
+        run: |
+          python tools/fetch_blender.py '5.2.1' "$RUNNER_TEMP/blender" > blender-path.txt
+          echo "BLENDER=$(tail -n 1 blender-path.txt)" >> "$GITHUB_ENV"
+      - name: Inspect same synthetic motion in metre and centimetre units
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/source_precision_probe.py -- "$RUNNER_TEMP/source-probe"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sequence-source-precision
+          path: ${{ runner.temp }}/source-probe/source_precision_report.json
+          retention-days: 14
