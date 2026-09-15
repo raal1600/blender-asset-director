@@ -28,8 +28,10 @@ def export_take(path, frames, scale, travel, phase):
     # Sparse authored samples, exported by Blender to an actual FBX. The long
     # take's middle and endpoint must survive native-time transfer and NLA.
     for f in sorted({1,frames,*range(2,frames, max(1,frames//24))}):
+        # Author at the intended scene time before writing keyed transforms.
+        scene.frame_set(f)
         u=(f-1)/(frames-1)
-        hips=rig.pose.bones[n['hips']];hips.location.x=travel*scale*u
+        hips=rig.pose.bones[n['hips']];hips.location=(travel*scale*u,0,0)
         hips.keyframe_insert('location',frame=f)
         for name,sign in [('upperarm_l',1),('upperarm_r',-1),('index_1_l',1),('index_1_r',-1)]:
             pb=rig.pose.bones[n[name]];pb.rotation_mode='QUATERNION'
@@ -38,6 +40,17 @@ def export_take(path, frames, scale, travel, phase):
     action=rig.animation_data.action;action.name='Armature|mixamo.com|Layer0'
     for c in ops.curves(action,rig.animation_data.action_slot):
         for k in c.keyframe_points:k.interpolation='LINEAR'
+    # Establish the actual synthetic travel before blaming downstream planning.
+    samples=[]
+    for f in (1,frames):
+        scene.frame_set(f);bpy.context.view_layer.update()
+        ev=rig.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        samples.append((ev.matrix_world@ev.pose.bones[n['hips']].matrix).translation.copy())
+    expected=Vector((travel*scale,0,0))
+    assert ((samples[1]-samples[0])-expected).length/scale < 1e-5, {
+        'stage':'authored synthetic source','measured':[list(v) for v in samples],
+        'expected_displacement':list(expected)}
+    scene.frame_set(1)
     bpy.ops.object.select_all(action='DESELECT');rig.select_set(True);skin.select_set(True)
     bpy.context.view_layer.objects.active=rig
     bpy.ops.export_scene.fbx(filepath=str(path),use_selection=True,add_leaf_bones=False,bake_anim=True,
@@ -90,7 +103,6 @@ def main(out,library):
     target.location=(2.3,-1.1,.2);target.rotation_euler.z=math.radians(17)
     for p in target.pose.bones:p.rotation_mode='QUATERNION'
     assert ops.rig_report(target)['anatomical_height'] is None
-    # An actual prior action and intentionally hidden root are preserved.
     head=target.pose.bones[n['head']]
     for f,a in [(1,0),(32,.02)]:
         head.rotation_quaternion=Quaternion((1,0,0),a);head.keyframe_insert('rotation_quaternion',frame=f)
@@ -102,7 +114,6 @@ def main(out,library):
     target_name,skin_name=target.name,skin.name;fingerprint=ops.rig_report(target,roles)['fingerprint']
     skin_hash=skin_signature(skin);prior_name=prior.name;prior_signature=sb.signature(prior,None)
     base=out/'existing-target.blend';bpy.ops.wm.save_as_mainfile(filepath=str(base));base_hash=file_hash(base)
-    # Explicit rest-ground calibration for the synthetic foot-weighted triangles.
     foot_ids=[v.index for v in skin.data.vertices if any(g.group==skin.vertex_groups[n['foot_l']].index for g in v.groups)]
     ground=min((skin.matrix_world@skin.data.vertices[i].co).z for i in foot_ids)
     with Library(library) as lib:
@@ -128,7 +139,15 @@ def main(out,library):
         assert clips[0].metadata['action']==clips[1].metadata['action']
         assert clips[0].local_files[0]['sha256']!=clips[1].local_files[0]['sha256']
         assert abs(clips[1].metadata['duration_seconds']-1112/30)<1e-5
-        passed('real generated FBX intake: same label, distinct bytes, full 37-second take')
+        indexed_displacements=[]
+        for clip,units,wanted in zip(clips,(1,100),(.92,.35)):
+            samples=clip.metadata['samples']
+            displacement=(Vector(samples[-1]['hips'])-Vector(samples[0]['hips']))/units
+            assert (displacement-Vector((wanted,0,0))).length < 1e-5, {
+                'stage':'indexed FBX','measured_m':list(displacement),'expected_m':wanted}
+            indexed_displacements.append(list(displacement))
+        passed('real generated FBX intake: same label, distinct bytes, full 37-second take',
+               indexed_anchor_displacements_m=indexed_displacements)
         transfers=[];plans=[]
         for i,clip in enumerate(clips):
             opts=dict(target_object=target_name,target_roles=roles,source_meters_per_unit=1 if i==0 else .01,
@@ -144,6 +163,12 @@ def main(out,library):
             td=lib.root/'jobs'/approved['id'];data=load_json(td/'result.json')['data']
             assert data['qa_roles']==roles and data['target_fingerprint']==fingerprint
             assert abs(data['duration_seconds']-clip.metadata['duration_seconds'])<1e-6
+            displacement=Vector(data['samples'][-1]['hips'])-Vector(data['samples'][0]['hips'])
+            rotation=Matrix([p['retarget_options']['pose_space']['rotation'][k:k+3] for k in (0,3,6)])
+            native=Vector(clip.metadata['samples'][-1]['hips'])-Vector(clip.metadata['samples'][0]['hips'])
+            expected=rotation@native*p['units']['runtime_translation_scale']
+            assert (displacement-expected).length < 1e-4, {
+                'stage':'retargeted anchor','measured':list(displacement),'expected':list(expected)}
             transfers.append((approved,data,td))
         assert abs(transfers[1][1]['frame_range'][1]-(1+1112*24/30))<1e-5
         assert transfers[1][1]['scene_frame_range'][1]==891
@@ -178,7 +203,6 @@ def main(out,library):
         assert result['performance']=='PENDING' and result['human']=='NOT_ESTABLISHED'
         grants=sorted({lib.get(c.id).metadata['license_grant'] for c in clips})
         assert lp.derivation(lib,file_hash(output))==grants
-        # Independent endpoint/midtake oracle, including rotated translated rig.
         worst=0.;rot_worst=0.
         for i,t in enumerate(manifest['timeline']):
             original=manifest['source_original_signatures'][i];action=bpy.data.actions[original['imported_action']]
@@ -204,15 +228,12 @@ def main(out,library):
         assert check['scene_frame_end']==math.ceil(manifest['final_key_frame'])
         passed('bound reviewed roles and dense transition contact diagnostics never lock deliberate gliding',
                endpoints=check['endpoint_errors'],seams=check['seams'],contact_states=sorted(states))
-        # Setting drift must not receive a false sequence-check pass.
         track=target.animation_data.nla_tracks.get(manifest['strips'][0]['track']);track.strips[0].influence=.5
         fail(lambda:sb.check(target,manifest),'SEQUENCE_STATE_CHANGED');track.strips[0].influence=1
         track.is_solo=True;fail(lambda:sb.check(target,manifest),'SEQUENCE_STATE_CHANGED');track.is_solo=False
         bpy.context.scene.frame_end-=1;fail(lambda:sb.check(target,manifest),'SEQUENCE_STATE_CHANGED')
         bpy.context.scene.frame_end+=1
         passed('muted/influence/solo/range drift and stale review are not accepted')
-        # Second configuration tests exact endpoint placement rather than travel continuation,
-        # without retargeting or importing new assets again.
         alternate=copy.deepcopy(request);alternate['joins'][0].update(placement='match_endpoint',yaw_degrees=-15,duration_seconds=.35)
         aj,ap,ad=run('sequence-plan',base,options=alternate)
         ae=sr.prepare(lib,approval|{'plan_job_id':aj['id'],'plan_id':ap['id']});jobs.run(lib,ae['id'],bpy.app.binary_path,600)
