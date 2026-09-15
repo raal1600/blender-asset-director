@@ -11,9 +11,54 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT/'src'), str(ROOT/'tools')]
 from sequence_fixture import export_take
 from transfer_planning_fixture import make_rig
-from asset_director import blender_ops as ops, transfer_blender as tb
+from asset_director import blender_ops as ops, transfer_blender as tb, sequence_blender as sb
 from asset_director.pose_transfer import PoseTransfer
 from asset_director.core import atomic_json, DirectorError, file_hash
+
+
+
+def sequence_precision_checks():
+    evidence = []
+    for metres, scale in ((1, 1), (1, .01), (.01, 1)):
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        bpy.ops.object.armature_add(enter_editmode=True)
+        rig = bpy.context.object
+        anchor = rig.data.edit_bones[0]; anchor.name = 'Anchor'
+        child = rig.data.edit_bones.new('Distal')
+        child.head = anchor.tail; child.tail = (0, 0, 2); child.parent = anchor
+        bpy.ops.object.mode_set(mode='OBJECT')
+        rig.scale = (scale,)*3
+        factor = metres*scale
+        for frame in (1, 2):
+            for bone in rig.pose.bones:
+                bone.rotation_mode = 'QUATERNION'
+                bone.location.x = (2e-7/factor if bone.name == 'Distal' and frame == 2 else 0)
+                bone.keyframe_insert('location', frame=frame)
+                bone.keyframe_insert('rotation_quaternion', frame=frame)
+        action = rig.animation_data.action; slot = rig.animation_data.action_slot
+        for curve in ops.curves(action, slot):
+            for key in curve.keyframe_points: key.interpolation = 'LINEAR'
+        bpy.context.view_layer.update()
+        before = sb.signature(action, slot)
+        sb.validate_action(rig, action, slot, 'Anchor', metres)
+        assert sb.signature(action, slot) == before
+        count = sum(len(c.keyframe_points) for c in ops.curves(action, slot))
+        assert tb.action_signature(action, slot, count) == before
+        try:
+            tb.action_signature(action, slot, count-1)
+            raise AssertionError('Source signature inspection exceeded explicit key budget')
+        except DirectorError as exc: assert exc.code == 'RESOURCE_LIMIT'
+        curve = next(c for c in ops.curves(action, slot)
+                     if c.data_path == rig.pose.bones['Distal'].path_from_id('location') and c.array_index == 0)
+        curve.keyframe_points[-1].co.y = .001/factor; curve.update()
+        try:
+            sb.validate_action(rig, action, slot, 'Anchor', metres)
+            raise AssertionError('Sequence accepted genuine extra-bone translation')
+        except DirectorError as exc: assert exc.code == 'SEQUENCE_ROOT_OWNERSHIP'
+        evidence.append({'metres_per_scene_unit':metres,'object_scale':scale,
+            'submicrometre_noise_accepted_without_key_changes':True,'one_mm_translation_rejected':True,
+            'explicit_source_key_budget_enforced':True})
+    return evidence
 
 
 def main(output):
@@ -68,7 +113,7 @@ def main(output):
         checks.append({'units_per_meter':units,'measured':policy_evidence,
                        'one_mm_non_anchor_motion_rejected_by':refusals,'source_file_preserved':True})
     atomic_json(root/'translation_precision_report.json', {'status':'PASS', 'blender':bpy.app.version_string,
-                'checks':checks, 'notice':'Numerical tolerance, not normalization, inferred capture quality or arbitrary extra translations.'})
+                'checks':checks, 'sequence_checks':sequence_precision_checks(), 'notice':'Numerical tolerance, not normalization, inferred capture quality or arbitrary extra translations.'})
 
 
 if __name__ == '__main__': main(sys.argv[sys.argv.index('--')+1])

@@ -76,7 +76,9 @@ def append_clip(lib, descriptor, target):
     return action, slot
 
 
-def validate_action(target, action, slot, anchor):
+def validate_action(target, action, slot, anchor, meters_per_unit=1):
+    from .translation_precision import precision
+    policy = precision(meters_per_unit, max(target.matrix_world.to_scale()))
     paths = {}; times = {'location': set(), 'rotation_quaternion': set()}
     for c in ops.curves(action, slot):
         match = PATH.fullmatch(c.data_path)
@@ -89,7 +91,10 @@ def validate_action(target, action, slot, anchor):
         require(vals and all(math.isfinite(v) for v in vals) and all(k.interpolation == 'LINEAR' for k in c.keyframe_points),
                 'SEQUENCE_CHANNEL_UNSUPPORTED', 'Native target clips must have finite linear baked curves')
         if prop == 'location' and bone != anchor:
-            require(max(vals)-min(vals) < 1e-5, 'SEQUENCE_ROOT_OWNERSHIP', 'A second bone has animated translation')
+            span_m = (max(vals)-min(vals))*policy['meters_per_local_unit']
+            require(span_m <= policy['tolerance_m_per_component'], 'SEQUENCE_ROOT_OWNERSHIP',
+                    f'{bone}: non-anchor translation span {span_m:.9g} m exceeds '
+                    f'{policy["tolerance_m_per_component"]:.9g} m')
         if bone == anchor: times[prop].update(float(k.co.x) for k in c.keyframe_points)
         b = target.data.bones[bone]
         while b and b.name != anchor: b = b.parent
@@ -170,7 +175,7 @@ def load_clips(lib, request, target, reader):
             require(role not in roles or roles[role] == name, 'SEQUENCE_ROLE_CONFLICT', 'Reviewed roles disagree')
             roles[role] = name
         action, slot = append_clip(lib, d, target)
-        paths, times = validate_action(target, action, slot, anchor)
+        paths, times = validate_action(target, action, slot, anchor, request['meters_per_unit'])
         d['curve_signature'] = signature(action, slot); d['bones'] = sorted(paths)
         d['anchor_key_times'] = times
         require(not descriptors or sorted(paths) == descriptors[0]['bones'],
