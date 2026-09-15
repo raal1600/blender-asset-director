@@ -21,14 +21,19 @@ from asset_director import transfer_review as tr, sequence_review as sr, sequenc
 from asset_director.core import Library, DirectorError, atomic_json, load_json, file_hash
 
 
-def export_take(path, frames, scale, travel, phase):
+def export_take(path, frames, scale, travel, phase, root_axis='X'):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     rig,skin,n=make_rig('GeneratedSource','source',scale)
+    # FBX reconstructs tails and auto-connects coincident children. Use a
+    # horizontal floor control; retain the collinear case as a negative test.
+    if root_axis == 'X':
+        bpy.context.view_layer.objects.active=rig;bpy.ops.object.mode_set(mode='EDIT')
+        root=rig.data.edit_bones[n['root']];root.tail=root.head+Vector((.15*scale,0,0))
+        bpy.ops.object.mode_set(mode='OBJECT')
+    else:
+        assert root_axis == 'Z'
     scene=bpy.context.scene;scene.render.fps=30;scene.frame_start=1;scene.frame_end=frames
-    # Sparse authored samples, exported by Blender to an actual FBX. The long
-    # take's middle and endpoint must survive native-time transfer and NLA.
     for f in sorted({1,frames,*range(2,frames, max(1,frames//24))}):
-        # Author at the intended scene time before writing keyed transforms.
         scene.frame_set(f)
         u=(f-1)/(frames-1)
         hips=rig.pose.bones[n['hips']];hips.location=(travel*scale*u,0,0)
@@ -40,7 +45,6 @@ def export_take(path, frames, scale, travel, phase):
     action=rig.animation_data.action;action.name='Armature|mixamo.com|Layer0'
     for c in ops.curves(action,rig.animation_data.action_slot):
         for k in c.keyframe_points:k.interpolation='LINEAR'
-    # Establish the actual synthetic travel before blaming downstream planning.
     samples=[]
     for f in (1,frames):
         scene.frame_set(f);bpy.context.view_layer.update()
@@ -252,4 +256,10 @@ def main(out,library):
             'notice':'Generated FBXs only. Numeric continuity is not natural dancing or user playback acceptance.'}
     atomic_json(out/'sequence_report.json',result);print(json.dumps({'status':'PASS','checks':len(checks)}))
 
-if __name__=='__main__':main(*sys.argv[sys.argv.index('--')+1:])
+if __name__=='__main__':
+    args=sys.argv[sys.argv.index('--')+1:]
+    try:main(*args)
+    except Exception:
+        import traceback
+        atomic_json(Path(args[0])/'sequence_failure.json',{'status':'FAIL','traceback':traceback.format_exc()[-12000:]})
+        raise

@@ -116,6 +116,10 @@ jobs:
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/translation_precision_fixture.py -- "$RUNNER_TEMP/translation-precision"
           cp "$RUNNER_TEMP/translation-precision/translation_precision_report.json" evidence/
+      - name: Connected FBX anchor detection and travelling source roundtrip
+        run: |
+          "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/fbx_anchor_fixture.py -- "$RUNNER_TEMP/fbx-anchor"
+          cp "$RUNNER_TEMP/fbx-anchor/fbx_anchor_report.json" evidence/
       - name: Full long-take sequence, root alignment, bridge and reviewed-role QA
         run: |
           "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/sequence_fixture.py -- "$RUNNER_TEMP/sequence" "$RUNNER_TEMP/bad-library"
@@ -124,6 +128,7 @@ jobs:
         if: always()
         run: |
           if [ -f "$RUNNER_TEMP/sequence/sequence_progress.json" ]; then cp "$RUNNER_TEMP/sequence/sequence_progress.json" evidence/; fi
+          if [ -f "$RUNNER_TEMP/sequence/sequence_failure.json" ]; then cp "$RUNNER_TEMP/sequence/sequence_failure.json" evidence/; fi
       - name: Live free asset acquisition and real-motion retarget
         if: matrix.blender == '5.0.0'
         run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence

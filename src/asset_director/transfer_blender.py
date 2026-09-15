@@ -119,7 +119,6 @@ def successor(role, r):
 def direction(obj, role, r):
     name = r[role]; end = successor(role,r)
     if end:
-        # Semantic joint-head direction must correspond to a real descendant path.
         b = obj.data.bones[r[end]].parent
         while b and b.name != name: b = b.parent
         require(b is not None, 'ALIGNMENT_REVIEW_REQUIRED', 'Semantic successor is outside its chain')
@@ -155,6 +154,11 @@ def source_checks(source, action, anchor, start, end, count, meters_per_unit=1):
             require(not values or max(values)-min(values)<1e-6,'SOURCE_OBJECT_MOTION_REVIEW','Animated object motion requires baking')
         if c.data_path.endswith('.scale'):
             require(all(abs(v-1)<1e-5 for v in values),'ANIMATED_SCALE_UNSUPPORTED','Source bone scales must remain one')
+        if c.data_path == source.pose.bones[anchor].path_from_id('location') and values:
+            require(not source.data.bones[anchor].use_connect or
+                    (max(values)-min(values))*policy['meters_per_local_unit'] <= policy['tolerance_m_per_component'],
+                    'CONNECTED_ANCHOR_TRANSLATION',
+                    'Imported translation anchor is connected to its parent; Blender ignores its location channels. Review the source, do not disconnect silently.')
         if c.data_path.endswith('.location') and c.data_path != source.pose.bones[anchor].path_from_id('location'):
             if values:
                 largest_non_anchor_span_m = max(largest_non_anchor_span_m,
@@ -197,7 +201,6 @@ def propose(lib, spec):
     start, end = o.get('start', start), o.get('end', end)
     from .motion_timing import bake_samples
     bake_samples(start, end, sfps, o['target_fps'], o.get('max_output_intervals', 360))
-    # Own the scratch state only. Planning never saves either input file.
     bpy.context.scene.frame_set(math.floor(start),subframe=start-math.floor(start))
     if target.animation_data:
         target.animation_data.action=None
@@ -221,7 +224,6 @@ def propose(lib, spec):
     evidence=source_checks(source,action,s_roles['hips'],start,end,o.get('check_count',65),o['source_meters_per_unit'])
     role_for={t_roles[r]:r for r in common};alignment={}; alignment_evidence=[];solved={}
     inv_rotation=target.matrix_world.to_quaternion().to_matrix().inverted()
-    # Topological rest order with unchanged helper reference bases.
     ordered=[];remaining=list(target.data.bones)
     while remaining:
         ready=[b for b in remaining if not b.parent or b.parent.name in solved or b.parent in ordered]
@@ -264,8 +266,6 @@ def propose(lib, spec):
     ground_evidence = None
     if 'ground_contact' in o:
         from .ground_contact import GroundContact
-        # No correction is applied while proposing a transfer. The existing
-        # executor receives only the host's explicit selected groups and cap.
         probe = GroundContact(target, t_roles['hips'], o['ground_contact'])
         ground_evidence = {'request':o['ground_contact'], 'selected_vertices':len(probe.indices),
                            'topology':probe.topology, 'repair_applied':False,
@@ -317,8 +317,6 @@ def verify_execution(lib, source, target, action, slot_id, options):
     ops.assign(source,action,slot_id)
     require(action_signature(action,source.animation_data.action_slot)==proposal['source_checks']['curve_signature'],
             'STALE_TRANSFER_BINDING','Selected action curves/slot changed since review')
-    # Only pass roles from the immutable proposal after world, rig and action
-    # binding checks. Do not infer them again from custom bone names at QA time.
     return {key: dict(proposal[key+'_roles']) for key in ('source', 'target')}
 
 
