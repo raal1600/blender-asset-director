@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "title": "Moonwalk to Thriller — latest real motion showcase",
+  "publication_scope": "Only this recording and its poster were authorized for public showcase publication on 2026-09-16. No source assets, private reports or future recordings are included.",
+  "runtime_commit": "1757db8e8bde0136ddc461a64ebfcc3c346f4322",
+  "video": {
+    "filename": "latest-demo.mp4",
+    "sha256": "6c8f43ed25b712f36dadfd0c2ccb0c2fc8a494c53b60d1baead56b7c64268fe7",
+    "bytes": 1701127,
+    "codec_name": "h264",
+    "width": 960,
+    "height": 800,
+    "pix_fmt": "yuv420p",
+    "fps": 30,
+    "frames": 120,
+    "seconds": 4
+  },
+  "poster": {
+    "filename": "latest-demo-poster.jpg",
+    "sha256": "baae065af5d94b0eec7286a978f17010c7c93eb1db552c74da0b9889be844392",
+    "bytes": 49496,
+    "codec_name": "mjpeg",
+    "width": 720,
+    "height": 600,
+    "frames": 1
+  }
+}

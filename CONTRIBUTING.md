@@ -27,7 +27,7 @@ build identity: include `git rev-parse HEAD` in bug reports and handoffs.
 | `tests/` | Portable unit, policy and failure-path tests; no Blender installation needed. |
 | `tools/` | Actual Blender fixtures, packaging, installers and bounded diagnostic tools. |
 | `skills/blender-asset-director/` | Agent instructions and role/operation reference contracts. |
-| `showcase/` | Public synthetic demo UI; only allowlisted generated media is published. |
+| `showcase/` | Synthetic lab and approved showcase UI/media; see [publication gates](docs/SHOWCASE_PUBLICATION.md). |
 | `docs/` | Design, contributor guidance and commit-specific acceptance/handoff evidence. |
 
 ## Test and review process
