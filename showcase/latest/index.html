@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="The latest four-method Moonwalk to Thriller recording from Blender Asset Director.">
+<title>Blender Asset Director · Latest real motion showcase</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b1220;color:#eef2ff;font:16px/1.65 system-ui,sans-serif}.wrap{max-width:1040px;margin:auto;padding:32px 20px 64px}h1{font-size:clamp(32px,6vw,60px);line-height:1.15;margin:.25em 0}p{color:#cbd5e1}.eyebrow{font-size:13px;letter-spacing:.14em;text-transform:uppercase}video{display:block;width:100%;height:auto;aspect-ratio:6/5;background:#000;border-radius:12px}.controls,.links{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:18px 0}button,select,.links a{font:inherit;border:1px solid #64748b;border-radius:8px;background:#1e293b;color:#fff;padding:10px 16px}button{cursor:pointer}button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #93c5fd;outline-offset:3px}.links a{text-decoration:none}.note{font-size:14px;color:#94a3b8}a{color:#93c5fd}#play-status{min-height:1.65em}code{overflow-wrap:anywhere}details{border-top:1px solid #334155;margin-top:28px;padding-top:16px}
+</style>
+</head>
+<body><main class="wrap">
+<p class="eyebrow">Blender Asset Director · Real motion showcase</p>
+<h1>Moonwalk → Thriller</h1>
+<p>Compare <strong>Cut, NLA, Aligned and Director</strong> in the newest approved recording. This four-second excerpt includes the transition; it is not the complete 38.5-second sequence.</p>
+<video id="demo" controls playsinline preload="metadata" poster="media/latest-demo-poster.jpg" aria-label="Four-method Moonwalk to Thriller comparison">
+<source src="media/latest-demo.mp4" type="video/mp4">
+Your browser cannot play this video. Use the direct video link below.
+</video>
+<div class="controls"><button id="play-demo" type="button">Play recording</button><button id="restart-demo" type="button">Restart</button><label for="speed">Playback speed</label><select id="speed"><option value="1">1×</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option></select></div>
+<p id="play-status" role="status" aria-live="polite"></p>
+<nav class="links" aria-label="Showcase links"><a href="media/latest-demo.mp4">Open video</a><a href="technical-validation/">Technical Transition Lab</a><a href="https://github.com/raal1600/blender-asset-director">Repository</a></nav>
+<details><summary>What this recording establishes</summary><p>The public MP4 is the exact approved 960 × 800 recording: 120 frames, 30 FPS, four seconds. Its identity and full decode are checked before publishing. The synthetic Transition Lab remains a separate technical example.</p><p class="note">Only this rendered recording and its poster are public. Original FBXs, Blender projects and private reports are not included. Technical success does not establish universal natural motion or replace artistic review.</p><a href="showcase.json">Recording identity</a></details>
+</main>
+<script>
+const video=document.getElementById('demo');
+const status=document.getElementById('play-status');
+function play(){status.textContent='';video.play().catch(()=>{status.textContent='Playback could not start. Try the video controls or direct video link.';});}
+document.getElementById('play-demo').addEventListener('click',play);
+document.getElementById('restart-demo').addEventListener('click',()=>{video.currentTime=0;play();});
+document.getElementById('speed').addEventListener('change',e=>{video.playbackRate=Number(e.target.value);});
+video.addEventListener('error',()=>{status.textContent='Video unavailable. Use the direct video link or report the failed recording identity.';});
+</script>
+</body>
+</html>

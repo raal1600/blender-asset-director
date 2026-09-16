@@ -2,6 +2,7 @@ name: Source package
 on:
   push:
     branches: [main, 'fix/**', 'feature/**', 'chore/**', 'docs/**']
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read

@@ -3,6 +3,9 @@
 For the final installer-default correction and new live download checks, read
 [the September 16 follow-up](INSTALLER_DEFAULTS.md).
 
+For the showcase verification pipeline and media completion gate, read
+[the showcase repair handoff](SHOWCASE_PUBLICATION.md).
+
 ## Source of truth
 
 `main` is the consolidated development branch. Runtime `0.6.0-dev.4` is not a

@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import subprocess
 import sys
+import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 from asset_director.core import Library, DirectorError, atomic_json, load_json
@@ -10,10 +11,34 @@ from asset_director.providers import Providers
 from asset_director import backend, jobs
 
 
+# Retry only acquisition-level transport failures, never Blender execution or QA.
+TRANSIENT_NETWORK_CODES = frozenset({'CONNECTION_FAILED', 'NETWORK_UNAVAILABLE', 'NETWORK_ERROR'})
+
+
+def retry_provider_call(operation, stage, record, sleep=time.sleep):
+    for attempt in range(1, 4):
+        try:
+            value = operation()
+        except DirectorError as exc:
+            record({'stage': stage, 'attempt': attempt, 'status': 'FAIL', 'code': exc.code})
+            if exc.code not in TRANSIENT_NETWORK_CODES or attempt == 3:
+                raise
+            sleep(2 * attempt)
+        else:
+            record({'stage': stage, 'attempt': attempt, 'status': 'PASS'})
+            return value
+
+
+
 def main(blender, library, out):
     output = Path(out).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    results = {'status': 'RUNNING', 'checks': {}, 'blender': blender}
+    results = {'status': 'RUNNING', 'checks': {}, 'blender': blender, 'network_attempts': []}
+
+    def record_network(event):
+        results['network_attempts'].append(event)
+        atomic_json(output / 'live_acceptance.json', results)
+        print(json.dumps({'network_attempt': event}), flush=True)
 
     def check(name, fn):
         try:
@@ -32,8 +57,9 @@ def main(blender, library, out):
         providers = Providers(lib)
 
         def pack_test():
-            pack = providers.search('quaternius', 'animation')['results'][0]['asset']['id']
-            acquired = providers.acquire(pack)
+            pack = retry_provider_call(lambda: providers.search('quaternius', 'animation'),
+                                       'quaternius_search', record_network)['results'][0]['asset']['id']
+            acquired = retry_provider_call(lambda: providers.acquire(pack), 'quaternius_acquire', record_network)
             j = jobs.prepare(lib, 'index', asset_id=pack, options={'max_clips': 256})
             jobs.run(lib, j['id'], blender, 900)
             indexed = jobs.index_result(lib, pack, j['id'])
@@ -44,10 +70,11 @@ def main(blender, library, out):
         pack_ok = check('quaternius_acquire_and_index', pack_test)
 
         def environment_test(provider, query, kind):
-            r = providers.search(provider, query, kind, 3, refresh=True)
+            r = retry_provider_call(lambda: providers.search(provider, query, kind, 3, refresh=True),
+                                    provider + '_search', record_network)
             assert r['results'], 'No live candidates'
             aid = r['results'][0]['asset']['id']
-            acquired = providers.acquire(aid)
+            acquired = retry_provider_call(lambda: providers.acquire(aid), provider + '_acquire', record_network)
             imp = jobs.prepare(lib, 'import', asset_id=aid)
             imported = jobs.run(lib, imp['id'], blender, 240)
             return {'asset_id': aid, 'acquisition': acquired['status'], 'import': imported['summary']}

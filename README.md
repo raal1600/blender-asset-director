@@ -4,8 +4,22 @@
 still installs **v0.5.0**; merging source does not publish a release or update an
 installed skill. Identify development builds by their full Git commit SHA.
 
+## Latest real motion showcase
+
+[![Watch the latest Moonwalk to Thriller comparison](https://raal1600.github.io/blender-asset-director/media/latest-demo-poster.jpg)](https://raal1600.github.io/blender-asset-director/)
+
+**[Play the recording on GitHub Pages](https://raal1600.github.io/blender-asset-director/)**
+— Cut, NLA, Aligned and Director compared over four seconds including the join.
+The approved recording is 960 × 800, 30 FPS and 120 frames, not the complete
+38.5-second sequence. Only the rendered MP4 and its poster are approved for
+publication; source FBXs, Blender projects and private reports remain private.
+
+The live site changes only after successful main deployment; a feature-branch
+README does not establish publication. [Recording identity, verification and
+publication gates](docs/SHOWCASE_PUBLICATION.md).
+
 [Contributor quick start](CONTRIBUTING.md) · [Current handoff and test gates](docs/CONSOLIDATION.md) ·
-[Documentation index](docs/README.md) · [Synthetic Transition Lab](https://raal1600.github.io/blender-asset-director/)
+[Documentation index](docs/README.md) · [Technical Transition Lab](https://raal1600.github.io/blender-asset-director/technical-validation/)
 
 Main brings together local animation intake, canonical motion and clay proxies,
 reviewed transfer planning, custom semantic roles, bone-display controls,
