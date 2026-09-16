@@ -1,5 +1,8 @@
 # Current development handoff — September 15, 2026
 
+For the final installer-default correction and new live download checks, read
+[the September 16 follow-up](INSTALLER_DEFAULTS.md).
+
 ## Source of truth
 
 `main` is the consolidated development branch. Runtime `0.6.0-dev.4` is not a
@@ -63,6 +66,7 @@ No raw licensed assets or private reports enter public Pages.
 | Blender regression coverage | Normal/custom roles, display, grounding, precision, source/action identity, long full-take sequencing and existing production fixtures. |
 | Transition Lab | Actual synthetic pipeline/render, H.264 validation and Chrome desktop/mobile playback. Main additionally requires successful deployment. |
 | Source package | Source-only package bound to the full commit; not a release or installation update. |
+| Published installer defaults | All five real no-version HTTPS install/reinstall/verify/uninstall jobs; see the September 16 follow-up. |
 | Private integration | Private repository pins this exact public SHA and runs real licensed inputs plus bounded comparison recording; evidence stays private. |
 
 A PR must cite its final Actions runs. The merge is authorized only after the
