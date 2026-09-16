@@ -156,9 +156,6 @@ jobs:
         run: |
           if [ -f "$RUNNER_TEMP/sequence/sequence_progress.json" ]; then cp "$RUNNER_TEMP/sequence/sequence_progress.json" evidence/; fi
           if [ -f "$RUNNER_TEMP/sequence/sequence_failure.json" ]; then cp "$RUNNER_TEMP/sequence/sequence_failure.json" evidence/; fi
-      - name: Live free asset acquisition and real-motion retarget
-        if: matrix.blender == '5.0.0'
-        run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence
       - name: Collect diagnostic reports (no source assets or secrets)
         if: always()
         shell: bash
@@ -170,6 +167,42 @@ jobs:
         if: always()
         with:
           name: blender-${{ matrix.blender }}-evidence
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  live-provider-acceptance:
+    name: live provider acceptance (informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Fetch checksum-verified Blender 5.0.0
+        run: |
+          python tools/fetch_blender.py '5.0.0' "$RUNNER_TEMP/blender" > blender-path.txt
+          echo "BLENDER=$(tail -n 1 blender-path.txt)" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/src" >> "$GITHUB_ENV"
+      - name: Acquire pinned retarget backend
+        run: python -m asset_director --library "$RUNNER_TEMP/bad-library" backend-install
+      - name: Live free asset acquisition and real-motion retarget
+        run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence
+      - name: Explain informational status
+        if: always()
+        shell: bash
+        run: |
+          echo '## Live provider acceptance' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This is an **informational network-dependent check**. Provider/network outages remain visible in logs and artifacts but do not make deterministic Blender CI red.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A successful run is still required before making a new claim that live provider acceptance passed.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-provider-acceptance-evidence
           path: evidence/
           if-no-files-found: warn
           retention-days: 14
