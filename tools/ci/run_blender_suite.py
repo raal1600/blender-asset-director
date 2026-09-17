@@ -5,6 +5,7 @@ remaining fixtures from running, and missing reports cannot turn into a pass.
 """
 import argparse
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -24,6 +25,12 @@ def validate_fixture(text, expected, directory):
         path = directory/expected
         if not path.is_file() or read(path).get('status') != 'PASS':
             raise ValueError('Missing or failed real Blender report: ' + expected)
+
+
+def validate_version(banner, expected):
+    # The publisher appends LTS to supported long-term release banners.
+    if not re.fullmatch(r'Blender ' + re.escape(expected) + r'(?: LTS)?', banner):
+        raise ValueError('Executable version differs from matrix: ' + banner)
 
 
 def run_process(args, env, log, timeout):
@@ -52,8 +59,8 @@ def main():
         env = dict(os.environ, PYTHONPATH=str(ROOT/'src'), PYTHONIOENCODING='utf-8')
         env.pop('PYTHONOPTIMIZE', None)
         version = subprocess.check_output([args.blender, '--version'], text=True, encoding='utf-8').splitlines()[0]
-        if version != 'Blender ' + args.version:
-            raise RuntimeError('Executable version differs from matrix: ' + version)
+        validate_version(version, args.version)
+        evidence.report['blender_banner'] = version
         with tempfile.TemporaryDirectory(prefix='synthetic-blender-suite-') as temporary:
             root = Path(temporary)
             library = root/'library'
