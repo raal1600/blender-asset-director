@@ -6,7 +6,7 @@ the released installer remains v0.5.0 until a separately approved release.
 
 | Topic | Read |
 |---|---|
-| CI journeys and evidence | [Workflow map](CI_WORKFLOWS.md), [installed studio E2E](STUDIO_E2E.md) |
+| CI journeys and evidence | [Workflow map](CI_WORKFLOWS.md), [installed studio E2E](STUDIO_E2E.md), [Windows fixture notes](CI_WINDOWS_FIXTURE.md) |
 | Installation and troubleshooting | [Installation](INSTALL.md), [default-version regression and live checks](INSTALLER_DEFAULTS.md) |
 | Runtime and role architecture | [Design](DESIGN.md), [harness contract](HARNESS_HANDOFF.md) |
 | Local sources and policy | [Local motion library](LOCAL_MOTION_LIBRARY.md) |

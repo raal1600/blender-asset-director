@@ -2,6 +2,7 @@
 
 Never point this at an existing studio. No provider/model calls or personal data.
 """
+from contextlib import closing
 import argparse
 import hashlib
 import json
@@ -10,6 +11,7 @@ from pathlib import Path
 import queue
 import shutil
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -30,6 +32,17 @@ def command(args, env, timeout=240):
     if result.returncode:
         raise RuntimeError(f'{Path(str(args[0])).name} failed: {result.stdout[-3000:]} {result.stderr[-3000:]}')
     return result.stdout
+
+
+def verify_catalog(path):
+    """Check the real catalog without retaining a connection on an error path."""
+    path = Path(path)
+    assert path.is_file(), 'Installed SQLite catalog is absent'
+    # sqlite3.Connection's context manager commits/rolls back; it does NOT close.
+    # Explicit closure matters when a later Blender failure retains this frame.
+    with closing(sqlite3.connect(str(path))) as db:
+        assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
+        assert db.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] > 0
 
 
 class MCP:
@@ -105,6 +118,13 @@ class Studio:
         for key in ('PYTHONPATH', 'BAD_LIBRARY', 'BAD_BLENDER', 'SKETCHFAB_TOKEN',
                     'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'DEEPSEEK_API_KEY', 'PYTHONOPTIMIZE'):
             self.env.pop(key, None)
+        # Only direct synthetic fixture/verification subprocesses use this setting.
+        # Real harness workers retain their existing sanitized environment policy.
+        if sys.platform == 'win32':
+            self.env['TBB_MALLOC_DISABLE_REPLACEMENT'] = '1'
+        self.evidence.report['fixture_allocator'] = (
+            'standard CRT; oneTBB replacement disabled for direct fixture calls'
+            if sys.platform == 'win32' else 'platform default')
         root = self.root
         self.env.update(BAD_CONFIG=str(root/'SystemRuntime/UserData/runtime.json'),
                         CODEX_HOME=str(root/'SystemRuntime/UserData/Codex'), PYTHONIOENCODING='utf-8',
@@ -116,8 +136,7 @@ class Studio:
                         APPDATA=str(root/'SystemRuntime/UserData/Roaming'),
                         XDG_CONFIG_HOME=str(root/'SystemRuntime/UserData/Config'))
         for folder in ('Archive/Trash', 'Docs', 'Database/Animations', 'Database/Characters',
-                       'Database/Meshes/Props', 'Workspace/Projects', 'SystemRuntime/Cache', 'SystemRuntime/Temp',
-                       'SystemRuntime/UserData/Launcher', 'SystemRuntime/UserData/Codex',
+                       'Database/Meshes/Props', 'Workspace/Projects', 'SystemRuntime/Cache', 'SystemRuntime/Temp', 'SystemRuntime/UserData/Launcher', 'SystemRuntime/UserData/Codex',
                        'SystemRuntime/UserData/Blender/config', 'SystemRuntime/UserData/Blender/scripts',
                        'SystemRuntime/UserData/Home', 'SystemRuntime/UserData/Local',
                        'SystemRuntime/UserData/Roaming', 'SystemRuntime/UserData/Config'):
@@ -148,11 +167,7 @@ class Studio:
                 assert digest(source) == digest(self.skill/'scripts/runtime/asset_director'/source.name)
             assert digest(self.codex_config) == self.codex_hash
         with self.evidence.checkpoint('catalog_initialized'):
-            import sqlite3
-            assert (self.library/'catalog.sqlite').is_file()
-            with sqlite3.connect(str(self.library/'catalog.sqlite')) as db:
-                assert db.execute('PRAGMA integrity_check').fetchone() == ('ok',)
-                assert db.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] > 0
+            verify_catalog(self.library/'catalog.sqlite')
             self.cmd([self.blender, '--background', '--factory-startup', '--disable-autoexec',
                       '--threads', '2', '--python-exit-code', '11',
                       '--python', ROOT/'tools/studio_e2e/scene.py', '--', self.source])
