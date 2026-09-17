@@ -264,6 +264,8 @@ def main():
                 server.wait(timeout=15)
                 server, session = start()
                 assert api('project?projectId='+project['id'])['project']['jobs']
+                # Reopen the document: changing only the URL fragment keeps the old JS token.
+                page.goto('about:blank')
                 page.goto(session['origin']+'/#'+session['token']); idle()
                 expect(page.locator('#project-title')).to_have_text('Synthetic E2E Project')
                 expect(page.locator('#jobs')).to_contain_text('SUCCEEDED')

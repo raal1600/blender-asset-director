@@ -36,9 +36,13 @@ jobs:
         run: |
           python tools/fetch_blender.py 5.2.1 "$RUNNER_TEMP/studio-blender" > blender-path.txt
       - name: Exercise installed studio, browser, MCP and real Blender
-        shell: bash
+        shell: python
         run: |
-          python tools/studio_e2e/run.py --blender "$(tail -n 1 blender-path.txt)" --evidence evidence/studio-e2e
+          from pathlib import Path
+          import subprocess, sys
+          blender = Path('blender-path.txt').read_text(encoding='utf-8-sig').strip()
+          subprocess.run([sys.executable, 'tools/studio_e2e/run.py', '--blender', blender,
+                          '--evidence', 'evidence/studio-e2e'], check=True)
       - name: Report measured scope
         if: always()
         shell: bash
