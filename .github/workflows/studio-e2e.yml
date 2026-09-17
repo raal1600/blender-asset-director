@@ -1,60 +1,80 @@
-name: Installed studio E2E
-on:
-  push:
-    branches: [main, 'feature/**', 'fix/**']
-  pull_request:
+name: 06 · Full installed studio E2E
+'on':
+  workflow_call:
+    inputs:
+      scenario:
+        description: Installed-studio journey
+        type: string
+        default: full
   workflow_dispatch:
+    inputs:
+      scenario:
+        description: Installed-studio journey
+        type: choice
+        options:
+        - full
+        - onboarding
+        - execution
+        - production
+        - recovery
+        default: full
 permissions:
   contents: read
-concurrency:
-  group: studio-e2e-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
   studio:
+    name: ${{ inputs.scenario || 'full' }} · ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os:
+        - ubuntu-latest
+        - windows-latest
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install browser test dependencies
-        run: |
-          python -m pip install playwright==1.55.0
-          python -m playwright install --with-deps chromium
-      - name: Fetch checksum-verified Blender
-        shell: bash
-        run: |
-          python tools/fetch_blender.py 5.2.1 "$RUNNER_TEMP/studio-blender" > blender-path.txt
-      - name: Exercise installed studio, browser, MCP and real Blender
-        shell: python
-        run: |
-          from pathlib import Path
-          import subprocess, sys
-          blender = Path('blender-path.txt').read_text(encoding='utf-8-sig').strip()
-          subprocess.run([sys.executable, 'tools/studio_e2e/run.py', '--blender', blender,
-                          '--evidence', 'evidence/studio-e2e'], check=True)
-      - name: Report measured scope
-        if: always()
-        shell: bash
-        run: |
-          echo '## Installed studio E2E' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Real installed harness, launcher UI, project MCP adapter, SQLite, Blender audit and CPU render using generated inputs. Synthetic source-use responses only.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Not covered: authenticated Codex/model calls, desktop focus/tray, live Blender add-on MCP, private assets, retargeting, or human visual acceptance. Read report.json for executed checks and failures.' >> "$GITHUB_STEP_SUMMARY"
-          if [ -f evidence/studio-e2e/report.json ]; then cat evidence/studio-e2e/report.json >> "$GITHUB_STEP_SUMMARY"; fi
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: studio-e2e-${{ matrix.os }}-${{ github.sha }}
-          path: evidence/studio-e2e/
-          if-no-files-found: warn
-          retention-days: 14
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: ./.github/actions/setup-blender
+      with:
+        version: 5.2.1
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Install pinned real browser runtime
+      run: |
+        python -m pip install playwright==1.55.0
+        python -m playwright install --with-deps chromium
+    - name: Exercise browser, installed launcher, project MCP and actual Blender
+      env:
+        JOURNEY: ${{ inputs.scenario || 'full' }}
+      shell: python
+      run: |
+        import os, subprocess, sys
+        subprocess.run([sys.executable, 'tools/studio_e2e/run.py',
+            '--blender', os.environ['BLENDER'], '--scenario', os.environ['JOURNEY'],
+            '--evidence', 'evidence/studio-e2e'], check=True)
+    - name: Report executed checkpoints and limitations
+      if: always()
+      shell: python
+      run: |
+        import json, os
+        from pathlib import Path
+        path = Path('evidence/studio-e2e/report.json')
+        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+            out.write('## Installed studio journey\n\n')
+            if not path.is_file():
+                out.write('FAIL: setup or execution did not produce a journey report.\n')
+            else:
+                report = json.loads(path.read_text(encoding='utf-8'))
+                report.pop('artifacts', None)
+                out.write('```json\n' + json.dumps(report, indent=2) + '\n```\n')
+    - name: Retain exact-commit evidence on success or failure
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: acceptance-studio-${{ inputs.scenario || 'full' }}-${{ matrix.os }}-${{ github.sha }}
+        path: evidence/studio-e2e/
+        if-no-files-found: error
+        overwrite: true
+        retention-days: 14

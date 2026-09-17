@@ -1,16 +1,14 @@
-name: Launcher tests and desktop build
+name: Checks · Launcher contracts and Windows build
 on:
-  push:
-    branches: [main, 'feature/**', 'fix/**']
-    paths: ['launcher/**', '.github/workflows/launcher.yml']
-  pull_request:
-    paths: ['launcher/**', '.github/workflows/launcher.yml']
+  workflow_call:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   launcher:
+    name: Real launcher contracts and Windows executable build
     runs-on: windows-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:

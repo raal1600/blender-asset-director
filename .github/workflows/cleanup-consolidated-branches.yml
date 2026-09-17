@@ -1,7 +1,7 @@
 name: Cleanup consolidated branches
 on:
   workflow_run:
-    workflows: ['Asset Director Tests', 'Transition Lab · Build and publish', 'Source package', 'Published installer defaults']
+    workflows: ['00 · Harness acceptance', 'Transition Lab · Build and publish', 'Source package', 'Published installer defaults']
     types: [completed]
 permissions:
   contents: read

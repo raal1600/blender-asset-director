@@ -1,62 +1,75 @@
 # Installed studio E2E
 
-`Installed studio E2E` builds an isolated studio from the exact checkout on Linux
-and Windows. It runs on development pushes, pull requests and manual dispatch.
-It does not require a PR, personal assets, model access, or provider credentials.
+The [CI workflow map](CI_WORKFLOWS.md) is the entry point. **00 · Harness
+acceptance** runs five installed-studio scenarios on Linux and Windows:
+`onboarding`, `execution`, `production`, `recovery`, and `full`. Each starts from
+an isolated installation of the exact checkout; `full` executes all stages in
+one studio. No personal data, model account, provider credential or E: mount is
+required.
 
-The fixture creates a fresh temporary root with spaces in its path and the local
-studio's `Archive`, `Database`, `Docs`, `SystemRuntime`, and `Workspace` layout.
-It installs the bundled harness using the real installer, initializes its SQLite
-catalog, copies the launcher from the same checkout, and redirects harness and
-Blender configuration into the fixture. The server starts from its installed
-location using the normal root-discovery behavior. No E: drive is required.
+## The disposable installation
 
-## Measured workflow
+The fixture recreates the studio's `Archive`, `Database`, `Docs`, `SystemRuntime`
+and `Workspace` layout in a temporary root with spaces. It installs the real
+bundled harness, compares its runtime bytes to the checkout, checks the actual
+SQLite catalog, and copies the real launcher. Harness, Blender and host settings
+are redirected to the disposable root. A generated Codex configuration sentinel
+must remain unchanged; Codex itself is not invoked.
 
-1. Generate a real animated cube scene with checksum-verified Blender 5.2.1.
-2. Start the installed launcher and verify installation health and authentication.
-3. Use Chromium to create a project, save its brief, complete onboarding, scan,
-   link and verify the generated source package, and select a working scene.
-4. Run a real saved-scene audit through the UI and inspect its successful job.
-5. Prepare a native preview job and bind it to the project. Refuse another
-   project's attempt to claim the job.
-6. Connect a synthetic JSON-RPC client to the real project MCP adapter. Cancel
-   its source-use form and assert the job stays PLANNED. Then submit a test-only
-   confirmation for generated inputs and run the real Blender CPU render.
-7. Verify output hashes, PNG dimensions, and unchanged source/scene bytes.
-8. Change the synthetic source and verify that project verification and audit
-   refuse it. Restore only the generated input bytes, leaving receipts intact.
-9. Restart the launcher, verify persistent jobs, move the project to Trash via
-   the UI, and restore it. Verify scenes, copied render and shared evidence.
+## Executed journeys
 
-Generated scene copying and render delivery are fixture setup/assertion steps;
-this suite does not claim the agent autonomously created or delivered them.
+The onboarding journey generates an animated cube in real Blender, starts the
+installed Node launcher, verifies authentication and health, and uses Chromium
+to create a project, save a brief, scan/attach/verify its source and run an actual
+saved-scene audit through the UI.
+
+The execution journey prepares and binds a native preview job, refuses a foreign
+project's binding attempt, and connects a synthetic JSON-RPC client to the real
+project MCP adapter. Cancellation must leave the job PLANNED without a render;
+confirmation for generated inputs must produce a real CPU preview with verified
+hashes and dimensions. Repeating the successful request must not change job,
+worker, result or render evidence or ask for another source-use confirmation.
+
+The production journey creates a two-checkpoint camera move, changes the observed
+light, world and exposure, runs camera QA, and renders a bounded preview through
+the installed harness/project adapter. It reopens the saved result in another
+Blender process to verify the camera animation and authored settings, preserved
+subject geometry/motion, and restored production resolution and sample count.
+Derived scene copying is explicit fixture orchestration, not autonomous delivery.
+
+The recovery journey changes only generated source bytes and requires verification
+and audit to refuse execution. It restores those bytes without editing receipts,
+restarts the server, rejects the old session token, verifies persistent jobs, and
+moves/restores the project through the browser Trash UI. The original scene,
+source, copied render, shared job evidence and Codex configuration must survive.
+
+## Evidence and scope
+
+`tools/studio_e2e/run.py` coordinates `support.py` and `journeys.py`; assertions
+remain in real user journeys rather than a mock replacement system. Every run
+writes incremental `report.json` and `junit.xml`. Reports start FAIL. Exact
+ordered checkpoints and retained execution evidence are mandatory for PASS.
+Each OS/scenario uploads commit-labelled reports, a UI screenshot, applicable
+synthetic preview images and generated job/worker evidence for 14 days. Failure
+screenshots and partial worker logs are captured when available. Whole studios,
+settings, sessions, browser storage, SQLite and source/derived `.blend` files are
+never uploaded. Textual session tokens are redacted.
+
 Source-use answers are synthetic protocol responses, not production approvals.
-No harness license or execution gate is bypassed; job receipts come from real
-execution. The scene is simple geometry, not a rig/retarget acceptance test.
-
-## Evidence and boundaries
-
-Each OS uploads a commit-labelled artifact for 14 days containing `report.json`,
-a UI screenshot, a synthetic preview PNG, and synthetic job records/worker logs.
-A failing test remains a failing job. Reports begin with FAIL and become PASS
-only after all assertions complete. The full studio, settings, session token,
-Codex profile and browser storage are never uploaded.
-
-Authenticated Codex/model calls, the desktop EXE's focus/tray behavior, live
-Blender add-on MCP, private/licensed inputs, retargeting and human visual
-acceptance are **not tested** here. Existing launcher unit/desktop-build and
-Blender matrices remain separate required checks. This is not a release gate
-substitute or an update to an installed local studio.
+Authenticated Codex/model decisions, native desktop EXE focus/tray, live Blender
+add-on MCP, private/licensed assets, installed-studio retargeting and human
+artistic acceptance are **not tested** here. Existing real motion regressions
+remain a separate required integration module. No local installation or release
+is updated by running these tests.
 
 ## Reproduce
 
-Install Python 3.11+, Node 20+ and Playwright 1.55.0 with Chromium. Use a disposable
-test environment with Blender 5.2.1, then run:
+With Python 3.11+, Node 20+, Blender 5.2.1 and Playwright 1.55.0 with Chromium:
 
 ```sh
-python tools/studio_e2e/run.py --blender /absolute/path/to/blender --evidence /temporary/evidence
+python tools/studio_e2e/run.py --blender /absolute/path/to/blender \
+  --scenario full --evidence /temporary/evidence
 ```
 
-The runner always creates a new temporary studio; it does not accept an existing
-studio path. It never uses the user's project data or installed harness.
+The runner always creates a fresh studio and never accepts an existing studio
+path. Focused scenarios still run real installation/onboarding prerequisites.

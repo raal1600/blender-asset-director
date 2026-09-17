@@ -1,0 +1,12 @@
+name: 04 · Scene authoring and preview E2E
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  journey:
+    name: Scene authoring and preview
+    uses: ./.github/workflows/studio-e2e.yml
+    with:
+      scenario: production

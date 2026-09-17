@@ -1,0 +1,45 @@
+name: External · Live provider acquisition E2E
+on:
+  push:
+    branches: [main, 'feature/**', 'fix/**', 'chore/**', 'docs/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: live-provider-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  live-provider-acceptance:
+    name: Real free-provider acquisition and motion retarget
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Fetch checksum-verified Blender 5.0.0
+        run: |
+          python tools/fetch_blender.py '5.0.0' "$RUNNER_TEMP/blender" > blender-path.txt
+          echo "BLENDER=$(tail -n 1 blender-path.txt)" >> "$GITHUB_ENV"
+          echo "PYTHONPATH=$GITHUB_WORKSPACE/src" >> "$GITHUB_ENV"
+      - name: Acquire pinned retarget backend
+        run: python -m asset_director --library "$RUNNER_TEMP/bad-library" backend-install
+      - name: Live free asset acquisition and real-motion retarget
+        run: python tools/cloud_acceptance.py "$BLENDER" "$RUNNER_TEMP/bad-library" evidence
+      - name: Explain external acceptance scope
+        if: always()
+        shell: bash
+        run: |
+          echo '## Live provider acceptance' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Real free-provider downloads and Blender retargeting. Network/provider failures fail this workflow visibly. This external gate is independent of deterministic synthetic acceptance; neither proves authenticated agent behavior.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-provider-acceptance-evidence
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 14

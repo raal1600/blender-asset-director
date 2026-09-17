@@ -1,0 +1,37 @@
+name: Integration · Blender authoring, motion and continuity
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  blender:
+    name: ${{ matrix.suite }} · Blender ${{ matrix.blender }}
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [authoring, motion, continuity]
+        blender: ['4.5.3', '5.0.0', '5.2.1']
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-blender
+        with:
+          version: ${{ matrix.blender }}
+      - name: Run every real Blender fixture in this subsystem and require its evidence
+        run: >-
+          python tools/ci/run_blender_suite.py --suite '${{ matrix.suite }}'
+          --blender "$BLENDER" --version '${{ matrix.blender }}'
+          --evidence evidence/blender
+      - name: Retain bounded fixture reports, logs and synthetic previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-blender-${{ matrix.suite }}-${{ matrix.blender }}-${{ github.sha }}
+          path: evidence/blender/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
