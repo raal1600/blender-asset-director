@@ -195,7 +195,7 @@ def main():
                 page.on('pageerror', lambda error: errors.append(str(error)))
 
                 def idle():
-                    page.wait_for_function("!document.body.classList.contains('busy')", timeout=220000)
+                    expect(page.locator("body.busy")).to_have_count(0, timeout=220000)
                     assert page.locator('#notice.error').count() == 0, page.locator('#notice').inner_text()
 
                 def click(selector):
