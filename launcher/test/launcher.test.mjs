@@ -43,6 +43,20 @@ test('project paths reject traversal, absolute paths and junction escapes',async
   await fs.symlink(outside,path.join(p.directory,'linked'),process.platform==='win32'?'junction':'dir');
   await assert.rejects(safe(p.directory,'linked/file.json'),/leaves/);
 });
+test('library scans accept a canonicalized database root without weakening traversal checks',async t=>{
+  const realRoot=await fs.mkdtemp(path.join(os.tmpdir(),'ad-launcher-real-'));
+  const aliasRoot=path.join(os.tmpdir(),'ad-launcher-alias-'+path.basename(realRoot));
+  t.after(()=>fs.rm(aliasRoot,{recursive:true,force:true}));
+  t.after(()=>fs.rm(realRoot,{recursive:true,force:true}));
+  for(const kind of ['Animations','Characters','Meshes'])await fs.mkdir(path.join(realRoot,'Database',kind),{recursive:true});
+  await fs.writeFile(path.join(realRoot,'Database/Animations/fixture.fbx'),'synthetic');
+  await fs.symlink(realRoot,aliasRoot,process.platform==='win32'?'junction':'dir');
+  const store=new Store(aliasRoot);await store.init();
+  const inventory=await store.scan();
+  assert.equal(inventory.sources.length,1);
+  assert.equal(inventory.sources[0].relative,'Animations/fixture.fbx');
+  await assert.rejects(safe(store.database,'../outside'),/traversal/);
+});
 test('jobs have one explicit project owner and cannot target another project',async t=>{
   const {store}=await fixture(t);const a=await store.create('Job A'),b=await store.create('Job B');
   const input=path.join(a.directory,'Scenes/test.blend');await fs.writeFile(input,'synthetic');

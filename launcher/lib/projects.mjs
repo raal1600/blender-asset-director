@@ -84,6 +84,11 @@ export class Store {
   async inventory() { return json(await safe(this.registry, 'sources.json')); }
   async scan() {
     const old = await this.inventory(); const candidates = [];
+    // Keep the containment root and scanned children in the same canonical
+    // namespace. On Windows, realpath may normalize casing or junctions; mixing
+    // that result with this.database can make path.relative() report a false
+    // traversal for files that are still inside Database.
+    const database = await fs.realpath(this.database);
     async function visit(base, dir, kind) {
       for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
         assert(!entry.isSymbolicLink(), 'Linked source packages are not supported.');
@@ -92,7 +97,7 @@ export class Store {
         else if (formats.has(path.extname(entry.name).toLowerCase())) candidates.push({ kind, file: slash(path.relative(base, full)) });
       }
     }
-    for (const kind of ['Animations','Characters','Meshes']) await visit(this.database, await safe(this.database, kind), kind);
+    for (const kind of ['Animations','Characters','Meshes']) await visit(database, await safe(database, kind), kind);
     const packages = new Map();
     for (const c of candidates) {
       const parts = c.file.split('/');
