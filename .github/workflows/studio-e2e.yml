@@ -1,0 +1,56 @@
+name: Installed studio E2E
+on:
+  push:
+    branches: [main, 'feature/**', 'fix/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: studio-e2e-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  studio:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install browser test dependencies
+        run: |
+          python -m pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+      - name: Fetch checksum-verified Blender
+        shell: bash
+        run: |
+          python tools/fetch_blender.py 5.2.1 "$RUNNER_TEMP/studio-blender" > blender-path.txt
+      - name: Exercise installed studio, browser, MCP and real Blender
+        shell: bash
+        run: |
+          python tools/studio_e2e/run.py --blender "$(tail -n 1 blender-path.txt)" --evidence evidence/studio-e2e
+      - name: Report measured scope
+        if: always()
+        shell: bash
+        run: |
+          echo '## Installed studio E2E' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Real installed harness, launcher UI, project MCP adapter, SQLite, Blender audit and CPU render using generated inputs. Synthetic source-use responses only.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Not covered: authenticated Codex/model calls, desktop focus/tray, live Blender add-on MCP, private assets, retargeting, or human visual acceptance. Read report.json for executed checks and failures.' >> "$GITHUB_STEP_SUMMARY"
+          if [ -f evidence/studio-e2e/report.json ]; then cat evidence/studio-e2e/report.json >> "$GITHUB_STEP_SUMMARY"; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-e2e-${{ matrix.os }}-${{ github.sha }}
+          path: evidence/studio-e2e/
+          if-no-files-found: warn
+          retention-days: 14
