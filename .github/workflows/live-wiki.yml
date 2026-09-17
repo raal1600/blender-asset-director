@@ -1,0 +1,114 @@
+name: Docs · Live wiki — build, verify and publish
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Build and test source-linked wiki
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    outputs:
+      publish: ${{ steps.source.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Offline checks including full wiki publishing round trip
+        run: python tools/run_checks.py --offline
+      - name: Build exact-commit documentation and generated inventories
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: >-
+          python tools/wiki/build.py --output "$RUNNER_TEMP/live-wiki"
+          --repository "$GITHUB_REPOSITORY" --commit "$GITHUB_SHA" --branch "$SOURCE_BRANCH"
+      - name: Select the single publishing source
+        id: source
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          BOOTSTRAP_BRANCH: feature/consolidated-updates-20260917
+          SOURCE_BRANCH: ${{ github.ref_name }}
+        shell: python
+        run: |
+          import os, sys
+          sys.path.insert(0, 'tools/wiki')
+          from publish import select_source
+          publish = False
+          selected = 'preview only'
+          if os.environ['GITHUB_EVENT_NAME'] != 'pull_request':
+              selected = select_source('.', os.environ['DEFAULT_BRANCH'], os.environ['BOOTSTRAP_BRANCH'])
+              publish = selected == os.environ['SOURCE_BRANCH']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write('publish=' + str(publish).lower() + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write('## Live wiki build\n\nSource: `' + os.environ['GITHUB_SHA'] + '`\n\n')
+              out.write('Publishing source: `' + selected + '`. This job creates documentation, not harness acceptance evidence.\n')
+      - name: Preserve generated Markdown and page-hash manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-wiki-${{ github.sha }}
+          path: ${{ runner.temp }}/live-wiki/
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+  publish:
+    name: Publish wiki and verify independent read-back
+    needs: build
+    if: >-
+      github.event_name != 'pull_request' &&
+      github.repository == 'raal1600/blender-asset-director' &&
+      needs.build.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+    concurrency:
+      group: live-wiki-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: live-wiki-${{ github.sha }}
+          path: ${{ runner.temp }}/live-wiki
+      - name: Sync managed pages without overwriting manual edits or history
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          BOOTSTRAP_BRANCH: feature/consolidated-updates-20260917
+        run: >-
+          python tools/wiki/publish.py --source "$RUNNER_TEMP/live-wiki"
+          --repository "$GITHUB_REPOSITORY" --default-branch "$DEFAULT_BRANCH"
+          --bootstrap-branch "$BOOTSTRAP_BRANCH" --report evidence/wiki-publish.json
+      - name: Report publication versus build-only status
+        if: always()
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          report = Path('evidence/wiki-publish.json')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write('## Wiki publication\n\n')
+              out.write('```json\n' + (report.read_text() if report.exists() else '{"status":"FAIL","error":"No publication report"}') + '\n```\n')
+              out.write('Wiki: https://github.com/' + os.environ['GITHUB_REPOSITORY'] + '/wiki\n')
+      - name: Retain publication and read-back result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-wiki-publication-${{ github.sha }}
+          path: evidence/wiki-publish.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
