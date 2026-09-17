@@ -1,0 +1,26 @@
+name: Launcher tests and desktop build
+on:
+  push:
+    branches: [main, 'feature/**', 'fix/**']
+    paths: ['launcher/**', '.github/workflows/launcher.yml']
+  pull_request:
+    paths: ['launcher/**', '.github/workflows/launcher.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  launcher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Synthetic launcher and lifecycle tests
+        working-directory: launcher
+        run: node --test
+      - name: Build desktop executable with pinned WebView2 SDK
+        shell: powershell
+        run: ./launcher/tools/build-launcher.ps1 -RestoreDependencies

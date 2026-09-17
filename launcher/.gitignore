@@ -1,0 +1,8 @@
+﻿node_modules/
+*.log
+*.exe
+*.dll
+.deps/
+config.json
+session.json
+WebView2/
