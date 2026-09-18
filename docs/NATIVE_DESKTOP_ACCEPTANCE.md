@@ -38,3 +38,20 @@ gates. There is no automatic merge, production install or release on CI success.
 Primary API references:
 - https://docs.blender.org/api/5.0/bpy.app.timers.html
 - https://learn.microsoft.com/en-us/dotnet/desktop/winforms/input-keyboard/how-to-simulate-events
+
+## Hosted graphics boundary
+
+The first real Windows runner loaded WebView2 but failed Blender GUI initialization
+with missing WGL/OpenGL support. `tools/ci/native_mesa.py` supplies Mesa 25.3.3
+LLVMpipe to that runner's disposable Blender directory only. The archive is bound
+to its published SHA256; only two named DLLs are extracted. No system deployment
+script runs, and no production installer or user's Blender receives those DLLs.
+The native fixture records the actual GPU API renderer string and refuses to call
+the software-driver test a hardware-GPU acceptance. The real Blender window,
+keyboard edit, and saved result are still required; headless execution is not a
+fallback. Mesa is MIT-led with component-specific terms; the binary distributor
+retains its package notices. The package is not redistributed with Asset Director.
+
+- https://github.com/pal1000/mesa-dist-win/releases/tag/25.3.3
+- https://github.com/pal1000/mesa-dist-win#mingw-and-msvc-package-contents
+- https://docs.mesa3d.org/license.html

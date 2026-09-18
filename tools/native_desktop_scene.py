@@ -19,10 +19,12 @@ if mode == 'seed':
     bpy.context.scene.camera = camera
     bpy.ops.wm.save_as_mainfile(filepath=destination)
 elif mode == 'sentinel':
+    import gpu
+    graphics = dict(renderer=gpu.platform.renderer_get(), vendor=gpu.platform.vendor_get(), version=gpu.platform.version_get())
     obj.location = (17, 3, 2)
     def pulse():
         value = dict(name=obj.name, location=list(obj.location), file=bpy.data.filepath,
-                     dirty=bool(bpy.data.is_dirty), observed_at=time.time())
+                     dirty=bool(bpy.data.is_dirty), observed_at=time.time(), gpu=graphics)
         target = Path(destination); tmp = target.with_suffix('.tmp')
         tmp.write_text(json.dumps(value), encoding='utf-8'); tmp.replace(target)
         return 1.0

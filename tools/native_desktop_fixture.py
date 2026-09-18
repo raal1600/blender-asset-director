@@ -5,6 +5,7 @@ assets are used. Cleanup addresses only processes spawned by this fixture.
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -73,6 +74,8 @@ class Journey:
 
     def run(self):
         e=self.e
+        if os.environ.get('NATIVE_MESA_RECEIPT'):
+            write(e.directory/'graphics.json',read(os.environ['NATIVE_MESA_RECEIPT']))
         with e.checkpoint('native_host_loaded') as check:
             create(self.root,self.blender,sys.executable,sys.executable,source_commit=e.report['commit'])
             launcher=self.root/'SystemRuntime/Launcher'
@@ -99,6 +102,9 @@ class Journey:
             sentinel=self.spawn([self.blender,'--factory-startup','--disable-autoexec','--python',
                 ROOT/'tools/native_desktop_scene.py','--','sentinel',sentinel_file],'sentinel')
             before=wait(lambda:read(sentinel_file),'unrelated unsaved scene');assert before['file']==''
+            if os.environ.get('NATIVE_MESA_RECEIPT'):
+                assert 'llvmpipe' in before['gpu']['renderer'].lower(),before['gpu']
+            check['gpu']=before['gpu']
             task=self.post('task-open',context={'targets':['NativeSubject']})['task'];self.task_pids.append(task['processId'])
             status_file=directory/('Docs/Workbench/'+task['id']+'-status.json')
             status=wait(lambda:(v if (v:=read(status_file)).get('expected_file') or v['state']=='FAILED' else None),'identified task')
@@ -160,8 +166,14 @@ def main():
     args=parser.parse_args()
     if sys.platform!='win32':raise RuntimeError('Windows desktop required; no emulated pass')
     evidence=Evidence(args.evidence,'desktop','native-roundtrip',platform='win32');journey=Journey(args.blender,evidence)
-    try:journey.run();evidence.finish(DESKTOP_CHECKS)
+    try:
+        try:journey.run()
+        finally:
+            journey.cleanup()
+            # Freeze and redact logs only after their processes stop, before hashing.
+            for log in evidence.directory.glob('*.log'):
+                log.write_text(evidence.redact(log.read_text(encoding='utf-8-sig',errors='replace')),encoding='utf-8')
+        evidence.finish(DESKTOP_CHECKS)
     except Exception as exc:evidence.fail(exc);raise
-    finally:journey.cleanup()
 
 if __name__=='__main__':main()

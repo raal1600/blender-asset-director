@@ -48,6 +48,9 @@ jobs:
       - uses: ./.github/actions/setup-blender
         with:
           version: '5.0.0'
+      - name: Add checksum-pinned software OpenGL only to disposable CI Blender
+        shell: powershell
+        run: python tools/ci/native_mesa.py "$env:BLENDER"
       - name: Exercise actual EXE, Blender GUI edit and checkpoint return
         shell: powershell
         run: python tools/native_desktop_fixture.py --blender "$env:BLENDER" --evidence native-desktop-evidence
