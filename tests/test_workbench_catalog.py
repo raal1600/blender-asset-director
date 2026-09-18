@@ -53,4 +53,17 @@ class CatalogTests(unittest.TestCase):
         for args in [{'limit':51},{'offset':-1},{'limit':True},{'query':'a'*2001},{'asset_id':'../../outside'},{'verify':True}]:
             with self.subTest(args=args),self.assertRaises(DirectorError):catalog(self.lib,**args)
 
+
+    def test_inspection_scope_partitions_project_owned_jobs_and_refuses_arbitrary_strings(self):
+        import uuid
+        options={'file':'incoming/model.blend','request_scope':'prj_'+str(uuid.uuid4())+':sc_'+str(uuid.uuid4())}
+        first=jobs.prepare(self.lib,'asset-contents',asset_id=self.asset.id,options=options)
+        options['request_scope']='prj_'+str(uuid.uuid4())+':sc_'+str(uuid.uuid4())
+        second=jobs.prepare(self.lib,'asset-contents',asset_id=self.asset.id,options=options)
+        self.assertNotEqual(first['id'],second['id'])
+        for scope in [None,42,{},'../../unrelated','python evil.py']:
+            options['request_scope']=scope
+            with self.subTest(scope=scope),self.assertRaises(DirectorError):
+                jobs.prepare(self.lib,'asset-contents',asset_id=self.asset.id,options=options)
+
 if __name__=='__main__':unittest.main()

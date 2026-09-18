@@ -36,7 +36,7 @@ OPS = {
     "look-adjust": set(look_contract.LOOK_FIELDS),
     "light-rig": {"subjects", "lights"},
     "index": {"max_clips", "sample"},
-    "asset-contents": {"file"},
+    "asset-contents": {"file", "request_scope"},
     "import": {"collection", "selection", "file"},
     "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture", "transfer_binding", "max_output_intervals"},
     "assemble": {"target_object", "clips", "fps", "controller_speed", "direction", "terrain_object", "travel_frames"},
@@ -119,6 +119,11 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
                 "TARGET_REQUIRED", "Render operations require a saved .blend checkpoint, not an asset ID")
     if operation == "render-frames":
         render_dependency = render_sequence.prepare(lib, options, input_file)
+    if operation == "asset-contents" and "request_scope" in options:
+        import re
+        require(isinstance(options["request_scope"], str) and
+                re.fullmatch(r"prj_[0-9a-f-]{36}:sc_[0-9a-f-]{36}", options["request_scope"]),
+                "INVALID_SCOPE", "Collection inspection scope must identify its project and scene")
     asset = lib.get(asset_id) if asset_id else None
     source_files = [render_dependency] if render_dependency else []
     if asset:

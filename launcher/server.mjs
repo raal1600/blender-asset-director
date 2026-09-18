@@ -28,7 +28,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
       const url = new URL(req.url,origin);
       if (!url.pathname.startsWith('/api/')) {
         assert(req.method === 'GET','Method not allowed.',405);
-        const assets = {'/':'index.html','/app.mjs':'app.mjs','/style.css':'style.css','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css'};
+        const assets = {'/':'index.html','/app.mjs':'app.mjs','/style.css':'style.css','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs'};
         assert(Object.hasOwn(assets,url.pathname),'Not found.',404);
         const ext = path.extname(assets[url.pathname]); res.setHeader('Content-Type',ext === '.html' ? 'text/html; charset=utf-8' : ext === '.css' ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8');
         return res.end(await fs.readFile(path.join(here,'public',assets[url.pathname])));
@@ -56,9 +56,9 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
         return send(200,{message:'Launcher stopped. Blender and Codex remain open.'});
       }
       assert(!stopping,'Launcher is shutting down.',503);
-      if(req.method==='GET'&&['/api/workbench/media','/api/workbench/source-image'].includes(url.pathname)) {
+      if(req.method==='GET'&&['/api/workbench/media','/api/workbench/source-image','/api/workbench/catalog-image'].includes(url.pathname)) {
         const parameters=Object.fromEntries(url.searchParams),id=parameters.projectId;
-        const media=url.pathname.endsWith('source-image')?await workbench.sourcePreview(id,parameters.sourceId):await workbench.media(id,parameters);
+        const media=url.pathname.endsWith('catalog-image')?await workbench.catalogImage(id,parameters.assetId):url.pathname.endsWith('source-image')?await workbench.sourcePreview(id,parameters.sourceId):await workbench.media(id,parameters);
         const stat=await fs.stat(media.path);assert(stat.size<=256*1024*1024,'Media exceeds this MVP browser limit.',413);
         res.writeHead(200,{'Content-Type':media.type,'Content-Length':stat.size});
         return res.end(await fs.readFile(media.path));
@@ -66,6 +66,8 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
       const action = async () => {
         const p = url.pathname; const id = body.projectId || url.searchParams.get('projectId');
         if (req.method === 'GET') {
+          if (p === '/api/workbench/catalog') return workbench.catalogPage(id,{query:url.searchParams.get('query')||'',offset:Number(url.searchParams.get('offset')||0),kind:url.searchParams.get('kind')||null});
+          if (p === '/api/workbench/catalog-detail') return workbench.catalogDetail(id,url.searchParams.get('assetId'));
           if (p === '/api/workbench/state') return workbench.state(id);
           if (p === '/api/workbench/capabilities') return workbench.available();
           if (p === '/api/state') return {capabilities,...await store.list(),trash:await store.trashList(),inventory:await store.inventory(),health:runtime.health,root,version:'0.1.0'};
@@ -81,6 +83,9 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
             if(command==='attest-sources')return workbench.attest(id,rev,body.confirmed);
             if(command==='create')return workbench.create(id,rev,body.name);
             if(command==='enter')return workbench.enter(id,sid,rev,body.stage);
+            if(command==='catalog-select')return workbench.selectCatalog(id,sid,rev,body.assetId,body.selected);
+            if(command==='catalog-job')return workbench.catalogJob(id,sid,rev,body.request);
+            if(command==='keep-building')return workbench.keepBuilding(id,sid,rev);
             if(command==='source')return workbench.selectSource(id,sid,rev,body.sourceId,body.selected);
             if(command==='inspect')return workbench.inspect(id,sid,rev,body.checkpointId);
             if(command==='import')return workbench.importCheckpoint(id,sid,rev,body.sourceScene);

@@ -23,6 +23,8 @@ bpy.context.object.name = 'Synthetic_E2E_Key'
 bpy.context.object.data.energy = 500
 scene = bpy.context.scene
 scene.render.engine = 'CYCLES'
+# This fixture tests direct scene rendering, not compositor/VSE output.
+scene.render.use_compositing = scene.render.use_sequencer = False
 scene.cycles.device = 'CPU'
 scene.cycles.samples = 7
 scene.render.resolution_x = 320

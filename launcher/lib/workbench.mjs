@@ -4,9 +4,10 @@ import {constants} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {assert, fileHash, now, safe, writeJson} from './storage.mjs';
 import {Workbench as WorkbenchCore} from './workbench-core.mjs';
+import {withCatalog} from './workbench-catalog.mjs';
 import {assertBlendEnvelope} from './workbench-files.mjs';
 
-export class Workbench extends WorkbenchCore {
+export class Workbench extends withCatalog(WorkbenchCore) {
   async importCheckpoint(id,sceneId,revision,sourceScene) {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);await this.unlocked(p);
     assert(!s.candidate,'Review or discard the existing candidate first.',409);

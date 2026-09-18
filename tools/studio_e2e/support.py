@@ -180,7 +180,7 @@ class Studio:
             write(self.root/'SystemRuntime/UserData/Launcher/config.json',
                   {'python': sys.executable, 'blender': self.blender, 'skill': str(self.skill),
                    'library': str(self.library), 'codex': str(self.root/'NOT_INSTALLED_codex'),
-                   'port': port, 'mcpPort': 1})
+                   'port': port, 'mcpPort': 1, 'ffmpeg': shutil.which('ffmpeg'), 'ffprobe': shutil.which('ffprobe')})
             self.start()
             assert self.api('health', {})['installed']['status'] == 'VERIFIED'
             self.api('state', expected=401, authenticated=False)
