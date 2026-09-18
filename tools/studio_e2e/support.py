@@ -216,8 +216,11 @@ class Studio:
             return json.load(response)
 
     def open_browser(self, pw):
-        self.browser = pw.chromium.launch()
+        self.browser = pw.chromium.launch(channel="chrome")
         self.page = self.browser.new_page(viewport={'width': 1440, 'height': 1100})
+        codec = self.page.evaluate("(mime) => document.createElement('video').canPlayType(mime)", 'video/mp4; codecs="avc1.42E01E"')
+        self.evidence.report['browser'] = {'channel': 'chrome', 'version': self.browser.version, 'h264': codec}
+        assert codec in {'probably', 'maybe'}, 'The installed browser cannot decode the MVP H.264 delivery format'
         self.page.on('pageerror', lambda error: self.errors.append(str(error)))
         self.page.goto(self.session['origin']+'/#'+self.session['token'])
         self.idle()

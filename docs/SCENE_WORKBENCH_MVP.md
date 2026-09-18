@@ -11,7 +11,8 @@ Use `SystemRuntime/Launcher/Start Workbench.ps1` in the staging studio, or
 open `/workbench` in the existing authenticated local launcher. Productions has only **Scenes**
 and **Final film**. Each scene keeps its own **World → Action → Shots → Light →
 Render** position, source choices, immutable checkpoints, and review decisions.
-The legacy launcher stays available during migration.
+The Windows desktop host and normal Start shortcut open this workbench. The
+legacy launcher remains available at `/` and through `Start Launcher.ps1 -Legacy`.
 
 World exposes the actual harness catalog and the independent original database
 packages. Search, inspect provenance and package images, and select ingredients.
@@ -83,7 +84,10 @@ explicit absolute Blender, Python and existing Codex executable paths; FFmpeg
 and FFprobe are optional explicit paths. Node 20+ must be available to the launcher. The target must not exist. The tool copies this
 source into a matching harness/launcher layout and creates a separate catalog;
 it does not migrate private data or update an existing installation. Its receipt
-says `runtime_ready: NOT_VERIFIED` until the actual environment is tested.
+says `runtime_ready: NOT_VERIFIED` until the actual environment is tested. Its
+`port: 0` requests a distinct OS-assigned loopback port, so the staging launcher
+does not compete with a running production launcher. Its session descriptor
+contains the resulting origin and must remain private.
 
 Build the Windows host with `launcher/tools/build-launcher.ps1 -RestoreDependencies`
 and retain its exact-source build receipt. The compiled host alone is not proof of
@@ -100,7 +104,9 @@ The existing **04 · Scene authoring and preview E2E** and **06 · Full installe
 studio E2E** journeys additionally exercise the real installed catalog, observed
 Blender collection import, checkpoint adoption, CPU rendering, FFmpeg encode,
 authenticated HTTP media delivery and actual browser movie playback on Windows
-and Linux. Scripted review choices are labelled as such. The real authoring
+and Linux using the branded Chrome channel (including a codec preflight),
+not the codec-limited Chromium headless shell. The launcher CSP is unchanged.
+Scripted review choices are labelled as such. The real authoring
 matrix also makes and verifies a three-scene film. Keep their existing aggregate
 and exact-commit evidence semantics; a fixture's presence is not a passing run.
 

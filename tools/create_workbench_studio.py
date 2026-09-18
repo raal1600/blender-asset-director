@@ -58,7 +58,8 @@ def create(root, blender, python, codex, *, source_commit=None, ffmpeg=None, ffp
         library = root / 'Database/AssetDirector'
         with Library(library):
             pass
-        configured.update(skill=str(skill), library=str(library), mcpPort=9876)
+        # Zero requests a distinct OS-assigned loopback port, not the live studio's port.
+        configured.update(skill=str(skill), library=str(library), mcpPort=9876, port=0)
         (root / 'SystemRuntime/UserData/Launcher/config.json').write_text(
             json.dumps(configured, indent=2), encoding='utf-8')
         # Preserve a manifest of the copied source. A supplied SHA is a label,

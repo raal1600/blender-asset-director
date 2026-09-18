@@ -1,4 +1,5 @@
 import {unfinishedWork} from './lib/lifecycle.mjs';
+import {listenPort} from './lib/listen-port.mjs';
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -143,7 +144,7 @@ async function main() {
   const settings = path.join(root,'SystemRuntime/UserData/Launcher');
   const config = await json(path.join(settings,'config.json'));
   for (const key of ['python','blender','skill','library','codex']) assert(path.isAbsolute(config[key]),`Invalid ${key} path in launcher configuration.`);
-  const app = await createApp({root,config,port:config.port || 48731});
+  const app = await createApp({root,config,port:listenPort(config)});
   try { await app.runtime.doctor(); } catch(e) { console.error('Startup health check: '+e.message); }
   const sessionPath = path.join(settings,'session.json');
   await writeJson(sessionPath,{origin:app.origin,token:app.token,pid:process.pid,root});

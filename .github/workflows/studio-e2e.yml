@@ -41,10 +41,10 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: '20'
-    - name: Install pinned real browser runtime
+    - name: Install real Chrome with H.264 playback support
       run: |
         python -m pip install playwright==1.55.0
-        python -m playwright install --with-deps chromium
+        python -m playwright install --with-deps chrome
     - name: Install explicit film encoder on disposable Linux runner
       if: runner.os == 'Linux' && (inputs.scenario == 'production' || inputs.scenario == 'full' || inputs.scenario == '')
       run: |

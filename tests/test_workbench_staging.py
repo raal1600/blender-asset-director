@@ -21,6 +21,7 @@ class StagingTests(unittest.TestCase):
             self.assertEqual(result['status'],'CREATED');self.assertEqual(result['runtime_ready'],'NOT_VERIFIED')
             config=json.loads((root/'SystemRuntime/UserData/Launcher/config.json').read_text())
             self.assertEqual(Path(config['library']).resolve(), (root/'Database/AssetDirector').resolve())
+            self.assertEqual(config['port'],0)
             self.assertTrue((root/'Database/AssetDirector/catalog.sqlite').is_file())
             self.assertTrue((root/'SystemRuntime/Launcher/public/workbench.html').is_file())
             self.assertTrue((root/'SystemRuntime/Launcher/Start Workbench.ps1').is_file())
