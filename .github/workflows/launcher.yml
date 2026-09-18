@@ -8,7 +8,7 @@ jobs:
   launcher:
     name: Real launcher contracts and Windows executable build
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,5 +42,20 @@ jobs:
             launcher/*.dll
             launcher/windows-build.json
             launcher/WEBVIEW2-*.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - uses: ./.github/actions/setup-blender
+        with:
+          version: '5.0.0'
+      - name: Exercise actual EXE, Blender GUI edit and checkpoint return
+        shell: powershell
+        run: python tools/native_desktop_fixture.py --blender "$env:BLENDER" --evidence native-desktop-evidence
+      - name: Retain native desktop evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-desktop-${{ github.sha }}
+          path: native-desktop-evidence/
           if-no-files-found: error
           retention-days: 14

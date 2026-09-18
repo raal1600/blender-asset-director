@@ -9,3 +9,6 @@ args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 if len(args) != 1:
     raise SystemExit('Expected one launcher-created task manifest')
 main(args[0])
+
+from asset_director.task_feedback import install
+install(args[0])
