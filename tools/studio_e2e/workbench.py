@@ -10,6 +10,24 @@ from playwright.sync_api import expect
 from support import digest, write
 
 
+
+def wait_for_media(page, selector, *, started=False):
+    """Read real media properties without wait_for_function's nested unsafe eval.
+
+    The launcher's restrictive Content-Security-Policy remains enabled.
+    """
+    media = page.locator(selector)
+    deadline = time.monotonic() + 30
+    observed = None
+    while time.monotonic() < deadline:
+        observed = media.evaluate('(v) => ({ready: v.readyState, time: v.currentTime, error: v.error ? v.error.code : null})')
+        assert observed['error'] is None, 'Browser media decode failed: ' + str(observed)
+        if observed['ready'] >= 2 and (not started or observed['time'] > 0):
+            return observed
+        page.wait_for_timeout(100)
+    raise AssertionError('Real browser media did not become ready/play: ' + str(observed))
+
+
 def review_scene(s):
     page = s.page
 
@@ -153,9 +171,9 @@ def catalog_and_film(s, click, idle, check):
     shot = scene['renders'][-1]
     assert shot['video']['frames'] == 4 and shot['video']['state'] == 'SUCCEEDED' and not shot['approved']
     click('[data-action="play-render"][data-id="' + shot['id'] + '"]')
-    page.wait_for_function('document.querySelector("#review-video").readyState >= 2', timeout=30000)
+    wait_for_media(page, '#review-video')
     page.locator('#review-video').evaluate('(v) => v.play()')
-    page.wait_for_function('document.querySelector("#review-video").currentTime > 0', timeout=30000)
+    wait_for_media(page, '#review-video', started=True)
     click('#dialog [data-action="close"]')
     click('[data-action="approve-render"][data-id="' + shot['id'] + '"]')
     click('[data-action="tab"][data-tab="film"]')
@@ -164,9 +182,9 @@ def catalog_and_film(s, click, idle, check):
     settle()
     cut = state()['project']['workbench']['film']['cuts'][-1]
     assert not cut['approved'] and cut['result']['frames'] == 4
-    page.wait_for_function('document.querySelector("video").readyState >= 2', timeout=30000)
+    wait_for_media(page, 'video[aria-label="Final film"]')
     page.locator('video[aria-label="Final film"]').evaluate('(v) => v.play()')
-    page.wait_for_function('document.querySelector("video").currentTime > 0', timeout=30000)
+    wait_for_media(page, 'video[aria-label="Final film"]', started=True)
     click('[data-action="approve-cut"]')
     cut = state()['project']['workbench']['film']['cuts'][-1]
     assert cut['approved'] and cut['result']['human_acceptance'] == 'PENDING'

@@ -15,20 +15,28 @@ URL = 'https://github.com/GyanD/codexffmpeg/releases/download/8.0.1/ffmpeg-8.0.1
 SHA256 = '467cde100a47ed4b03a897988aeb4a296890c1e2b2d2864204657d002bc5fb90'
 PREFIX = 'ffmpeg-8.0.1-full_build/bin/'
 MAX_BYTES = 400 * 1024 * 1024
+# Static full-build executables together exceed the compressed ZIP size. This
+# separate bound applies only after the fixed vendor SHA256 is verified.
+MAX_EXTRACTED_BYTES = 1024 * 1024 * 1024
 
 
 def extract(archive, destination):
     destination = Path(destination)
     if destination.exists():
         raise ValueError('Encoder destination must be new')
+    if Path(archive).stat().st_size > MAX_BYTES:
+        raise ValueError('Encoder archive exceeds download bound')
     if hashlib.sha256(Path(archive).read_bytes()).hexdigest() != SHA256:
         raise ValueError('FFmpeg archive checksum mismatch')
     with zipfile.ZipFile(archive) as z:
         names = [PREFIX + name for name in ('ffmpeg.exe', 'ffprobe.exe')]
         if any(z.namelist().count(name) != 1 for name in names):
             raise ValueError('Missing or ambiguous encoder executable')
-        if sum(z.getinfo(name).file_size for name in names) > MAX_BYTES:
-            raise ValueError('Encoder payload exceeds extraction bound')
+        if any(z.getinfo(name).is_dir() or z.getinfo(name).file_size <= 0 for name in names):
+            raise ValueError('Empty or non-file encoder entry')
+        expanded = sum(z.getinfo(name).file_size for name in names)
+        if expanded > MAX_EXTRACTED_BYTES:
+            raise ValueError('Encoder payload exceeds extraction bound: ' + str(expanded))
         destination.mkdir(parents=True)
         for name in names:
             with z.open(name) as source, (destination / Path(name).name).open('xb') as out:
