@@ -1,4 +1,4 @@
-"""Small JSON CLI. No host writes; doctor reads a redacted user-level MCP declaration."""
+"""Stable stdlib CLI. No host writes; doctor reads a redacted user-level MCP declaration."""
 from __future__ import annotations
 import argparse
 import json
@@ -28,6 +28,7 @@ def parser():
     q=s.add_parser("film-assemble"); q.add_argument("--plan",required=True); q.add_argument("--project",required=True); q.add_argument("--ffmpeg",required=True); q.add_argument("--ffprobe",required=True)
     s.add_parser("workbench-capabilities")
     q=s.add_parser("workbench-catalog"); q.add_argument("--query",default=""); q.add_argument("--offset",type=int,default=0); q.add_argument("--limit",type=int,default=24); q.add_argument("--asset"); q.add_argument("--verify",action="store_true"); q.add_argument("--kind",choices=["model","pack","animation","material","hdri"])
+    q=s.add_parser("workbench-verify"); q.add_argument("--project",required=True)
     s.add_parser("doctor"); s.add_parser("providers"); s.add_parser("report"); s.add_parser("rebuild-catalog")
     q=s.add_parser("plan"); q.add_argument("brief")
     q=s.add_parser("studio-plan"); q.add_argument("--brief",required=True); q.add_argument("--audit",required=True)
@@ -37,7 +38,7 @@ def parser():
     q=s.add_parser("show"); q.add_argument("asset_id"); q.add_argument("--full",action="store_true")
     q=s.add_parser("acquire"); q.add_argument("asset_id"); q.add_argument("--resolution",choices=["1k","2k"],default="1k")
     q=s.add_parser("seed"); q.add_argument("--download", action="store_true", help="Explicitly acquire the free Quaternius Standard archive")
-    q=s.add_parser("intake"); q.add_argument("path"); q.add_argument("--evidence",required=True)
+    q=s.add_parser("intake"); q.add_argument("path"); q.add_argument("--evidence",required=True); q.add_argument("--preserve-existing",action="store_true")
     s.add_parser("backend-install")
     q=s.add_parser("job-prepare"); q.add_argument("operation",choices=list(jobs.OPS)); q.add_argument("--input"); q.add_argument("--asset"); q.add_argument("--options",help="Path to options JSON (not an executable script)")
     q=s.add_parser("job-run"); q.add_argument("job_id"); q.add_argument("--blender",default=settings.blender_path()); q.add_argument("--timeout",type=int,default=360)
@@ -59,6 +60,9 @@ def main(argv=None):
                 result = dispatch(lib, args)
             elif command == "workbench-capabilities":
                 result={"schema":1,"render_frames":True,"film_assemble":True,"task_workspace":True,"catalog":True,"asset_contents":True,"runtime":__version__,"implementation":jobs.implementation_hash(),"limits":{"frames_per_shot":360,"frames_per_film":3600,"render_seconds":900},"audio":False}
+            elif command == "workbench-verify":
+                from .workbench_catalog import verify_project
+                result=verify_project(lib,args.project)
             elif command == "workbench-catalog":
                 from .workbench_catalog import catalog
                 result=catalog(lib,args.query,args.offset,args.limit,args.asset,args.verify,args.kind)
@@ -105,7 +109,7 @@ def main(argv=None):
                 result=provider.acquire(aid) if args.download else {"status":"METADATA_ONLY", "asset_id":aid, "next":"seed --download explicitly acquires the free Standard package"}
             elif command == "intake":
                 from .intake import intake
-                result=intake(lib,args.path,args.evidence)
+                result=intake(lib,args.path,args.evidence,preserve_existing=args.preserve_existing)
             elif command == "backend-install":
                 from .backend import install
                 result=install(lib)

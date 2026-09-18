@@ -1,8 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {assert,digest,json,now,safe,writeJson} from './storage.mjs';
+import {assert,digest,exists,json,now,safe,writeJson} from './storage.mjs';
 const disclaimer='This is a user attestation for this project and these exact source versions, not a harness license grant. Retained terms, catalog review, rig inspection and reviewed-job validation remain required.';
+const acceptedSource = r => r.kind==='source-use'&&r.state==='ANSWERED'&&r.answer?.decision==='Confirm project use'&&['mcp-elicitation-client-response','launcher-ui-source-confirmation'].includes(r.transport);
+function sourceUseMessage(context){
+  const mixamo=context.scope.sources.some(s=>/^Animations\/Mixamo\//i.test(s.relative));
+  return [`Source-use confirmation for ${context.p.name}.`,`Requested work: ${context.p.brief}`,'Sources (fixed versions):',...context.scope.sources.map(s=>`${s.relative} [${s.version}]`),'Choose Confirm project use only if you have rights to use and adapt all listed sources for this project.',...(mixamo?['For the source(s) listed under Mixamo, confirmation also attests that you obtained them through official Mixamo downloads and reviewed the applicable terms for this project. Folder names alone are not proof of origin.','Review: https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html and https://www.adobe.com/legal/terms.html']:[]),'This excludes future files, raw redistribution, public asset-library publishing and model training. Choose another option if you cannot confirm. The adapter supplies no default answer.',disclaimer].join('\n\n');
+}
 export class Interactions {
  constructor(store,runtime,projectId,sessionId){Object.assign(this,{store,runtime,projectId,sessionId});}
  async context(){
@@ -27,13 +32,31 @@ export class Interactions {
   }else record.reason=response?.action==='decline'?'User declined.':'User cancelled or did not submit an answer.';
   record.finishedAt=now();await writeJson(file,record);return {record,file};
  }
+ async sourceStatus(){
+  const context=await this.context();
+  const dir=await safe(context.p.directory,'Docs/Interactions');
+  const records=await exists(dir)?await this.records(context.p):[];
+  const prior=records.find(r=>r.scopeHash===context.scopeHash&&acceptedSource(r));
+  return {ready:context.scope.sources.length===0||!!prior,scope:context.scope,scopeHash:context.scopeHash,message:sourceUseMessage(context),notice:disclaimer};
+ }
+ async attestFromLauncher(revision,confirmed){
+  const context=await this.context();
+  assert(context.p.revision===revision,'Project changed. Review the current source list.',409);
+  assert(confirmed===true,'Source use needs an explicit user confirmation.');
+  assert((await this.store.verify(this.projectId)).ok,'Pinned source bytes changed. Confirmation refused.',409);
+  const id=randomUUID(),record={schema:1,id,kind:'source-use',projectId:this.projectId,sessionId:this.sessionId,
+   scopeHash:context.scopeHash,scope:context.scope,state:'ANSWERED',createdAt:now(),finishedAt:now(),
+   answer:{decision:'Confirm project use'},message:sourceUseMessage(context),transport:'launcher-ui-source-confirmation',notice:disclaimer};
+  await writeJson(path.join(await this.directory(context.p),id+'.json'),record);
+  // This is a distinct, honest UI transport, never a fabricated MCP response.
+  return {ready:true,receipt:id,scopeHash:context.scopeHash,message:sourceUseMessage(context),notice:disclaimer};
+ }
  async prepare(elicit,signal){
   const context=await this.context();assert((await this.store.verify(this.projectId)).ok,'Linked sources changed or are missing. Deliberately relink current versions before authorization.',409);
   if(!context.scope.sources.length)return {status:'NO_LINKED_SOURCES',ready:true,scopeHash:context.scopeHash,projectId:this.projectId,notice:disclaimer};
-  const prior=(await this.records(context.p)).find(r=>r.kind==='source-use'&&r.scopeHash===context.scopeHash&&r.state==='ANSWERED'&&r.answer?.decision==='Confirm project use'&&r.transport==='mcp-elicitation-client-response');
+  const prior=(await this.records(context.p)).find(r=>r.scopeHash===context.scopeHash&&acceptedSource(r));
   if(prior)return {status:'USER_ATTESTED',ready:true,scopeHash:context.scopeHash,receipt:path.join(await this.directory(context.p),prior.id+'.json'),notice:disclaimer};
-  const mixamo=context.scope.sources.some(s=>/^Animations\/Mixamo\//i.test(s.relative));
-  const message=[`Source-use confirmation for ${context.p.name}.`,`Requested work: ${context.p.brief}`,'Sources (fixed versions):',...context.scope.sources.map(s=>`${s.relative} [${s.version}]`),'Choose Confirm project use only if you have rights to use and adapt all listed sources for this project.',...(mixamo?['For the source(s) listed under Mixamo, confirmation also attests that you obtained them through official Mixamo downloads and reviewed the applicable terms for this project. Folder names alone are not proof of origin.','Review: https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html and https://www.adobe.com/legal/terms.html']:[]),'This excludes future files, raw redistribution, public asset-library publishing and model training. Choose another option if you cannot confirm. The adapter supplies no default answer.',disclaimer].join('\n\n');
+  const message=sourceUseMessage(context);
   const schema={type:'object',properties:{decision:{type:'string',title:'Source-use decision',enum:['Not sure yet','Provide license details','Confirm project use']},details:{type:'string',title:'License details or questions (optional)',maxLength:4000}},required:['decision']};
   const {record,file}=await this.request(context,'source-use',message,schema,elicit,signal);
   if((await this.context()).scopeHash!==context.scopeHash||!(await this.store.verify(this.projectId)).ok)return {status:'STALE',ready:false,receipt:file,message:'Scope or source bytes changed while the question was open. Review the current inputs and ask again.'};

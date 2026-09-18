@@ -13,6 +13,9 @@ MODEL_SUFFIXES = {'.glb', '.gltf', '.fbx', '.obj', '.blend'}
 def describe(lib, asset, *, verify=False):
     record = asset.to_dict()
     identity = {key: value for key, value in record.items() if key != 'checked_at'}
+    # Index receipts describe derived catalog work, not a new source version.
+    identity['metadata'] = {k: v for k, v in identity.get('metadata', {}).items()
+                            if k not in {'indexed_clips', 'index_job'}}
     policy = rights(asset, lib=lib)
     if verify:
         require(asset.local_files, 'SOURCE_REQUIRED', 'Acquire or explicitly intake this asset first')
@@ -71,3 +74,27 @@ def validate_import(lib, asset, options):
     if 'collection' in options:
         require(isinstance(options['collection'], str) and 0 < len(options['collection']) <= 255,
                 'INVALID_COLLECTION', 'Invalid destination collection name')
+
+
+def verify_project(lib, project_file):
+    """One bounded verification call for all pinned native records in a project.
+
+    The launcher validates project ownership before requesting this. This read-only
+    helper never converts an attestation to a grant or edits catalog records.
+    """
+    from .core import load_json
+    project = load_json(Path(project_file))
+    require(project.get('owner') == 'asset-director-launcher', 'PROJECT_REQUIRED', 'Use a launcher project')
+    refs = project.get('workbench', {}).get('catalogPins', [])
+    require(isinstance(refs, list) and len(refs) <= 2000, 'RESOURCE_LIMIT', 'Too many catalog pins')
+    checked, ids = [], set()
+    for ref in refs:
+        require(isinstance(ref, dict) and isinstance(ref.get('id'), str) and
+                ref['id'] not in ids and isinstance(ref.get('version'), str),
+                'INVALID_PIN', 'Invalid or duplicate catalog pin')
+        ids.add(ref['id'])
+        current = catalog(lib, asset_id=ref['id'], verify=True)
+        require(current['version'] == ref['version'], 'STALE_CATALOG_PIN',
+                'Catalog content or rights evidence changed for ' + ref['id'] + '; explicitly review a new version')
+        checked.append({'id': ref['id'], 'version': ref['version']})
+    return {'schema': 1, 'ok': True, 'pins': checked, 'license_approval': False}
