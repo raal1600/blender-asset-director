@@ -59,7 +59,7 @@ def main(argv=None):
                 from .motion_cli import dispatch
                 result = dispatch(lib, args)
             elif command == "workbench-capabilities":
-                result={"schema":1,"render_frames":True,"film_assemble":True,"task_workspace":True,"catalog":True,"asset_contents":True,"runtime":__version__,"implementation":jobs.implementation_hash(),"limits":{"frames_per_shot":360,"frames_per_film":3600,"render_seconds":900},"audio":False}
+                result={"schema":1,"render_frames":True,"film_assemble":True,"task_workspace":True,"preview_camera":True,"catalog":True,"asset_contents":True,"runtime":__version__,"implementation":jobs.implementation_hash(),"limits":{"frames_per_shot":360,"frames_per_film":3600,"render_seconds":900},"audio":False}
             elif command == "workbench-verify":
                 from .workbench_catalog import verify_project
                 result=verify_project(lib,args.project)

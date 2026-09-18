@@ -29,7 +29,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
       const url = new URL(req.url,origin);
       if (!url.pathname.startsWith('/api/')) {
         assert(req.method === 'GET','Method not allowed.',405);
-        const assets = {'/':'index.html','/app.mjs':'app.mjs','/style.css':'style.css','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs'};
+        const assets = {'/':'index.html','/app.mjs':'app.mjs','/style.css':'style.css','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
         assert(Object.hasOwn(assets,url.pathname),'Not found.',404);
         const ext = path.extname(assets[url.pathname]); res.setHeader('Content-Type',ext === '.html' ? 'text/html; charset=utf-8' : ext === '.css' ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8');
         return res.end(await fs.readFile(path.join(here,'public',assets[url.pathname])));
@@ -83,6 +83,8 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
             assert(Number.isInteger(rev),'Expected a project revision.');
             if(command==='attest-sources')return workbench.attest(id,rev,body.confirmed);
             if(command==='create')return workbench.create(id,rev,body.name);
+            if(command==='shot-save')return workbench.saveShot(id,sid,rev,body.shot);
+            if(command==='shot-select')return workbench.selectShot(id,sid,rev,body.shotId);
             if(command==='enter')return workbench.enter(id,sid,rev,body.stage);
             if(command==='catalog-select')return workbench.selectCatalog(id,sid,rev,body.assetId,body.selected);
             if(command==='catalog-job')return workbench.catalogJob(id,sid,rev,body.request);

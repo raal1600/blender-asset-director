@@ -1,5 +1,6 @@
 /** Existing Codex terminal, but exact scene/native catalog context. No extra model call. */
 import fs from 'node:fs/promises';
+import {shotFor} from '../public/workbench-lineage.mjs';
 import {randomUUID} from 'node:crypto';
 import {buildSessionContext} from './onboarding.mjs';
 import {checkpointFor,stages,stageIndex} from './workbench-model.mjs';
@@ -14,7 +15,7 @@ export async function startSpecialist(work,p,sceneId) {
   const task={projectId:p.id,sceneId,activity:scene.stage,checkpoint:checkpointFor(scene),
     selectedSources:p.assets.filter(a=>scene.sources.includes(a.sourceId)),
     nativeCatalog:(p.workbench.catalogPins||[]).filter(a=>(scene.catalog||[]).includes(a.id)),
-    selectedMotion:scene.selectedMotion||null,role:stages[stageIndex(scene.stage)].role};
+    selectedMotion:scene.selectedMotion||null,selectedShot:shotFor(scene),role:stages[stageIndex(scene.stage)].role};
   context.prompt+='\n\n## Scene-scoped workbench task\n'+JSON.stringify(task,null,2)+'\n\n'+
     'This exact scene is the target, not the legacy scene pointer. Native catalog IDs and pinned versions are selected ingredients, not imported objects, rig compatibility or license grants. Search existing sources first. For animation, inspect source motion and target rig, propose transfer-plan, then request its explicit review before transfer-prepare and mediated execution. Do not guess mappings. '+
     'Use the installed specialist and its existing bounded operations. Call prepare_project; bind prepared jobs before run_project_job. Respect the shared project writer semaphore. Never overwrite checkpoints, originals or live Blender edits. A dedicated manual Blender window does not establish ownership of the existing MCP socket. '+

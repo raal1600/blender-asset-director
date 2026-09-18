@@ -3,11 +3,19 @@ import fs from 'node:fs/promises';
 import {constants} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {assert, fileHash, now, safe, writeJson} from './storage.mjs';
+import {saveShot,selectShot,taskShotContext} from './workbench-shots.mjs';
+import {checkpointFor} from './workbench-model.mjs';
 import {Workbench as WorkbenchCore} from './workbench-core.mjs';
 import {withCatalog} from './workbench-catalog.mjs';
 import {assertBlendEnvelope} from './workbench-files.mjs';
 
 export class Workbench extends withCatalog(WorkbenchCore) {
+  saveShot(...args){return saveShot(this,...args);}
+  selectShot(...args){return selectShot(this,...args);}
+  async openTask(id,sceneId,revision,context={}) {
+    const p=await this.project(id,revision),scene=this.scene(p,sceneId);
+    return super.openTask(id,sceneId,revision,taskShotContext(scene,checkpointFor(scene),context));
+  }
   async importCheckpoint(id,sceneId,revision,sourceScene) {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);await this.unlocked(p);
     assert(!s.candidate,'Review or discard the existing candidate first.',409);

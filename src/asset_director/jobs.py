@@ -41,7 +41,7 @@ OPS = {
     "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture", "transfer_binding", "max_output_intervals"},
     "assemble": {"target_object", "clips", "fps", "controller_speed", "direction", "terrain_object", "travel_frames"},
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
-    "preview": {"frames", "width", "height", "samples", "target_object", "stage"},
+    "preview": {"frames", "width", "height", "samples", "target_object", "stage", "camera"},
 }
 MUTATIONS = {"sequence-execute", "bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
              "light-adjust", "world-adjust", "look-adjust", "light-rig"}
@@ -113,6 +113,9 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
         path = Path(input_file).expanduser().resolve()
         require(path.is_file() and path.suffix.lower() in {".blend", ".glb", ".gltf", ".fbx", ".bvh", ".obj"}, "INVALID_INPUT", "Input must be an existing supported Blender/asset file")
         inputs.append({"role": "target", "path": str(path), "sha256": file_hash(path), "size": path.stat().st_size})
+    if operation == "preview":
+        from .preview_camera import validate as validate_preview_camera
+        validate_preview_camera(options)
     render_dependency = None
     if operation in {"render-readiness", "render-frames"}:
         require(asset_id is None and input_file is not None and Path(input_file).suffix.lower() == ".blend",

@@ -18,6 +18,12 @@ bpy.ops.object.camera_add(location=(4, -6, 4))
 camera = bpy.context.object
 camera.rotation_euler = (Vector((0, 0, 0)) - camera.location).to_track_quat('-Z', 'Y').to_euler()
 bpy.context.scene.camera = camera
+# A second actual angle for shot-local preview/render acceptance.
+other_data = camera.data.copy()
+other = bpy.data.objects.new('Synthetic_E2E_Reverse', other_data)
+bpy.context.scene.collection.objects.link(other)
+other.location = (-4, 4, 2)
+other.rotation_euler = (Vector((0, 0, 0)) - other.location).to_track_quat('-Z', 'Y').to_euler()
 bpy.ops.object.light_add(type='AREA', location=(1, -3, 5))
 bpy.context.object.name = 'Synthetic_E2E_Key'
 bpy.context.object.data.energy = 500

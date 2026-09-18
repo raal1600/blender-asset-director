@@ -5,6 +5,8 @@ import {constants} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {assert, exists, fileHash, json, now, safe, snapshot, writeJson, digest} from './storage.mjs';
 import {stages, stageIndex, initialWorkbench, checkpointFor, canEnter, approveCheckpoint, validId} from './workbench-model.mjs';
+import {shotFor,renderIsCurrent} from '../public/workbench-lineage.mjs';
+import {assertObservedShot} from './workbench-shots.mjs';
 import {Interactions} from './interactions.mjs';
 import {buildSessionContext} from './onboarding.mjs';
 const uid = prefix => prefix+randomUUID();
@@ -144,12 +146,13 @@ export class Workbench {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);await this.unlocked(p);
     assert(s.candidate,'No candidate to discard.');s.candidate=null;return this.store.save(p,p.revision);
   }
-  async openTask(id,sceneId,revision,{targets=[],camera=null,frame=null}={}) {
+  async openTask(id,sceneId,revision,{targets=[],camera=null,frame=null,frameRange=null}={}) {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);
     assert(!s.candidate&&!s.task&&!s.run,'Review or resolve the existing scene task first.',409);
     assert(Array.isArray(targets)&&targets.length<=64&&targets.every(x=>typeof x==='string'&&x.length<=255),'Invalid targets.');
     assert(camera===null||typeof camera==='string'&&camera.length<=255,'Invalid camera.');
     assert(frame===null||Number.isInteger(frame)&&frame>=-100000&&frame<=100000,'Invalid frame.');
+    assert(frameRange===null||Array.isArray(frameRange)&&frameRange.length===2&&frameRange.every(Number.isInteger)&&frameRange[0]>=-100000&&frameRange[1]<=100000&&frameRange[1]>=frameRange[0]&&frameRange[1]-frameRange[0]<360,'Invalid task playback range.');
     const cap=await this.available();assert(cap.task_workspace,'Install the matching development harness to enable task workspaces.',409);
     assert((await this.store.verify(id)).ok,'Pinned sources changed before task launch.',409);
     let input=null;if(s.current){const cp=await this.verify(p,s);input={path:cp.path,sha256:cp.sha256};}
@@ -161,7 +164,7 @@ export class Workbench {
     const taskId=uid('task_');await this.lock(p,taskId);
     const task={schema:1,id:taskId,projectId:id,sceneId,stage:s.stage,projectDirectory:p.directory,library:this.config.library,
       input,workingScene:`Scenes/${sceneId}--edit-${taskId}.blend`,checkpointScene:`Scenes/${sceneId}--saved-${taskId}.blend`,
-      returnFile:`Docs/Workbench/${taskId}-return.json`,selectedSources,targets,camera,frame,action:'workbench-edit',state:'RUNNING',startedAt:now()};
+      returnFile:`Docs/Workbench/${taskId}-return.json`,selectedSources,targets,camera,frame,...(frameRange?{frameRange}:{}),action:'workbench-edit',state:'RUNNING',startedAt:now()};
     const file=await safe(p.directory,`Runs/${taskId}.json`);
     try {
       await writeJson(file,task);s.task=taskId;await this.store.save(p,p.revision);
@@ -222,20 +225,25 @@ export class Workbench {
     assert(!s.candidate,'Finish reviewing the checkpoint candidate first.',409);
     const cap=await this.available();assert(cap.render_frames,'Matching development harness required.',409);
     if(operation!=='render-readiness')assert((await this.interactions(id).sourceStatus()).ready,'Review the exact production source use before rendering. This does not replace native licensing gates.',409);
+    const selected=shotFor(s),shot=selected&&['shots','light','render'].includes(s.stage)?selected:null;
+    const shotRef=shot?{shotId:shot.id,shotRevision:shot.revision,shotName:shot.name}:{};
+    if(operation!=='render-readiness'&&shot)assertObservedShot(s,cp,shot);
     if(operation==='render-frames'){
       assert(canEnter(s,'render')&&s.stage==='render','Finish scene development before rendering a shot.',409);
       assert(confirmed===true,'Explicit render authorization required.');assert(cap.encoder,'Configure FFmpeg and FFprobe before rendering a review movie.',409);
       assert(s.readiness?.checkpointId===cp.id,'Check render readiness for this exact checkpoint first.',409);
+      if(shot)assert(options?.camera===shot.camera&&options.start===shot.start&&options.end===shot.end,'Render camera or timing differs from the selected shot. Edit the shot definition first.',409);
       options={...options,readiness_job:s.readiness.jobId};
     }
     if(operation==='preview') {
       assert(confirmed===true,'Explicit CPU preview authorization required.');
       const frame=options?.frame;assert(Number.isInteger(frame)&&frame>=-100000&&frame<=100000,'Choose a frame.');
-      options={frames:[frame],width:640,height:360,samples:4};
+      if(shot){assert(cap.preview_camera,'Matching shot-preview harness required.',409);assert(frame>=shot.start&&frame<=shot.end,'Preview frame is outside the selected shot.',409);}
+      options={frames:[frame],width:640,height:360,samples:4,...(shot?{camera:shot.camera}:{})};
     }
     if(operation==='render-readiness')options={};
     const runId=uid('run_');await this.lock(p,runId);
-    const file=await safe(p.directory,`Runs/${runId}.json`),r={schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',checkpointId:cp.id,startedAt:now(),authorization:confirmed?'explicit-launcher-user-action':'read-only',options};
+    const file=await safe(p.directory,`Runs/${runId}.json`),r={schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',checkpointId:cp.id,startedAt:now(),authorization:confirmed?'explicit-launcher-user-action':'read-only',options,...shotRef};
     try {
       await writeJson(file,r);
       const optionFile=await safe(p.directory,`Docs/Workbench/${runId}-options.json`);await writeJson(optionFile,options);
@@ -259,8 +267,8 @@ export class Workbench {
           await this.serialize(async()=>{
             const current=await this.project(id),s=this.scene(current,sceneId);
             if(operation==='render-readiness')s.readiness={jobId:job.id,checkpointId:cp.id,data};
-            if(operation==='preview')s.preview={jobId:job.id,checkpointId:cp.id};
-            if(operation==='render-frames')s.renders.push({id:uid('rnd_'),jobId:job.id,checkpointId:cp.id,createdAt:now(),options,data,video,approved:false});
+            if(operation==='preview')s.preview={jobId:job.id,checkpointId:cp.id,camera:options.camera||null,...shotRef};
+            if(operation==='render-frames')s.renders.push({id:uid('rnd_'),jobId:job.id,checkpointId:cp.id,createdAt:now(),options,data,video,approved:false,...shotRef});
             s.run=null;await this.store.save(current,current.revision);
           });
           r.state='SUCCEEDED';
@@ -285,7 +293,7 @@ export class Workbench {
   async approveRender(id,sceneId,revision,renderId) {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);await this.unlocked(p);const cp=await this.verify(p,s);
     assert(canEnter(s,'render'),'Complete scene development before approving its output.',409);
-    const r=s.renders.find(r=>r.id===renderId);assert(r&&r.checkpointId===cp.id,'Render belongs to an older checkpoint.',409);
+    const r=s.renders.find(r=>r.id===renderId);assert(r&&renderIsCurrent(s,r),'Render belongs to an older checkpoint or shot revision.',409);
     await this.runtime.job(r.jobId);await this.verifyCut(p,r.video);
     r.approved=true;r.approvedAt=now();s.completed.render=cp.id;
     await writeJson(await safe(p.directory,`Docs/Workbench/${uid('review_')}.json`),{projectId:id,sceneId,renderId,checkpointSha256:cp.sha256,videoSha256:r.video.sha256,decision:'APPROVE_RENDER',createdAt:now(),transport:'launcher-ui'});
@@ -295,13 +303,22 @@ export class Workbench {
     assert(Array.isArray(refs)&&refs.length>0&&refs.length<=32,'Choose one to 32 reviewed shots.');const clips=[];
     for(const ref of refs) {
       const s=this.scene(p,ref.sceneId),r=s.renders.find(r=>r.id===ref.renderId),cp=await this.verify(p,s);
-      assert(r?.approved&&r.checkpointId===cp.id,'A film input is unapproved or outdated. Review its source scene.',409);
+      assert(r?.approved&&renderIsCurrent(s,r),'A film input is unapproved or outdated. Review its source scene and shot.',409);
       clips.push({scene_id:s.id,job_id:r.jobId,checkpoint_sha256:cp.sha256});
     }
     return clips;
   }
   async arrange(id,revision,clips) {
-    const p=await this.project(id,revision);await this.unlocked(p);assert(Array.isArray(clips),'Invalid film inputs.');if(clips.length)await this.clips(p,clips);p.workbench.film.clips=clips.map(c=>({sceneId:c.sceneId,renderId:c.renderId}));return this.store.save(p,p.revision);
+    const p=await this.project(id,revision);await this.unlocked(p);assert(Array.isArray(clips)&&clips.length<=32,'Invalid film inputs.');
+    // Existing stale inputs can be removed/reordered one at a time. Only the
+    // render/assembly gates require every retained input to be current.
+    for(const ref of clips){
+      assert(ref&&Object.keys(ref).every(k=>['sceneId','renderId'].includes(k)),'Invalid film reference.');
+      const scene=this.scene(p,ref.sceneId),render=scene.renders.find(r=>r.id===ref.renderId);
+      assert(render,'Unknown or unapproved film input.',404);
+      if(!p.workbench.film.clips.some(c=>c.sceneId===ref.sceneId&&c.renderId===ref.renderId))await this.clips(p,[ref]);
+    }
+    p.workbench.film.clips=clips.map(c=>({sceneId:c.sceneId,renderId:c.renderId}));return this.store.save(p,p.revision);
   }
   async assemble(id,revision,confirmed) {
     assert(confirmed===true,'Approve the exact film inputs before encoding.');

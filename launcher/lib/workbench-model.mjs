@@ -40,10 +40,14 @@ export function validateWorkbench(w) {
     assert(Object.entries(s.completed).every(([stage,id])=>stageIndex(stage)>=0&&cp.has(id)),'Unknown activity checkpoint.');
     if(s.shots!==undefined){
       assert(Array.isArray(s.shots)&&s.shots.length<=200&&new Set(s.shots.map(x=>x.id)).size===s.shots.length,'Invalid shot list.');
-      for(const shot of s.shots)assert(validId(shot.id,'shot_')&&Number.isInteger(shot.revision)&&shot.revision>=1&&typeof shot.name==='string'&&shot.name.length<=100&&typeof shot.camera==='string'&&shot.camera.length<=255&&Number.isInteger(shot.start)&&Number.isInteger(shot.end)&&shot.end>=shot.start&&shot.end-shot.start<360,'Invalid shot record.');
+      for(const shot of s.shots)assert(validId(shot.id,'shot_')&&Number.isInteger(shot.revision)&&shot.revision>=1&&typeof shot.name==='string'&&shot.name.trim().length>0&&shot.name.length<=100&&!/[\r\n\0]/.test(shot.name)&&typeof shot.camera==='string'&&shot.camera.length>0&&shot.camera.length<=255&&!/[\r\n\0]/.test(shot.camera)&&Number.isInteger(shot.start)&&Number.isInteger(shot.end)&&shot.start>=-100000&&shot.end<=100000&&shot.end>=shot.start&&shot.end-shot.start<360&&(!shot.checkpointId||cp.has(shot.checkpointId)),'Invalid shot record.');
       assert(!s.selectedShot||s.shots.some(x=>x.id===s.selectedShot),'Unknown selected shot.');
     }
-    for(const r of s.renders) assert(validId(r.id,'rnd_') && /^j_[a-f0-9]{24}$/.test(r.jobId) && cp.has(r.checkpointId),'Invalid scene render.');
+    assert(s.shots!==undefined||!s.selectedShot,'Unknown selected shot.');
+    for(const r of s.renders) {
+      assert(validId(r.id,'rnd_') && /^j_[a-f0-9]{24}$/.test(r.jobId) && cp.has(r.checkpointId),'Invalid scene render.');
+      assert(!r.shotId||validId(r.shotId,'shot_')&&(s.shots||[]).some(x=>x.id===r.shotId)&&Number.isInteger(r.shotRevision)&&r.shotRevision>=1,'Invalid rendered shot reference.');
+    }
   }
   assert(w.film && Array.isArray(w.film.clips) && w.film.clips.length <= 32 && Array.isArray(w.film.cuts),'Invalid film state.');
   assert(new Set(w.film.cuts.map(c=>c.id)).size===w.film.cuts.length&&w.film.cuts.every(c=>validId(c.id,'cut_')&&Array.isArray(c.refs)&&typeof c.approved==='boolean'),'Invalid cut history.');

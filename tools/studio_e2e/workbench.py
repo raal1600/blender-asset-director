@@ -154,21 +154,43 @@ def catalog_and_film(s, click, idle, check):
     page.screenshot(path=str(s.evidence.directory / 'workbench-native-import.png'))
     # The generated asset already contains keyframed action, cameras and lights.
     # These confirmations test state transitions, not manual authoring/quality.
-    for activity in ['world', 'action', 'shots', 'light']:
+    for activity in ['world', 'action']:
         assert state()['project']['workbench']['scenes'][0]['stage'] == activity
         click('[data-action="approve"]')
-    assert s.api('workbench/capabilities')['encoder'], 'Film journey needs real FFmpeg and FFprobe'
+    # Save a named shot from observed camera metadata; never invent cameras.
+    camera_names = [o['name'] for o in imported['audit']['objects'] if o['type'] == 'CAMERA']
+    assert len(camera_names) >= 2
+    click('[data-action="new-shot"]')
+    page.locator('#shot-name').fill('Synthetic arrival')
+    page.locator('#shot-camera').select_option(camera_names[-1])
+    page.locator('#shot-start').fill('1')
+    page.locator('#shot-end').fill('4')
+    click('[data-action="save-shot"]')
+    scene = state()['project']['workbench']['scenes'][0]
+    definition = scene['shots'][0]
+    assert scene['selectedShot'] == definition['id'] and definition['revision'] == 1
+    click('[data-action="preview"]')
+    click('[data-action="save-preview"]')
+    scene = settle()
+    assert scene['preview']['camera'] == definition['camera']
+    assert scene['preview']['shotId'] == definition['id'] and scene['preview']['shotRevision'] == 1
+    for activity in ['shots', 'light']:
+        assert state()['project']['workbench']['scenes'][0]['stage'] == activity
+        click('[data-action="approve"]')
+    assert s.api('workbench/capabilities')['encoder'], 'Film journey needs real FFmpeg and FFprobe' 
     click('[data-action="readiness"]')
     scene = settle()
     assert not scene['readiness']['data']['blockers']
-    page.locator('#render-start').fill('1')
-    page.locator('#render-end').fill('4')
+    expect(page.locator('#render-start')).to_be_disabled()
+    expect(page.locator('#render-end')).to_be_disabled()
+    expect(page.locator('#render-camera')).to_have_value(definition['camera'])
     page.locator('#render-width').fill('64')
     page.locator('#render-height').fill('64')
     page.locator('#render-samples').fill('1')
     click('[data-action="render"]')
     scene = settle()
     shot = scene['renders'][-1]
+    assert shot['shotId'] == definition['id'] and shot['shotRevision'] == definition['revision']
     assert shot['video']['frames'] == 4 and shot['video']['state'] == 'SUCCEEDED' and not shot['approved']
     click('[data-action="play-render"][data-id="' + shot['id'] + '"]')
     wait_for_media(page, '#review-video')
@@ -192,5 +214,33 @@ def catalog_and_film(s, click, idle, check):
                  import_job=imported['jobId'], render_job=shot['jobId'],
                  film_sha256=cut['result']['sha256'], browser_movie_playback=True,
                  approval_input='scripted generated-fixture decisions only')
+
+    with s.evidence.checkpoint('workbench_shot_roundtrip') as shot_check:
+        # Revise timing without changing scene bytes: the old render must become
+        # historical. Old green scene hashes cannot validate a changed shot.
+        click('[data-action="edit-source"][data-id="' + scene['id'] + '"]')
+        click('[data-action="stage"][data-stage="shots"]')
+        click('[data-action="edit-shot"][data-id="' + definition['id'] + '"]')
+        page.locator('#shot-end').fill('3')
+        click('[data-action="save-shot"]')
+        changed = state()['project']['workbench']['scenes'][0]
+        assert changed['current'] == imported['id'] and changed['shots'][0]['revision'] == 2
+        assert changed['renders'][0]['approved'] and not changed['completed'].get('light')
+        click('[data-action="return-film"]')
+        expect(page.locator('.film-inspector h2')).to_have_text('Historical cut')
+        expect(page.locator('[data-action="approve-cut"]')).to_be_disabled()
+        # Independently require server refusal; a disabled button alone is not a gate.
+        response = page.request.post(s.session['origin'] + '/api/workbench/approve-cut',
+            headers={'Authorization': 'Bearer ' + s.session['token']},
+            data={'projectId': s.project['id'], 'revision': state()['project']['revision'], 'cutId': cut['id']})
+        assert response.status == 409, response.text()
+        click('[data-action="remove-clip"][data-index="0"]')
+        assert not state()['project']['workbench']['film']['clips']
+        assert state()['project']['workbench']['film']['cuts'][-1]['result']['sha256'] == cut['result']['sha256']
+        page.screenshot(path=str(s.evidence.directory / 'workbench-shot-revision.png'))
+        shot_check.update(shot_id=definition['id'], rendered_revision=1, revised_definition=2,
+                          camera=definition['camera'], scene_hash_unchanged=True,
+                          stale_approval_http=409, historical_cut_preserved=True,
+                          approval_input='scripted generated-fixture decisions only')
 
     page.remove_listener('dialog', confirm)

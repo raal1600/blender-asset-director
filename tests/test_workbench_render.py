@@ -169,8 +169,9 @@ class RenderContractTests(unittest.TestCase):
 
     def test_task_manifest_validation_without_importing_bpy(self):
         self.assertEqual(task_workspace.validate(self.task()), self.project.resolve())
+        self.assertEqual(task_workspace.validate({**self.task(), 'frameRange': [1, 4]}), self.project.resolve())
         for patch in [{'stage': 'arbitrary-script'}, {'workingScene': '../escape.blend'}, {'checkpointScene': 'Scenes/synthetic.blend'},
-                      {'returnFile': 'project.json'}, {'projectId': 'prj_' + str(uuid.uuid4())}, {'targets': [5]}, {'camera': '\0'}, {'frame': True}]:
+                      {'returnFile': 'project.json'}, {'projectId': 'prj_' + str(uuid.uuid4())}, {'targets': [5]}, {'camera': '\0'}, {'frame': True}, {'frameRange': [2, 1]}, {'frameRange': [1, True]}, {'frameRange': [1, 361]}]:
             with self.subTest(patch=patch):
                 with self.assertRaises(DirectorError): task_workspace.validate({**self.task(), **patch})
 

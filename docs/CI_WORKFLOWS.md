@@ -70,9 +70,9 @@ Node contract tests and the real Windows executable build, but does not claim to
 test tray/focus behavior. These execute on every coordinated revision instead of
 being hidden behind a launcher-only path filter.
 
-`blender-regressions.yml` retains all **19 existing fixture invocations** across
+`blender-regressions.yml` retains all **20 fixture invocations** across
 Blender **4.5.3, 5.0.0 and 5.2.1**. They are separated into three real-Blender
-subsystems: **authoring** (7), **motion** (7), and **continuity** (5). This includes
+subsystems: **authoring** (8), **motion** (7), and **continuity** (5). This includes
 normal and custom-role transfer, proxy skin, source/action identity, grounding and
 full-take sequencing. These are deeper integration/regression checks, not proof
 that the browser/installed-app route exercises every motion operation. Within a
@@ -171,3 +171,19 @@ studio journey. Python 3.11+, Node, Blender and the pinned Playwright/browser
 runtime are prerequisites; the runner does not install substitutes into a user's
 studio. All reports identify untested boundaries. A local portable pass, queued
 Actions run or a historical report is never a claim that current E2E passed.
+
+## Shot-aware workbench acceptance
+
+The production/full studio journeys now require `workbench_shot_roundtrip` as a
+separate checkpoint in each OS partition. The browser saves a named shot from an
+observed camera, requests an actual camera-bound preview and render, plays and
+approves the generated movie, then revises the shot without changing scene bytes.
+It requires HTTP 409 from approval of the old cut, preserves its historical movie,
+and removes stale inputs. `workbench-shot-revision.png` is a required hashed
+attachment, not optional decoration.
+
+The real Blender authoring fixture also renders two cameras at the same frame in
+a scene with a conflicting camera marker. It compares generated image hashes and
+reopens saved preview artifacts to check marker preservation. The original scene
+hash must remain unchanged. This proves the isolated worker contract, not live
+GUI task ownership, authenticated agent decisions or artistic quality.

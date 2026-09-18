@@ -58,6 +58,35 @@ Human task editing and mediated agent jobs share the project writer semaphore.
 This coordinates supported application paths, not arbitrary external shell writes
 or OS-level access. Never edit a frozen checkpoint or manually repair its receipts.
 
+## Named shots and exact-camera previews
+
+Capture shots now saves named, versioned definitions using **observed cameras and
+frame ranges** from a checkpoint audit or its current readiness report. A shot
+references one scene; it never creates a duplicate world. Select a shot to carry
+its exact camera, frame and playback range into the Blender task. The playback
+range does not trim the saved scene's production range. Whole scene remains an
+explicit option for legacy projects and broader edits.
+
+Shot selection is not camera creation or a rendered thumbnail. Create or refine
+cameras with the specialist or Blender, then collect the saved checkpoint. Numeric
+shot metadata is entered only here, not repeated across World/Action/Light.
+The selected shot supplies the render camera and range; editing those decisions
+requires revising the definition rather than silently overriding it at render time.
+
+An explicit-camera preview uses the chosen camera even when timeline markers
+normally switch to another camera. It restores the original camera and marker
+bindings before saving its disposable preview artifact. Checkpoints stay untouched.
+Preview evidence is bound to the shot ID, shot revision and checkpoint; switching
+to a different shot cannot display the previous shot's image as current evidence.
+
+Lights are still shared scene state, not independent per-shot lighting overrides.
+A new scene checkpoint conservatively invalidates dependent output. A changed
+shot definition invalidates renders pinned to that shot's previous revision even
+when the scene bytes are identical. Historical approved movies remain inspectable
+but cannot be approved as current or silently reused in a new cut. Old film inputs
+can be removed incrementally without trapping the user behind another stale input.
+**Edit source → Return to Final film** keeps the film arrangement and review position.
+
 ## Rendering and Final film
 
 Readiness inspects the saved checkpoint, cameras, frame range, external files and
@@ -121,3 +150,29 @@ launcher → Blender edit → checkpoint → launcher round trip, authorized Cod
 representative private assets with retained rights, and human review of the
 resulting film. Public synthetic CI does not establish those claims. Do not merge,
 release or replace the live studio merely because portable tests pass.
+
+## Production acceptance before replacing the installed studio
+
+The bounded silent-film implementation is not a claim of production acceptance.
+Use a new staging root and retain evidence for the **same source commit**:
+
+1. Run the unchanged-head public acceptance gate and retain its merge SHA, all
+   partition reports, the Windows host build receipt, and hashes of delivered files.
+2. On Windows, open the actual EXE, create/resume a project, open a dedicated Blender
+   task, edit an object/rig/camera/light, save a checkpoint and collect it. Keep an
+   unrelated unsaved Blender window open and prove its content was not replaced.
+   Check second launch, idle close, active-work close, tray/restore and restart.
+3. Use the configured, authorized Codex session on a representative private asset
+   and motion. Confirm the intended target and native license/transfer review path.
+   Exercise cancellation and a refused/stale source before permitting execution.
+4. Make three related scenes and at least two named shots in one scene. Render,
+   play and explicitly approve the shot movies. Assemble/review a complete film,
+   revise a shot and a source scene, and demonstrate refusal of stale deliveries.
+5. Record human temporal/visual acceptance of the final file's exact hash and the
+   supported workload, plus backup/rollback instructions. Keep private source files,
+   credentials, database and review evidence out of public CI and public Git.
+
+A missing native/private/human record is **NOT TESTED**, never a synthetic pass.
+Public CI records scripted approval inputs separately. Source changes reset the
+required evidence; installer publication and live-studio migration remain explicit
+release decisions. The Vercel site remains a design demo, not a remote studio.

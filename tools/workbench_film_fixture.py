@@ -33,7 +33,7 @@ def rejection(fn, expected, name):
     except DirectorError as exc:
         check(exc.code == expected, name, code=exc.code, expected=expected)
         return
-    raise AssertionError(name + ': expected refusal ' + expected)
+    raise AssertionError(name + ': expected refusal')
 
 
 def create_scene(filename, number):
@@ -57,6 +57,13 @@ def create_scene(filename, number):
     camera.location = (2.5 + number * .1, -4, 2)
     camera.rotation_euler = (Vector((0, 0, .5)) - camera.location).to_track_quat('-Z', 'Y').to_euler()
     scene.camera = camera
+    reverse_data = bpy.data.cameras.new('Synthetic reverse')
+    reverse = bpy.data.objects.new(reverse_data.name, reverse_data)
+    scene.collection.objects.link(reverse)
+    reverse.location = (-3, 4, 1.5)
+    reverse.rotation_euler = (Vector((0, 0, .5)) - reverse.location).to_track_quat('-Z', 'Y').to_euler()
+    marker = scene.timeline_markers.new('Switch to reverse', frame=2)
+    marker.camera = reverse
     light_data = bpy.data.lights.new('Synthetic key', 'AREA'); light_data.energy = 400; light_data.size = 4
     light = bpy.data.objects.new('Synthetic key', light_data); scene.collection.objects.link(light)
     light.location = (0, -2, 4)
@@ -86,9 +93,10 @@ def main():
                     'projectDirectory': str(project), 'library': str(lib.root), 'input': {'path': source.relative_to(project).as_posix(), 'sha256': source_hash},
                     'workingScene': 'Scenes/edit-' + str(number) + '.blend', 'checkpointScene': 'Scenes/checkpoint-' + str(number) + '.blend',
                     'returnFile': 'Docs/Workbench/' + task_id + '-return.json', 'targets': [camera], 'camera': camera,
-                    'frame': 1, 'action': 'workbench-edit', 'state': 'RUNNING', 'startedAt': 'synthetic-fixture', 'selectedSources': []}
+                    'frame': 1, 'frameRange': [1, 4], 'action': 'workbench-edit', 'state': 'RUNNING', 'startedAt': 'synthetic-fixture', 'selectedSources': []}
             initialized = task_workspace.initialize(task)
             check(not initialized['gui_configured'], 'headless_does_not_claim_gui', scene=number)
+            check(bpy.context.scene.use_preview_range and bpy.context.scene.frame_preview_end == 4, 'task_playback_range_selected', scene=number)
             check(bpy.context.scene.camera.name == camera, 'exact_camera_selected', scene=number)
             check(bpy.context.view_layer.objects.active.name == camera, 'exact_target_selected', scene=number)
             bpy.data.objects[camera].data.lens = 45 + number
@@ -98,6 +106,25 @@ def main():
             check(file_hash(source) == source_hash, 'original_preserved', scene=number)
             check(returned['human_acceptance'] == 'PENDING' and returned['audit']['camera'] == camera, 'observed_checkpoint_not_autoapproved', scene=number)
             rejection(lambda: task_workspace.checkpoint(task, initialized), 'CHECKPOINT_EXISTS', 'checkpoint_never_overwritten')
+            # Compare real images from two cameras at the same frame where a
+            # marker selects the reverse. Then reopen the preview .blend and prove
+            # its original camera bindings survived. The input never changes.
+            if number == 1:
+                previews = []
+                for preview_camera in [camera, 'Synthetic reverse']:
+                    preview = jobs.prepare(lib, 'preview', str(checkpoint), options={
+                        'frames': [2], 'width': 64, 'height': 64, 'samples': 1, 'camera': preview_camera})
+                    preview = jobs.run(lib, preview['id'], bpy.app.binary_path, timeout=180)
+                    report = json.loads((lib.root / 'jobs' / preview['id'] / 'result.json').read_text())['data']
+                    check(report['camera'] == preview_camera and report['scene_camera_restored'] and
+                          report['timeline_camera_bindings_restored'], 'explicit_camera_preview_evidence', camera=preview_camera)
+                    previews.append(lib.root / 'jobs' / preview['id'] / 'preview_0002.png')
+                    saved = lib.root / 'jobs' / preview['id'] / 'result.blend'
+                    bpy.ops.wm.open_mainfile(filepath=str(saved), load_ui=False, use_scripts=False)
+                    check(bpy.context.scene.timeline_markers.get('Switch to reverse').camera.name == 'Synthetic reverse',
+                          'saved_preview_preserves_camera_marker', camera=preview_camera)
+                check(file_hash(previews[0]) != file_hash(previews[1]), 'two_cameras_produce_different_real_frames')
+                check(file_hash(checkpoint) == returned['sha256'], 'preview_preserves_checkpoint_bytes')
             ready = jobs.prepare(lib, 'render-readiness', str(checkpoint))
             ready = jobs.run(lib, ready['id'], bpy.app.binary_path, timeout=180)
             readiness = json.loads((lib.root / 'jobs' / ready['id'] / 'result.json').read_text())['data']

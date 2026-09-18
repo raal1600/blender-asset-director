@@ -116,7 +116,8 @@ def execute(job_path, *, live=False):
                     target = bpy.context.scene.objects.get(options.get("target_object", ""))
                     require(target is not None, "TARGET_REQUIRED", "Explicit staging needs an observed target object")
                     stage(target)
-                data = ops.render_previews(directory, options)
+                from asset_director.preview_camera import render_previews
+                data = render_previews(directory, options)
             elif op == "index":
                 data = {"clips": [], "rigs": [], "unassigned_actions": [], "files_indexed": []}
                 candidates = [f for f in files if Path(f["path"]).suffix.lower() in {".glb", ".gltf", ".fbx", ".bvh", ".blend"}]

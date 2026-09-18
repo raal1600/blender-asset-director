@@ -56,7 +56,7 @@ def validate_artifacts(directory, report):
         if 'execution' in stages:
             required.add('synthetic-preview.png')
         if 'production' in stages:
-            required.update(('production-preview.png', 'production-scene.json'))
+            required.update(('production-preview.png', 'production-scene.json', 'workbench-shot-revision.png'))
     elif report['kind'] == 'installation':
         required.add('bootstrap.log')
     elif report['kind'] == 'blender':

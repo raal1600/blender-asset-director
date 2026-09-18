@@ -11,11 +11,11 @@ import sys
 from .core import Library, atomic_json, fields, file_hash, load_json, require, within
 
 STAGES = {"world": "Layout", "action": "Animation", "shots": "Layout", "light": "Shading", "render": "Rendering"}
-TASK_FIELDS = {"schema", "id", "projectId", "sceneId", "stage", "projectDirectory", "library", "input", "workingScene", "checkpointScene", "returnFile", "targets", "camera", "frame", "action", "state", "startedAt", "processId", "selectedSources"}
+TASK_FIELDS = {"schema", "id", "projectId", "sceneId", "stage", "projectDirectory", "library", "input", "workingScene", "checkpointScene", "returnFile", "targets", "camera", "frame", "action", "state", "startedAt", "processId", "selectedSources", "frameRange"}
 
 
 def validate(task):
-    fields(task, TASK_FIELDS, TASK_FIELDS - {"processId"})
+    fields(task, TASK_FIELDS, TASK_FIELDS - {"processId", "frameRange"})
     require(task["schema"] == 1 and task["stage"] in STAGES, "INVALID_TASK", "Unknown task schema or stage")
     for key, prefix in (("id", "task_"), ("projectId", "prj_"), ("sceneId", "sc_")):
         require(isinstance(task[key], str) and re.fullmatch(prefix + r"[0-9a-f-]{36}", task[key]),
@@ -26,6 +26,10 @@ def validate(task):
     require(task["camera"] is None or isinstance(task["camera"], str) and 0 < len(task["camera"]) <= 255 and not any(c in task["camera"] for c in "\r\n\0"), "INVALID_TASK", "Invalid camera")
     require(task["frame"] is None or type(task["frame"]) is int and -100000 <= task["frame"] <= 100000,
             "INVALID_TASK", "Invalid frame")
+    frame_range = task.get("frameRange")
+    require(frame_range is None or isinstance(frame_range, list) and len(frame_range) == 2 and
+            all(type(f) is int for f in frame_range) and -100000 <= frame_range[0] <= frame_range[1] <= 100000
+            and frame_range[1] - frame_range[0] < 360, "INVALID_TASK", "Invalid task playback range")
     require(task["action"] == "workbench-edit", "INVALID_TASK", "Unknown task operation")
     require(isinstance(task["projectDirectory"], str) and Path(task["projectDirectory"]).is_absolute(),
             "INVALID_TASK", "Expected an absolute project directory")
@@ -88,6 +92,13 @@ def initialize(task):
             workspace.name = "Asset Director - " + task["stage"].title()
             configured = True
     scene = bpy.context.scene
+    if task.get("frameRange"):
+        start, end = task["frameRange"]
+        require(scene.frame_start <= start <= end <= scene.frame_end, "TARGET_CHANGED", "Shot range leaves the saved scene")
+        scene.frame_preview_start, scene.frame_preview_end = start, end
+        scene.use_preview_range = True
+        require([scene.frame_preview_start, scene.frame_preview_end] == [start, end],
+                "INVALID_TASK", "Blender did not retain the requested playback range")
     for name in task["targets"]:
         require(scene.objects.get(name) is not None, "TARGET_CHANGED", "Observed target is no longer in this scene: " + name)
     for obj in bpy.context.selected_objects:

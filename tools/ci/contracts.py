@@ -8,7 +8,7 @@ STAGES = {
     'installation': ('installed_checkout', 'catalog_initialized', 'launcher_authenticated'),
     'onboarding': ('project_created', 'sources_verified', 'scene_audited'),
     'execution': ('foreign_binding_refused', 'cancellation_blocks', 'confirmed_render', 'idempotent_replay'),
-    'production': ('camera_authored', 'look_authored', 'camera_verified', 'production_preview', 'workbench_scene_review'),
+    'production': ('camera_authored', 'look_authored', 'camera_verified', 'production_preview', 'workbench_scene_review', 'workbench_shot_roundtrip'),
     'recovery': ('source_drift_refused', 'session_rotated', 'restart_persisted', 'trash_restored'),
 }
 SCENARIOS = {

@@ -84,6 +84,10 @@ def render(lib, spec, directory):
     scene = bpy.context.scene
     camera = scene.objects.get(options["camera"])
     require(camera is not None and camera.type == "CAMERA", "CAMERA_REQUIRED", "Observed camera is missing")
+    # This isolated worker never saves its disposable scene. Suspend camera
+    # markers so rendering cannot re-evaluate a different camera after frame_set.
+    for marker in scene.timeline_markers:
+        marker.camera = None
     scene.camera = camera
     scene.render.engine = "CYCLES"
     scene.cycles.device = "CPU"
