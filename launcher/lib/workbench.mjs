@@ -1,3 +1,4 @@
+import {focusTask} from './workbench-task.mjs';
 /** Scene workbench facade: native file/catalog adapters over the shared job lifecycle. */
 import fs from 'node:fs/promises';
 import {constants} from 'node:fs';
@@ -10,6 +11,7 @@ import {withCatalog} from './workbench-catalog.mjs';
 import {assertBlendEnvelope} from './workbench-files.mjs';
 
 export class Workbench extends withCatalog(WorkbenchCore) {
+  focusTask(...args){return focusTask(this,...args);}
   saveShot(...args){return saveShot(this,...args);}
   selectShot(...args){return selectShot(this,...args);}
   async openTask(id,sceneId,revision,context={}) {

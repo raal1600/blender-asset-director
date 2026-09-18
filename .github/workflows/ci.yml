@@ -107,3 +107,32 @@ jobs:
             out.write('\nA pass requires every dependency plus all 23 exact-commit evidence partitions and the native desktop report. '
                 'See docs/CI_WORKFLOWS.md for the journey map. This does not certify authenticated model calls, '
                 'live Blender add-on MCP, non-fixture native desktop use, private inputs, or artistic acceptance.\n')
+
+  candidate:
+    name: Package verified Windows candidate (not a release)
+    needs: acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - uses: actions/download-artifact@v4
+      with:
+        name: workbench-windows-host-${{ github.sha }}
+        path: candidate-host
+    - uses: actions/download-artifact@v4
+      with:
+        name: native-desktop-${{ github.sha }}
+        path: candidate-native
+    - name: Verify source, tested host and native evidence before packaging
+      run: python tools/package_workbench_candidate.py --output candidate/Asset-Director-Candidate.zip --host candidate-host --native candidate-native
+    - uses: actions/upload-artifact@v4
+      with:
+        name: workbench-candidate-${{ github.sha }}
+        path: candidate/
+        if-no-files-found: error
+        retention-days: 14

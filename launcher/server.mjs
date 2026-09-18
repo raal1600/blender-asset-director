@@ -29,7 +29,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
       const url = new URL(req.url,origin);
       if (!url.pathname.startsWith('/api/')) {
         assert(req.method === 'GET','Method not allowed.',405);
-        const assets = {'/':'index.html','/app.mjs':'app.mjs','/style.css':'style.css','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
+        const assets = {'/':'index.html','/app.mjs':'app.mjs','/style.css':'style.css','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-task.mjs':'workbench-task.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
         assert(Object.hasOwn(assets,url.pathname),'Not found.',404);
         const ext = path.extname(assets[url.pathname]); res.setHeader('Content-Type',ext === '.html' ? 'text/html; charset=utf-8' : ext === '.css' ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8');
         return res.end(await fs.readFile(path.join(here,'public',assets[url.pathname])));
@@ -95,6 +95,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
             if(command==='approve')return workbench.approve(id,sid,rev,body.stage,body.checkpointId);
             if(command==='discard')return workbench.discard(id,sid,rev);
             if(command==='task-open')return workbench.openTask(id,sid,rev,body.context);
+            if(command==='task-focus')return workbench.focusTask(id,sid,rev);
             if(command==='task-collect')return workbench.collectTask(id,sid,rev);
             if(command==='resolve')return workbench.resolve(id,sid,rev,body.runId,body.confirmStopped);
             if(command==='run')return workbench.startJob(id,sid,rev,body.operation,body.options,body.confirmed);

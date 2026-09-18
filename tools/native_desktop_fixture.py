@@ -36,7 +36,7 @@ class Journey:
     def __init__(self, blender, evidence):
         self.blender=str(Path(blender).resolve());self.e=evidence
         self.root=Path(tempfile.mkdtemp(prefix='ad-native-'))/'studio'
-        self.children=[];self.task_pids=[];self.session=None
+        self.children=[];self.task_pids=[];self.session=None;self.task_evidence=[]
 
     def spawn(self,args,label):
         log=(self.e.directory/(label+'.log')).open('wb')
@@ -107,6 +107,7 @@ class Journey:
             check['gpu']=before['gpu']
             task=self.post('task-open',context={'targets':['NativeSubject']})['task'];self.task_pids.append(task['processId'])
             status_file=directory/('Docs/Workbench/'+task['id']+'-status.json')
+            self.task_evidence=[status_file, directory/('Docs/Workbench/'+task['id']+'-startup.log')]
             status=wait(lambda:(v if (v:=read(status_file)).get('expected_file') or v['state']=='FAILED' else None),'identified task')
             assert status['state']!='FAILED',status
             write(e.directory/'task-status.json', status)
@@ -160,6 +161,11 @@ class Journey:
             subprocess.run(['taskkill','/PID',str(pid),'/T','/F'],capture_output=True,timeout=15)
         for p in self.children:
             if p.poll() is None:subprocess.run(['taskkill','/PID',str(p.pid),'/T','/F'],capture_output=True,timeout=15)
+
+        for file in self.task_evidence:
+            if file.is_file():
+                text=self.e.redact(file.read_text(encoding='utf-8',errors='replace'))
+                (self.e.directory/('task-startup.log' if file.suffix=='.log' else 'task-status.json')).write_text(text,encoding='utf-8')
 
 
 def main():
