@@ -36,13 +36,17 @@ def install(filename):
     task = load_json(Path(filename))
     status = within(Path(task['projectDirectory']), 'Docs/Workbench/' + task['id'] + '-status.json')
     configured = load_json(status)['gui_configured']
+    print('Feedback: status read', flush=True)
 
     def draw(self, context):
         self.layout.operator('asset_director.save_checkpoint', text='Save checkpoint & return')
 
+    print('Feedback: registering topbar', flush=True)
     bpy.types.TOPBAR_MT_editor_menus.append(draw)
+    print('Feedback: topbar registered', flush=True)
     from .task_window import task_window
     window = task_window()
+    print('Feedback: window resolved', flush=True)
     if window:
         for area in window.screen.areas:
             if area.type == 'VIEW_3D':
@@ -56,5 +60,7 @@ def install(filename):
             print('ASSET_DIRECTOR_STATUS_UNAVAILABLE ' + type(exc).__name__, flush=True)
         return 1.0
 
+    print('Feedback: regions configured', flush=True)
     heartbeat()
+    print('Feedback: initial observation saved', flush=True)
     bpy.app.timers.register(heartbeat, first_interval=1.0, persistent=True)

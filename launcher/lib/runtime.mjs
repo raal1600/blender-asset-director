@@ -1,3 +1,4 @@
+import {taskArguments} from './workbench-launch.mjs';
 import {randomUUID} from 'node:crypto';
 import {buildSessionContext} from './onboarding.mjs';
 import fs from 'node:fs/promises';
@@ -110,7 +111,8 @@ export class Runtime {
     assert(manifest===await safe(project.directory,`Runs/${task.id}.json`)&&task.projectId===project.id,'Invalid task manifest.');
     // A new factory-startup process preserves every existing Blender window and
     // user preference. There is deliberately no claim to an existing MCP socket.
-    const child=spawn(this.config.blender,['--factory-startup','--disable-autoexec','--python',helper,'--',manifest],
+    const args=await taskArguments(project,task,manifest,helper);
+    const child=spawn(this.config.blender,args,
       {detached:true,stdio:'ignore',windowsHide:false,cwd:project.directory});
     await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
     child.unref();return child.pid;
@@ -146,8 +148,7 @@ export class Runtime {
     try {blenderSetup=await this.startBlender(id,false);}catch(e){blenderSetup={started:false,connected:false,message:e.message};}
     const sessionId=randomUUID();
     const directory=await safe(context.directory,'Docs/Codex');await fs.mkdir(directory,{recursive:true});
-    const promptFile=await safe(context.directory,'Docs/Codex/'+sessionId+'.md');
-    await fs.writeFile(promptFile,context.prompt,{flag:'wx'});
+    const promptFile=await safe(context.directory,'Docs/Codex/'+sessionId+'.md');await fs.writeFile(promptFile,context.prompt,{flag:'wx'});
     await writeJson(await safe(context.directory,'Docs/Codex/'+sessionId+'.json'),{...context,sessionId,createdAt:now(),promptFile,blenderSetup});
     const terminal=await this.launchTerminal(id,sessionId);
     return {message:'Codex terminal started with your saved brief, capabilities and linked sources. '+blenderSetup.message+' Continue the conversation in the terminal.',directory:context.directory,processId:terminal.processId,sessionId,blenderSetup};
@@ -168,7 +169,7 @@ export class Runtime {
     return result;
   }
   async audit(id) {
-    const p = await this.store.get(id); assert(p.scene,'Choose a saved scene before auditing.');
+    const p = await this.store.get(id); assert(p.scene,'Choose a saved project scene before auditing.');
     const verified = await this.store.verify(id); assert(verified.ok,'A pinned source changed or is missing. Resolve project asset checks before running jobs.',409);
     const input = await safe(p.directory,p.scene);
     const receipt = {schema:1,projectId:id,action:'scene-audit',startedAt:now(),state:'PREPARING',input};

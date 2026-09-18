@@ -34,9 +34,10 @@ arbitrary user's machine. Follow [local acceptance](WORKBENCH_LOCAL_ACCEPTANCE.m
 ## The Blender return path
 
 `task_entry` defers GUI task initialization until Blender's event loop is running.
-After a file load, the task re-establishes the sole normal window in its dedicated
-process with `Context.temp_override`; it never guesses among another process's
-windows. Startup diagnostics are bounded and scoped to the validated project.
+The launcher verifies and copies a frozen checkpoint before opening that disposable
+copy through Blender's command line. The GUI helper does not reload window data
+inside an active timer. It resolves only the sole normal window in its dedicated
+process with `Context.temp_override`, never another process's window. Startup diagnostics are bounded and scoped to the validated project.
 An ambiguous window, unknown target or changed file fails rather than claiming
 successful setup.
 

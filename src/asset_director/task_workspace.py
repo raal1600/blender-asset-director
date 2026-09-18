@@ -71,13 +71,31 @@ def initialize(task):
     import bpy
     from . import license_policy as lp
     project = validate(task)
-    require(not within(project, task["workingScene"]).exists() and not within(project, task["checkpointScene"]).exists(),
-            "OUTPUT_EXISTS", "Task files already exist; resume explicitly instead of overwriting")
+    require(not within(project, task["checkpointScene"]).exists(),
+            "OUTPUT_EXISTS", "Task checkpoint already exists; do not overwrite")
     bpy.context.preferences.filepaths.use_scripts_auto_execute = False
-    if task["input"]:
-        bpy.ops.wm.open_mainfile(filepath=str(within(project, task["input"]["path"])), load_ui=False, use_scripts=False)
+    working = within(project, task["workingScene"])
+    if bpy.app.background:
+        require(not working.exists(), "OUTPUT_EXISTS", "Task working file already exists")
+        if task["input"]:
+            bpy.ops.wm.open_mainfile(filepath=str(within(project, task["input"]["path"])), load_ui=False, use_scripts=False)
+        else:
+            bpy.ops.wm.read_factory_settings(use_empty=True)
+    elif task["input"]:
+        # The launcher copied and verified the frozen input before starting this
+        # dedicated GUI. Loading on the CLI avoids invalidating a live timer's UI
+        # context. The original is never opened as the mutable GUI file.
+        require(working.is_file() and file_hash(working) == task["input"]["sha256"],
+                "STALE_INPUT", "Expected an unchanged launcher-created working copy")
+        require(bool(bpy.data.filepath) and Path(bpy.data.filepath).resolve() == working,
+                "TASK_CONTEXT_CHANGED", "Launch this task with its verified working copy")
     else:
-        bpy.ops.wm.read_factory_settings(use_empty=True)
+        require(not working.exists() and not bpy.data.filepath,
+                "TASK_CONTEXT_CHANGED", "New tasks require an unused factory-startup window")
+        # This process was just created without a file. Remove only its factory
+        # objects; never reload windowing data or touch another Blender process.
+        for obj in list(bpy.data.objects):
+            bpy.data.objects.remove(obj, do_unlink=True)
     from .task_window import task_window
     window = task_window()
     if window:

@@ -154,6 +154,16 @@ class Journey:
             human_acceptance='NOT_TESTED',authorized_codex='NOT_TESTED',private_assets='NOT_TESTED'))
 
     def cleanup(self):
+        # Capture only the known synthetic task before stopping its process.
+        # This distinguishes absent/dead windows from an unavailable heartbeat.
+        for pid in self.task_pids:
+            try:
+                seen=self.ui(pid,'observe')
+                write(self.e.directory/'task-windows.json',seen)
+                if any(w['visible'] for w in seen['windows']):
+                    self.ui(pid,'capture',OutputPath=self.e.directory/'task-final-window.png')
+            except Exception as exc:
+                write(self.e.directory/'task-observation-error.json',{'error':str(exc)[:2000]})
         if self.session:
             try:self.api('stop',{})
             except Exception:pass
@@ -171,6 +181,7 @@ class Journey:
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--blender',required=True);parser.add_argument('--evidence',required=True,type=Path)
     args=parser.parse_args()
+    if not __debug__:raise RuntimeError('Optimized Python disables native test assertions')
     if sys.platform!='win32':raise RuntimeError('Windows desktop required; no emulated pass')
     evidence=Evidence(args.evidence,'desktop','native-roundtrip',platform='win32');journey=Journey(args.blender,evidence)
     try:

@@ -48,25 +48,49 @@ def start(filename):
     identity = dict(taskId=task['id'], projectId=task['projectId'], sceneId=task['sceneId'])
     atomic_json(status, dict(identity, state='STARTING'))
 
-    def prepare():
+    stream = BoundedLog(log)
+
+    def failed(exc):
+        atomic_json(status, dict(identity, state='FAILED', message=str(exc)[:2000]))
+        stream.close()
+
+    def controls():
         try:
-            with BoundedLog(log) as stream, redirect_stdout(stream), redirect_stderr(stream):
+            with redirect_stdout(stream), redirect_stderr(stream):
                 try:
-                    print('Workspaces:', [w.name for w in bpy.data.workspaces])
-                    print('Normal windows:', len(bpy.context.window_manager.windows))
-                    main(filename)
+                    print('Installing UI feedback after file/workspace setup')
                     install(filename)
                     print('Task observation:', observation(task, load_json(status)['gui_configured']))
                 except Exception:
                     traceback.print_exc()
                     raise
+            stream.close()
         except Exception as exc:
-            atomic_json(status, dict(identity, state='FAILED', message=str(exc)[:2000]))
+            failed(exc)
+        return None
+
+    def prepare():
+        try:
+            with redirect_stdout(stream), redirect_stderr(stream):
+                try:
+                    print('Workspaces:', [w.name for w in bpy.data.workspaces])
+                    print('Normal windows:', len(bpy.context.window_manager.windows))
+                    main(filename)
+                    print('File and workspace setup returned')
+                except Exception:
+                    traceback.print_exc()
+                    raise
+            if bpy.app.background:
+                controls()
+            else:
+                # Let pending window/workspace updates settle before touching
+                # menus or regions. Do not retain a pre-load area pointer.
+                bpy.app.timers.register(controls, first_interval=0.2, persistent=True)
+        except Exception as exc:
+            failed(exc)
         return None
 
     if bpy.app.background:
         prepare()
     else:
-        # File/workspace operators from startup --python can run before the
-        # initial native window becomes a valid editor context.
         bpy.app.timers.register(prepare, first_interval=0.2, persistent=True)
