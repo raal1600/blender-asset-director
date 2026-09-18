@@ -9,7 +9,7 @@ from mathutils import Vector
 mode, destination = sys.argv[sys.argv.index('--') + 1:]
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.mesh.primitive_cube_add()
-obj = bpy.context.object
+obj = bpy.context.view_layer.objects.active
 obj.name = 'NativeSubject' if mode == 'seed' else 'UnrelatedUnsavedSentinel'
 if mode == 'seed':
     camera = bpy.data.objects.new('NativeCamera', bpy.data.cameras.new('NativeCamera'))

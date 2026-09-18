@@ -12,7 +12,7 @@ class MesaScopeTests(unittest.TestCase):
             root=Path(d); outside=root/'blender.exe';outside.touch()
             with self.assertRaises(ValueError):validate_destination(outside,root)
             exe=root/'verified-blender/blender/blender.exe';exe.parent.mkdir(parents=True);exe.touch()
-            self.assertEqual(validate_destination(exe,root),exe.parent)
+            self.assertEqual(validate_destination(exe,root),exe.parent.resolve())
             (exe.parent/'opengl32.dll').touch()
             with self.assertRaises(ValueError):validate_destination(exe,root)
     def test_dependency_is_immutable_not_latest(self):

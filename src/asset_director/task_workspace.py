@@ -101,7 +101,7 @@ def initialize(task):
                 "INVALID_TASK", "Blender did not retain the requested playback range")
     for name in task["targets"]:
         require(scene.objects.get(name) is not None, "TARGET_CHANGED", "Observed target is no longer in this scene: " + name)
-    for obj in bpy.context.selected_objects:
+    for obj in bpy.context.view_layer.objects:
         obj.select_set(False)
     for name in task["targets"]:
         obj = scene.objects[name]
@@ -116,7 +116,8 @@ def initialize(task):
         scene.frame_set(task["frame"])
     if task["camera"]:
         scene.camera = camera  # Preserve the requested camera after timeline markers.
-    if task["stage"] == "action" and bpy.context.object and bpy.context.object.type == "ARMATURE":
+    active = bpy.context.view_layer.objects.active
+    if task["stage"] == "action" and active and active.type == "ARMATURE":
         if bpy.ops.object.mode_set.poll():
             bpy.ops.object.mode_set(mode="POSE")
     if window and scene.camera and task["stage"] in {"shots", "light"}:

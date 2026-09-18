@@ -21,7 +21,7 @@ def observation(task, configured):
                 observed_at=time.time(), processId=os.getpid(), expected_file=matches,
                 dirty=bool(bpy.data.is_dirty) if matches else None, gui_configured=configured,
                 workspace=window.workspace.name if window and matches else None,
-                active_object=bpy.context.object.name if matches and bpy.context.object else None,
+                active_object=bpy.context.view_layer.objects.active.name if matches and bpy.context.view_layer.objects.active else None,
                 frame=scene.frame_current if matches else None,
                 checkpoint_available=returned,
                 areas=[dict(type=a.type, x=a.x, y=a.y, width=a.width, height=a.height)

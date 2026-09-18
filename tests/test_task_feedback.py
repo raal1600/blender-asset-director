@@ -16,8 +16,10 @@ class FeedbackTests(unittest.TestCase):
             task = dict(id='t', projectId='p', sceneId='s', projectDirectory=d,
                         workingScene='Scenes/work.blend', returnFile='Docs/return.json')
             bpy = NS(data=NS(filepath=str(root / 'Scenes/work.blend'), is_dirty=True),
-                     context=NS(window=None, scene=NS(frame_current=4), object=NS(name='Selected')))
+                     context=NS(window=None, scene=NS(frame_current=4), view_layer=NS(objects=NS(active=NS(name='Selected')))))
             with patch.dict(sys.modules, {'bpy': bpy}):
+                # Startup and timers have no area-specific context.object attribute.
+                self.assertFalse(hasattr(bpy.context, 'object'))
                 result = observation(task, False)
                 self.assertEqual(result['state'], 'READY')
                 self.assertTrue(result['dirty']); self.assertEqual(result['active_object'], 'Selected')
