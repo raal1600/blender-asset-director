@@ -15,7 +15,7 @@ class FeedbackTests(unittest.TestCase):
             root = Path(d); (root / 'Scenes').mkdir(); (root / 'Docs').mkdir()
             task = dict(id='t', projectId='p', sceneId='s', projectDirectory=d,
                         workingScene='Scenes/work.blend', returnFile='Docs/return.json')
-            bpy = NS(data=NS(filepath=str(root / 'Scenes/work.blend'), is_dirty=True),
+            bpy = NS(app=NS(background=True), data=NS(filepath=str(root / 'Scenes/work.blend'), is_dirty=True),
                      context=NS(window=None, scene=NS(frame_current=4), view_layer=NS(objects=NS(active=NS(name='Selected')))))
             with patch.dict(sys.modules, {'bpy': bpy}):
                 # Startup and timers have no area-specific context.object attribute.

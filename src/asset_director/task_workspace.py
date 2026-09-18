@@ -78,6 +78,18 @@ def initialize(task):
         bpy.ops.wm.open_mainfile(filepath=str(within(project, task["input"]["path"])), load_ui=False, use_scripts=False)
     else:
         bpy.ops.wm.read_factory_settings(use_empty=True)
+    from .task_window import task_window
+    window = task_window()
+    if window:
+        # File load can clear context.window even in a visible interactive process.
+        with bpy.context.temp_override(window=window):
+            return configure(task, project)
+    return configure(task, project)
+
+
+def configure(task, project):
+    import bpy
+    from . import license_policy as lp
     with Library(task["library"]) as lib:
         baseline = lp.derivation(lib, task["input"]["sha256"]) if task["input"] else []
         embedded = json.loads(bpy.context.scene.get(lp.SCENE_KEY, "[]"))
@@ -86,7 +98,8 @@ def initialize(task):
     configured = False
     window = bpy.context.window
     if window and not bpy.app.background:
-        workspace = bpy.data.workspaces.get(STAGES[task["stage"]])
+        workspace = (bpy.data.workspaces.get("Asset Director - " + task["stage"].title()) or
+                     bpy.data.workspaces.get(STAGES[task["stage"]]))
         if workspace:
             window.workspace = workspace
             workspace.name = "Asset Director - " + task["stage"].title()

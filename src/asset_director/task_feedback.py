@@ -13,15 +13,17 @@ def observation(task, configured):
     import bpy
     root = Path(task['projectDirectory']).resolve()
     matches = bool(bpy.data.filepath) and Path(bpy.data.filepath).resolve() == within(root, task['workingScene'])
-    window = bpy.context.window
-    scene = bpy.context.scene
+    from .task_window import task_window
+    window = task_window()
+    scene = window.scene if window else bpy.context.scene
+    active = (window.view_layer if window else bpy.context.view_layer).objects.active
     returned = within(root, task['returnFile']).is_file()
     return dict(taskId=task['id'], projectId=task['projectId'], sceneId=task['sceneId'],
                 state='CHECKPOINT_SAVED' if returned else 'READY' if matches else 'CONTEXT_CHANGED',
                 observed_at=time.time(), processId=os.getpid(), expected_file=matches,
                 dirty=bool(bpy.data.is_dirty) if matches else None, gui_configured=configured,
                 workspace=window.workspace.name if window and matches else None,
-                active_object=bpy.context.view_layer.objects.active.name if matches and bpy.context.view_layer.objects.active else None,
+                active_object=active.name if matches and active else None,
                 frame=scene.frame_current if matches else None,
                 checkpoint_available=returned,
                 areas=[dict(type=a.type, x=a.x, y=a.y, width=a.width, height=a.height)
@@ -39,8 +41,10 @@ def install(filename):
         self.layout.operator('asset_director.save_checkpoint', text='Save checkpoint & return')
 
     bpy.types.TOPBAR_MT_editor_menus.append(draw)
-    if bpy.context.window:
-        for area in bpy.context.window.screen.areas:
+    from .task_window import task_window
+    window = task_window()
+    if window:
+        for area in window.screen.areas:
             if area.type == 'VIEW_3D':
                 area.spaces.active.show_region_ui = True
 

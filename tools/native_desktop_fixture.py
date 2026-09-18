@@ -109,7 +109,8 @@ class Journey:
             status_file=directory/('Docs/Workbench/'+task['id']+'-status.json')
             status=wait(lambda:(v if (v:=read(status_file)).get('expected_file') or v['state']=='FAILED' else None),'identified task')
             assert status['state']!='FAILED',status
-            assert status['gui_configured'] and status['active_object']=='NativeSubject'
+            write(e.directory/'task-status.json', status)
+            assert status['gui_configured'] and status['active_object']=='NativeSubject', status
             self.ui(task['processId'],'capture',OutputPath=e.directory/'native-blender.png')
             check.update(workspace=status['workspace'],target=status['active_object'])
         with e.checkpoint('active_close_preserved'):
