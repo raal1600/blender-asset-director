@@ -22,3 +22,25 @@ jobs:
       - name: Build desktop executable with pinned WebView2 SDK
         shell: powershell
         run: ./launcher/tools/build-launcher.ps1 -RestoreDependencies
+      - name: Record exact source identity of the Windows candidate host
+        shell: python
+        run: |
+          import hashlib, json, os
+          from pathlib import Path
+          files = [*Path('launcher').glob('*.exe'), *Path('launcher').glob('*.dll')]
+          assert files, 'Windows build produced no desktop files'
+          Path('launcher/windows-build.json').write_text(json.dumps({
+              'commit': os.environ['GITHUB_SHA'], 'runtime': 'external Node/Python/Blender required',
+              'status': 'COMPILED_NOT_NATIVE_GUI_ACCEPTED',
+              'files': {f.name: hashlib.sha256(f.read_bytes()).hexdigest() for f in files}}, indent=2))
+      - name: Retain Windows host for isolated staging, not automatic installation
+        uses: actions/upload-artifact@v4
+        with:
+          name: workbench-windows-host-${{ github.sha }}
+          path: |
+            launcher/*.exe
+            launcher/*.dll
+            launcher/windows-build.json
+            launcher/WEBVIEW2-*.txt
+          if-no-files-found: error
+          retention-days: 14

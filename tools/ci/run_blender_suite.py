@@ -86,6 +86,11 @@ def main():
                         validate_fixture(text, expected, output)
                         if not expected.startswith('@'):
                             shutil.copy2(output/expected, destination/expected)
+                        if name == 'workbench-film':
+                            movie=output/'synthetic-film.mp4'
+                            if not movie.is_file() or movie.stat().st_size>8*1024*1024:
+                                raise RuntimeError('Missing or oversized synthetic film evidence')
+                            shutil.copy2(movie,destination/movie.name)
                         if name == 'proxy-visual':
                             previews = list(output.glob('proxy-*.png'))
                             if not previews:

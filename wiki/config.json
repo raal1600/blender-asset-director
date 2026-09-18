@@ -29,6 +29,7 @@
     "Safety": "SECURITY.md",
     "Contributing": "CONTRIBUTING.md",
     "Troubleshooting": "wiki/Troubleshooting.md",
-    "Live-Wiki": "docs/LIVE_WIKI.md"
+    "Live-Wiki": "docs/LIVE_WIKI.md",
+    "Scene-Workbench-MVP": "docs/SCENE_WORKBENCH_MVP.md"
   }
 }

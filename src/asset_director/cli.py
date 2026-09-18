@@ -25,6 +25,9 @@ def parser():
     q=s.add_parser("sequence-prepare"); q.add_argument("--review", required=True, help="Approval of an exact sequence-plan")
     q=s.add_parser("transfer-prepare"); q.add_argument("--review",required=True,help="Explicit approval of a completed transfer-plan job")
     q=s.add_parser("configure"); q.add_argument("--blender"); q.add_argument("--skill-path")
+    q=s.add_parser("film-assemble"); q.add_argument("--plan",required=True); q.add_argument("--project",required=True); q.add_argument("--ffmpeg",required=True); q.add_argument("--ffprobe",required=True)
+    s.add_parser("workbench-capabilities")
+    q=s.add_parser("workbench-catalog"); q.add_argument("--query",default=""); q.add_argument("--offset",type=int,default=0); q.add_argument("--limit",type=int,default=24); q.add_argument("--asset"); q.add_argument("--verify",action="store_true"); q.add_argument("--kind",choices=["model","pack","animation","material","hdri"])
     s.add_parser("doctor"); s.add_parser("providers"); s.add_parser("report"); s.add_parser("rebuild-catalog")
     q=s.add_parser("plan"); q.add_argument("brief")
     q=s.add_parser("studio-plan"); q.add_argument("--brief",required=True); q.add_argument("--audit",required=True)
@@ -54,6 +57,14 @@ def main(argv=None):
             if command.startswith("motion-") or command == "retarget-profile":
                 from .motion_cli import dispatch
                 result = dispatch(lib, args)
+            elif command == "workbench-capabilities":
+                result={"schema":1,"render_frames":True,"film_assemble":True,"task_workspace":True,"catalog":True,"asset_contents":True,"runtime":__version__,"implementation":jobs.implementation_hash(),"limits":{"frames_per_shot":360,"frames_per_film":3600,"render_seconds":900},"audio":False}
+            elif command == "workbench-catalog":
+                from .workbench_catalog import catalog
+                result=catalog(lib,args.query,args.offset,args.limit,args.asset,args.verify,args.kind)
+            elif command == "film-assemble":
+                from .film import assemble
+                result=assemble(lib,load_json(Path(args.plan)),args.project,args.ffmpeg,args.ffprobe)
             elif command == "configure":
                 result=settings.configure(library=args.library,blender=args.blender,skill_path=args.skill_path)
             elif command == "doctor":

@@ -102,6 +102,19 @@ export class Runtime {
     await command(path.join(process.env.SystemRoot,'explorer.exe'),[destination],10000).catch(e => { if (!e.message.includes('(1)')) throw e; });
     return {opened:destination};
   }
+  async launchWorkbenchTask(project,manifest) {
+    const helper=path.join(this.config.skill,'scripts/task_workspace.py');
+    assert(path.isAbsolute(this.config.blender)&&await exists(this.config.blender),'Configured Blender executable is missing.');
+    assert(await exists(helper),'Install the matching development harness; the task helper is missing.');
+    const task=await json(manifest);
+    assert(manifest===await safe(project.directory,`Runs/${task.id}.json`)&&task.projectId===project.id,'Invalid task manifest.');
+    // A new factory-startup process preserves every existing Blender window and
+    // user preference. There is deliberately no claim to an existing MCP socket.
+    const child=spawn(this.config.blender,['--factory-startup','--disable-autoexec','--python',helper,'--',manifest],
+      {detached:true,stdio:'ignore',windowsHide:false,cwd:project.directory});
+    await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
+    child.unref();return child.pid;
+  }
   async launchReview(project,filename){
     assert(await exists(this.config.blender),'Configured Blender executable is missing.');
     const child=spawn(this.config.blender,['--disable-autoexec',filename],{detached:true,stdio:'ignore',windowsHide:false,cwd:project.directory});

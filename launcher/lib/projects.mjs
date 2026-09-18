@@ -4,6 +4,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { assert, exists, json, now, relativeName, safe, slash, snapshot, writeJson } from './storage.mjs';
 
+import {validateWorkbench} from './workbench-model.mjs';
 import {validateOnboarding} from './onboarding.mjs';
 
 export const projectId = id => assert(/^prj_[0-9a-f-]{36}$/.test(id), 'Invalid project ID.');
@@ -23,6 +24,9 @@ export class Store {
     for (const a of p.assets) { sourceId(a.sourceId); assert(/^[0-9a-f]{64}$/.test(a.version), 'Invalid asset version.'); }
     for (const j of p.jobs) assert(/^j_[0-9a-f]{24}$/.test(j.id), 'Invalid job reference.');
     validateOnboarding(p);
+    validateWorkbench(p.workbench);
+    if(p.workbench) assert(p.workbench.scenes.every(s=>s.sources.every(id=>p.assets.some(a=>a.sourceId===id))),
+      'Scene sources must remain pinned by their production.');
     return p;
   }
   async list() {
@@ -129,7 +133,7 @@ export class Store {
     assert(!p.assets.some(a => a.sourceId === sid), 'Source already linked. Remove its reference before deliberately choosing a new version.', 409);
     p.assets.push({ sourceId: sid, version: s.version, linkedAt: now() }); return this.save(p, revision);
   }
-  async detach(id, sid, revision) { const p = await this.get(id); sourceId(sid); p.assets = p.assets.filter(a => a.sourceId !== sid); return this.save(p, revision); }
+  async detach(id, sid, revision) { const p = await this.get(id); sourceId(sid); assert(!p.workbench?.scenes.some(s=>s.sources.includes(sid)),'This source is selected by a scene. Deselect it there before removing the production pin.',409); p.assets = p.assets.filter(a => a.sourceId !== sid); return this.save(p, revision); }
   async verify(id) {
     const p = await this.get(id); const results = [];
     for (const ref of p.assets) {
@@ -175,6 +179,8 @@ export class Store {
     const p=await this.get(id);
     assert(p.revision===revision,'Project changed. Refresh before moving it to Trash.',409);
     assert(!(await fs.lstat(p.directory)).isSymbolicLink(),'Linked project folders cannot be moved to Trash.');
+    for(const lock of ['Runs/.interactive-execution.lock','Runs/.workbench-writer.lock'])
+      assert(!await exists(await safe(p.directory,lock)),'A project writer is active or needs recovery.',409);
     const runs=await this.runs(id);
     assert(!runs.some(r=>['RUNNING','PREPARING'].includes(r.state)),'An operation is unfinished. Resolve it before moving the project.',409);
     for(const ref of p.jobs) {

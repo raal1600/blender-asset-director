@@ -13,8 +13,11 @@ from . import motion_contract
 from . import transfer_contract
 from . import bone_display_contract
 from . import sequence_contract
+from . import render_sequence
 
 OPS = {
+    "render-readiness": set(),
+    "render-frames": render_sequence.FIELDS,
     **sequence_contract.OPS,
     "bone-display-audit": bone_display_contract.AUDIT_FIELDS,
     "bone-display": bone_display_contract.DISPLAY_FIELDS,
@@ -33,7 +36,8 @@ OPS = {
     "look-adjust": set(look_contract.LOOK_FIELDS),
     "light-rig": {"subjects", "lights"},
     "index": {"max_clips", "sample"},
-    "import": {"collection", "selection"},
+    "asset-contents": {"file"},
+    "import": {"collection", "selection", "file"},
     "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture", "transfer_binding", "max_output_intervals"},
     "assemble": {"target_object", "clips", "fps", "controller_speed", "direction", "terrain_object", "travel_frames"},
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
@@ -41,7 +45,7 @@ OPS = {
 }
 MUTATIONS = {"sequence-execute", "bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
              "light-adjust", "world-adjust", "look-adjust", "light-rig"}
-TARGET_REQUIRED = {"sequence-plan", "sequence-execute", "sequence-check", "bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
+TARGET_REQUIRED = {"render-readiness", "render-frames", "sequence-plan", "sequence-execute", "sequence-check", "bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
                    "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 
 OPS.update(motion_contract.OPS)
@@ -109,8 +113,14 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
         path = Path(input_file).expanduser().resolve()
         require(path.is_file() and path.suffix.lower() in {".blend", ".glb", ".gltf", ".fbx", ".bvh", ".obj"}, "INVALID_INPUT", "Input must be an existing supported Blender/asset file")
         inputs.append({"role": "target", "path": str(path), "sha256": file_hash(path), "size": path.stat().st_size})
+    render_dependency = None
+    if operation in {"render-readiness", "render-frames"}:
+        require(asset_id is None and input_file is not None and Path(input_file).suffix.lower() == ".blend",
+                "TARGET_REQUIRED", "Render operations require a saved .blend checkpoint, not an asset ID")
+    if operation == "render-frames":
+        render_dependency = render_sequence.prepare(lib, options, input_file)
     asset = lib.get(asset_id) if asset_id else None
-    source_files = []
+    source_files = [render_dependency] if render_dependency else []
     if asset:
         require(asset.local_files, "ASSET_NOT_ACQUIRED", "Acquire/intake the source first")
         if operation in {"import", "retarget", "native-clip", "transfer-plan"}:
@@ -150,6 +160,12 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     if asset and operation != "index" and asset.metadata.get("license_grant"):
         grants.add(asset.metadata["license_grant"])
     for f in inputs: grants.update(lp.derivation(lib, f["sha256"]))
+    if operation in {"import", "asset-contents"}:
+        require(asset is not None, "SOURCE_REQUIRED", "Choose an acquired catalog asset")
+        from .workbench_catalog import validate_import
+        validate_import(lib, asset, options)
+        if operation == "asset-contents":
+            require(not input_file and "file" in options, "SOURCE_ONLY_OPERATION", "Inspect one explicit source member, without a target")
     if operation == "native-clip":
         require(asset and asset.kind == "animation" and asset.metadata.get("action") and asset.metadata.get("fps"),
                 "INDEX_REQUIRED", "Choose an indexed animation clip for native playback")
@@ -212,6 +228,10 @@ def read_job(lib: Library, jid: str) -> tuple[dict, Path]:
     current = lp.dependencies(lib, job["specification"].get("license_grants", []))
     require(current == job["specification"].get("license_files", []), "LICENSE_EVIDENCE_CHANGED", "Prepared license evidence changed")
     for f in current: lib.verify_file(f)
+    if job["specification"]["operation"] == "render-frames":
+        audit, _ = render_sequence.readiness(lib, job["specification"]["options"]["readiness_job"],
+                                             job["specification"]["inputs"][0]["path"])
+        render_sequence.verify_external(audit)
     return job, path
 
 
