@@ -7,7 +7,8 @@ record `git rev-parse HEAD` and the separately tested PR merge SHA.
 
 ## A scene owns its work
 
-Open `/workbench` in the existing local launcher. Productions has only **Scenes**
+Use `SystemRuntime/Launcher/Start Workbench.ps1` in the staging studio, or
+open `/workbench` in the existing authenticated local launcher. Productions has only **Scenes**
 and **Final film**. Each scene keeps its own **World → Action → Shots → Light →
 Render** position, source choices, immutable checkpoints, and review decisions.
 The legacy launcher stays available during migration.
@@ -16,6 +17,9 @@ World exposes the actual harness catalog and the independent original database
 packages. Search, inspect provenance and package images, and select ingredients.
 An item marked **Selected** is not an imported object. For a Blender package,
 inspect its actual collection names before selecting which collections to import.
+A file containing only loose scene-root objects has no appendable collections;
+prepare a separate package with a named collection in Blender, leaving the
+original unchanged.
 For another supported model member, choose its exact recorded file. A user must
 confirm source use for this project's pinned versions; native license policies
 still apply and can refuse the operation. No source is automatically relicensed.

@@ -35,4 +35,11 @@ world.use_nodes = True
 scene.world = world
 scene.frame_end = 12
 scene.frame_set(1)
+# A reusable .blend package needs a real named Collection. The scene's master
+# collection is not a library collection and cannot be explicitly appended.
+collection = bpy.data.collections.new('Synthetic_E2E_Set')
+scene.collection.children.link(collection)
+for obj in list(scene.collection.objects):
+    collection.objects.link(obj)
+    scene.collection.objects.unlink(obj)
 bpy.ops.wm.save_as_mainfile(filepath=str(out))

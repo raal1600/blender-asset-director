@@ -23,6 +23,7 @@ class StagingTests(unittest.TestCase):
             self.assertEqual(Path(config['library']).resolve(), (root/'Database/AssetDirector').resolve())
             self.assertTrue((root/'Database/AssetDirector/catalog.sqlite').is_file())
             self.assertTrue((root/'SystemRuntime/Launcher/public/workbench.html').is_file())
+            self.assertTrue((root/'SystemRuntime/Launcher/Start Workbench.ps1').is_file())
             self.assertEqual(list((root/'Database/Meshes').iterdir()),[])
             self.assertFalse(result['production_installed']);self.assertEqual(result['native_gui'],'NOT_TESTED')
     def test_invalid_executable_does_not_create_target(self):
