@@ -1,3 +1,4 @@
+import {atomicRename} from './atomic-rename.mjs';
 import fs from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import path from 'node:path';
@@ -36,11 +37,19 @@ export async function safe(root, relative = '') {
 export async function writeJson(filename, value) {
   await fs.mkdir(path.dirname(filename), { recursive: true });
   const tmp = `${filename}.${randomUUID()}.tmp`;
+  let prepared=false;
   try {
     const handle = await fs.open(tmp, 'wx');
     try { await handle.writeFile(JSON.stringify(value, null, 2) + '\n'); await handle.sync(); } finally { await handle.close(); }
-    await fs.rename(tmp, filename);
-  } finally { await fs.rm(tmp, { force: true }); }
+    prepared=true;
+    await atomicRename(tmp, filename);
+  } catch(error) {
+    // A complete but unpublished snapshot is recovery evidence, not committed
+    // state. Preserve the prior destination and report failure honestly.
+    if(prepared)error.message+='; uncommitted JSON snapshot retained at '+tmp;
+    else await fs.rm(tmp,{force:true}).catch(()=>{});
+    throw error;
+  }
 }
 export async function fileHash(filename) {
   const h = createHash('sha256');
