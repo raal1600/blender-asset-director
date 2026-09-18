@@ -116,6 +116,10 @@ def main():
         check(result['state'] == 'SUCCEEDED' and result['frames'] == 12 and len(result['sources']) == 3, 'three_scene_film_encoded_and_decoded')
         check(result['audio'] == 'NONE' and result['human_acceptance'] == 'PENDING', 'technical_success_not_artistic_approval')
         check(result['fps'] == {'numerator': 24, 'denominator': 1} and result['dimensions'] == [64, 64], 'exact_delivery_timebase')
+        # Retain only the generated movie, not the fixture's .blend files or catalog.
+        movie = project / 'Deliverables' / plan['id'] / result['file']
+        shutil.copyfile(movie, OUT / 'synthetic-film.mp4')
+        check(file_hash(OUT / 'synthetic-film.mp4') == result['sha256'], 'retained_film_matches_verified_output')
         rejection(lambda: film.assemble(lib, plan, project, encoder, probe), 'OUTPUT_EXISTS', 'film_does_not_overwrite')
         bad = dict(plan, id='cut_' + str(uuid.uuid4()), clips=[dict(clips[0], checkpoint_sha256='f' * 64)])
         rejection(lambda: film.assemble(lib, bad, project, encoder, probe), 'STALE_FILM_PLAN', 'wrong_checkpoint_refused')

@@ -20,7 +20,7 @@ class StagingTests(unittest.TestCase):
             result=create(root,sys.executable,sys.executable,sys.executable,source_commit='a'*40)
             self.assertEqual(result['status'],'CREATED');self.assertEqual(result['runtime_ready'],'NOT_VERIFIED')
             config=json.loads((root/'SystemRuntime/UserData/Launcher/config.json').read_text())
-            self.assertEqual(config['library'],str(root/'Database/AssetDirector'))
+            self.assertEqual(Path(config['library']).resolve(), (root/'Database/AssetDirector').resolve())
             self.assertTrue((root/'Database/AssetDirector/catalog.sqlite').is_file())
             self.assertTrue((root/'SystemRuntime/Launcher/public/workbench.html').is_file())
             self.assertEqual(list((root/'Database/Meshes').iterdir()),[])
