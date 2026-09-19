@@ -1,6 +1,6 @@
 ﻿# Asset Director Launcher 0.1.0
 
-The scene workbench is the only client: `/`, `/index.html`, and `/workbench` open the same application. The old frontend and `-Legacy` startup switch are removed; existing project schemas, source folders, provider/MCP definitions and reviewed backend APIs are retained. Studio contains diagnostics and recoverable project archive/restore.
+The scene workbench is the only client: `/`, `/index.html`, and `/workbench` open the same application. The old frontend and `-Legacy` startup switch are removed; existing project schemas, source folders, provider/MCP definitions and reviewed backend APIs are retained. Productions exposes Archive production on each row and Archived productions for restore; Studio also retains diagnostics and archive.
 
 Local Node 20+ application; no npm dependencies, build service, API key, or cloud storage. Double-click `Asset Director.exe` to open the dedicated desktop window. It uses the installed Microsoft Edge WebView2 runtime and starts or reuses the loopback server. Closing the desktop window stops the server when idle. The PowerShell script remains available for browser-only use; browser tabs do not control server lifetime.
 
@@ -39,7 +39,7 @@ Official API references used: [Node child processes](https://nodejs.org/download
 
 ## Project Trash
 
-Use the three-dot menu beside a project under Your Projects, then Move project to Trash. Close that project in Blender/Codex before moving it. The folder is moved intact to Archive/Trash/<project-id>/<original-folder>; shared database sources and harness job records remain untouched. Unfinished operations block the move. Trashed projects continue to reserve their job ownership.
+On Productions, choose Archive production beside the intended production, then confirm its name. Use Archived productions to restore it. Archive is recoverable removal, not permanent deletion; it is also available under an open production's Studio menu. Close that project in Blender/Codex before moving it. The folder is moved intact to Archive/Trash/<project-id>/<original-folder>; shared database sources and harness job records remain untouched. Unfinished operations block the move. Trashed projects continue to reserve their job ownership.
 
 System > Project Trash provides Restore, which returns the project to its exact original path and refuses to overwrite an existing folder. There is no permanent-delete endpoint.
 

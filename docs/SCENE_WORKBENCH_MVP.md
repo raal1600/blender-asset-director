@@ -26,7 +26,7 @@ per scene **and activity** for the current browser session. Motion results use c
 filtered by type; source texture sheets are not represented as motion previews.
 **Checkpoint preview** shows a real rendered still tied to the displayed checkpoint, or the current rendered shot movie during Render. Its empty state is not an error or a live viewport: save a checkpoint, then explicitly authorize a preview. A still does not prove animation; temporal review remains in Blender or the actual movie. **Open Blender · assemble world** is the manual working-copy route. **Open Codex specialist** is the separately reviewed AI-assisted route; launching it is not approval, automatic import, or control of the manual task.
 
-Production diagnostics and recoverable archive/restore live in the new workbench. Saved-file auditing verifies an explicit owned file without changing the project's scene pointer. Existing modular E2E journeys now use this surface, not an unlinked legacy test page.
+Productions exposes Open production and Archive production on every row, plus Archived productions for restore. The named archive confirmation preserves files/history and explains restoration; cancellation does not send a write. The selected row's ID/revision is used, never another open production. Existing stale-revision, active-writer and occupied-restore guards remain enforced. Studio also retains diagnostics and archive. Saved-file auditing verifies an explicit owned file without changing the project's scene pointer. Existing modular E2E journeys now use this surface, not an unlinked legacy test page.
 
 Details and exact import gates remain in the inspector. Original packages are
 not merged with catalog records based on a matching name.

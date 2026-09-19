@@ -178,15 +178,44 @@ def recovery(s):
         s.click('[data-action="diagnostics"]')
         expect(s.page.locator('#diagnostic-jobs')).to_contain_text('SUCCEEDED')
         s.click('#dialog [data-action="close"]')
-    with s.evidence.checkpoint('trash_restored'):
-        s.page.on('dialog', lambda dialog: dialog.accept())
-        s.click('[data-action="settings"]')
-        s.click('[data-action="archive-production"]')
+    with s.evidence.checkpoint('trash_restored') as check:
+        peer=s.api('projects/create',{'name':'Synthetic untouched production','brief':'Must remain unchanged when another production is archived.'})
+        peer_manifest=Path(peer['directory'])/'project.json';peer_hash=digest(peer_manifest)
+        original={p.relative_to(s.project_dir).as_posix():digest(p) for p in s.project_dir.rglob('*') if p.is_file()}
+        s.click('[data-action="refresh"]')
+        s.click('[data-action="picker"]')
+        row='[data-production-id="'+s.project['id']+'"]'
+        expect(s.page.locator(row+' [data-action="project"]')).to_be_visible()
+        expect(s.page.locator(row+' [data-action="archive-production"]')).to_be_visible()
+        s.page.screenshot(path=str(s.evidence.directory/'productions-archive-desktop.png'))
+        s.page.set_viewport_size({'width':390,'height':844})
+        assert s.page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        s.page.screenshot(path=str(s.evidence.directory/'productions-archive-mobile.png'))
+        s.page.set_viewport_size({'width':1440,'height':1100})
+        messages=[]
+        def cancel_archive(dialog):
+            messages.append(dialog.message);dialog.dismiss()
+        s.page.once('dialog',cancel_archive)
+        s.click(row+' [data-action="archive-production"]')
+        assert 'Synthetic E2E Project' in messages[-1] and 'not permanent deletion' in messages[-1]
+        assert s.project_dir.exists() and not s.api('state')['trash']['projects']
+        assert original=={p.relative_to(s.project_dir).as_posix():digest(p) for p in s.project_dir.rglob('*') if p.is_file()}
+        s.page.once('dialog',lambda dialog:dialog.accept())  # Generated fixture only, not a human decision.
+        s.click(row+' [data-action="archive-production"]')
         assert not s.project_dir.exists()
         assert digest(s.source) == s.source_hash and s.png.exists()
+        assert digest(peer_manifest)==peer_hash
+        expect(s.page.locator('[data-production-id="'+peer['id']+'"]')).to_be_visible()
+        expect(s.page.locator(row)).to_have_count(0)
         s.click('[data-action="archived-productions"]')
+        s.page.once('dialog',lambda dialog:dialog.accept())  # Restore the generated fixture only.
         s.click('[data-action="restore-production"][data-id="'+s.project['id']+'"]')
         expect(s.page.locator('.projectbar .production')).to_contain_text('Synthetic E2E Project')
         assert digest(s.project_dir/'Renders/synthetic-preview.png') == digest(s.png)
         assert not s.api('state')['trash']['projects']
+        assert original=={p.relative_to(s.project_dir).as_posix():digest(p) for p in s.project_dir.rglob('*') if p.is_file()}
+        assert digest(peer_manifest)==peer_hash
+        check.update(surface='Productions list',named_confirmation=True,cancel_preserved=True,
+                     other_production_unchanged=True,complete_project_bytes_restored=True,
+                     approval_input='scripted generated-fixture decisions only')
         s.preserve()

@@ -10,6 +10,9 @@ dialog video{width:100%;max-height:65vh;background:#0a1019} [hidden]{display:non
 @media(max-width:760px){.projectbar{flex-wrap:wrap}.library-stack{width:100%}.world.has-checkpoint .library-stack,.action .library-stack{order:1}.world.has-checkpoint .evidence,.action .evidence{order:0}.action .decision{order:2}}
 /* The scene keeps ingredients compact; the library is a bounded, contextual dialog. */
 .workbench.world{grid-template-columns:minmax(0,1fr) 260px}
+.production-row>.production-copy{min-width:0;overflow-wrap:anywhere}
+.production-row>.production-actions{flex:0 0 auto}
+@media(max-width:760px){.production-row>.production-copy,.production-row>.production-actions{flex-basis:100%}.production-actions button{flex:1 1 100%}}
 .ingredients{border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:14px 16px;margin-bottom:20px}
 .ingredients-heading{display:flex;align-items:center;gap:16px}
 .ingredients h3{font-size:14px}.ingredients p{margin-top:4px}
