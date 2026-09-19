@@ -9,6 +9,7 @@ import {shotFor,renderIsCurrent,previewIsCurrent} from '../public/workbench-line
 import {assertObservedShot} from './workbench-shots.mjs';
 import {Interactions} from './interactions.mjs';
 import {buildSessionContext} from './onboarding.mjs';
+import {sourcePage,selectedSourceSummary} from './source-browser.mjs';
 const uid = prefix => prefix+randomUUID();
 const lockName='Runs/.workbench-writer.lock';
 const sharedLock='Runs/.interactive-execution.lock';
@@ -29,7 +30,19 @@ export class Workbench {
       return {...await this.runtime.harness(['workbench-capabilities']),encoder};}
     catch(e) {return {schema:1,available:false,message:'This workbench needs the matching development harness. The installed runtime was not changed.',detail:e.message};}
   }
-  async state(id) {
+  async sourcePage(id,{sceneId,selected=false,...options}={}) {
+    const p=await this.project(id);
+    assert(typeof selected==='boolean','Invalid source scope.');
+    const selectedIds=selected?this.scene(p,sceneId).sources:null;
+    return sourcePage(await this.store.inventory(),{...options,selectedIds});
+  }
+  async sourceDetail(id,sourceId) {
+    await this.store.get(id);
+    assert(validId(sourceId,'src_'),'Invalid source identity.');
+    const source=(await this.store.inventory()).sources.find(a=>a.id===sourceId);
+    assert(source,'Source not found.',404);return source;
+  }
+  async state(id,{compact=false}={}) {
     const p=await this.project(id);
     const locked=await exists(await safe(p.directory,lockName))||await exists(await safe(p.directory,sharedLock));
     const taskStatuses={};
@@ -37,7 +50,8 @@ export class Workbench {
       const file=await safe(p.directory,`Docs/Workbench/${scene.task}-status.json`);
       if(await exists(file)) {const status=await json(file);assert(status.taskId===scene.task&&status.projectId===id&&status.sceneId===scene.id,'Wrong task status identity.');taskStatuses[scene.id]=status;}
     }
-    return {project:p,stages,taskStatuses,savedScenes:await this.store.scenes(id),inventory:await this.store.inventory(),locked,sourceUse:await this.interactions(id).sourceStatus(),runs:await this.store.runs(id)};
+    const inventory=await this.store.inventory();
+    return {project:p,stages,taskStatuses,savedScenes:await this.store.scenes(id),inventory:compact?selectedSourceSummary(inventory,p):inventory,locked,sourceUse:await this.interactions(id).sourceStatus(),runs:await this.store.runs(id)};
   }
   async unlocked(p) {
     assert(!await exists(await safe(p.directory,lockName)),'This project has an unfinished workbench task. Collect or resolve it first.',409);
