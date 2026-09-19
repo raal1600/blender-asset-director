@@ -16,6 +16,23 @@ legacy launcher remains available at `/` and through `Start Launcher.ps1 -Legacy
 
 World exposes the actual harness catalog and the independent original database
 packages. Search, inspect provenance and package images, and select ingredients.
+The scene shows a bounded Ingredients summary (four rows at most). **Browse
+assets** opens a viewport-bounded browser with separate **Catalog assets** and
+**Source packages** tabs, one scoped search, type/selected filters, grid/list
+layouts and 24-result pages. Search, source tab, page and result scroll are kept
+per scene for the current browser session. Motion results use compact rows when
+filtered by type; source texture sheets are not represented as motion previews.
+Details and exact import gates remain in the inspector. Original packages are
+not merged with catalog records based on a matching name.
+
+The workbench opts into compact state responses (selected source summaries only)
+and loads catalog/package pages only while browsing. The legacy state API remains
+unchanged. Package paging is read-only; Refresh library explicitly confirms a
+registry rescan. No schema migration, automatic intake, preview generation,
+relicensing, dependency download or library rewrite is performed. Registry search
+still reads its JSON index on the server; this is bounded response/DOM loading,
+not a claim of an indexed large-scale database search implementation.
+
 An item marked **Selected** is not an imported object. For a Blender package,
 inspect its actual collection names before selecting which collections to import.
 A file containing only loose scene-root objects has no appendable collections;

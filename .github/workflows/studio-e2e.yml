@@ -71,6 +71,17 @@ jobs:
         subprocess.run([sys.executable, 'tools/studio_e2e/run.py',
             '--blender', os.environ['BLENDER'], '--scenario', os.environ['JOURNEY'],
             '--evidence', 'evidence/studio-e2e'], check=True)
+    - name: Verify bounded catalog UI with 10000 synthetic records
+      if: inputs.scenario == 'full' || inputs.scenario == ''
+      run: python tools/catalog_browser_suite.py --evidence evidence/catalog-browser
+    - name: Retain separate synthetic catalog UI evidence
+      if: always() && (inputs.scenario == 'full' || inputs.scenario == '')
+      uses: actions/upload-artifact@v4
+      with:
+        name: catalog-browser-${{ matrix.os }}-${{ github.sha }}
+        path: evidence/catalog-browser/
+        if-no-files-found: error
+        retention-days: 14
     - name: Report executed checkpoints and limitations
       if: always()
       shell: python

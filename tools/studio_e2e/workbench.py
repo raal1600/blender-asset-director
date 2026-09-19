@@ -51,8 +51,11 @@ def review_scene(s):
         click('[data-action="new-scene"]:visible >> nth=0')
         page.locator('#new-name').fill('Synthetic workbench scene')
         click('[data-action="save-scene"]')
-        expect(page.locator('.asset')).to_have_count(1)
-        click('.asset [data-action="source"]')
+        click('[data-action="browse-assets"]:visible >> nth=0')
+        click('[data-action="browser-tab"][data-tab="sources"]')
+        expect(page.locator('.browser-asset')).to_have_count(1)
+        click('.browser-asset [data-action="source"]')
+        click('[data-action="browser-close"]')
         state = s.api('workbench/state?projectId=' + s.project['id'])
         scene = state['project']['workbench']['scenes'][0]
         assert len(scene['sources']) == 1 and not scene['checkpoints']
@@ -119,7 +122,10 @@ def catalog_and_film(s, click, idle, check):
     aid = asset['asset_id']
     click('[data-action="stage"][data-stage="world"]')
     click('.projectbar [data-action="refresh"]')
+    click('[data-action="browse-assets"]:visible >> nth=0')
+    click('[data-action="browser-tab"][data-tab="catalog"]')
     click('[data-action="catalog-select"][data-id="' + aid + '"]')
+    click('[data-action="browser-close"]')
     use = s.api('workbench/state?projectId=' + s.project['id'])['sourceUse']
     assert not use['ready'] and any(a['sourceId'] == aid for a in use['scope']['sources'])
     click('[data-action="source-review"]')
@@ -141,11 +147,11 @@ def catalog_and_film(s, click, idle, check):
             time.sleep(.2)
         raise AssertionError('Workbench native operation did not finish')
 
-    click('[data-action="catalog-detail"][data-id="' + aid + '"]')
+    click('.ingredient[data-action="catalog-detail"][data-id="' + aid + '"]')
     click('[data-action="catalog-inspect"]')
     scene = settle()
     assert scene['assetContents'][aid]['collections']
-    click('[data-action="catalog-detail"][data-id="' + aid + '"]')
+    click('.ingredient[data-action="catalog-detail"][data-id="' + aid + '"]')
     page.locator('[name="catalog-collection"]').first.check()
     def confirm(dialog):
         dialog.accept()

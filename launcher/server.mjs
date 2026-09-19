@@ -32,7 +32,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
       const url = new URL(req.url,origin);
       if (!url.pathname.startsWith('/api/')) {
         assert(req.method === 'GET','Method not allowed.',405);
-        const assets = {'/workbench-images.mjs':'workbench-images.mjs','/':'index.html','/app.mjs':'app.mjs','/style.css':'style.css','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-task.mjs':'workbench-task.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
+        const assets = {'/workbench-browser.mjs':'workbench-browser.mjs','/workbench-images.mjs':'workbench-images.mjs','/':'index.html','/app.mjs':'app.mjs','/style.css':'style.css','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-task.mjs':'workbench-task.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
         assert(Object.hasOwn(assets,url.pathname),'Not found.',404);
         const ext = path.extname(assets[url.pathname]); res.setHeader('Content-Type',ext === '.html' ? 'text/html; charset=utf-8' : ext === '.css' ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8');
         return res.end(await fs.readFile(path.join(here,'public',assets[url.pathname])));
@@ -74,9 +74,11 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
           if(p==='/api/lifecycle/task')return taskForExit(workbench,id,url.searchParams.get('runId'));
           if (p === '/api/workbench/catalog') return workbench.catalogPage(id,{query:url.searchParams.get('query')||'',offset:Number(url.searchParams.get('offset')||0),kind:url.searchParams.get('kind')||null});
           if (p === '/api/workbench/catalog-detail') return workbench.catalogDetail(id,url.searchParams.get('assetId'));
-          if (p === '/api/workbench/state') return workbench.state(id);
+          if (p === '/api/workbench/sources') return workbench.sourcePage(id,{query:url.searchParams.get('query')||'',kind:url.searchParams.get('kind')||'',offset:Number(url.searchParams.get('offset')||0),sceneId:url.searchParams.get('sceneId'),selected:url.searchParams.get('selected')==='true'});
+          if (p === '/api/workbench/source-detail') return workbench.sourceDetail(id,url.searchParams.get('sourceId'));
+          if (p === '/api/workbench/state') return workbench.state(id,{compact:url.searchParams.get('compact')==='true'});
           if (p === '/api/workbench/capabilities') return workbench.available();
-          if (p === '/api/state') return {capabilities,...await store.list(),trash:await store.trashList(),inventory:await store.inventory(),health:runtime.health,root,version:'0.1.0'};
+          if (p === '/api/state') return {capabilities,...await store.list(),trash:await store.trashList(),...(url.searchParams.get('compact')==='true'?{}:{inventory:await store.inventory()}),health:runtime.health,root,version:'0.1.0'};
           if (p === '/api/project') return {project:await store.get(id),scenes:await store.scenes(id),jobs:await runtime.jobs(id),runs:await store.runs(id)};
           if (p === '/api/codex/preview') return buildSessionContext(store,config,id);
           if (p === '/api/blender/scene') return runtime.liveScene(id);
