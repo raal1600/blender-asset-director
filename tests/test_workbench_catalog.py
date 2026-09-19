@@ -49,6 +49,22 @@ class CatalogTests(unittest.TestCase):
         item=catalog(self.lib,asset_id=self.asset.id,verify=True)
         self.assertTrue(item['verified']);self.assertFalse(item['policy']['eligible'])
         with self.assertRaises(DirectorError):jobs.prepare(self.lib,'import',asset_id=self.asset.id,options={'file':'incoming/model.blend','selection':['Set']})
+    def test_kind_groups_filter_before_pagination_without_rewriting_catalog(self):
+        from dataclasses import replace
+        for i in range(60):
+            self.lib.put(replace(self.asset, source_id='scope-'+str(i), title='Scoped '+str(i),
+                                 kind=['model','pack','animation','material','hdri'][i % 5]))
+        before=[a.to_dict() for a in self.lib.all()]
+        world=catalog(self.lib,kinds=['model','pack'])
+        self.assertEqual(world['total'],25);self.assertEqual(len(world['items']),24)
+        self.assertEqual(len(catalog(self.lib,kinds=['model','pack'],offset=24)['items']),1)
+        self.assertTrue(all(a['kind'] in {'model','pack'} for a in world['items']))
+        self.assertEqual(catalog(self.lib,kinds=['animation'])['total'],12)
+        self.assertEqual(catalog(self.lib,kinds=['material','hdri'])['total'],24)
+        self.assertEqual(catalog(self.lib,kinds=['model','pack'],kind='animation')['total'],0)
+        self.assertEqual([a.to_dict() for a in self.lib.all()],before)
+        for kinds in [[],['wrong'],['model','model'],'model',[{}],True]:
+            with self.subTest(kinds=kinds),self.assertRaises(DirectorError):catalog(self.lib,kinds=kinds)
     def test_query_and_identity_bounds(self):
         for args in [{'limit':51},{'offset':-1},{'limit':True},{'query':'a'*2001},{'asset_id':'../../outside'},{'verify':True}]:
             with self.subTest(args=args),self.assertRaises(DirectorError):catalog(self.lib,**args)

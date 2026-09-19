@@ -42,7 +42,28 @@ def main():
             click('[data-action="project"][data-id="'+session['projectId']+'"]')
             assert not any('/api/workbench/catalog' in r['path'] or '/api/workbench/sources'==r['path'] for r in report['requests'])
             capture('01-compact-scene')
+            assert not page.get_by_text('Legacy launcher',exact=True).count()
+            # Explicit metadata-only scenes, not lifecycle/Blender approval evidence.
+            for scene_id,activity,catalog_count,source_count,kinds in [
+                (session['sceneId'],'world',4000,6666,{'model','pack'}),
+                (session['motionSceneId'],'action',2000,3334,{'animation'}),
+                (session['lookSceneId'],'light',4000,0,{'material','hdri'})]:
+                click('[data-action="scene"][data-id="'+scene_id+'"]')
+                click('[data-action="browse-assets"].primary')
+                expect(page.locator('#browser-activity')).to_have_value(activity)
+                expect(page.locator('.browser-asset')).to_have_count(24)
+                assert set(page.locator('.browser-asset').evaluate_all('(rows)=>rows.map(r=>r.dataset.kind)'))<=kinds
+                assert 'of '+str(catalog_count)+' assets' in page.locator('.browser-footer [role="status"]').inner_text()
+                capture('workflow-'+activity+'-catalog')
+                click('[data-action="browser-tab"][data-tab="sources"]')
+                expect(page.locator('.browser-asset')).to_have_count(min(source_count,24))
+                assert 'of '+str(source_count)+' packages' in page.locator('.browser-footer [role="status"]').inner_text()
+                capture('workflow-'+activity+'-sources')
+                click('[data-action="browser-close"]')
+            click('[data-action="scene"][data-id="'+session['sceneId']+'"]')
             click('[data-action="browse-assets"].primary')
+            page.locator('#browser-activity').select_option('all');idle()
+            click('[data-action="browser-tab"][data-tab="catalog"]')
             expect(page.locator('.browser-asset')).to_have_count(24)
             capture('02-wide-catalog')
             page.locator('.browser-results').evaluate('(e)=>e.scrollTop=350')
@@ -105,7 +126,7 @@ def main():
                 page.keyboard.press('Escape')
             assert hashlib.sha256(registry.read_bytes()).hexdigest()==before
             assert not report['errors'],report['errors']
-            report['checks']=['lazy catalog/package requests','24-card bound with 10000 entries','next page','reopen restores page/scroll','search across full library','search retained across sources','source inspector','motion rows without atlas requests','native inspector refuses import','selection survives refresh without import','selected filter','empty search','modal keyboard containment','nested Escape and focus return','1024 and 390 responsive layouts','registry preserved']
+            report['checks']=['World: models/packs only','Action: movement only','Light: materials/HDRIs only','workflow filter before pagination','source packages filtered by activity','activity-specific browser state','legacy entry removed','explicit entire-library escape','lazy catalog/package requests','24-card bound with 10000 entries','next page','reopen restores page/scroll','search across full library','search retained across sources','source inspector','motion rows without atlas requests','native inspector refuses import','selection survives refresh without import','selected filter','empty search','modal keyboard containment','nested Escape and focus return','1024 and 390 responsive layouts','registry preserved']
             report['status']='PASS'
         except Exception as e:
             report['status']='FAIL';report['failure']=str(e).replace(session['token'],'[REDACTED]')

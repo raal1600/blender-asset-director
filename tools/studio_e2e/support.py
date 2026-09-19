@@ -227,8 +227,8 @@ class Studio:
 
     def idle(self):
         from playwright.sync_api import expect
-        expect(self.page.locator('body.busy')).to_have_count(0, timeout=220000)
-        assert self.page.locator('#notice.error').count() == 0, self.page.locator('#notice').inner_text()
+        expect(self.page.locator('body.working')).to_have_count(0, timeout=220000)
+        expect(self.page.locator('#notice')).to_be_hidden()
 
     def click(self, selector):
         self.page.locator(selector).click()

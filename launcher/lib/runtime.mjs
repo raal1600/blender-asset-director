@@ -177,10 +177,11 @@ export class Runtime {
     }
     return result;
   }
-  async audit(id) {
-    const p = await this.store.get(id); assert(p.scene,'Choose a saved project scene before auditing.');
+  async audit(id,scene) {
+    const p = await this.store.get(id),selected=scene??p.scene;
+    assert(typeof selected==='string'&&(await this.store.scenes(id)).includes(selected),'Choose a saved file inside this project Scenes folder.');
     const verified = await this.store.verify(id); assert(verified.ok,'A pinned source changed or is missing. Resolve project asset checks before running jobs.',409);
-    const input = await safe(p.directory,p.scene);
+    const input = await safe(p.directory,selected);
     const receipt = {schema:1,projectId:id,action:'scene-audit',startedAt:now(),state:'PREPARING',input};
     const receiptFile = await safe(p.directory,`Runs/audit-${Date.now()}.json`);
     await writeJson(receiptFile,receipt);

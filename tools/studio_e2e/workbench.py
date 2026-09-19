@@ -47,14 +47,17 @@ def review_scene(s):
     with s.evidence.checkpoint('workbench_scene_review') as check:
         page.goto(s.session['origin'] + '/workbench#' + s.session['token'])
         idle()
-        click('[data-action="project"][data-id="' + s.project['id'] + '"]')
-        click('[data-action="new-scene"]:visible >> nth=0')
-        page.locator('#new-name').fill('Synthetic workbench scene')
-        click('[data-action="save-scene"]')
+        if page.locator('[data-action="project"][data-id="'+s.project['id']+'"]').count():
+            click('[data-action="project"][data-id="' + s.project['id'] + '"]')
+        if not s.api('workbench/state?projectId='+s.project['id'])['project']['workbench']['scenes']:
+            click('[data-action="new-scene"]:visible >> nth=0')
+            page.locator('#new-name').fill('Synthetic workbench scene')
+            click('[data-action="save-scene"]')
         click('[data-action="browse-assets"]:visible >> nth=0')
         click('[data-action="browser-tab"][data-tab="sources"]')
         expect(page.locator('.browser-asset')).to_have_count(1)
-        click('.browser-asset [data-action="source"]')
+        if not page.locator('.browser-asset').evaluate("e=>e.classList.contains('selected')"):
+            click('.browser-asset [data-action="source"]')
         click('[data-action="browser-close"]')
         state = s.api('workbench/state?projectId=' + s.project['id'])
         scene = state['project']['workbench']['scenes'][0]
@@ -101,7 +104,7 @@ def review_scene(s):
         check.update(optional_package_images=package_images, missing_image_console_404=False)
         page.remove_listener('response', image_response)
         s.preserve()
-        # Restore the legacy surface for the existing recovery/trash journey.
+        # Reopen the same workbench for the existing recovery/trash journey.
         page.goto(s.session['origin'] + '/#' + s.session['token'])
         s.idle()
 

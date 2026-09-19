@@ -18,12 +18,12 @@ test('two simultaneous staging listeners do not collide or expose non-loopback s
   assert.equal(await (await fetch(`http://127.0.0.1:${servers[0].address().port}`)).text(),'stage one');
   assert.equal(await (await fetch(`http://127.0.0.1:${servers[1].address().port}`)).text(),'stage two');
 });
-test('source startup points to the real workbench and preserves explicit legacy access',async()=>{
+test('source startup has one workbench and no legacy UI switch',async()=>{
   // Static contract only. Windows build and native desktop behavior are separate gates.
   const native=await fs.readFile(new URL('../tools/AssetDirectorLauncher.cs',import.meta.url),'utf8');
   const shortcut=await fs.readFile(new URL('../Start Launcher.ps1',import.meta.url),'utf8');
   const server=await fs.readFile(new URL('../server.mjs',import.meta.url),'utf8');
   assert.ok(native.includes('view.Source=new Uri(origin+"/workbench#"+token);'));
-  assert.ok(shortcut.includes("$page = if ($Legacy) { '/#' } else { '/workbench#' }"));
+  assert.ok(shortcut.includes("$page = '/workbench#'"));assert.ok(!shortcut.includes('$Legacy'));
   assert.ok(server.includes('port:listenPort(config)'));
 });
