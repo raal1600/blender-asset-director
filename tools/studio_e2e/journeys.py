@@ -129,6 +129,8 @@ def production(s):
         check['job'] = result['id']
         check['preview_sha256'] = digest(directory/'preview_0012.png')
         s.preserve()
+    from workbench import review_scene
+    review_scene(s)
 
 
 def recovery(s):

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { assert, exists, json, now, relativeName, safe, slash, snapshot, writeJson } from './storage.mjs';
 
+import {validateWorkbench} from './workbench-model.mjs';
 import {validateOnboarding} from './onboarding.mjs';
 
 export const projectId = id => assert(/^prj_[0-9a-f-]{36}$/.test(id), 'Invalid project ID.');
@@ -23,6 +24,9 @@ export class Store {
     for (const a of p.assets) { sourceId(a.sourceId); assert(/^[0-9a-f]{64}$/.test(a.version), 'Invalid asset version.'); }
     for (const j of p.jobs) assert(/^j_[0-9a-f]{24}$/.test(j.id), 'Invalid job reference.');
     validateOnboarding(p);
+    validateWorkbench(p.workbench);
+    if(p.workbench) assert(p.workbench.scenes.every(s=>s.sources.every(id=>p.assets.some(a=>a.sourceId===id))),
+      'Scene sources must remain pinned by their production.');
     return p;
   }
   async list() {
@@ -69,7 +73,7 @@ export class Store {
     return this.get(id);
   }
   instructions(id) {
-    return `# Asset Director project\n\nProject ID: ${id}. Read project.json before any operation. This manifest is the authoritative project context; a selection in the launcher UI is not global session state.\n\nUse the blender-asset-director skill at ${path.join(this.root, 'SystemRuntime/Harness/Installed')}. Read its SKILL.md and only the relevant operation contracts.\n\nShared sources and the managed library are under ${this.database}. Never edit source originals or harness receipts. Asset references in project.json are launcher source IDs and pinned hashes, not harness catalog IDs, license grants, or proof of scene provenance. Verify them before production with the launcher. Intake/review and harness catalog IDs remain separate.\n\nSave editable scenes under Scenes/, renders under Renders/, approved exports under Deliverables/, and notes under Docs/. Use relative render paths //../Renders/ for scenes saved directly in Scenes/. Never put required assets solely in Cache or Temp.\n\nUse node "${path.join(this.root, 'SystemRuntime/Launcher/cli.mjs')}" verify ${id} before work. Use the launcher audit command for a read-only scene audit. After any other harness job is prepared, bind its ID before execution with: node "${path.join(this.root, 'SystemRuntime/Launcher/cli.mjs')}" bind-job ${id} JOB_ID. The launcher enforces one owning project per job; shared prerequisites may be referenced as dependencies, not claimed as new project jobs. Do not edit job receipts to insert project IDs.\n\nInspect the existing Blender scene before touching it; never load over unsaved work. Starting Blender, checking health, and reading a scene are setup. Creative changes still require a user brief and the skill's bounded review workflow. Opening this workspace alone does not authorize rendering or production.\n`;
+    return `# Asset Director project\n\nProject ID: ${id}. Read project.json before any operation. This manifest is the authoritative project context; a selection in the launcher UI is not global session state.\n\nRead ${path.join(this.root, 'SystemRuntime/UserData/Launcher/config.json')} and use its exact skill path for blender-asset-director. Do not assume a source checkout, global skill or legacy directory is the configured runtime. Read that skill's SKILL.md and only the relevant operation contracts.\n\nShared sources and the managed library are under ${this.database}. Never edit source originals or harness receipts. Asset references in project.json are launcher source IDs and pinned hashes, not harness catalog IDs, license grants, or proof of scene provenance. Verify them before production with the launcher. Intake/review and harness catalog IDs remain separate.\n\nSave editable scenes under Scenes/, renders under Renders/, approved exports under Deliverables/, and notes under Docs/. Use relative render paths //../Renders/ for scenes saved directly in Scenes/. Never put required assets solely in Cache or Temp.\n\nUse node "${path.join(this.root, 'SystemRuntime/Launcher/cli.mjs')}" verify ${id} before work. Use the launcher audit command for a read-only scene audit. After any other harness job is prepared, bind its ID before execution with: node "${path.join(this.root, 'SystemRuntime/Launcher/cli.mjs')}" bind-job ${id} JOB_ID. The launcher enforces one owning project per job; shared prerequisites may be referenced as dependencies, not claimed as new project jobs. Do not edit job receipts to insert project IDs.\n\nInspect the existing Blender scene before touching it; never load over unsaved work. Starting Blender, checking health, and reading a scene are setup. Creative changes still require a user brief and the skill's bounded review workflow. Opening this workspace alone does not authorize rendering or production.\n`;
   }
   async update(id, { revision, name, brief, scene, capabilities, capabilityMode, onboarding }) {
     const p = await this.get(id);
@@ -129,7 +133,7 @@ export class Store {
     assert(!p.assets.some(a => a.sourceId === sid), 'Source already linked. Remove its reference before deliberately choosing a new version.', 409);
     p.assets.push({ sourceId: sid, version: s.version, linkedAt: now() }); return this.save(p, revision);
   }
-  async detach(id, sid, revision) { const p = await this.get(id); sourceId(sid); p.assets = p.assets.filter(a => a.sourceId !== sid); return this.save(p, revision); }
+  async detach(id, sid, revision) { const p = await this.get(id); sourceId(sid); assert(!p.workbench?.scenes.some(s=>s.sources.includes(sid)),'This source is selected by a scene. Deselect it there before removing the production pin.',409); p.assets = p.assets.filter(a => a.sourceId !== sid); return this.save(p, revision); }
   async verify(id) {
     const p = await this.get(id); const results = [];
     for (const ref of p.assets) {
@@ -175,6 +179,8 @@ export class Store {
     const p=await this.get(id);
     assert(p.revision===revision,'Project changed. Refresh before moving it to Trash.',409);
     assert(!(await fs.lstat(p.directory)).isSymbolicLink(),'Linked project folders cannot be moved to Trash.');
+    for(const lock of ['Runs/.interactive-execution.lock','Runs/.workbench-writer.lock'])
+      assert(!await exists(await safe(p.directory,lock)),'A project writer is active or needs recovery.',409);
     const runs=await this.runs(id);
     assert(!runs.some(r=>['RUNNING','PREPARING'].includes(r.state)),'An operation is unfinished. Resolve it before moving the project.',409);
     for(const ref of p.jobs) {

@@ -21,6 +21,13 @@ jobs:
       - uses: ./.github/actions/setup-blender
         with:
           version: ${{ matrix.blender }}
+      - name: Install the explicit silent-film encoder for authoring acceptance
+        if: matrix.suite == 'authoring'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
+          ffprobe -version
       - name: Run every real Blender fixture in this subsystem and require its evidence
         run: >-
           python tools/ci/run_blender_suite.py --suite '${{ matrix.suite }}'

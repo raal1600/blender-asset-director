@@ -96,6 +96,15 @@ def scene_audit():
               'matrix_world':flatten(obj.matrix_world),'dimensions':vector(obj.dimensions),
               'hide_render':obj.hide_render,'semantic_role':'UNKNOWN',
               'materials':[s.material.name if s.material else None for s in obj.material_slots]}
+        # Observed provenance is distinct from the launcher's selected sources.
+        item['asset_id'] = obj.get('bad_asset') if isinstance(obj.get('bad_asset'), str) else None
+        item['import_job'] = obj.get('bad_job') if isinstance(obj.get('bad_job'), str) else None
+        animation = obj.animation_data
+        if animation and animation.action:
+            action = animation.action
+            slot = getattr(animation, 'action_slot', None)
+            item['animation'] = {'action': action.name, 'slot': getattr(slot, 'identifier', None),
+                                 'frame_range': list(action.frame_range)}
         if obj.type in GEOMETRY:
             try:
                 points=points_at([obj]);center,extent=bounding_box(points)

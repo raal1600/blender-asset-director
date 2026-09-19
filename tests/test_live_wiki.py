@@ -27,6 +27,9 @@ def initialize(root, branch='master'):
     git(root, 'config', 'user.email', 'wiki-test@example.invalid')
 
 
+@unittest.skipIf(
+    (ROOT / '_release.json').is_file() and not (ROOT / '.git').exists(),
+    'Repository-only Git publication E2E: run on the checkout, not inside an installer archive')
 class LiveWikiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

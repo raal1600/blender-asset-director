@@ -1,4 +1,4 @@
-param([switch]$NoBrowser)
+param([switch]$NoBrowser, [switch]$Legacy)
 $ErrorActionPreference = 'Stop'
 $launcherRoot = $PSScriptRoot
 $studioRoot = [IO.Path]::GetFullPath((Join-Path $launcherRoot '..\..'))
@@ -26,5 +26,8 @@ if (-not $session) {
     }
 }
 if (-not $session) { throw "The launcher did not start. Check $settingsRoot\server-error.log" }
-if (-not $NoBrowser) { Start-Process ($session.origin + '/#' + $session.token) }
+if (-not $NoBrowser) {
+    $page = if ($Legacy) { '/#' } else { '/workbench#' }
+    Start-Process ($session.origin + $page + $session.token)
+}
 Write-Output ('Asset Director Launcher is running at ' + $session.origin)

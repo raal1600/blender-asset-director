@@ -7,6 +7,8 @@ export async function unfinishedWork(store,config) {
   const {projects,errors}=await store.list();
   const reasons=errors.map(e=>`${e.folder}: ${e.message}`);
   for(const project of projects) {
+    if(await exists(await safe(project.directory,'Runs/.workbench-writer.lock')))
+      reasons.push(`${project.name}: scene writer active or recovery required`);
     if(await exists(await safe(project.directory,'Runs/.interactive-execution.lock')))
       reasons.push(`${project.name}: interactive job pending or running`);
     for(const name of await fs.readdir(await safe(project.directory,'Runs'))) {

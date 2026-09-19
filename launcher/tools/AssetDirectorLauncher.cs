@@ -99,7 +99,7 @@ internal sealed class Desktop : Form {
             view.CoreWebView2.NewWindowRequested+=(s,e)=>{e.Handled=true;OpenExternal(e.Uri);};
             view.CoreWebView2.NavigationStarting+=(s,e)=>{if(!e.Uri.StartsWith(origin+"/",StringComparison.Ordinal)){e.Cancel=true;OpenExternal(e.Uri);}};
             view.CoreWebView2.NavigationCompleted+=(s,e)=>{if(e.IsSuccess){status.Visible=false;Log("desktop.log","Desktop interface loaded successfully.");}else{status.Text="Unable to display Asset Director. Close the window and reopen it.";}};
-            view.Source=new Uri(origin+"/#"+token);
+            view.Source=new Uri(origin+"/workbench#"+token);
         } catch(Exception e) {status.Text="Asset Director could not open.\n\n"+e.Message;MessageBox.Show(this,status.Text,"Asset Director",MessageBoxButtons.OK,MessageBoxIcon.Error);}
         finally {starting=false;}
     }

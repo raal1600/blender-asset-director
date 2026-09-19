@@ -75,6 +75,17 @@ def execute(job_path, *, live=False):
             elif op == "contact-check":
                 from asset_director.transfer_blender import contact_check
                 data = contact_check(options)
+            elif op == "asset-contents":
+                source = next(f for f in files if f["path"] == options["file"])
+                filename = lib.verify_file(source)
+                collections = []
+                if filename.suffix.lower() == ".blend":
+                    # Metadata only: append no data, execute no embedded scripts.
+                    with bpy.data.libraries.load(str(filename), link=False) as (available, requested):
+                        collections = list(available.collections)
+                    require(len(collections) <= 4096, "RESOURCE_LIMIT", "Source has too many collections")
+                data = {"asset_id": spec["asset_id"], "file": source["path"], "sha256": source["sha256"],
+                        "collections": sorted(collections), "requires_selection": filename.suffix.lower() == ".blend"}
             elif op == "inspect": data = ops.inspect_scene()
             elif op in {"motion-export", "body-audit", "clay-proxy", "motion-source", "motion-retarget"}:
                 from asset_director import motion_blender
@@ -97,12 +108,16 @@ def execute(job_path, *, live=False):
             elif op == "look-adjust": data = scene_ops.look_adjust(options, job["id"])
             elif op == "camera-check": data = scene_ops.camera_check(options)
             elif op == "light-rig": data = scene_ops.light_rig(options, job["id"])
+            elif op in {"render-readiness", "render-frames"}:
+                from asset_director import render_sequence_blender
+                data = render_sequence_blender.audit() if op == "render-readiness" else render_sequence_blender.render(lib, spec, directory)
             elif op == "preview":
                 if options.get("stage"):
                     target = bpy.context.scene.objects.get(options.get("target_object", ""))
                     require(target is not None, "TARGET_REQUIRED", "Explicit staging needs an observed target object")
                     stage(target)
-                data = ops.render_previews(directory, options)
+                from asset_director.preview_camera import render_previews
+                data = render_previews(directory, options)
             elif op == "index":
                 data = {"clips": [], "rigs": [], "unassigned_actions": [], "files_indexed": []}
                 candidates = [f for f in files if Path(f["path"]).suffix.lower() in {".glb", ".gltf", ".fbx", ".bvh", ".blend"}]
@@ -140,11 +155,17 @@ def execute(job_path, *, live=False):
                     candidates = [f for f in files if Path(f["path"]).suffix.lower() in {".glb", ".gltf", ".fbx", ".obj", ".blend"}]
                     require(candidates, "NO_MODEL", "No supported mesh file")
                     f = sorted(candidates, key=lambda x: ({".glb":0,".gltf":1,".fbx":2,".obj":3,".blend":4}[Path(x["path"]).suffix.lower()],x["path"]))[0]
+                    if "file" in options:
+                        f = next(x for x in candidates if x["path"] == options["file"])
                     created = ops.import_file(lib.verify_file(f), package_root(lib,f), selection=options.get("selection"))
                     for obj in created:
                         for previous in list(obj.users_collection): previous.objects.unlink(obj)
                         collection.objects.link(obj); obj["bad_asset"] = asset.id; obj["bad_job"] = job["id"]
                     data = {"objects": [o.name for o in created], "source": asset.id}
+                # The launcher adopts a byte-identical candidate into project Scenes.
+                # Preserve external references across that move, without touching sources.
+                bpy.ops.file.make_paths_absolute()
+                data["scene_audit"] = scene_ops.scene_audit()
             elif op == "retarget":
                 target = bpy.data.objects.get(options.get("target_object", ""))
                 require(target and target.type == "ARMATURE", "TARGET_REQUIRED", "Specify the target armature from an inspection report")
