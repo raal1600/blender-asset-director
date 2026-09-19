@@ -10,7 +10,8 @@ from verify_evidence import validate_artifacts
 DESKTOP_CHECKS = ('native_host_loaded', 'second_launch_reused', 'blender_task_focused',
                   'active_close_preserved', 'native_edit_checkpoint', 'unrelated_unsaved_preserved',
                   'idle_exit_stopped_server', 'restart_resumed')
-ARTIFACTS = {'native-desktop.png', 'native-blender.png', 'native-checkpoint.json', 'native-events.json'}
+ARTIFACTS = {'native-desktop.png', 'native-blender.png', 'native-checkpoint.json', 'native-events.json',
+             'native-task-exit.png', 'native-exit-options.png', 'empty-task-status.json'}
 
 
 def verify(root, commit):

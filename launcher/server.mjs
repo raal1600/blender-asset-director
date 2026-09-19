@@ -1,4 +1,7 @@
-import {unfinishedWork} from './lib/lifecycle.mjs';
+import {unfinishedState} from './lib/lifecycle.mjs';
+import {taskForExit,actOnExitTask} from './lib/exit-task.mjs';
+import {Console} from 'node:console';
+import {createWriteStream} from 'node:fs';
 import {listenPort} from './lib/listen-port.mjs';
 import http from 'node:http';
 import fs from 'node:fs/promises';
@@ -44,9 +47,9 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
         body = data ? JSON.parse(data) : {};
       }
       const lifecycle = async () => {
-        const reasons = await unfinishedWork(store,config);
+        const {reasons,tasks,needsAttention} = await unfinishedState(store,config);
         if(pending) reasons.unshift(`${pending} launcher operation(s) in progress`);
-        return {version:1,busy:reasons.length > 0,reasons,stopping};
+        return {version:2,busy:reasons.length > 0,reasons,tasks,needsAttention,stopping};
       };
       if(req.method === 'GET' && url.pathname === '/api/lifecycle') return send(200,await lifecycle());
       if(req.method === 'POST' && url.pathname === '/api/stop') {
@@ -68,6 +71,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
       const action = async () => {
         const p = url.pathname; const id = body.projectId || url.searchParams.get('projectId');
         if (req.method === 'GET') {
+          if(p==='/api/lifecycle/task')return taskForExit(workbench,id,url.searchParams.get('runId'));
           if (p === '/api/workbench/catalog') return workbench.catalogPage(id,{query:url.searchParams.get('query')||'',offset:Number(url.searchParams.get('offset')||0),kind:url.searchParams.get('kind')||null});
           if (p === '/api/workbench/catalog-detail') return workbench.catalogDetail(id,url.searchParams.get('assetId'));
           if (p === '/api/workbench/state') return workbench.state(id);
@@ -79,6 +83,8 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
           if (p === '/api/blender') return runtime.blender();
           if (p === '/api/session') return {app:'asset-director-launcher',version:'0.1.0',root};
         } else {
+          if(p==='/api/lifecycle/task-close')return actOnExitTask(workbench,body,'close');
+          if(p==='/api/lifecycle/task-recover')return actOnExitTask(workbench,body,'recover');
           if(p.startsWith('/api/workbench/')) {
             const sid=body.sceneId,rev=body.revision,command=p.slice('/api/workbench/'.length);
             assert(Number.isInteger(rev),'Expected a project revision.');
@@ -146,6 +152,14 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
 async function main() {
   const root = path.resolve(process.argv[2] || path.join(here,'../..'));
   const settings = path.join(root,'SystemRuntime/UserData/Launcher');
+  if(process.argv[3]==='--desktop-logs') {
+    // The server owns its logs, not pipes in the desktop host. Exiting only the
+    // desktop cannot break logging or terminate an ongoing worker via EPIPE.
+    const stdout=createWriteStream(path.join(settings,'server.log'),{flags:'a'});
+    const stderr=createWriteStream(path.join(settings,'server-error.log'),{flags:'a'});
+    await Promise.all([stdout,stderr].map(stream=>new Promise((resolve,reject)=>{stream.once('open',resolve);stream.once('error',reject);})));
+    globalThis.console=new Console({stdout,stderr});
+  }
   const config = await json(path.join(settings,'config.json'));
   for (const key of ['python','blender','skill','library','codex']) assert(path.isAbsolute(config[key]),`Invalid ${key} path in launcher configuration.`);
   const app = await createApp({root,config,port:listenPort(config)});

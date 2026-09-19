@@ -96,6 +96,9 @@ def initialize(task):
         # objects; never reload windowing data or touch another Blender process.
         for obj in list(bpy.data.objects):
             bpy.data.objects.remove(obj, do_unlink=True)
+        # Refresh the dedicated factory view layer before enumerating it. Blender
+        # can otherwise expose removed factory objects as None during GUI startup.
+        bpy.context.view_layer.update()
     from .task_window import task_window
     window = task_window()
     if window:
@@ -133,7 +136,8 @@ def configure(task, project):
     for name in task["targets"]:
         require(scene.objects.get(name) is not None, "TARGET_CHANGED", "Observed target is no longer in this scene: " + name)
     for obj in bpy.context.view_layer.objects:
-        obj.select_set(False)
+        if obj is not None:
+            obj.select_set(False)
     for name in task["targets"]:
         obj = scene.objects[name]
         require(obj.name in bpy.context.view_layer.objects, "TARGET_HIDDEN", "Target is not in the active view layer")

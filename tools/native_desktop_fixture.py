@@ -93,6 +93,38 @@ class Journey:
             self.project=self.api('projects/create',dict(name='Synthetic native acceptance',brief='Scripted editing and preservation; not artistic review.'))
             created=self.api('workbench/create',dict(projectId=self.project['id'],revision=self.project['revision'],name='Native scene'))
             self.scene_id=created['sceneId'];directory=Path(created['project']['directory']);seed=directory/'Scenes/native-input.blend'
+            # Real empty-world startup used to expose removed factory objects as
+            # None. Exercise it, then normal-close only its exact owned process.
+            empty=self.post('task-open',context={})['task'];self.task_pids.append(empty['processId'])
+            empty_status=directory/('Docs/Workbench/'+empty['id']+'-status.json')
+            observed=wait(lambda:(v if (v:=read(empty_status)).get('expected_file') or v['state']=='FAILED' else None),'empty world task')
+            assert observed['state']!='FAILED',observed
+            assert (directory/empty['workingScene']).is_file()
+            original_empty=digest(directory/empty['workingScene'])
+            detail=self.api('lifecycle/task?projectId='+self.project['id']+'&runId='+empty['id'])
+            assert detail['canClose'] and not detail['canRecover'],detail
+            write(e.directory/'empty-task-status.json',observed)
+            self.ui(self.host.pid,'close',Text='Asset Director')
+            wait(lambda:any(w['title']=='Before you exit' for w in self.ui(self.host.pid,'observe')['windows']),'empty close options')
+            self.ui(self.host.pid,'button',Text='Inspect selected task')
+            wait(lambda:any(w['title']=='Task needs attention' for w in self.ui(self.host.pid,'observe')['windows']),'task exit inspection')
+            self.ui(self.host.pid,'capture',Text='Task needs attention',OutputPath=e.directory/'native-task-exit.png')
+            self.ui(self.host.pid,'button',Text='Close Blender task')
+            wait(lambda:any(w['title']=='Task status' for w in self.ui(self.host.pid,'observe')['windows']),'normal-close request')
+            self.ui(self.host.pid,'button',Text='OK')
+            wait(lambda:self.api('lifecycle/task?projectId='+self.project['id']+'&runId='+empty['id'])['canRecover'],'empty task stopped')
+            self.ui(self.host.pid,'button',Text='Inspect selected task')
+            wait(lambda:any(w['title']=='Task needs attention' for w in self.ui(self.host.pid,'observe')['windows']),'stopped task inspection')
+            self.ui(self.host.pid,'button',Text='Recover stopped task')
+            wait(lambda:any(w['title']=='Task status' for w in self.ui(self.host.pid,'observe')['windows']),'recovery confirmation')
+            self.ui(self.host.pid,'button',Text='OK')
+            assert self.host.wait(timeout=30)==0
+            wait(lambda:not (self.root/'SystemRuntime/UserData/Launcher/session.json').exists(),'empty task idle shutdown')
+            self.task_pids.remove(empty['processId']) # already proven stopped; never target a recycled PID in cleanup
+            assert digest(directory/empty['workingScene'])==original_empty
+            self.start_host('after-empty-recovery')
+            assert not self.state()['locked']
+            check.update(empty_world_ready=True,normal_close_requested=True,stopped_recovery_preserved=True)
             job=self.spawn([self.blender,'-b','--factory-startup','--disable-autoexec','--python-exit-code','1',
                 '--python',ROOT/'tools/native_desktop_scene.py','--','seed',seed],'seed')
             assert job.wait(timeout=90)==0;original=digest(seed)
@@ -116,12 +148,24 @@ class Journey:
             check.update(workspace=status['workspace'],target=status['active_object'])
         with e.checkpoint('active_close_preserved'):
             self.ui(self.host.pid,'close',Text='Asset Director')
-            wait(lambda:any(w['title']=='Work is still running' for w in self.ui(self.host.pid,'observe')['windows']),'active-work dialog')
+            wait(lambda:any(w['title']=='Before you exit' for w in self.ui(self.host.pid,'observe')['windows']),'active-work dialog')
             self.ui(self.host.pid,'button',Text='Keep running in tray')
             wait(lambda:not any(w['visible'] and w['title']=='Asset Director' for w in self.ui(self.host.pid,'observe')['windows']),'tray hiding')
             assert self.api('lifecycle')['busy'] and self.state()['locked']
             assert self.spawn([self.exe],'tray-restore').wait(timeout=15)==0
             wait(lambda:any(w['visible'] and w['title']=='Asset Director' for w in self.ui(self.host.pid,'observe')['windows']),'tray restore')
+            # Desktop-only exit is distinct from hiding in tray and from stopping
+            # the server. No Blender window or backend worker is terminated.
+            original_session=dict(self.session)
+            self.ui(self.host.pid,'close',Text='Asset Director')
+            wait(lambda:any(w['title']=='Before you exit' for w in self.ui(self.host.pid,'observe')['windows']),'exit-only dialog')
+            self.ui(self.host.pid,'capture',Text='Before you exit',OutputPath=e.directory/'native-exit-options.png')
+            self.ui(self.host.pid,'button',Text='Exit Director only')
+            assert self.host.wait(timeout=30)==0
+            assert self.api('lifecycle')['busy'] and self.state()['locked']
+            assert read(self.root/'SystemRuntime/UserData/Launcher/session.json')==original_session
+            self.start_host('resume-after-desktop-only-exit')
+            assert self.session==original_session
         with e.checkpoint('native_edit_checkpoint') as check:
             area=max((a for a in read(status_file)['areas'] if a['type']=='VIEW_3D'),key=lambda a:a['width']*a['height'])
             point=dict(X=area['x']+int(area['width']*.4),Y=area['y']+int(area['height']*.5))

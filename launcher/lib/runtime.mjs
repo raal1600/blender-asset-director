@@ -117,6 +117,15 @@ export class Runtime {
     await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
     child.unref();return child.pid;
   }
+  async taskProcess(project,task,action='inspect',identity='') {
+    if(process.platform!=='win32'||!Number.isSafeInteger(task.processId)||task.processId<=0)return {state:'unknown'};
+    const manifest=await safe(project.directory,`Runs/${task.id}.json`);
+    const {stdout}=await command(path.join(toolsDir,'../Asset Director.exe'),
+      ['--task-process',String(task.processId),this.config.blender,manifest,action,identity],10000);
+    return JSON.parse(stdout);
+  }
+  inspectWorkbenchTask(project,task){return this.taskProcess(project,task);}
+  closeWorkbenchTask(project,task,identity){return this.taskProcess(project,task,'close',identity);}
   async launchReview(project,filename){
     assert(await exists(this.config.blender),'Configured Blender executable is missing.');
     const child=spawn(this.config.blender,['--disable-autoexec',filename],{detached:true,stdio:'ignore',windowsHide:false,cwd:project.directory});
