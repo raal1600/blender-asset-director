@@ -33,12 +33,14 @@ class CandidateTests(unittest.TestCase):
             self.assertEqual(verify_bundle(root)['source_commit'],SHA)
             self.assertFalse((root/'candidate-install.json').exists())
     def test_changed_missing_extra_and_escaped_files_refused(self):
-        for case in ('changed','missing','extra','escape','source-id','tree-id','host-id','host-hash'):
+        for case in ('changed','missing','extra','bytecode','escape','source-id','tree-id','host-id','host-hash'):
             with self.subTest(case=case),TemporaryDirectory() as d:
                 root=Path(d);m,b= bundle(root)
                 if case=='changed':(root/'Setup.ps1').write_text('changed')
                 if case=='missing':(root/'Setup.ps1').unlink()
                 if case=='extra':(root/'tools/extra.py').write_text('unlisted')
+                if case=='bytecode':
+                    cache=root/'tools/__pycache__';cache.mkdir();(cache/'create_workbench_studio.pyc').write_bytes(b'unlisted code')
                 if case=='escape':m['files']['../outside.py']='c'*64
                 if case=='source-id':m['source_commit']='main'
                 if case=='tree-id':m.pop('source_tree')

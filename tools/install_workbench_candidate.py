@@ -52,7 +52,7 @@ def verify_bundle(root):
             raise ValueError('Candidate file changed: ' + name)
     # Unexpected source code can shadow imports; do not ignore it during verification.
     actual = {f.relative_to(root).as_posix() for f in root.rglob('*')
-              if f.is_file() and '__pycache__' not in f.parts and f.relative_to(root).as_posix() != 'CANDIDATE.json'}
+              if f.is_file() and f.relative_to(root).as_posix() != 'CANDIDATE.json'}
     if actual != set(files):
         raise ValueError('Bundle contains unlisted or missing files')
     build = read(root / 'launcher/windows-build.json')
@@ -77,8 +77,15 @@ def install_candidate(target, config, bundle=ROOT):
             raise ValueError('Select an existing absolute ' + name + ' executable path')
     # Existing folders are refused by create() before any runtime file is copied.
     sys.path.insert(0, str(bundle / 'tools'))
-    from create_workbench_studio import create
-    result = create(target, source_commit=manifest['source_commit'], **tools)
+    previous_bytecode = sys.dont_write_bytecode
+    try:
+        # Do not create cache files in the verified source bundle. Unexpected
+        # bytecode is rejected above, since it can otherwise shadow source imports.
+        sys.dont_write_bytecode = True
+        from create_workbench_studio import create
+        result = create(target, source_commit=manifest['source_commit'], **tools)
+    finally:
+        sys.dont_write_bytecode = previous_bytecode
     root = Path(result['root'])
     record = dict(schema=1, source_commit=manifest['source_commit'], source_tree=manifest['source_tree'],
                   ci=manifest.get('ci'), status='INSTALLING_HOST',

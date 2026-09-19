@@ -7,7 +7,10 @@ import os from 'node:os';
 import {taskArguments} from '../lib/workbench-launch.mjs';
 import {fileHash} from '../lib/storage.mjs';
 async function fixture(t){
- const directory=await fs.mkdtemp(path.join(os.tmpdir(),'ad-preload-'));t.after(()=>fs.rm(directory,{recursive:true,force:true}));
+ const created=await fs.mkdtemp(path.join(os.tmpdir(),'ad-preload-'));t.after(()=>fs.rm(created,{recursive:true,force:true}));
+ // Production Store.get returns a canonical directory. Windows short-name temp
+ // paths (and macOS temp symlinks) must use that same namespace in this fixture.
+ const directory=await fs.realpath(created);
  await fs.mkdir(path.join(directory,'Scenes'));await fs.mkdir(path.join(directory,'Runs'));
  const source=path.join(directory,'Scenes/frozen.blend');await fs.writeFile(source,'BLENDER SYNTHETIC INPUT');
  const input={path:'Scenes/frozen.blend',sha256:(await fileHash(source)).sha256};
@@ -22,8 +25,8 @@ test('task CLI opens a verified copy before the fixed Python entry, not the orig
 });
 test('changed input, original overwrite and escaping references are rejected',async t=>{
  const f=await fixture(t);
- await assert.rejects(taskArguments(f.project,{...f.task,workingScene:f.task.input.path},f.manifest,'fixed'));
- await assert.rejects(taskArguments(f.project,{...f.task,input:{...f.task.input,path:'../outside.blend'}},f.manifest,'fixed'));
+ await assert.rejects(taskArguments(f.project,{...f.task,workingScene:f.task.input.path},f.manifest,'fixed'),/original/);
+ await assert.rejects(taskArguments(f.project,{...f.task,input:{...f.task.input,path:'../outside.blend'}},f.manifest,'fixed'),/frozen task input/);
  await fs.writeFile(f.source,'CHANGED');await assert.rejects(taskArguments(f.project,f.task,f.manifest,'fixed'),/changed/i);
 });
 test('a new empty task passes no positional file and preserves the fixed argument boundary',async t=>{
