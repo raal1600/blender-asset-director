@@ -1,0 +1,9 @@
+/** Saved-output evidence only: never a live viewport or an approval. */
+import {shotFor,renderIsCurrent,previewIsCurrent} from './workbench-lineage.mjs';
+export function evidenceView({scene,checkpoint,esc,b,canPreview=false}) {
+  const shot=shotFor(scene),movie=[...scene.renders].reverse().find(r=>renderIsCurrent(scene,r)&&(!shot||r.shotId===shot.id));
+  const preview=!!checkpoint&&previewIsCurrent(scene,checkpoint.id),showMovie=scene.stage==='render'&&movie;
+  const title=showMovie?'Rendered shot movie':preview?'Checkpoint preview':'Checkpoint preview · not generated';
+  const help=checkpoint?'Generate a still from this saved checkpoint, or inspect the file directly in Blender. A saved camera is required for rendering.':'Select and import world assets, or open Blender to build the scene. Save and return a checkpoint before generating a preview.';
+  return `<div class="viewport"><header><span>${title}</span><small>${checkpoint?esc(checkpoint.id.slice(3,11)):'No checkpoint yet'}</small></header>${showMovie?`<video controls playsinline preload="metadata" data-media="render" data-id="${esc(movie.id)}" aria-label="Rendered shot movie"></video>`:preview?'<img data-media="preview" alt="Rendered still of the current saved checkpoint">':`<div class="empty-media"><div class="symbol" aria-hidden="true">◇</div><h3>${checkpoint?'No preview for this checkpoint':'No saved scene yet'}</h3><p>${help}</p></div>`}<footer>${showMovie?'Actual silent H.264 output. Watching it does not approve it.':scene.stage==='action'?'A still cannot prove movement. Play the animation in Blender and inspect timing, deformation and contacts.':'A rendered still of the saved file—not a live Blender viewport. Asset selection does not create scene objects.'}${checkpoint&&scene.stage!=='render'?b(preview?'Update preview':scene.candidate?'Preview candidate':'Generate preview','preview',{},'small',!canPreview):''}</footer></div>`;
+}

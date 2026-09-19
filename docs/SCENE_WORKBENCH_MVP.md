@@ -12,7 +12,9 @@ open `/workbench` in the existing authenticated local launcher. Productions has 
 and **Final film**. Each scene keeps its own **World → Action → Shots → Light →
 Render** position, source choices, immutable checkpoints, and review decisions.
 The Windows desktop host and normal Start shortcut open this workbench. The
-legacy launcher remains available at `/` and through `Start Launcher.ps1 -Legacy`.
+old launcher UI has been retired. `/`, `/index.html` and `/workbench` all open the same workbench; there is no `-Legacy` switch. Existing project schemas and backend/MCP contracts remain compatible.
+
+World defaults to model/pack catalog assets and Meshes/Characters source packages: environments, props and characters. Action defaults to animation/movement; its performer selector shows objects already observed in the scene. Light defaults to materials/HDRIs, using the reviewed specialist workflow for assignment. Shots uses observed cameras and Render uses shot outputs, not a general asset shelf. An explicit **Entire library** choice can find other or misclassified records; it is never the default. Filtering occurs before pagination for both stores and selected pins. No database schema migration, file relocation, automatic reclassification or source-version rewrite is performed.
 
 World exposes the actual harness catalog and the independent original database
 packages. Search, inspect provenance and package images, and select ingredients.
@@ -20,8 +22,12 @@ The scene shows a bounded Ingredients summary (four rows at most). **Browse
 assets** opens a viewport-bounded browser with separate **Catalog assets** and
 **Source packages** tabs, one scoped search, type/selected filters, grid/list
 layouts and 24-result pages. Search, source tab, page and result scroll are kept
-per scene for the current browser session. Motion results use compact rows when
+per scene **and activity** for the current browser session. Motion results use compact rows when
 filtered by type; source texture sheets are not represented as motion previews.
+**Checkpoint preview** shows a real rendered still tied to the displayed checkpoint, or the current rendered shot movie during Render. Its empty state is not an error or a live viewport: save a checkpoint, then explicitly authorize a preview. A still does not prove animation; temporal review remains in Blender or the actual movie. **Open Blender · assemble world** is the manual working-copy route. **Open Codex specialist** is the separately reviewed AI-assisted route; launching it is not approval, automatic import, or control of the manual task.
+
+Production diagnostics and recoverable archive/restore live in the new workbench. Saved-file auditing verifies an explicit owned file without changing the project's scene pointer. Existing modular E2E journeys now use this surface, not an unlinked legacy test page.
+
 Details and exact import gates remain in the inspector. Original packages are
 not merged with catalog records based on a matching name.
 

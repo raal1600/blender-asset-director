@@ -34,7 +34,7 @@ def describe(lib, asset, *, verify=False):
     }
 
 
-def catalog(lib, query='', offset=0, limit=24, asset_id=None, verify=False, kind=None):
+def catalog(lib, query='', offset=0, limit=24, asset_id=None, verify=False, kind=None, kinds=None):
     require(isinstance(query, str) and len(query) <= 2000, 'INVALID_QUERY', 'Search is limited to 2000 characters')
     require(type(offset) is int and offset >= 0 and type(limit) is int and 1 <= limit <= 50,
             'RESOURCE_LIMIT', 'Use a nonnegative offset and 1..50 records per page')
@@ -43,8 +43,11 @@ def catalog(lib, query='', offset=0, limit=24, asset_id=None, verify=False, kind
         return describe(lib, lib.get(asset_id), verify=verify)
     require(not verify, 'INVALID_QUERY', 'Byte verification requires one explicit asset')
     require(kind is None or kind in {'model','pack','animation','material','hdri'}, 'INVALID_QUERY', 'Invalid asset kind')
+    require(kinds is None or isinstance(kinds, list) and 1 <= len(kinds) <= 5 and
+            all(isinstance(k, str) and k in {'model','pack','animation','material','hdri'} for k in kinds)
+            and len(set(kinds)) == len(kinds), 'INVALID_QUERY', 'Invalid asset kind group')
     search = tokens(query)
-    matched = [asset for asset in lib.all() if asset.local_files and (kind is None or asset.kind == kind) and
+    matched = [asset for asset in lib.all() if asset.local_files and (kind is None or asset.kind == kind) and (kinds is None or asset.kind in kinds) and
                (not search or search <= tokens(asset.title + ' ' + ' '.join(asset.tags)))]
     selected = matched[offset:offset + limit]
     summaries=[]

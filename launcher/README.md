@@ -1,5 +1,7 @@
 ﻿# Asset Director Launcher 0.1.0
 
+The scene workbench is the only client: `/`, `/index.html`, and `/workbench` open the same application. The old frontend and `-Legacy` startup switch are removed; existing project schemas, source folders, provider/MCP definitions and reviewed backend APIs are retained. Studio contains diagnostics and recoverable project archive/restore.
+
 Local Node 20+ application; no npm dependencies, build service, API key, or cloud storage. Double-click `Asset Director.exe` to open the dedicated desktop window. It uses the installed Microsoft Edge WebView2 runtime and starts or reuses the loopback server. Closing the desktop window stops the server when idle. The PowerShell script remains available for browser-only use; browser tabs do not control server lifetime.
 
 The launcher is a project and environment adapter around the existing installed harness. It does not replace the harness catalog, change installed skill code, provide an arbitrary command endpoint, or imply license approval. Blender connection checks use only the add-on's read-only `get_addon_info` handshake. No second MCP provider or configuration is installed.

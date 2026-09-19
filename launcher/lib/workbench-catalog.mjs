@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {assert,fileHash,now,safe,writeJson} from './storage.mjs';
 import {startSpecialist} from './workbench-specialist.mjs';
 import {approveCheckpoint,checkpointFor} from './workbench-model.mjs';
+import {scopeKinds} from '../public/workbench-scope.mjs';
 
 const assetId=id=>assert(typeof id==='string'&&/^a_[a-f0-9]{24}$/.test(id),'Invalid catalog asset.');
 export async function verifyNative(store,runtime,p) {
@@ -13,11 +14,13 @@ export async function verifyNative(store,runtime,p) {
   assert(result.ok===true,'Native catalog sources changed; review their pinned versions.',409);
 }
 export const withCatalog=Base=>class extends Base {
-  async catalogPage(id,{query='',offset=0,kind=null}={}) {
+  async catalogPage(id,{query='',offset=0,kind=null,activity='all'}={}) {
     await this.store.get(id);
     assert(typeof query==='string'&&query.length<=2000&&Number.isSafeInteger(offset)&&offset>=0,'Invalid catalog search.');
     assert(kind===null||['model','pack','animation','material','hdri'].includes(kind),'Invalid catalog type.');
-    return this.runtime.harness(['workbench-catalog','--query',query,'--offset',String(offset),'--limit','24',...(kind?['--kind',kind]:[])]);
+    let kinds;try{kinds=scopeKinds(activity);}catch{assert(false,'Invalid workflow activity.');}
+    if(!kinds.length||kind&&!kinds.includes(kind))return {schema:1,items:[],total:0,offset:0,next_offset:null};
+    return this.runtime.harness(['workbench-catalog','--query',query,'--offset',String(offset),'--limit','24',...(kind?['--kind',kind]:[]),...(activity==='all'?[]:['--kinds',...kinds])]);
   }
   async catalogDetail(id,aid,verify=false) {
     await this.store.get(id);assetId(aid);

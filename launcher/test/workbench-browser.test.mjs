@@ -45,9 +45,9 @@ test('selected native view pages immutable pins, not rights or import authority'
 });
 test('scene panel remains compact and never claims selection imported an object',()=>{
   const s={...scene,catalog:Array.from({length:100},(_,i)=>aid(i))};
-  const p={workbench:{catalogPins:s.catalog.map(id=>({id,title:'<unsafe> source'}))}};
+  const p={workbench:{catalogPins:s.catalog.map(id=>({id,title:'<unsafe> source',kind:'model'}))}};
   const html=ingredientsView({project:p,scene:s,inventory:{sources:[source(0)]},esc,b});
-  assert.equal((html.match(/class="ingredient"/g)||[]).length,4);assert.ok(html.includes('View all selected (101)'));
+  assert.equal((html.match(/class="ingredient"/g)||[]).length,4);assert.ok(html.includes('Selected for this activity (101)'));
   assert.ok(html.includes('&lt;unsafe&gt;'));assert.ok(!html.includes('data-catalog-image'));
   assert.equal(ingredientStatus(scene,aid(0)),'Selected · not imported');
   const observed={...scene,current:'cp',checkpoints:[{id:'cp',audit:{objects:[{asset_id:aid(0)}]}}]};
