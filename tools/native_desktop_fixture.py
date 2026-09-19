@@ -127,7 +127,7 @@ class Journey:
             point=dict(X=area['x']+int(area['width']*.4),Y=area['y']+int(area['height']*.5))
             self.ui(task['processId'],'move',**point)
             wait(lambda:read(status_file).get('dirty'),'native edit dirty state')
-            self.ui(task['processId'],'checkpoint',**point)
+            self.ui(task['processId'],'checkpoint',OutputPath=e.directory/'native-checkpoint-search.png',**point)
             returned=wait(lambda:read(directory/task['returnFile']),'native checkpoint receipt')
             obj=next(o for o in returned['audit']['objects'] if o['name']=='NativeSubject')
             assert abs(obj['matrix_world'][3]-1)<1e-5,obj['matrix_world']

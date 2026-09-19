@@ -30,6 +30,25 @@ def observation(task, configured):
                        for a in window.screen.areas] if window and matches else [])
 
 
+CHECKPOINT_LABEL = 'Save checkpoint and return to launcher'
+
+
+def register_checkpoint_menus(types):
+    """Give F3 a canonical menu entry without changing user preferences.
+
+    F3 searches menu entries. The abbreviated direct header button alone is not
+    the canonical operator search label; retain both access paths.
+    """
+    def menu_entry(self, context):
+        self.layout.operator('asset_director.save_checkpoint', text=CHECKPOINT_LABEL)
+
+    def quick_button(self, context):
+        self.layout.operator('asset_director.save_checkpoint', text='Save checkpoint & return')
+
+    types.TOPBAR_MT_file.append(menu_entry)
+    types.TOPBAR_MT_editor_menus.append(quick_button)
+
+
 def install(filename):
     """Call after task_workspace.main initialized and registered the real operator."""
     import bpy
@@ -38,11 +57,8 @@ def install(filename):
     configured = load_json(status)['gui_configured']
     print('Feedback: status read', flush=True)
 
-    def draw(self, context):
-        self.layout.operator('asset_director.save_checkpoint', text='Save checkpoint & return')
-
-    print('Feedback: registering topbar', flush=True)
-    bpy.types.TOPBAR_MT_editor_menus.append(draw)
+    print('Feedback: registering File menu and topbar', flush=True)
+    register_checkpoint_menus(bpy.types)
     print('Feedback: topbar registered', flush=True)
     from .task_window import task_window
     window = task_window()

@@ -30,3 +30,21 @@ class FeedbackTests(unittest.TestCase):
                 self.assertNotIn('unrelated.blend', json.dumps(result))
                 (root / 'Docs/return.json').write_text('{}')
                 self.assertEqual(observation(task, False)['state'], 'CHECKPOINT_SAVED')
+
+
+class CheckpointMenuTests(unittest.TestCase):
+    def test_canonical_command_is_in_file_menu_without_overriding_short_button(self):
+        from asset_director.task_feedback import register_checkpoint_menus, CHECKPOINT_LABEL
+        file_menu, topbar = [], []
+        register_checkpoint_menus(NS(TOPBAR_MT_file=file_menu, TOPBAR_MT_editor_menus=topbar))
+        self.assertEqual(len(file_menu), 1)
+        self.assertEqual(len(topbar), 1)
+        calls = []
+        layout = NS(operator=lambda *args, **kw: calls.append((args, kw)))
+        file_menu[0](NS(layout=layout), None)
+        topbar[0](NS(layout=layout), None)
+        self.assertEqual(calls, [
+            (('asset_director.save_checkpoint',), {'text': CHECKPOINT_LABEL}),
+            (('asset_director.save_checkpoint',), {'text': 'Save checkpoint & return'}),
+        ])
+        self.assertEqual(CHECKPOINT_LABEL, 'Save checkpoint and return to launcher')

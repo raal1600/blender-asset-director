@@ -55,3 +55,24 @@ retains its package notices. The package is not redistributed with Asset Directo
 - https://github.com/pal1000/mesa-dist-win/releases/tag/25.3.3
 - https://github.com/pal1000/mesa-dist-win#mingw-and-msvc-package-contents
 - https://docs.mesa3d.org/license.html
+
+
+## Checkpoint command discovery
+
+The native run for head `04892ae3ebc2842f7f5053ecc56c619c6909e238`
+(test merge `8ae66ec806bea98782822b0e22e2619f1a158c03`, run `35407879220`)
+reached a real Blender transform but timed out waiting for the F3 checkpoint
+receipt. Its screenshot retained the modified object with no saved checkpoint.
+The compact top-bar button used a different label and was not a canonical File
+menu entry. The original failure and attachments remain unchanged.
+
+The helper now also registers **Save checkpoint and return to launcher** in File,
+retaining the compact top-bar button. This follows Blender's menu-registration
+pattern for F3 discovery without enabling developer search or changing keymaps
+or preferences. The fixture captures the actual F3 result before Enter and
+still requires the saved receipt and audited transform. A registered function
+or screenshot alone does not prove the round trip. Fresh native CI is required.
+
+Primary references:
+- https://docs.blender.org/api/4.3/bpy.types.Operator.html
+- https://docs.blender.org/manual/en/5.0/interface/operators.html

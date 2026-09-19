@@ -68,6 +68,13 @@ if($Action -eq 'move') {
  [Windows.Forms.SendKeys]::SendWait('x');[Windows.Forms.SendKeys]::SendWait('1');[Windows.Forms.SendKeys]::SendWait('{ENTER}')
 }else{
  [Windows.Forms.SendKeys]::SendWait('{F3}');Start-Sleep -Milliseconds 400
- [Windows.Forms.SendKeys]::SendWait('Save checkpoint and return to launcher');Start-Sleep -Milliseconds 400
+ [Windows.Forms.SendKeys]::SendWait('Save checkpoint and return to launcher');Start-Sleep -Milliseconds 700
+ # Capture the actual search result. A keystroke or screenshot alone is not a pass.
+ if($OutputPath -ne '') {
+  $shot=New-Object NativeWindow+Rect;[NativeWindow]::GetWindowRect($handle,[ref]$shot)|Out-Null
+  $bitmap=New-Object Drawing.Bitmap ($shot.right-$shot.left),($shot.bottom-$shot.top);$g=[Drawing.Graphics]::FromImage($bitmap)
+  try{$g.CopyFromScreen($shot.left,$shot.top,0,0,$bitmap.Size);$bitmap.Save($OutputPath,[Drawing.Imaging.ImageFormat]::Png)}finally{$g.Dispose();$bitmap.Dispose()}
+ }
+ if([NativeWindow]::GetForegroundWindow() -ne $handle){throw 'Foreground changed during search; refusing Enter.'}
  [Windows.Forms.SendKeys]::SendWait('{ENTER}')
 }
