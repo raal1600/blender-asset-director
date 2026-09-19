@@ -5,7 +5,7 @@ import {constants} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {assert, exists, fileHash, json, now, safe, snapshot, writeJson, digest} from './storage.mjs';
 import {stages, stageIndex, initialWorkbench, checkpointFor, canEnter, approveCheckpoint, validId} from './workbench-model.mjs';
-import {shotFor,renderIsCurrent} from '../public/workbench-lineage.mjs';
+import {shotFor,renderIsCurrent,previewIsCurrent} from '../public/workbench-lineage.mjs';
 import {assertObservedShot} from './workbench-shots.mjs';
 import {Interactions} from './interactions.mjs';
 import {buildSessionContext} from './onboarding.mjs';
@@ -70,9 +70,9 @@ export class Workbench {
     await fs.unlink(path.join(directory,'owner.json'));await fs.rmdir(directory);
     await fs.rmdir(await safe(p.directory,sharedLock));
   }
-  async verify(p,scene) {
+  async verify(p,scene,checkpointId=scene.current) {
     const verified=await this.store.verify(p.id); assert(verified.ok,'A pinned source changed or is missing. Resolve source versions first.',409);
-    const cp=checkpointFor(scene); assert(cp,'Save and approve a scene checkpoint first.',409);
+    const cp=checkpointFor(scene,checkpointId); assert(cp,'Save and approve a scene checkpoint first.',409);
     const bytes=await fileHash(await safe(p.directory,cp.path));
     assert(bytes.sha256===cp.sha256&&bytes.size===cp.size,'Saved checkpoint changed. Import the edited file as a new candidate, never replace an approval.',409);
     return cp;
@@ -221,8 +221,9 @@ export class Workbench {
   }
   async startJob(id,sceneId,revision,operation,options,confirmed=false) {
     assert(['render-readiness','preview','render-frames'].includes(operation),'Unknown workbench operation.');
-    const p=await this.project(id,revision),s=this.scene(p,sceneId),cp=await this.verify(p,s);
-    assert(!s.candidate,'Finish reviewing the checkpoint candidate first.',409);
+    const p=await this.project(id,revision),s=this.scene(p,sceneId);
+    assert(operation==='preview'||!s.candidate,'Finish reviewing the checkpoint candidate first.',409);
+    const cp=await this.verify(p,s,operation==='preview'?(s.candidate||s.current):s.current);
     const cap=await this.available();assert(cap.render_frames,'Matching development harness required.',409);
     if(operation!=='render-readiness')assert((await this.interactions(id).sourceStatus()).ready,'Review the exact production source use before rendering. This does not replace native licensing gates.',409);
     const selected=shotFor(s),shot=selected&&['shots','light','render'].includes(s.stage)?selected:null;
@@ -266,6 +267,8 @@ export class Workbench {
           }
           await this.serialize(async()=>{
             const current=await this.project(id),s=this.scene(current,sceneId);
+            assert(s.run===runId&&(operation==='preview'?(s.candidate||s.current):s.current)===cp.id,'Scene changed during the operation; output retained for inspection.',409);
+            await this.verify(current,s,cp.id);
             if(operation==='render-readiness')s.readiness={jobId:job.id,checkpointId:cp.id,data};
             if(operation==='preview')s.preview={jobId:job.id,checkpointId:cp.id,camera:options.camera||null,...shotRef};
             if(operation==='render-frames')s.renders.push({id:uid('rnd_'),jobId:job.id,checkpointId:cp.id,createdAt:now(),options,data,video,approved:false,...shotRef});
@@ -356,14 +359,19 @@ export class Workbench {
     const s=this.scene(p,sceneId);
     if(renderId){const r=s.renders.find(r=>r.id===renderId);assert(r,'Render not found.',404);return {path:await this.verifyCut(p,r.video),type:'video/mp4'};}
     assert(kind==='preview'&&s.preview,'No preview is available.',404);
+    const cp=await this.verify(p,s,s.candidate||s.current);
+    assert(previewIsCurrent(s,cp.id),'Preview belongs to another checkpoint or shot.',409);
+    assert(p.jobs.some(j=>j.id===s.preview.jobId),'Preview job is not bound to this production.',409);
     const job=await this.runtime.job(s.preview.jobId);assert(job.state==='SUCCEEDED','Preview job did not succeed.',409);
+    assert(job.specification?.operation==='preview'&&job.specification.inputs.some(input=>input.sha256===cp.sha256&&input.size===cp.size),'Preview input does not match this checkpoint.',409);
     const output=job.outputs.find(o=>/^jobs\/j_[a-f0-9]{24}\/preview_-?\d+\.png$/.test(o.path));assert(output,'Preview image is missing.');
-    const file=await safe(this.config.library,output.path);assert((await fileHash(file)).sha256===output.sha256,'Preview changed.',409);return {path:file,type:'image/png'};
+    assert(output.path.startsWith(`jobs/${job.id}/`),'Preview output belongs to another job.',409);
+    const file=await safe(this.config.library,output.path),bytes=await fileHash(file);assert(bytes.sha256===output.sha256&&bytes.size===output.size,'Preview changed.',409);return {path:file,type:'image/png'};
   }
   async sourcePreview(id,sourceId) {
     await this.store.get(id);const item=(await this.store.inventory()).sources.find(s=>s.id===sourceId);assert(item?.available,'Source unavailable.',404);
     const version=await json(await safe(this.store.registry,`versions/${item.id}/${item.version}.json`));
-    const image=version.files.find(f=>/\.(png|jpe?g)$/i.test(f.path));assert(image,'This package does not contain an image preview.',404);
+    const image=version.files.find(f=>/\.(png|jpe?g)$/i.test(f.path)&&f.size<=8*1024*1024);if(!image)return null;
     const base=await safe(this.store.database,item.relative);assert((await fs.stat(base)).isDirectory(),'No package image preview.',404);
     const file=await safe(base,image.path);assert((await fileHash(file)).sha256===image.sha256,'Package image changed; refresh library.',409);
     assert(image.size<=8*1024*1024,'Package image is too large to preview.');return {path:file,type:/\.png$/i.test(file)?'image/png':'image/jpeg'};

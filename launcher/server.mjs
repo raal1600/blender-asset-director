@@ -29,7 +29,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
       const url = new URL(req.url,origin);
       if (!url.pathname.startsWith('/api/')) {
         assert(req.method === 'GET','Method not allowed.',405);
-        const assets = {'/':'index.html','/app.mjs':'app.mjs','/style.css':'style.css','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-task.mjs':'workbench-task.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
+        const assets = {'/workbench-images.mjs':'workbench-images.mjs','/':'index.html','/app.mjs':'app.mjs','/style.css':'style.css','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-task.mjs':'workbench-task.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
         assert(Object.hasOwn(assets,url.pathname),'Not found.',404);
         const ext = path.extname(assets[url.pathname]); res.setHeader('Content-Type',ext === '.html' ? 'text/html; charset=utf-8' : ext === '.css' ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8');
         return res.end(await fs.readFile(path.join(here,'public',assets[url.pathname])));
@@ -60,6 +60,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
       if(req.method==='GET'&&['/api/workbench/media','/api/workbench/source-image','/api/workbench/catalog-image'].includes(url.pathname)) {
         const parameters=Object.fromEntries(url.searchParams),id=parameters.projectId;
         const media=url.pathname.endsWith('catalog-image')?await workbench.catalogImage(id,parameters.assetId):url.pathname.endsWith('source-image')?await workbench.sourcePreview(id,parameters.sourceId):await workbench.media(id,parameters);
+        if(!media){res.writeHead(204);return res.end();}
         const stat=await fs.stat(media.path);assert(stat.size<=256*1024*1024,'Media exceeds this MVP browser limit.',413);
         res.writeHead(200,{'Content-Type':media.type,'Content-Length':stat.size});
         return res.end(await fs.readFile(media.path));

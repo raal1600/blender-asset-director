@@ -30,6 +30,11 @@ def wait_for_media(page, selector, *, started=False):
 
 def review_scene(s):
     page = s.page
+    package_images = []
+    def image_response(response):
+        if '/api/workbench/source-image?' in response.url:
+            package_images.append(response.status)
+    page.on('response', image_response)
 
     def idle():
         expect(page.locator('#app.busy')).to_have_count(0, timeout=220000)
@@ -89,6 +94,9 @@ def review_scene(s):
                      original_preserved=True, approval_input='scripted synthetic user confirmation',
                      blender_gui='NOT_TESTED')
         catalog_and_film(s, click, idle, check)
+        assert package_images and all(status == 204 for status in package_images), package_images
+        check.update(optional_package_images=package_images, missing_image_console_404=False)
+        page.remove_listener('response', image_response)
         s.preserve()
         # Restore the legacy surface for the existing recovery/trash journey.
         page.goto(s.session['origin'] + '/#' + s.session['token'])
@@ -147,6 +155,29 @@ def catalog_and_film(s, click, idle, check):
     imported = next(c for c in scene['checkpoints'] if c['id'] == scene['candidate'])
     assert any(o.get('asset_id') == aid and o.get('import_job') == imported['jobId'] for o in imported['audit']['objects'])
     assert scene['current'] != imported['id']
+    # Preview the still-unapproved candidate through the actual UI and worker.
+    # Cancelling the dialog must not prepare a job or synthesize a review.
+    before_jobs = len(state()['project']['jobs'])
+    before_current, before_completed = scene['current'], dict(scene['completed'])
+    click('[data-action="preview"]')
+    click('#dialog [data-action="close"]')
+    assert len(state()['project']['jobs']) == before_jobs
+    click('[data-action="preview"]')
+    click('[data-action="save-preview"]')
+    scene = settle()
+    assert scene['candidate'] == imported['id'] and scene['current'] == before_current
+    assert scene['completed'] == before_completed
+    assert scene['preview']['checkpointId'] == imported['id']
+    preview = page.locator('img[data-media="preview"]')
+    expect(preview).to_be_visible()
+    deadline = time.monotonic() + 30
+    while not preview.evaluate('(image) => image.complete && image.naturalWidth > 0'):
+        assert time.monotonic() < deadline, 'Actual candidate PNG did not decode'
+        page.wait_for_timeout(100)
+    assert digest(s.project_dir / imported['path']) == imported['sha256']
+    page.screenshot(path=str(s.evidence.directory / 'workbench-candidate-preview.png'))
+    check.update(candidate_preview_job=scene['preview']['jobId'],
+                 candidate_preview_without_approval=True, candidate_preview_browser_decoded=True)
     click('[data-action="keep-building"]')
     scene = state()['project']['workbench']['scenes'][0]
     assert scene['stage'] == 'world' and scene['current'] == imported['id'] and not scene['candidate']

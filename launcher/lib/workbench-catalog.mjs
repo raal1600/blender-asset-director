@@ -40,12 +40,12 @@ export const withCatalog=Base=>class extends Base {
   }
   async catalogImage(id,aid) {
     const a=await this.catalogDetail(id,aid),image=a.files.find(f=>/\.(png|jpe?g)$/i.test(f.path)&&f.size<=8*1024*1024);
-    assert(image,'No package image available.',404);
+    if(!image)return null;
     const filename=await safe(this.config.library,image.path),actual=await fileHash(filename);
     assert(actual.sha256===image.sha256&&actual.size===image.size,'Package image changed.',409);
     return {path:filename,type:/\.png$/i.test(filename)?'image/png':'image/jpeg'};
   }
-  async verify(p,scene){await verifyNative(this.store,this.runtime,p);return super.verify(p,scene);}
+  async verify(p,scene,checkpointId=scene.current){await verifyNative(this.store,this.runtime,p);return super.verify(p,scene,checkpointId);}
   async approve(...args){const p=await this.project(args[0],args[2]);await verifyNative(this.store,this.runtime,p);return super.approve(...args);}
   async openTask(...args){const p=await this.project(args[0],args[2]);await verifyNative(this.store,this.runtime,p);return super.openTask(...args);}
   async codex(id,sceneId,revision){const p=await this.project(id,revision);await verifyNative(this.store,this.runtime,p);return startSpecialist(this,p,sceneId);}

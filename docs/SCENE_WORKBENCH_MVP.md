@@ -60,6 +60,20 @@ or OS-level access. Never edit a frozen checkpoint or manually repair its receip
 
 ## Named shots and exact-camera previews
 
+Pending candidates can be inspected with **Preview candidate** before either
+keep decision. The explicit authorization renders one bounded CPU frame from
+that exact frozen candidate through the existing project-bound worker. It does
+not keep the candidate, complete an activity, or permit delivery rendering.
+Source-use review, byte verification, writer coordination and selected-shot
+checks still apply. External harness images are not automatically adopted as
+scene evidence: use this workbench action to establish the exact binding.
+
+Optional package-image absence returns authenticated HTTP 204 and keeps the
+honest placeholder. Missing sources, stale image bytes and authentication failures
+remain errors. Thumbnail requests are limited to four at a time and reused in
+a bounded, version-keyed browser-session cache; Refresh explicitly rechecks them.
+This cache contains package images only, never checkpoint previews or approvals.
+
 Capture shots now saves named, versioned definitions using **observed cameras and
 frame ranges** from a checkpoint audit or its current readiness report. A shot
 references one scene; it never creates a duplicate world. Select a shot to carry

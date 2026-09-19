@@ -8,7 +8,7 @@ export function renderIsCurrent(scene, render) {
     shot.start===render.options?.start&&shot.end===render.options?.end;
 }
 export function previewIsCurrent(scene, checkpointId=scene.current) {
-  const preview=scene.preview,shot=shotFor(scene);
+  const preview=scene.preview,shot=['world','action'].includes(scene.stage)?null:shotFor(scene);
   if(!preview||preview.checkpointId!==checkpointId)return false;
   return shot?preview.shotId===shot.id&&preview.shotRevision===shot.revision&&preview.camera===shot.camera:!preview.shotId;
 }
