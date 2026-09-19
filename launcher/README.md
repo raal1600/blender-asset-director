@@ -75,9 +75,11 @@ Double-click `Asset Director.exe`. The executable and three WebView2 DLLs must r
 
 - A second launch restores the existing window, including from the notification area.
 - Closing an idle window stops the local server and exits.
-- Active operations, unfinished run receipts, interactive execution locks and running project-bound harness jobs block shutdown. Choose Keep running in tray, Exit when finished, or Cancel. Waiting leaves the window visible until work completes; reopening restores it. Stale unfinished receipts require investigation, not automatic deletion.
-- Blender and Codex processes are never terminated. Independently launched jobs may continue; future activity in those sessions is not prevented by closing the launcher.
-- Unknown or unreadable work status leaves the window open. The desktop uses the authenticated stop endpoint, never process-name termination.
+- Active operations, unfinished receipts and writer locks block **backend shutdown**, not your ability to exit the desktop. The close dialog names the project, scene and recorded failure. Choose **Exit Director only** to close its window and leave the local server and work running, **Keep running in tray**, **Exit when finished**, or Cancel. Reopening reconnects to the same authenticated session when the backend is still running.
+- **Inspect selected task** checks the task's actual process. **Close Blender task** requests a normal window close for that exact task only; respond to Blender's normal Save Changes prompt. It never force-kills Blender, Codex or a worker, and sending the request does not mean the task has stopped.
+- **Recover stopped task** requires a fresh stopped-process check, explicit confirmation, unchanged project revision and no uncollected checkpoint. It uses recorded recovery, retains working files and failure evidence, and records no creative approval. A saved return receipt offers **Collect checkpoint** instead.
+- Unknown, unreadable or mismatched process identity disables close/recovery. You can still exit only Director; backend locks and evidence remain intact. Failed setup disables indefinite **Exit when finished** waiting and asks for attention. The authenticated stop endpoint continues to refuse unfinished work.
+- Desktop-launched servers write their own logs under UserData, independent of the host window's lifetime. Exit-only is not a claim that background jobs or the server have stopped. Reopen Director to inspect them and stop the backend when idle.
 - `Start Launcher.ps1` remains the browser-only entry point. Closing a browser tab still leaves that server running. System > Stop also refuses unfinished work.
 
 Source: `tools/AssetDirectorLauncher.cs`. Rebuild with `tools/build-launcher.ps1` while the desktop app is closed. The local executable is unsigned. SDK DLLs are from Microsoft.Web.WebView2 1.0.3800.47 on NuGet; see WEBVIEW2-LICENSE.txt. WebView2 data stays in SystemRuntime/UserData/Launcher/WebView2.

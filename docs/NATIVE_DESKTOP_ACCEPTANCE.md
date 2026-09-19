@@ -17,6 +17,24 @@ It checks active-close/tray/restore, idle-close/server shutdown, restart/session
 rotation and checkpoint persistence. Only captured fixture process IDs are stopped.
 No existing studio, model account, original asset or user preferences are modified.
 
+The same named checkpoints also require empty-world GUI initialization, inspection
+and normal close of that exact task window, explicit stopped-task recovery with
+working-file preservation, and **Exit Director only** followed by reconnection to
+the still-running backend/session. The close dialog names unfinished work and
+offers task inspection, normal Blender close, checkpoint collection, or stopped
+task recovery as applicable. There is no force-kill control or silent stale-lock
+deletion. Unknown status still permits desktop-only exit while preserving backend
+work. Additional native dialog screenshots and the empty-task observation are
+required evidence; an offscreen layout render is not a native interaction pass.
+
+Normal close checks the configured executable, exact task command-line manifest,
+PID and process creation identity, holding the process handle across the request.
+The user still answers Blender's Save Changes dialog. This follows the documented
+non-forcing behavior of
+[Process.CloseMainWindow](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.closemainwindow).
+The desktop's server writes its own logs, so closing the host cannot break the
+backend's output pipes. This does not make background work production-approved.
+
 Run only on an unused disposable Windows desktop. The native input helper refuses
 to type unless the foreground window belongs to the exact fixture process. A
 runner without the required desktop/graphics capability fails; a headless worker
