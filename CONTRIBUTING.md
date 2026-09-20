@@ -34,12 +34,16 @@ build identity: include `git rev-parse HEAD` in bug reports and handoffs.
 
 1. Make a focused branch from current main. Add tests for success, refusal,
    preservation and compatibility behavior. Update the affected contract and docs.
-2. Open a pull request. **Asset Director Tests** must pass all ten matrix jobs.
-   **Transition Lab · Build and publish** must pass build and browser validation;
-   deployment is deliberately skipped on pull requests. Review logs and uploaded
-   JSON evidence, not just a green job name. **Published installer defaults** must
-   pass all five real no-version HTTPS installation jobs; see
-   [the installer-default follow-up](docs/INSTALLER_DEFAULTS.md). Do not ignore unexpected skips.
+2. Open a pull request. **00 · Harness acceptance** must pass its final
+   **Harness acceptance** job: all named journeys, portable/launcher checks,
+   real Blender subsystem/version matrix and render/browser playback. Review
+   exact-commit reports and artifacts, not only green job names. See the
+   [workflow and evidence map](docs/CI_WORKFLOWS.md). **Published installer
+   defaults** must separately pass all five real no-version HTTPS lifecycle
+   jobs; see [the installer-default follow-up](docs/INSTALLER_DEFAULTS.md).
+   Main additionally requires **Transition Lab · Build and publish** deployment.
+   Do not ignore unexpected skips or confuse synthetic coverage with live-agent
+   acceptance.
 3. For source/runtime changes affecting licensed inputs, a maintainer updates the
    private test repository's `harness-ref.txt` to this exact public commit and
    runs its complete integration/recording workflow before merging. Public CI

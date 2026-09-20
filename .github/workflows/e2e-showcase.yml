@@ -1,0 +1,119 @@
+name: 07 · Render and browser playback E2E
+'on':
+  workflow_call: null
+  workflow_dispatch: null
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Offline regression and packaging gates
+      env:
+        PYTHONPATH: src
+      run: |
+        python -m unittest discover -s tests -v
+        python tools/install_skill.py --self-test
+    - name: Verify exact approved media identity before expensive work
+      run: python tools/verify_showcase_media.py --identity-only --report "$RUNNER_TEMP/showcase-media-identity.json"
+    - name: Install media verification dependencies
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y ffmpeg fonts-dejavu-core
+    - name: Fully decode and verify the approved recording and poster
+      run: python tools/verify_showcase_media.py --report "$RUNNER_TEMP/showcase-media-report.json"
+    - name: Fetch checksum-verified Blender and pinned retarget backend
+      run: |
+        python tools/fetch_blender.py '5.2.1' "$RUNNER_TEMP/blender" > blender-path.txt
+        echo "BLENDER=$(tail -n 1 blender-path.txt)" >> "$GITHUB_ENV"
+        echo "PYTHONPATH=$GITHUB_WORKSPACE/src" >> "$GITHUB_ENV"
+        PYTHONPATH=src python -m asset_director --library "$RUNNER_TEMP/showcase-library" backend-install
+    - name: Generate and verify the actual synthetic full-length sequence
+      run: |
+        "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/sequence_fixture.py -- "$RUNNER_TEMP/showcase-fixture" "$RUNNER_TEMP/showcase-library"
+    - name: Render four real Blender-evaluated methods (480 bounded CPU frames)
+      run: |
+        "$BLENDER" --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/transition_showcase.py -- "$RUNNER_TEMP/showcase-library" "$RUNNER_TEMP/showcase-fixture" "$RUNNER_TEMP/showcase-render"
+    - name: Assemble verified showcase and allowlisted technical lab
+      run: |
+        python tools/build_transition_site.py "$RUNNER_TEMP/showcase-render" "$RUNNER_TEMP/web/blender-asset-director"
+        python tools/build_showcase_landing.py "$RUNNER_TEMP/web/blender-asset-director"
+    - name: Retain media verification evidence even on failure
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: showcase-media-verification
+        path: |
+          ${{ runner.temp }}/showcase-media-identity.json
+          ${{ runner.temp }}/showcase-media-report.json
+        if-no-files-found: error
+        retention-days: 14
+        overwrite: true
+    - name: Keep bounded synthetic failure reports
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: transition-lab-render-failure
+        path: |
+          ${{ runner.temp }}/showcase-fixture/sequence_failure.json
+          ${{ runner.temp }}/showcase-fixture/sequence_progress.json
+          ${{ runner.temp }}/showcase-render/metrics.json
+        if-no-files-found: warn
+        retention-days: 7
+        overwrite: true
+    - name: Retain encoded public website before browser validation
+      uses: actions/upload-artifact@v4
+      with:
+        name: transition-lab-render
+        path: ${{ runner.temp }}/web/blender-asset-director/
+        if-no-files-found: error
+        include-hidden-files: true
+        retention-days: 14
+        overwrite: true
+  validate:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Reuse this run's completed site
+      uses: actions/download-artifact@v4
+      with:
+        name: transition-lab-render
+        path: ${{ runner.temp }}/web/blender-asset-director
+    - name: Install the branded Chrome used by both playback tests
+      run: |
+        python -m pip install playwright==1.55.0
+        python -m playwright install --with-deps chrome
+    - name: Verify approved landing-page media and technical lab in Chrome
+      run: |
+        python -m http.server 8765 --bind 127.0.0.1 --directory "$RUNNER_TEMP/web" > "$RUNNER_TEMP/http.log" 2>&1 &
+        http_pid=$!
+        trap 'kill "$http_pid" 2>/dev/null || true' EXIT
+        for attempt in 1 2 3 4 5; do
+          if curl --fail --silent http://127.0.0.1:8765/blender-asset-director/ > /dev/null; then break; fi
+          sleep 1
+        done
+        python tools/test_showcase_page.py http://127.0.0.1:8765/blender-asset-director/ "$RUNNER_TEMP/page-evidence/showcase"
+        python tools/test_transition_page.py http://127.0.0.1:8765/blender-asset-director/technical-validation/ "$RUNNER_TEMP/page-evidence/technical"
+    - name: Retain both browser reports and screenshots on success or failure
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: transition-lab-browser-evidence
+        path: ${{ runner.temp }}/page-evidence/
+        if-no-files-found: error
+        retention-days: 14
+        overwrite: true

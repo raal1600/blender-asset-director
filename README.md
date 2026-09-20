@@ -252,3 +252,5 @@ a job/receipt to bypass hashes after an upgrade; prepare new jobs against curren
 code and inputs. Cloud tests do not certify your current GUI state or artistic
 output. [Resume](docs/RESUME.md) · [Security](SECURITY.md) ·
 [Design](docs/DESIGN.md) · [Third-party notices](THIRD_PARTY_NOTICES.md).
+
+The optional [project launcher and Windows desktop host](docs/LAUNCHER.md) is developed in `launcher/`, alongside the harness. It retains its own tests and external studio configuration.

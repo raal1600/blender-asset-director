@@ -1,0 +1,12 @@
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {spawn} from 'node:child_process';
+import {Store,projectId as validateId} from '../lib/projects.mjs';
+import {assert,json,safe} from '../lib/storage.mjs';
+const root=path.resolve(fileURLToPath(new URL('../../..',import.meta.url)));
+const [projectId,sessionId,mode]=process.argv.slice(2);assert(!mode||mode==='interaction-test','Unknown session mode.');validateId(projectId);assert(/^[a-f0-9-]{36}$/.test(sessionId),'Invalid session ID.');
+const project=await new Store(root).get(projectId),session=await json(await safe(project.directory,`Docs/Codex/${sessionId}.json`));assert(session.projectId===projectId&&session.directory===project.directory,'Session mismatch.');
+const config=await json(await safe(root,'SystemRuntime/UserData/Launcher/config.json')),adapter=fileURLToPath(new URL('./project-mcp.mjs',import.meta.url));
+const toml='{command='+JSON.stringify(process.execPath)+',args='+JSON.stringify([adapter,root,projectId,sessionId])+',startup_timeout_sec=20,tool_timeout_sec=86400}';
+const prompt=mode==='interaction-test'?'This is a harmless Asset Director question-interface test only. Discover and call the asset_director MCP interaction_test tool exactly once so the user can see the choices. Do not initialize production, read creative briefs, run Blender jobs, request source rights, or change scenes. After the user responds or cancels, report that result. If the tool is unavailable, report the actual MCP startup error.':`Read Docs/Codex/${sessionId}.md for this project request and initialization instructions. Read AGENTS.md and project.json. Discover the asset_director MCP tools and call prepare_project at the source-use checkpoint. Ask blocking follow-up questions with ask_project_question so the user receives choices inside Codex. Never substitute a guessed answer or prose-only blocker for a required interaction. If this MCP is unavailable, report that specific setup failure and leave dependent work pending.`;
+const child=spawn(config.codex,['--cd',project.directory,'-c','mcp_servers.asset_director='+toml,prompt],{cwd:project.directory,stdio:'inherit',shell:false,windowsHide:false});child.on('error',e=>{console.error(e.message);process.exitCode=1;});child.on('exit',code=>{process.exitCode=code??1;});

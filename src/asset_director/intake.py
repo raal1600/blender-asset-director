@@ -6,7 +6,7 @@ from .core import Asset, Library, DirectorError, file_hash, load_json, fields, r
 from .acquire import ASSET_SUFFIXES, MAX_DOWNLOAD, download, extract_zip, gltf_dependencies, safe_member
 
 
-def intake(lib: Library, selected: str, evidence_file: str) -> dict:
+def intake(lib: Library, selected: str, evidence_file: str, *, preserve_existing: bool = False) -> dict:
     source = Path(selected).expanduser().resolve()
     require(source.exists(), "FILE_NOT_FOUND", "Selected local asset does not exist")
     evidence = load_json(Path(evidence_file))
@@ -51,5 +51,19 @@ def intake(lib: Library, selected: str, evidence_file: str) -> dict:
               evidence.get("price"), True, sorted({Path(f["path"]).suffix.lower() for f in usable}), evidence.get("tags", []),
               "user_attested" if evidence.get("attested") else "unverified", usable,
               {"intake": "explicit local selection; rights claims supplied by user", "package_sha256": package})
+    if preserve_existing:
+        try:
+            existing = lib.get(a.id)
+        except DirectorError as exc:
+            if exc.code != "ASSET_NOT_FOUND":
+                raise
+        else:
+            # A launcher intake never rewrites previously reviewed catalog
+            # metadata, provider identity or licensing for the same package.
+            for record in existing.local_files:
+                lib.verify_file(record)
+            return {"status": "ALREADY_INTAKEN", "asset_id": existing.id,
+                    "files": len(existing.local_files), "evidence": existing.evidence,
+                    "catalog_evidence_preserved": True}
     lib.put(a)
     return {"status": "INTAKEN", "asset_id": a.id, "files": len(usable), "evidence": a.evidence}

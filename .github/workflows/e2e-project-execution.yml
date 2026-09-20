@@ -1,0 +1,12 @@
+name: 03 · Approval and job execution E2E
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  journey:
+    name: Approval and job execution
+    uses: ./.github/workflows/studio-e2e.yml
+    with:
+      scenario: execution
