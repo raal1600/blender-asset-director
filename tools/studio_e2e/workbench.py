@@ -41,7 +41,14 @@ def review_scene(s):
         expect(page.locator('#notice')).to_be_hidden()
 
     def click(selector):
+        if selector == '[data-action="import"]' and page.locator('.world-more').count():
+            page.locator('.world-more summary').click()
+        if selector.startswith('.ingredient') and not page.locator(selector).count():
+            page.locator('.world-more summary').click()
+            page.locator('[data-action="world-ingredients"]').click()
         if selector == '[data-action="preview"]':
+            if page.locator('.world-inspection').count() and page.locator('.world-inspection').get_attribute('open') is None:
+                page.locator('.world-inspection > summary').click()
             panel = page.locator('.rendered-evidence')
             if panel.get_attribute('open') is None:
                 panel.locator('summary').click()
@@ -81,6 +88,8 @@ def review_scene(s):
             dialog.accept()
         page.on('dialog', confirm)
         try:
+            click('[data-action="keep-building"]')
+            assert not s.api('workbench/state?projectId='+s.project['id'])['project']['workbench']['scenes'][0]['completed']
             click('[data-action="approve"]')
         finally:
             page.remove_listener('dialog', confirm)

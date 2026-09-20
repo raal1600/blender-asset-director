@@ -31,6 +31,13 @@ def main():
             expect(page.locator('body')).not_to_have_class(__import__('re').compile(r'\bworking\b'))
             expect(page.locator('#notice')).to_be_hidden()
         def click(selector):page.locator(selector).click();idle()
+        def choose_scene(scene_id):
+            if page.locator('#scene-picker').is_visible():
+                page.locator('#scene-picker').select_option(scene_id);idle()
+            else:click('[data-action="scene"][data-id="'+scene_id+'"]')
+        def filters():
+            panel=page.locator('.browser-filters')
+            if panel.count() and panel.get_attribute('open') is None:click('.browser-filters > summary')
         def capture(name):
             page.screenshot(path=str(output/(name+'.png')))
             metrics=page.evaluate('''() => ({width:innerWidth,height:innerHeight,pageWidth:document.documentElement.scrollWidth,pageHeight:document.documentElement.scrollHeight,
@@ -48,8 +55,8 @@ def main():
                 (session['sceneId'],'world',4000,6666,{'model','pack'}),
                 (session['motionSceneId'],'action',2000,3334,{'animation'}),
                 (session['lookSceneId'],'light',4000,0,{'material','hdri'})]:
-                click('[data-action="scene"][data-id="'+scene_id+'"]')
-                click('[data-action="browse-assets"].primary')
+                choose_scene(scene_id)
+                click('[data-action="browse-assets"]:visible >> nth=0')
                 expect(page.locator('#browser-activity')).to_have_value(activity)
                 expect(page.locator('.browser-asset')).to_have_count(24)
                 assert set(page.locator('.browser-asset').evaluate_all('(rows)=>rows.map(r=>r.dataset.kind)'))<=kinds
@@ -60,8 +67,15 @@ def main():
                 assert 'of '+str(source_count)+' packages' in page.locator('.browser-footer [role="status"]').inner_text()
                 capture('workflow-'+activity+'-sources')
                 click('[data-action="browser-close"]')
-            click('[data-action="scene"][data-id="'+session['sceneId']+'"]')
-            click('[data-action="browse-assets"].primary')
+            choose_scene(session['sceneId'])
+            click('[data-action="browse-assets"]:visible >> nth=0')
+            filters();page.keyboard.press('Escape')
+            expect(page.locator('#library-dialog')).to_be_visible()
+            expect(page.locator('.browser-filters')).not_to_have_attribute('open','')
+            expect(page.locator('.browser-filters > summary')).to_be_focused()
+            filters();page.locator('#library-title').click()
+            expect(page.locator('.browser-filters')).not_to_have_attribute('open','')
+            filters()
             page.locator('#browser-activity').select_option('all');idle()
             click('[data-action="browser-tab"][data-tab="catalog"]')
             expect(page.locator('.browser-asset')).to_have_count(24)
@@ -72,8 +86,8 @@ def main():
             assert page.locator('.browser-results').evaluate('(e)=>e.scrollTop')==0
             page.locator('.browser-results').evaluate('(e)=>e.scrollTop=220')
             click('[data-action="browser-close"]')
-            expect(page.locator('[data-action="browse-assets"].primary')).to_be_focused()
-            click('[data-action="browse-assets"].primary')
+            expect(page.locator('[data-action="browse-assets"]').first).to_be_focused()
+            click('[data-action="browse-assets"]:visible >> nth=0')
             expect(page.locator('.browser-footer [role="status"]')).to_have_text('25–48 of 10000 assets')
             assert page.locator('.browser-results').evaluate('(e)=>e.scrollTop')>=200
             page.locator('#browser-query').fill('09999');page.locator('#browser-query').press('Enter');idle()
@@ -88,13 +102,13 @@ def main():
             page.locator('#browser-query').fill('');page.locator('#browser-query').press('Enter');idle()
             expect(page.locator('.browser-asset')).to_have_count(24)
             capture('03-source-packages')
-            page.locator('#browser-kind').select_option('Animations');idle()
+            filters();page.locator('#browser-kind').select_option('Animations');idle()
             click('[data-action="browser-layout"][data-layout="list"]')
             expect(page.locator('.browser-results')).to_have_class(__import__('re').compile(r'\blist\b'))
             expect(page.locator('[data-layout="list"]')).to_have_attribute('aria-pressed','true')
             assert page.locator('[data-source-image]').count()==0
             capture('04-motion-list')
-            page.locator('#browser-kind').select_option('');idle()
+            filters();page.locator('#browser-kind').select_option('');idle()
             click('[data-action="browser-tab"][data-tab="catalog"]')
             page.locator('#browser-query').fill('00000');page.locator('#browser-query').press('Enter');idle()
             click('#library-dialog [data-action="catalog-detail"]')
@@ -104,7 +118,7 @@ def main():
             if not page.locator('.browser-asset').evaluate("(e)=>e.classList.contains('selected')"):
                 click('[data-action="catalog-select"]')
             expect(page.locator('.browser-asset')).to_have_class(__import__('re').compile(r'\bselected\b'))
-            page.locator('#browser-scope').select_option('selected');idle()
+            filters();page.locator('#browser-scope').select_option('selected');idle()
             expect(page.locator('.browser-asset')).to_have_count(1)
             assert 'Selected · not imported' in page.locator('.browser-asset').inner_text()
             page.locator('#browser-query').fill('missing');page.locator('#browser-query').press('Enter');idle()
@@ -119,7 +133,7 @@ def main():
                 page.set_viewport_size({'width':width,'height':height})
                 capture('05-scene-'+str(width))
                 if width==1024:
-                    task=page.locator('[data-action="task"]').bounding_box()
+                    task=page.locator('.world-next .primary').bounding_box()
                     assert task['y']+task['height']<=height, 'Primary scene action is below the first screen'
                 click('[data-action="browse-assets"]:visible >> nth=0')
                 capture('06-browser-'+str(width))

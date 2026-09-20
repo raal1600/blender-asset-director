@@ -18,6 +18,7 @@ def main():
     parser.add_argument('--node', default='node')
     parser.add_argument('--chrome')
     parser.add_argument('--native-fixture', help='Optional previously generated PASS fixture, never a user scene')
+    parser.add_argument('--guided-world', action='store_true', help='Exercise real World import/review UI with scripted synthetic decisions')
     args = parser.parse_args()
     output = Path(args.evidence).resolve(); output.mkdir(parents=True, exist_ok=False)
     source = {'commit': subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
@@ -33,7 +34,9 @@ def main():
     root = output / 'studio'; session_file = root / 'browser-session.json'
     env = dict(os.environ); env['PYTHONDONTWRITEBYTECODE'] = '1'
     with (output / 'server.log').open('wb') as log:
-        process = subprocess.Popen([args.node, str(ROOT / 'tools/embedded_viewer_fixture.mjs'), str(root), str(generated), sys.executable, args.blender],
+        fixture = 'world_guided_fixture.mjs' if args.guided_world else 'embedded_viewer_fixture.mjs'
+        check = 'world_guided_check.py' if args.guided_world else 'embedded_viewer_check.py'
+        process = subprocess.Popen([args.node, str(ROOT / 'tools' / fixture), str(root), str(generated), sys.executable, args.blender],
                                    cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, env=env)
         session = None
         try:
@@ -43,9 +46,9 @@ def main():
                 if time.monotonic() > deadline: raise TimeoutError('Viewer fixture did not start')
                 time.sleep(.1)
             session = json.loads(session_file.read_text())
-            command = [sys.executable, '-B', str(ROOT / 'tools/embedded_viewer_check.py'), '--fixture', str(root), '--evidence', str(output / 'browser')]
+            command = [sys.executable, '-B', str(ROOT / 'tools' / check), '--fixture', str(root), '--evidence', str(output / 'browser')]
             if args.chrome: command += ['--chrome', args.chrome]
-            return subprocess.run(command, env=env, timeout=300).returncode
+            return subprocess.run(command, env=env, timeout=600 if args.guided_world else 300).returncode
         finally:
             if session and process.poll() is None:
                 request = urllib.request.Request(session['origin']+'/api/stop', data=b'{}', headers={'Authorization':'Bearer '+session['token'], 'Content-Type':'application/json'})

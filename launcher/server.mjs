@@ -36,6 +36,8 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assert(req.method === 'GET','Method not allowed.',405);
         const assets = {'/asset-presentation.mjs':'asset-presentation.mjs','/workbench-browser.mjs':'workbench-browser.mjs','/workbench-images.mjs':'workbench-images.mjs','/':'workbench.html','/index.html':'workbench.html','/workbench-scope.mjs':'workbench-scope.mjs','/workbench-evidence.mjs':'workbench-evidence.mjs','/workbench-studio.mjs':'workbench-studio.mjs','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-task.mjs':'workbench-task.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
         assets['/workbench-progress.mjs']='workbench-progress.mjs';
+        assets['/workbench-world.mjs']='workbench-world.mjs';
+        assets['/workbench-world.css']='workbench-world.css';
         assets['/viewer-3d.mjs']='viewer-3d.mjs';
         assets['/icon.svg']='icon.svg';
         for(const name of ['build/three.module.js','build/three.core.js','examples/jsm/loaders/GLTFLoader.js','examples/jsm/controls/OrbitControls.js','examples/jsm/utils/BufferGeometryUtils.js','examples/jsm/utils/SkeletonUtils.js'])assets['/vendor/three/'+name]='vendor/three/'+name;

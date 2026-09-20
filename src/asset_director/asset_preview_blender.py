@@ -23,6 +23,10 @@ def create(lib, asset, member):
     # Unrecorded external files are not silently adopted into a preview copy.
     root = (lib.root / 'incoming/package').resolve()
     known = {lib.verify_file(f).resolve() for f in asset.local_files}
+    original_root = asset.metadata.get('preview_original_root')
+    source_map = asset.metadata.get('preview_source_map', {})
+    original_to_copy = {(Path(original_root) / original).resolve(): (lib.root / member).resolve()
+                        for member, original in source_map.items()} if original_root else {}
     for datablocks in (bpy.data.images, bpy.data.libraries, bpy.data.movieclips, bpy.data.sounds,
                        bpy.data.fonts, bpy.data.cache_files, bpy.data.volumes):
         for block in datablocks:
@@ -32,9 +36,12 @@ def create(lib, asset, member):
             if getattr(block, 'source', None) == 'GENERATED':
                 continue
             p = Path(bpy.path.abspath(value, library=getattr(block, 'library', None))).resolve()
-            original_root = asset.metadata.get('preview_original_root')
-            if p not in known and original_root and p.is_relative_to(Path(original_root)):
-                mapped = root / p.relative_to(Path(original_root))
+            original = p
+            if source_map and value.startswith('//') and not getattr(block, 'library', None):
+                original = (Path(original_root) / Path(asset.metadata['preview_original_member']).parent / value[2:]).resolve()
+            if p not in known and original_root and original.is_relative_to(Path(original_root)):
+                mapped = original_to_copy.get(original) if source_map else root / original.relative_to(Path(original_root))
+                require(mapped is not None, 'EXTERNAL_REFERENCE', 'Unrecorded checkpoint dependency')
                 require(mapped.resolve() in known, 'EXTERNAL_REFERENCE', 'Unrecorded checkpoint dependency')
                 block.filepath = str(mapped)
                 if isinstance(block, bpy.types.Image):

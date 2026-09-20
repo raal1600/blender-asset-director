@@ -76,6 +76,20 @@ class PreviewTests(unittest.TestCase):
         with self.assertRaisesRegex(DirectorError,'own attempt'):snapshot(self.request,embedded=True)
         self.assertFalse((self.preview/'library').exists())
 
+    def test_blend_checkpoint_uses_short_verified_copy_paths_and_exact_dependency_map(self):
+        scene=self.source/'scene.blend';scene.write_bytes(b'synthetic checkpoint bytes')
+        data={**self.data,'source_kind':'checkpoint','file':'scene.blend',
+              'files':[{'path':'scene.blend','size':scene.stat().st_size,'sha256':file_hash(scene)},*self.data['files']]}
+        atomic_json(self.request,data)
+        _,directory,asset=snapshot(self.request,embedded=True)
+        self.assertEqual(asset.metadata['preview_member'],'incoming/package/f0000.blend')
+        self.assertEqual(asset.metadata['preview_source_map'],{'incoming/package/f0000.blend':'scene.blend','incoming/package/f0001.glb':'model.glb'})
+        self.assertEqual(asset.metadata['preview_original_member'],'scene.blend')
+        for record,original in zip(asset.local_files,data['files']):
+            self.assertEqual(record['sha256'],original['sha256'])
+            self.assertEqual(file_hash(directory/record['path']),file_hash(self.source/original['path']))
+        self.assertEqual(scene.read_bytes(),b'synthetic checkpoint bytes')
+
     def test_taxonomy_is_factual_and_filters_before_paging_without_record_mutation(self):
         a=Asset('local','a','Character in marketing name','model','')
         self.assertEqual(classification(a)['id'],'model')

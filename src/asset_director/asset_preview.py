@@ -45,8 +45,15 @@ def snapshot(request_file, *, embedded=False):
         sources.append(p)
     destination.mkdir()
     files = []
-    for source, f in zip(sources, records):
-        relative = 'incoming/package/' + f['path']
+    # A checkpoint spans project and catalog roots. Mirroring those long paths
+    # under ViewerPreviews can exceed Blender's Windows path support. Only the
+    # disposable BLEND inspection bundle is flattened; source packages (including
+    # glTF relative resources) retain their original layout.
+    compact = embedded and request['source_kind'] == 'checkpoint' and Path(request['file']).suffix.lower() == '.blend'
+    source_map = {}
+    for index, (source, f) in enumerate(zip(sources, records)):
+        relative = ('incoming/package/f%04d%s' % (index, Path(f['path']).suffix.lower())
+                    if compact else 'incoming/package/' + f['path'])
         target = within(destination, relative)
         target.parent.mkdir(parents=True, exist_ok=True)
         with source.open('rb') as inp, target.open('xb') as out:
@@ -55,6 +62,7 @@ def snapshot(request_file, *, embedded=False):
                 and source.stat().st_size == f['size'] and file_hash(source) == f['sha256'],
                 'STALE_SOURCE', 'Source changed during preview snapshot; failed attempt retained')
         files.append({**f, 'path': relative})
+        source_map[relative] = f['path']
     # Inspection-only transient record in a separate SQLite library. It is not
     # intake into the user's catalog and carries no manufactured rights grant.
     meta = {'preview_only': True}
@@ -63,6 +71,10 @@ def snapshot(request_file, *, embedded=False):
         # be rebound to their verified copies in this disposable worker.
         meta['preview_original_root'] = str(source_root)
         meta['preview_checkpoint'] = request['source_kind'] == 'checkpoint'
+        if compact:
+            meta['preview_source_map'] = source_map
+            meta['preview_original_member'] = request['file']
+            meta['preview_member'] = next(p for p, original in source_map.items() if original == request['file'])
     motion = copy.deepcopy(request.get('motion') or {})
     if motion:
         fields(motion, {'file', 'action', 'slot', 'source_object', 'fps', 'frame_start', 'frame_end'},
@@ -90,7 +102,7 @@ def prepare(request_file, blender, *, embedded=False):
                       source_kind=request['source_kind'], title=request['title'], file=request['file'])
         with Library(directory) as lib:
             job = jobs.prepare(lib, 'asset-preview', asset_id=asset.id,
-                               options={'file': 'incoming/package/' + request['file'], **({'embedded': True} if embedded else {})})
+                               options={'file': asset.metadata.get('preview_member', 'incoming/package/' + request['file']), **({'embedded': True} if embedded else {})})
             status.update(job_id=job['id'], state='RUNNING')
             atomic_json(receipt, status)
             job = jobs.run(lib, job['id'], blender, timeout=180)

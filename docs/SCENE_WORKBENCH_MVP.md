@@ -16,15 +16,29 @@ old launcher UI has been retired. `/`, `/index.html` and `/workbench` all open t
 
 World defaults to model/pack catalog assets and Meshes/Characters source packages: environments, props and characters. Action defaults to animation/movement; its performer selector shows objects already observed in the scene. Light defaults to materials/HDRIs, using the reviewed specialist workflow for assignment. Shots uses observed cameras and Render uses shot outputs, not a general asset shelf. An explicit **Entire library** choice can find other or misclassified records; it is never the default. Filtering occurs before pagination for both stores and selected pins. No database schema migration, file relocation, automatic reclassification or source-version rewrite is performed.
 
-World exposes the actual harness catalog and the independent original database
-packages. Search, inspect provenance and package images, and select ingredients.
-The scene shows a bounded Ingredients summary (four rows at most). **Browse
-assets** opens a viewport-bounded browser with separate **Catalog assets** and
-**Source packages** tabs, one scoped search, type/selected filters, grid/list
-layouts and 24-result pages. Search, source tab, page and result scroll are kept
+World uses a focused saved-scene canvas and one contextual next step: **Find an
+asset**, **Review source use** when required, **Add to world**, **Keep this
+change**, then **Continue to Action**. The scene picker replaces the permanent
+sidebar for this activity. **More** retains selected ingredients, checkpoint
+history, scene details, saved-file import and the specialist route. Active tasks,
+failures and required rights decisions stay visible; they are not hidden in More.
+
+The browser exposes the actual harness catalog and independent original database
+packages, with separate **Catalog assets** and **Source packages** tabs, search,
+category and 24-result pages. World puts workflow scope, type/selected filters and
+grid/list layouts under **Filters & view**. Search, source tab, page and result scroll are kept
 per scene **and activity** for the current browser session. Motion results use compact rows when
 filtered by type; source texture sheets are not represented as motion previews.
-**Checkpoint preview** shows a real rendered still tied to the displayed checkpoint, or the current rendered shot movie during Render. Its empty state is not an error or a live viewport: save a checkpoint, then explicitly authorize a preview. A still does not prove animation; temporal review remains in Blender or the actual movie. **Open Blender · assemble world** is the manual working-copy route. **Open Codex specialist** is the separately reviewed AI-assisted route; launching it is not approval, automatic import, or control of the manual task.
+The main World canvas automatically inspects saved checkpoint geometry in 3D; it
+does not stream unsaved Blender edits or prove final lighting/render quality.
+Eligible catalog model details open an inspection preview before import. Preview
+copies never select, import or approve an asset. Failed previews remain visible
+and the separate Blender inspection route remains available.
+**Inspection tools → Rendered still** retains the separately authorized,
+camera-rendered checkpoint preview. Render still shows actual shot movies.
+A still does not prove animation. **Arrange in Blender** opens the separate
+editable working copy. **More → Open Codex specialist** is the separately reviewed
+AI-assisted route; launching it is not approval or control of the manual task.
 
 Productions exposes Open production and Archive production on every row, plus Archived productions for restore. The named archive confirmation preserves files/history and explains restoration; cancellation does not send a write. The selected row's ID/revision is used, never another open production. Existing stale-revision, active-writer and occupied-restore guards remain enforced. Studio also retains diagnostics and archive. Saved-file auditing verifies an explicit owned file without changing the project's scene pointer. Existing modular E2E journeys now use this surface, not an unlinked legacy test page.
 
@@ -34,10 +48,11 @@ not merged with catalog records based on a matching name.
 The workbench opts into compact state responses (selected source summaries only)
 and loads catalog/package pages only while browsing. The legacy state API remains
 unchanged. Package paging is read-only; Refresh library explicitly confirms a
-registry rescan. No schema migration, automatic intake, preview generation,
+registry rescan. No schema migration, automatic intake, package-wide preview generation,
 relicensing, dependency download or library rewrite is performed. Registry search
 still reads its JSON index on the server; this is bounded response/DOM loading,
-not a claim of an indexed large-scale database search implementation.
+not a claim of an indexed large-scale database search implementation. The World
+preview behavior above is explicit local inspection, not automatic catalog intake.
 
 An item marked **Selected** is not an imported object. For a Blender package,
 inspect its actual collection names before selecting which collections to import.
@@ -48,17 +63,27 @@ For another supported model member, choose its exact recorded file. A user must
 confirm source use for this project's pinned versions; native license policies
 still apply and can refuse the operation. No source is automatically relicensed.
 
-**Import into world** executes the existing bounded harness import worker, binds
+**Add to world** executes the existing bounded harness import worker, binds
 its job to this project before execution, verifies its output and object tags,
 and copies its saved result byte-for-byte into a new project checkpoint. Source
 references were made absolute by that worker. This keeps native derivation hashes
 and the originals intact. The result is a candidate, never automatic approval.
 
-Use **Keep & continue building** to adopt the candidate without completing World.
-Add another ingredient or refine placement in Blender. Use **Keep checkpoint &
-continue** only when you want to finish the current activity. Returning to an
+Use **Keep this change** to adopt the candidate without completing World.
+Add another ingredient or refine placement in Blender. **Continue to Action** is
+a separate reviewed completion decision, available after keeping the change.
+Other activities retain their own keep/complete controls. Returning to an
 earlier activity and adopting a new checkpoint invalidates dependent work, not
-its historical records or older approved film files.
+its historical records or older approved film files. Adding an already observed
+asset explicitly says **Add another copy**; discarding that new candidate does not
+remove the earlier checkpoint.
+
+On Windows, embedded checkpoint inspection copies use short generated filenames
+and an exact verified dependency map, avoiding duplicated long project paths.
+This only affects disposable BLEND preview copies: originals, checkpoint bytes,
+catalog layout and normal source-package relative paths stay unchanged. Unrecorded
+dependencies are still refused. Very long configured runtime roots can still
+exceed host tool limits; this is not a system-wide long-path setting change.
 
 ## Detailed editing and specialists
 

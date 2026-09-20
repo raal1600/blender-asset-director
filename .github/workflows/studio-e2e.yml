@@ -90,6 +90,17 @@ jobs:
         path: evidence/catalog-browser/
         if-no-files-found: error
         retention-days: 14
+    - name: Verify guided World with real synthetic Blender import
+      # Shares the existing installed-studio partition; no new workflow identity
+      # or publication of private browser sessions is introduced.
+      if: inputs.scenario == 'full' || inputs.scenario == ''
+      shell: python
+      run: |
+        import os, subprocess, sys
+        subprocess.run([sys.executable, 'tools/embedded_viewer_suite.py',
+            '--blender', os.environ['BLENDER'], '--guided-world',
+            '--native-fixture', 'evidence/embedded-viewer/native',
+            '--evidence', 'evidence/guided-world'], check=True)
     - name: Report executed checkpoints and limitations
       if: always()
       shell: python
