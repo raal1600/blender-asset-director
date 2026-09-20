@@ -85,3 +85,10 @@ test('deselection retains the production pin and cannot silently replace its ver
   assert.deepEqual(p.workbench.scenes[0].catalog,[]);assert.equal(p.workbench.catalogPins.length,1);
   f.asset.version='c'.repeat(64);await assert.rejects(f.work.selectCatalog(p.id,f.sceneId,p.revision,f.aid,true),/older version/);
 });
+
+test('animation found through Entire library cannot use World import',async t=>{
+  const f=await fixture(t);f.asset.kind='animation';let p=await f.select();
+  await f.work.attest(p.id,p.revision,true);
+  await assert.rejects(f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true}),/models and packs/);
+  assert.equal(f.calls.some(a=>a[0]==='job-prepare'),false);
+});

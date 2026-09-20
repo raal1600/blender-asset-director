@@ -26,6 +26,7 @@ BOOTSTRAP_CHECKS = (
 # id, script, generated report (or stdout marker), pass library, extra arguments.
 BLENDER_SUITES = {
     'authoring': (
+        ('asset-preview', 'asset_preview_fixture.py', 'asset_preview_report.json', False, ()),
         ('workbench-film', 'workbench_film_fixture.py', 'workbench_film_report.json', False, ()),
         ('studio', 'studio_fixture.py', 'studio_report.json', False, ()),
         ('camera', 'camera_fixture.py', 'camera_report.json', False, ()),

@@ -5,6 +5,7 @@ import {constants} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {assert, exists, fileHash, json, now, safe, snapshot, writeJson, digest} from './storage.mjs';
 import {stages, stageIndex, initialWorkbench, checkpointFor, canEnter, approveCheckpoint, validId} from './workbench-model.mjs';
+import {referenceImage,sourceCategory} from '../public/asset-presentation.mjs';
 import {shotFor,renderIsCurrent,previewIsCurrent} from '../public/workbench-lineage.mjs';
 import {assertObservedShot} from './workbench-shots.mjs';
 import {Interactions} from './interactions.mjs';
@@ -40,7 +41,7 @@ export class Workbench {
     await this.store.get(id);
     assert(validId(sourceId,'src_'),'Invalid source identity.');
     const source=(await this.store.inventory()).sources.find(a=>a.id===sourceId);
-    assert(source,'Source not found.',404);return source;
+    assert(source,'Source not found.',404);return {...source,subcategory:sourceCategory(source)};
   }
   async state(id,{compact=false}={}) {
     const p=await this.project(id);
@@ -385,7 +386,7 @@ export class Workbench {
   async sourcePreview(id,sourceId) {
     await this.store.get(id);const item=(await this.store.inventory()).sources.find(s=>s.id===sourceId);assert(item?.available,'Source unavailable.',404);
     const version=await json(await safe(this.store.registry,`versions/${item.id}/${item.version}.json`));
-    const image=version.files.find(f=>/\.(png|jpe?g)$/i.test(f.path)&&f.size<=8*1024*1024);if(!image)return null;
+    const image=version.files.find(f=>referenceImage(f.path)&&f.size<=8*1024*1024);if(!image)return null;
     const base=await safe(this.store.database,item.relative);assert((await fs.stat(base)).isDirectory(),'No package image preview.',404);
     const file=await safe(base,image.path);assert((await fileHash(file)).sha256===image.sha256,'Package image changed; refresh library.',409);
     assert(image.size<=8*1024*1024,'Package image is too large to preview.');return {path:file,type:/\.png$/i.test(file)?'image/png':'image/jpeg'};

@@ -6,53 +6,63 @@ selection verifies all files and pins the content and rights evidence together.
 from pathlib import Path
 import re
 from .core import DirectorError, digest, require, rights, tokens
+from .catalog_presentation import presentation, classification, reference_image, SUBCATEGORIES
 
 MODEL_SUFFIXES = {'.glb', '.gltf', '.fbx', '.obj', '.blend'}
 
 
-def describe(lib, asset, *, verify=False):
+def describe(lib, asset, *, verify=False, labels=None):
     record = asset.to_dict()
     identity = {key: value for key, value in record.items() if key != 'checked_at'}
     # Index receipts describe derived catalog work, not a new source version.
     identity['metadata'] = {k: v for k, v in identity.get('metadata', {}).items()
                             if k not in {'indexed_clips', 'index_job'}}
+    version=digest(identity)
+    display=presentation(asset)
+    label=(labels or {}).get(asset.id)
+    if label and label['version']==version and asset.kind in {'model','pack'}:
+        display['subcategory']={'id':label['subcategory'],'basis':'User catalog label for this exact source version'}
     policy = rights(asset, lib=lib)
     if verify:
         require(asset.local_files, 'SOURCE_REQUIRED', 'Acquire or explicitly intake this asset first')
         for file in asset.local_files:
             lib.verify_file(file)
     return {
-        'id': asset.id, 'version': digest(identity), 'title': asset.title,
+        'id': asset.id, 'version': version, 'title': asset.title, **display,
         'kind': asset.kind, 'provider': asset.provider, 'files': asset.local_files,
         'policy': policy, 'verified': verify, 'metadata': asset.metadata,
         'source_url': asset.source_url, 'author': asset.author,
         'license_id': asset.license_id, 'license_url': asset.license_url,
         'evidence': asset.evidence,
         'models': [f['path'] for f in asset.local_files if Path(f['path']).suffix.lower() in MODEL_SUFFIXES],
-        'package_images': [f['path'] for f in asset.local_files if Path(f['path']).suffix.lower() in {'.png', '.jpg', '.jpeg'}],
+        'package_images': [f['path'] for f in asset.local_files if reference_image(f['path'])],
         'notice': 'Indexed metadata; not rig compatibility, artistic acceptance, or legal clearance.'
     }
 
 
-def catalog(lib, query='', offset=0, limit=24, asset_id=None, verify=False, kind=None, kinds=None):
+def catalog(lib, query='', offset=0, limit=24, asset_id=None, verify=False, kind=None, kinds=None, subcategory=None, labels=None):
     require(isinstance(query, str) and len(query) <= 2000, 'INVALID_QUERY', 'Search is limited to 2000 characters')
     require(type(offset) is int and offset >= 0 and type(limit) is int and 1 <= limit <= 50,
             'RESOURCE_LIMIT', 'Use a nonnegative offset and 1..50 records per page')
     if asset_id is not None:
         require(isinstance(asset_id, str) and re.fullmatch(r'a_[a-f0-9]{24}', asset_id), 'INVALID_ASSET', 'Invalid catalog identity')
-        return describe(lib, lib.get(asset_id), verify=verify)
+        return describe(lib, lib.get(asset_id), verify=verify,labels=labels)
     require(not verify, 'INVALID_QUERY', 'Byte verification requires one explicit asset')
     require(kind is None or kind in {'model','pack','animation','material','hdri'}, 'INVALID_QUERY', 'Invalid asset kind')
     require(kinds is None or isinstance(kinds, list) and 1 <= len(kinds) <= 5 and
             all(isinstance(k, str) and k in {'model','pack','animation','material','hdri'} for k in kinds)
             and len(set(kinds)) == len(kinds), 'INVALID_QUERY', 'Invalid asset kind group')
     search = tokens(query)
+    require(subcategory is None or isinstance(subcategory, str) and subcategory in SUBCATEGORIES,
+            'INVALID_QUERY', 'Invalid subcategory')
     matched = [asset for asset in lib.all() if asset.local_files and (kind is None or asset.kind == kind) and (kinds is None or asset.kind in kinds) and
+               (subcategory is None or describe(lib,asset,labels=labels)['subcategory']['id'] == subcategory) and
                (not search or search <= tokens(asset.title + ' ' + ' '.join(asset.tags)))]
+    matched.sort(key=lambda asset:(asset.title.casefold(),asset.id))
     selected = matched[offset:offset + limit]
     summaries=[]
     for asset in selected:
-        item=describe(lib,asset)
+        item=describe(lib,asset,labels=labels)
         item['file_count']=len(item.pop('files'))
         item['models']=item['models'][:16]
         item['package_images']=item['package_images'][:1]

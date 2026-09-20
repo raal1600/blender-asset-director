@@ -5,6 +5,8 @@ import {randomUUID} from 'node:crypto';
 import {assert,fileHash,now,safe,writeJson} from './storage.mjs';
 import {startSpecialist} from './workbench-specialist.mjs';
 import {approveCheckpoint,checkpointFor} from './workbench-model.mjs';
+import {labelArguments,setCatalogLabel,displayLabels} from './catalog-labels.mjs';
+import {referenceImage} from '../public/asset-presentation.mjs';
 import {scopeKinds} from '../public/workbench-scope.mjs';
 
 const assetId=id=>assert(typeof id==='string'&&/^a_[a-f0-9]{24}$/.test(id),'Invalid catalog asset.');
@@ -14,17 +16,19 @@ export async function verifyNative(store,runtime,p) {
   assert(result.ok===true,'Native catalog sources changed; review their pinned versions.',409);
 }
 export const withCatalog=Base=>class extends Base {
-  async catalogPage(id,{query='',offset=0,kind=null,activity='all'}={}) {
+  async state(...args){return displayLabels(this,await super.state(...args));}
+  async labelCatalog(...args){return setCatalogLabel(this,...args);}
+  async catalogPage(id,{query='',offset=0,kind=null,activity='all',subcategory=null}={}) {
     await this.store.get(id);
     assert(typeof query==='string'&&query.length<=2000&&Number.isSafeInteger(offset)&&offset>=0,'Invalid catalog search.');
     assert(kind===null||['model','pack','animation','material','hdri'].includes(kind),'Invalid catalog type.');
     let kinds;try{kinds=scopeKinds(activity);}catch{assert(false,'Invalid workflow activity.');}
     if(!kinds.length||kind&&!kinds.includes(kind))return {schema:1,items:[],total:0,offset:0,next_offset:null};
-    return this.runtime.harness(['workbench-catalog','--query',query,'--offset',String(offset),'--limit','24',...(kind?['--kind',kind]:[]),...(activity==='all'?[]:['--kinds',...kinds])]);
+    return this.runtime.harness(['workbench-catalog','--query',query,'--offset',String(offset),'--limit','24',...(subcategory?['--subcategory',subcategory]:[]),...(kind?['--kind',kind]:[]),...(activity==='all'?[]:['--kinds',...kinds]),...await labelArguments(this)]);
   }
   async catalogDetail(id,aid,verify=false) {
     await this.store.get(id);assetId(aid);
-    return this.runtime.harness(['workbench-catalog','--asset',aid,...(verify?['--verify']:[])]);
+    return this.runtime.harness(['workbench-catalog','--asset',aid,...(verify?['--verify']:[]),...await labelArguments(this)]);
   }
   async selectCatalog(id,sceneId,revision,aid,selected) {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);await this.unlocked(p);assetId(aid);
@@ -34,7 +38,7 @@ export const withCatalog=Base=>class extends Base {
     if(selected) {
       const a=await this.catalogDetail(id,aid,true),prior=p.workbench.catalogPins.find(a=>a.id===aid);
       assert(!prior||prior.version===a.version,'This production pins an older version. Do not overwrite its lineage.',409);
-      if(!prior)p.workbench.catalogPins.push({id:a.id,version:a.version,title:a.title,kind:a.kind,provider:a.provider,files:a.files});
+      if(!prior)p.workbench.catalogPins.push({id:a.id,version:a.version,title:a.title,kind:a.kind,provider:a.provider,files:a.files,subcategory:a.subcategory,motion:a.motion});
       if(!s.catalog.includes(aid))s.catalog.push(aid);
       if(a.kind==='animation')s.selectedMotion=aid;
     }else {s.catalog=s.catalog.filter(x=>x!==aid);if(s.selectedMotion===aid)s.selectedMotion=null;}
@@ -42,7 +46,7 @@ export const withCatalog=Base=>class extends Base {
     return this.store.save(p,p.revision);
   }
   async catalogImage(id,aid) {
-    const a=await this.catalogDetail(id,aid),image=a.files.find(f=>/\.(png|jpe?g)$/i.test(f.path)&&f.size<=8*1024*1024);
+    const a=await this.catalogDetail(id,aid),image=a.files.find(f=>referenceImage(f.path)&&f.size<=8*1024*1024);
     if(!image)return null;
     const filename=await safe(this.config.library,image.path),actual=await fileHash(filename);
     assert(actual.sha256===image.sha256&&actual.size===image.size,'Package image changed.',409);
@@ -76,6 +80,7 @@ export const withCatalog=Base=>class extends Base {
     const a=await this.catalogDetail(id,aid,true);
     assert(typeof file==='string'&&a.models.includes(file),'Choose an exact supported model member.');
     if(operation==='import') {
+      assert(['model','pack'].includes(a.kind),'World import accepts models and packs, not animation or look assets.',409);
       assert(confirmed===true,'Import needs an explicit user action.');
       assert(a.policy?.eligible,'Native source policy blocks this import; selecting an asset is not permission.',409);
       assert((await this.interactions(id).sourceStatus()).ready,'Review the exact production source use first.',409);

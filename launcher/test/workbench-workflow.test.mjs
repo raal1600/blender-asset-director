@@ -47,8 +47,8 @@ test('Action inspector offers reviewed motion guidance, not World import',()=>{
   const asset={id:'motion',version:'b'.repeat(64),kind:'animation',models:['motion.fbx'],policy:{eligible:true}};
   const scene={stage:'action',catalog:['motion']};
   const view=catalogDialog({asset,scene,locked:false,sourceReady:true,esc,b});
-  assert.match(view.body,/motion take is not applied by selection/);
-  assert.match(view.body,/exact transfer plan/);assert.ok(!view.buttons.includes('catalog-import'));
+  assert.match(view.body,/Selection does not apply motion/);
+  assert.match(view.body,/exact reviewed transfer plan/);assert.ok(!view.buttons.includes('catalog-import'));
 });
 test('checkpoint panel explains actual saved evidence and does not fake animation',()=>{
   const scene={stage:'world',renders:[],checkpoints:[],current:null,candidate:null};

@@ -1,3 +1,4 @@
+import {launchAssetPreview} from './asset-preview-launch.mjs';
 import {taskArguments} from './workbench-launch.mjs';
 import {randomUUID} from 'node:crypto';
 import {buildSessionContext} from './onboarding.mjs';
@@ -40,6 +41,7 @@ export class Runtime {
     const { stdout } = await command(this.config.python, [path.join(this.config.skill,'scripts/director.py'),'--library',this.config.library,...args],timeout);
     return JSON.parse(stdout.replace(/^\uFEFF/,''));
   }
+  async launchAssetPreview(directory,receipt) {return launchAssetPreview(this,directory,receipt);}
   async doctor() {
     assert(await exists(path.join(this.config.library,'catalog.sqlite')), 'The configured harness database is missing.');
     const result = await this.harness(['doctor']);

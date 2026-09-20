@@ -35,10 +35,11 @@ dialog h2{overflow-wrap:anywhere}
 .browser-tabs button.active{border-bottom-color:var(--accent);color:var(--accent)}
 .browser-toolbar{display:flex;align-items:center;gap:8px;padding:16px 24px 8px;flex-wrap:wrap;flex-shrink:0}
 .browser-toolbar label{margin:0}.browser-toolbar input,.browser-toolbar select{margin:0}
+.browser-toolbar{align-items:flex-end}.browser-toolbar label>span{display:block;font-size:11px;margin-bottom:6px;color:var(--muted)}
 .browser-query{flex:1;min-width:180px}.browser-query input{width:100%}
 .view-switch{display:flex;gap:3px}
 .view-switch [aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
-.browser-description{padding:0 24px 12px;font-size:11px;flex-shrink:0}
+.browser-description{padding:0 24px 12px;font-size:11px;flex-shrink:0;display:flex;align-items:center;gap:12px}.browser-description p{flex:1;margin:0}
 #browser-notice{margin:0 24px 8px;max-height:100px;overflow:auto;flex-shrink:0}
 .browser-results{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));grid-auto-rows:max-content;gap:14px;padding:4px 24px 18px;align-content:start;scrollbar-gutter:stable}
 .browser-results>.empty{grid-column:1/-1;padding:55px 20px}
@@ -49,6 +50,10 @@ dialog h2{overflow-wrap:anywhere}
 .browser-thumb img{width:100%;height:100%;object-fit:contain}
 .browser-thumb>small{position:absolute;bottom:5px;left:6px;background:#101822de;padding:3px 5px;border-radius:3px;font-size:10px}
 .browser-asset .copy{padding:12px;min-width:0;flex:1}
+.asset-type{display:inline-block;border:1px solid #44617f;background:#172b40;border-radius:4px;padding:3px 7px;color:#d4e7ff;font-size:11px;margin-bottom:8px}
+.asset-facts{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.asset-facts .asset-type{margin:0}.asset-use{border-top:1px solid var(--line);padding-top:16px;margin-top:18px}
+.preview-explanation{background:var(--raised);border-left:3px solid var(--accent);padding:12px}.motion-facts{color:#c4dcf4}
+#asset-preview-status:not(:empty){padding:12px;border:1px solid var(--line);border-radius:4px}#dialog footer{flex-wrap:wrap}#dialog select{max-width:100%}
 .browser-asset h3{font-size:13px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .browser-asset .copy>small{display:block;font-size:11px;margin-top:6px;overflow-wrap:anywhere}
 .asset-actions{display:flex;border-top:1px solid var(--line)}
@@ -82,12 +87,12 @@ dialog h2{overflow-wrap:anywhere}
 @media(max-width:760px){
  #library-dialog{width:calc(100vw - 16px);height:calc(100dvh - 16px)}
  .browser-heading{padding:15px 14px 10px}.browser-heading h2{font-size:20px}
- .browser-tabs{padding:0 10px;flex-wrap:wrap;gap:0}.browser-tabs .grow,.browser-tabs>small{display:none}
+ .browser-tabs{padding:0 10px;flex-wrap:wrap;gap:0}.browser-tabs .grow{display:none}.browser-tabs>small{display:block;width:100%;padding:7px 4px}
  .browser-tabs button{flex:1;font-size:12px}
  .browser-toolbar{padding:12px 14px 8px;gap:7px}.browser-query{min-width:calc(100% - 86px)}
  .browser-toolbar select{max-width:150px;font-size:11px}.view-switch button{padding:8px}
  .browser-description{padding:0 14px 10px;line-height:1.6}
- .browser-results{padding:4px 14px 14px;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px}
+ .browser-results{padding:4px 14px 14px;grid-template-columns:1fr;gap:10px}
  .browser-footer{padding:10px 14px!important;gap:8px;flex-wrap:wrap}
  .browser-footer>div{min-width:0}.browser-footer small{display:none}.browser-footer .row{gap:6px}
  .browser-results.list .browser-asset{grid-template-columns:42px minmax(0,1fr)}
