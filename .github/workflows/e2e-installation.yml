@@ -1,0 +1,45 @@
+name: 01 · Installation lifecycle E2E
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installation:
+    name: Install → repeat → update → verify → remove · ${{ matrix.id }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            shell: powershell
+            id: windows-powershell
+          - os: windows-latest
+            shell: pwsh
+            id: windows-pwsh
+          - os: ubuntu-latest
+            shell: sh
+            id: linux-sh
+          - os: macos-latest
+            shell: sh
+            id: macos-sh
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Exercise real bootstrap and installed CLI, preserving the library and host configuration
+        run: python tools/ci/run_bootstrap.py --shell ${{ matrix.shell }} --evidence evidence/installation
+      - name: Retain installation lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-installation-${{ matrix.id }}-${{ github.sha }}
+          path: evidence/installation/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14

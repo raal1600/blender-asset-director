@@ -1,0 +1,127 @@
+name: 06 · Full installed studio E2E
+'on':
+  workflow_call:
+    inputs:
+      scenario:
+        description: Installed-studio journey
+        type: string
+        default: full
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Installed-studio journey
+        type: choice
+        options:
+        - full
+        - onboarding
+        - execution
+        - production
+        - recovery
+        default: full
+permissions:
+  contents: read
+jobs:
+  studio:
+    name: ${{ inputs.scenario || 'full' }} · ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+        - ubuntu-latest
+        - windows-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: ./.github/actions/setup-blender
+      with:
+        version: 5.2.1
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Install real Chrome with H.264 playback support
+      run: |
+        python -m pip install playwright==1.55.0
+        python -m playwright install --with-deps chrome
+    - name: Install explicit film encoder on disposable Linux runner
+      if: runner.os == 'Linux' && (inputs.scenario == 'production' || inputs.scenario == 'full' || inputs.scenario == '')
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+        ffmpeg -version
+        ffprobe -version
+    - name: Fetch checksum-pinned portable film encoder on disposable Windows runner
+      if: runner.os == 'Windows' && (inputs.scenario == 'production' || inputs.scenario == 'full' || inputs.scenario == '')
+      shell: python
+      run: |
+        import os, subprocess, sys
+        from pathlib import Path
+        destination = Path(os.environ['RUNNER_TEMP']) / 'workbench-ffmpeg'
+        subprocess.run([sys.executable, 'tools/ci/fetch_ffmpeg.py', str(destination)], check=True)
+        with open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8') as out:
+            out.write(str(destination) + '\n')
+    - name: Exercise browser, installed launcher, project MCP and actual Blender
+      env:
+        JOURNEY: ${{ inputs.scenario || 'full' }}
+      shell: python
+      run: |
+        import os, subprocess, sys
+        subprocess.run([sys.executable, 'tools/studio_e2e/run.py',
+            '--blender', os.environ['BLENDER'], '--scenario', os.environ['JOURNEY'],
+            '--evidence', 'evidence/studio-e2e'], check=True)
+    - name: Verify bounded catalog UI with 10000 synthetic records
+      if: inputs.scenario == 'full' || inputs.scenario == ''
+      run: python tools/catalog_browser_suite.py --evidence evidence/catalog-browser
+    - name: Verify embedded WebGL with generated native inputs
+      if: inputs.scenario == 'full' || inputs.scenario == ''
+      shell: python
+      run: |
+        import os, subprocess, sys
+        # Generated fixture only. No new screenshot/log publication is configured.
+        subprocess.run([sys.executable, 'tools/embedded_viewer_suite.py',
+            '--blender', os.environ['BLENDER'], '--evidence', 'evidence/embedded-viewer'], check=True)
+    - name: Retain separate synthetic catalog UI evidence
+      if: always() && (inputs.scenario == 'full' || inputs.scenario == '')
+      uses: actions/upload-artifact@v4
+      with:
+        name: catalog-browser-${{ matrix.os }}-${{ github.sha }}
+        path: evidence/catalog-browser/
+        if-no-files-found: error
+        retention-days: 14
+    - name: Verify guided World with real synthetic Blender import
+      # Shares the existing installed-studio partition; no new workflow identity
+      # or publication of private browser sessions is introduced.
+      if: inputs.scenario == 'full' || inputs.scenario == ''
+      shell: python
+      run: |
+        import os, subprocess, sys
+        subprocess.run([sys.executable, 'tools/embedded_viewer_suite.py',
+            '--blender', os.environ['BLENDER'], '--guided-world',
+            '--native-fixture', 'evidence/embedded-viewer/native',
+            '--evidence', 'evidence/guided-world'], check=True)
+    - name: Report executed checkpoints and limitations
+      if: always()
+      shell: python
+      run: |
+        import json, os
+        from pathlib import Path
+        path = Path('evidence/studio-e2e/report.json')
+        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as out:
+            out.write('## Installed studio journey\n\n')
+            if not path.is_file():
+                out.write('FAIL: setup or execution did not produce a journey report.\n')
+            else:
+                report = json.loads(path.read_text(encoding='utf-8'))
+                report.pop('artifacts', None)
+                out.write('```json\n' + json.dumps(report, indent=2) + '\n```\n')
+    - name: Retain exact-commit evidence on success or failure
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: acceptance-studio-${{ inputs.scenario || 'full' }}-${{ matrix.os }}-${{ github.sha }}
+        path: evidence/studio-e2e/
+        if-no-files-found: error
+        overwrite: true
+        retention-days: 14

@@ -1,0 +1,12 @@
+name: 02 · Project onboarding and audit E2E
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  journey:
+    name: Project onboarding and audit
+    uses: ./.github/workflows/studio-e2e.yml
+    with:
+      scenario: onboarding

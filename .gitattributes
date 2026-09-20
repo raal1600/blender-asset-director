@@ -1,0 +1,2 @@
+# Vendored integrity records refer to exact upstream bytes on every OS.
+launcher/public/vendor/three/** -text

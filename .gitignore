@@ -3,6 +3,10 @@ __pycache__/
 .venv/
 *.egg-info/
 build/
+!launcher/public/vendor/three/build/
+!launcher/public/vendor/three/build/three.module.js
+!launcher/public/vendor/three/build/three.core.js
+/.cache/
 dist/
 .env
 .env.*

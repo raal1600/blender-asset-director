@@ -1,0 +1,24 @@
+/** Disposable real-harness World fixture. Never opens an existing studio. */
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {constants} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {createApp} from '../launcher/server.mjs';
+import {fileHash,writeJson} from '../launcher/lib/storage.mjs';
+const repository=fileURLToPath(new URL('../',import.meta.url));
+const [root,generated,python,blender]=process.argv.slice(2);
+if(!root||!generated||!python||!blender)throw Error('Expected NEW fixture directory, generated synthetic input, Python and Blender');
+const prior=JSON.parse(await fs.readFile(path.join(generated,'asset_preview_report.json'),'utf8'));
+if(prior.status!=='PASS')throw Error('Synthetic native source fixture must pass first');
+await fs.mkdir(root);
+const input=path.join(root,'SyntheticInputs');await fs.mkdir(input);
+await fs.copyFile(path.join(generated,'originals/scene.glb'),path.join(input,'scene.glb'),constants.COPYFILE_EXCL);
+const library=path.join(root,'Database/AssetDirector');
+const app=await createApp({root,config:{library,python,blender,skill:path.join(repository,'skills/blender-asset-director')},port:0});
+const evidence=path.join(root,'synthetic-intake.json');
+await writeJson(evidence,{title:'Synthetic animated prop',kind:'model',source_url:'https://example.invalid/generated-ci-fixture',license_id:'CC0-1.0',license_url:'https://example.invalid/synthetic-license',author:'Synthetic fixture generator',price:0,attested:true});
+const asset=await app.runtime.harness(['intake',input,'--evidence',evidence,'--preserve-existing']);
+let project=await app.store.create('Guided World · synthetic test','Disposable generated inputs. Scripted test decisions are not human creative approval.');
+const created=await app.workbench.create(project.id,project.revision,'Build a world');project=await app.store.get(project.id);
+await writeJson(path.join(root,'browser-session.json'),{fixture:'synthetic-guided-world',origin:app.origin,token:app.token,pid:process.pid,root,projectId:project.id,sceneId:created.sceneId,assetId:asset.asset_id,projectManifest:path.join(project.directory,'project.json'),catalog:path.join(library,'catalog.sqlite'),input:path.join(input,'scene.glb'),original:await fileHash(path.join(input,'scene.glb'))});
+console.log('Disposable guided World server ready. Authentication stays in the private fixture.');

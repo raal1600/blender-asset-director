@@ -203,13 +203,21 @@ class Library:
         for d in ("manifests", "downloads", "extracted", "prepared", "previews", "licenses", "incoming", "jobs", "reports", "cache", "backends"):
             (self.root / d).mkdir(exist_ok=True)
         self.db = sqlite3.connect(self.root / "catalog.sqlite", timeout=15)
-        self.db.execute("PRAGMA journal_mode=WAL")
-        version = self.db.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (0, SCHEMA):
+        try:
+            self.db.execute("PRAGMA journal_mode=WAL")
+            version = self.db.execute("PRAGMA user_version").fetchone()[0]
+            if version not in (0, SCHEMA):
+                raise DirectorError("CATALOG_VERSION", "Unsupported catalog version; do not downgrade")
+            self.db.executescript("CREATE TABLE IF NOT EXISTS assets(id TEXT PRIMARY KEY, record TEXT NOT NULL); CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY, at REAL NOT NULL, kind TEXT NOT NULL, data TEXT NOT NULL);")
+            # Reassigning even the same user_version is a SQLite write transaction.
+            # Readers must not flush the catalog or contend with its real writers.
+            # Initialization remains durable; no cache or relaxed synchronous mode.
+            if version != SCHEMA:
+                self.db.execute(f"PRAGMA user_version={SCHEMA}")
+                self.db.commit()
+        except Exception:
             self.db.close()
-            raise DirectorError("CATALOG_VERSION", "Unsupported catalog version; do not downgrade")
-        self.db.executescript("CREATE TABLE IF NOT EXISTS assets(id TEXT PRIMARY KEY, record TEXT NOT NULL); CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY, at REAL NOT NULL, kind TEXT NOT NULL, data TEXT NOT NULL);")
-        self.db.execute(f"PRAGMA user_version={SCHEMA}"); self.db.commit()
+            raise
     def close(self): self.db.close()
     def __enter__(self): return self
     def __exit__(self, *args): self.close()

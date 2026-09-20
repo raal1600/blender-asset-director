@@ -1,0 +1,12 @@
+name: 05 · Source integrity and recovery E2E
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  journey:
+    name: Source integrity and recovery
+    uses: ./.github/workflows/studio-e2e.yml
+    with:
+      scenario: recovery

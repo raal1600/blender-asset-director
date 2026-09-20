@@ -1,0 +1,28 @@
+name: Set up verified Blender
+description: Use the repository's checksum-verifying official Blender downloader.
+inputs:
+  version:
+    description: Exact supported Blender version
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Fetch and expose checksum-verified Blender
+      shell: python
+      env:
+        BLENDER_VERSION: ${{ inputs.version }}
+      run: |
+        import os, subprocess, sys
+        from pathlib import Path
+        destination = Path(os.environ['RUNNER_TEMP']) / 'verified-blender'
+        result = subprocess.run([sys.executable, 'tools/fetch_blender.py',
+            os.environ['BLENDER_VERSION'], str(destination)], check=True,
+            capture_output=True, text=True, encoding='utf-8')
+        executable = result.stdout.strip().splitlines()[-1]
+        if not Path(executable).is_file():
+            raise RuntimeError('Verified Blender executable not found')
+        with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as out:
+            out.write('BLENDER=' + executable + '\n')
