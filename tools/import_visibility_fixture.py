@@ -90,6 +90,6 @@ try:
         check({'SyntheticBody','Icosphere'}<=names,'checkpoint GLB retains character and unrelated same-name geometry')
         check(file_hash(source)==original and file_hash(seed)==seed_hash and file_hash(checkpoint)==checkpoint_hash and file_hash(legacy)==legacy_hash,'sources and old checkpoints are byte-identical')
     report={'status':'PASS' if all(c['status']=='PASS' for c in checks) else 'FAIL','checks':checks,'blender_version':bpy.app.version_string,'human_approval':'NOT_GRANTED'}
-    atomic_json(out/'report.json',report);print(json.dumps(report));assert report['status']=='PASS'
+    atomic_json(out/'import_visibility_report.json',report);print(json.dumps(report));assert report['status']=='PASS'
 except BaseException as error:
     atomic_json(out/'failure.json',{'status':'FAIL','checks':checks,'error':str(error)});raise

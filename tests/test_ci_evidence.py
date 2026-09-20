@@ -37,8 +37,9 @@ class CoverageContractTests(unittest.TestCase):
         self.assertEqual(len({row[0] for row in fixtures}), 22)
         self.assertIn('asset-preview', {row[0] for row in fixtures})
         self.assertIn('import-visibility', {row[0] for row in fixtures})
-        for _, script, _, _, _ in fixtures:
+        for _, script, expected, _, _ in fixtures:
             self.assertTrue((ROOT/'tools'/script).is_file())
+            self.assertNotIn(expected, ('report.json', 'junit.xml'), 'Reserved top-level evidence filename')
         self.assertEqual(set(BLENDER_SUITES), {'authoring', 'motion', 'continuity'})
 
     def test_every_named_studio_journey_reaches_installed_runtime_and_audit(self):
@@ -154,6 +155,22 @@ class AcceptanceGateTests(unittest.TestCase):
 
 
 class EvidenceWriterTests(unittest.TestCase):
+    def test_every_configured_blender_report_survives_attachment_inventory(self):
+        # Parser metadata only, never execution evidence or Blender acceptance.
+        for suite, fixtures in BLENDER_SUITES.items():
+            with self.subTest(suite=suite), tempfile.TemporaryDirectory() as tmp, patch('evidence.source_commit', return_value=SHA):
+                root = Path(tmp)
+                evidence = Evidence(root, 'blender', suite)
+                for name, _, expected, _, _ in fixtures:
+                    folder = root/'fixtures'/name
+                    folder.mkdir(parents=True)
+                    with evidence.checkpoint(name):
+                        (folder/'process.log').write_text('Unit-test parser metadata, not a real execution')
+                        if not expected.startswith('@'):
+                            write(folder/expected, {'status': 'PASS', 'scope': 'UNIT_TEST_METADATA_ONLY'})
+                evidence.finish(row[0] for row in fixtures)
+                validate_artifacts(root, read(root/'report.json'))
+
     def test_writer_starts_failed_and_cannot_finish_without_execution_evidence(self):
         with tempfile.TemporaryDirectory() as tmp, patch('evidence.source_commit', return_value=SHA):
             evidence = Evidence(tmp, 'unit-fixture', 'metadata-only')
