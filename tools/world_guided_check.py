@@ -89,6 +89,12 @@ def main():
             assert digest(Path(session['projectManifest']).parent/cp['path'])==cp['sha256']
             report['checks'].append('Actual Blender import yields observed mesh; real 3D orbit; keep is distinct from World completion')
             capture('06-kept-world')
+            click('.world-inspection > summary');click('.rendered-evidence > summary')
+            click('.projectbar [data-action="refresh"]')
+            expect(page.locator('.world-inspection')).to_have_attribute('open','')
+            expect(page.locator('.rendered-evidence')).to_have_attribute('open','')
+            click('.world-inspection > summary')
+            report['checks'].append('Inspection and rendered-still panels retain their open state across authenticated refresh')
             for width,height in [(1024,768),(640,900)]:
                 page.set_viewport_size({'width':width,'height':height});capture('07-layout-'+str(width))
                 expect(page.get_by_role('button',name='Continue to Action',exact=True)).to_be_visible()

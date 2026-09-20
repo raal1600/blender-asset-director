@@ -191,6 +191,10 @@ def catalog_and_film(s, click, idle, check):
     assert scene['completed'] == before_completed
     assert scene['preview']['checkpointId'] == imported['id']
     preview = page.locator('img[data-media="preview"]')
+    # Returning from the real render must preserve the user's open inspection
+    # tools. Never force-click a hidden control to conceal a product regression.
+    expect(page.locator('.world-inspection')).to_have_attribute('open','')
+    expect(page.locator('.rendered-evidence')).to_have_attribute('open','')
     if page.locator('.rendered-evidence').get_attribute('open') is None:
         page.locator('.rendered-evidence summary').click()
     expect(preview).to_be_visible()
