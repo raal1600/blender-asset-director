@@ -103,6 +103,8 @@ def main():
             expect(page.locator('.browser-asset')).to_have_count(24)
             capture('03-source-packages')
             filters();page.locator('#browser-kind').select_option('Animations');idle()
+            expect(page.locator('.browser-filters')).to_have_attribute('open','')
+            expect(page.locator('[data-action="browser-layout"][data-layout="list"]')).to_be_visible()
             click('[data-action="browser-layout"][data-layout="list"]')
             expect(page.locator('.browser-results')).to_have_class(__import__('re').compile(r'\blist\b'))
             expect(page.locator('[data-layout="list"]')).to_have_attribute('aria-pressed','true')

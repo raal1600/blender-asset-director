@@ -67,7 +67,7 @@ export function assetBrowser({dialog,context,api,esc,b,loadImages,releaseImages=
   dialog.addEventListener('toggle',e=>{if(e.target.matches?.('.browser-filters')&&e.target.isConnected&&ui)ui.filtersOpen=e.target.open;},true);
   dialog.addEventListener('pointerdown',e=>{const filters=dialog.querySelector('.browser-filters[open]');if(filters&&!filters.contains(e.target)){ui.filtersOpen=false;filters.open=false;}});
   const currentKey=()=>context().scene?context().project.id+':'+context().scene.id+':'+context().scene.stage:null;
-  const remember=()=>{if(ui)ui.scroll[ui.tab]=dialog.querySelector('.browser-results')?.scrollTop||0;};
+  const remember=()=>{if(ui){ui.scroll[ui.tab]=dialog.querySelector('.browser-results')?.scrollTop||0;const filters=dialog.querySelector('.browser-filters');if(filters)ui.filtersOpen=filters.open;}};
   function paint(focus=null) {
     if(!dialog.open)return;
     releaseImages(dialog);
@@ -103,7 +103,7 @@ export function assetBrowser({dialog,context,api,esc,b,loadImages,releaseImages=
     await refresh({capture:false,focus:'#browser-query'});
   }
   function close() {remember();request++;dialog.close();}
-  dialog.addEventListener('close',()=>{request++;releaseImages(dialog);dialog.innerHTML='';document.body.classList.remove('library-open');document.querySelector('[data-action="browse-assets"]')?.focus();});
+  dialog.addEventListener('close',()=>{request++;releaseImages(dialog);dialog.innerHTML='';document.body.classList.remove('library-open');const visible=e=>!e.disabled&&e.getClientRects().length;([...document.querySelectorAll('[data-action="browse-assets"]')].find(visible)||[...document.querySelectorAll('.world-next .primary')].find(visible))?.focus();});
   dialog.addEventListener('cancel',remember);
   dialog.addEventListener('keydown',event=>{
     const filters=dialog.querySelector('.browser-filters[open]');
@@ -126,7 +126,7 @@ export function assetBrowser({dialog,context,api,esc,b,loadImages,releaseImages=
       if(action==='browser-tab'){ui.filtersOpen=false;ui.tab=data.tab;ui.subcategory=null;await refresh({capture:false,focus:'[data-action="browser-tab"][data-tab="'+ui.tab+'"]'});}
       else if(action==='browser-layout'){ui.filtersOpen=false;ui.layout=data.layout;paint(context().scene.stage==='world'?'.browser-filters summary':`[data-layout="${ui.layout}"]`);}
       else if(action==='browser-page'){ui.offset[ui.tab]=Number(data.offset);ui.scroll[ui.tab]=0;await refresh({capture:false,focus:'.browser-results'});}
-      else if(action==='browser-search'){ui.filtersOpen=false;await refresh({reset:true,focus:'#browser-query'});}
+      else if(action==='browser-search'){ui.filtersOpen=false;await refresh({reset:true,capture:false,focus:'#browser-query'});}
       else if(action==='browser-activity'){ui.subcategory=null;ui.activity=data.value==='all'?'all':context().scene.stage;ui.kind={catalog:'',sources:''};ui.offset={catalog:0,sources:0};ui.scroll={catalog:0,sources:0};await refresh({reset:true,focus:'#browser-activity'});}
       else if(action==='browser-subcategory'){ui.subcategory=data.value||null;await refresh({reset:true,focus:'#browser-subcategory'});}
       else if(action==='browser-reset'){ui.query='';ui.kind={catalog:'',sources:''};ui.subcategory=null;ui.selected=false;await refresh({reset:true,focus:'#browser-query'});}

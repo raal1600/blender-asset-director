@@ -80,6 +80,9 @@ def main():
             current=finish_job();cp=next(c for c in current['checkpoints'] if c['id']==current['candidate'])
             assert any(o.get('asset_id')==session['assetId'] and o.get('type')=='MESH' for o in cp['audit']['objects'])
             ready('[data-scene-viewer]');capture('05-import-review')
+            click('.world-more > summary');click('[data-action="world-ingredients"]')
+            click('#dialog [data-action="browse-assets"].primary');page.keyboard.press('Escape');idle()
+            expect(page.get_by_role('button',name='Keep this change',exact=True)).to_be_focused()
             assert not current['current'] and not current['completed']
             canvas=page.locator('[data-scene-viewer] canvas');before_orbit=canvas.screenshot();box=canvas.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
             page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+90,y+20,steps=9);page.mouse.up();page.wait_for_timeout(300)
@@ -104,7 +107,7 @@ def main():
             primary=page.locator('.world-next .primary');primary.hover()
             assert primary.evaluate("e=>getComputedStyle(e).backgroundColor")=='rgb(197, 212, 255)','Primary hover must retain light background and readable contrast'
             page.set_viewport_size({'width':1440,'height':960})
-            click('[data-action="browse-assets"]');click('[data-action="catalog-preview-detail"]');ready('#dialog [data-viewer-host]')
+            click('.world-next [data-action="browse-assets"]');click('[data-action="catalog-preview-detail"]');ready('#dialog [data-viewer-host]')
             expect(page.get_by_role('button',name='Add another copy',exact=True)).to_be_visible()
             click('[data-action="catalog-import"]');second=finish_job();second_cp=next(c for c in second['checkpoints'] if c['id']==second['candidate'])
             assert second_cp['id']!=cp['id'];click('[data-action="discard"]')

@@ -41,11 +41,15 @@ def main():
         session = None
         try:
             deadline = time.monotonic() + 40
-            while not session_file.exists():
+            while session is None:
                 if process.poll() is not None: raise RuntimeError('Viewer fixture startup failed; see server.log')
                 if time.monotonic() > deadline: raise TimeoutError('Viewer fixture did not start')
+                try:
+                    session = json.loads(session_file.read_text())
+                except (FileNotFoundError, PermissionError, json.JSONDecodeError):
+                    pass  # Publication is bounded; a partial/busy file is not a ready session.
+                if session is not None: break
                 time.sleep(.1)
-            session = json.loads(session_file.read_text())
             command = [sys.executable, '-B', str(ROOT / 'tools' / check), '--fixture', str(root), '--evidence', str(output / 'browser')]
             if args.chrome: command += ['--chrome', args.chrome]
             return subprocess.run(command, env=env, timeout=600 if args.guided_world else 300).returncode
