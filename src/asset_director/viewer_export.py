@@ -33,7 +33,9 @@ def export(destination, observed):
             'RESOURCE_LIMIT', 'Textures exceed the interactive preview budget')
     # Export only the currently saved scene, preserving native timebase. Materials
     # are glTF approximations; scene cameras/lights and compositor are not a render.
-    args = dict(filepath=str(destination), export_format='GLB', use_active_scene=True,
+    # Honor object/collection render visibility, including explicitly repaired
+    # rig widgets. Hidden helpers must not reappear in the inspection derivative.
+    args = dict(filepath=str(destination), export_format='GLB', use_active_scene=True, use_renderable=True,
                 export_animations=True, export_extras=False, export_cameras=False,
                 export_lights=False, export_apply=False)
     supported = bpy.ops.export_scene.gltf.get_rna_type().properties.keys()

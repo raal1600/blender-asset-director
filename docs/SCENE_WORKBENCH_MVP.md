@@ -238,3 +238,18 @@ A missing native/private/human record is **NOT TESTED**, never a synthetic pass.
 Public CI records scripted approval inputs separately. Source changes reset the
 required evidence; installer publication and live-studio migration remain explicit
 release decisions. The Vercel site remains a design demo, not a remote studio.
+
+### Imported rig helpers and saved-scene visibility
+
+World import preserves the original collection membership of objects actually
+referenced as imported rigs' custom bone shapes. It does not identify helpers by
+names such as Icosphere, delete them, or change their rig references. This keeps
+importer-created hidden controls from becoming visible scene geometry when the
+other imported objects are organized into the job collection.
+
+The in-app GLB inspection derivative respects object and collection render
+visibility. A previously affected checkpoint can use the existing reviewed
+`bone-display` operation to hide its observed widget in a separate result; the
+original checkpoint, skin, rest data, animations and widget references remain.
+The real `import-visibility` regression covers both import and repaired-checkpoint
+export, animated deformation, source preservation and unrelated same-name geometry.

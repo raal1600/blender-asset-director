@@ -164,9 +164,16 @@ def execute(job_path, *, live=False):
                     if "file" in options:
                         f = next(x for x in candidates if x["path"] == options["file"])
                     created = ops.import_file(lib.verify_file(f), package_root(lib,f), selection=options.get("selection"))
+                    # Importers may create hidden mesh templates for bone controls.
+                    # Moving those out of their source collections can make them
+                    # visible/renderable. Identify actual references, never names.
+                    widgets = {p.custom_shape for rig in created if rig.type == 'ARMATURE'
+                               for p in rig.pose.bones if p.custom_shape}
                     for obj in created:
-                        for previous in list(obj.users_collection): previous.objects.unlink(obj)
-                        collection.objects.link(obj); obj["bad_asset"] = asset.id; obj["bad_job"] = job["id"]
+                        if obj not in widgets:
+                            for previous in list(obj.users_collection): previous.objects.unlink(obj)
+                            collection.objects.link(obj)
+                        obj["bad_asset"] = asset.id; obj["bad_job"] = job["id"]
                     data = {"objects": [o.name for o in created], "source": asset.id}
                 # The launcher adopts a byte-identical candidate into project Scenes.
                 # Preserve external references across that move, without touching sources.
