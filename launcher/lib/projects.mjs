@@ -206,18 +206,23 @@ export class Store {
     await fs.unlink(await safe(p.container,'trash.json'));await fs.rmdir(p.container);
     return this.get(id);
   }
-  async bindJob(id, job) {
+  async bindJob(id, job, updateProject=null) {
+    assert(updateProject===null||typeof updateProject==='function','Invalid project update.');
     assert(/^j_[0-9a-f]{24}$/.test(job.id), 'Invalid harness job.');
     const p = await this.get(id); const all = await this.list(); const trash = await this.trashList();
     assert(!trash.errors.length, 'A trash record is invalid; job ownership cannot be verified.',409); all.projects.push(...trash.projects);
     assert(!all.projects.some(x => x.id !== id && x.jobs.some(j => j.id === job.id)), 'This job already belongs to another project.', 409);
-    if (p.jobs.some(j => j.id === job.id)) return p;
+    const alreadyBound=p.jobs.some(j => j.id === job.id);
+    if (alreadyBound&&!updateProject) return p;
     // A job with target files must target this project. Shared source-only jobs
     // can be explicitly associated but never silently inferred from UI selection.
     for (const f of job.specification.inputs) {
       const rel = slash(path.relative(p.directory, f.path)); await safe(p.directory, rel);
     }
-    p.jobs.push({ id: job.id, operation: job.specification.operation, linkedAt: now() });
+    if(!alreadyBound)p.jobs.push({ id: job.id, operation: job.specification.operation, linkedAt: now() });
+    // Internal callers can publish associated state in the same durable revision.
+    // Ownership, input containment and optimistic revision checks still precede execution.
+    if(updateProject)await updateProject(p);
     return this.save(p,p.revision);
   }
 }

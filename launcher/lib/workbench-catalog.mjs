@@ -8,6 +8,7 @@ import {approveCheckpoint,checkpointFor} from './workbench-model.mjs';
 import {labelArguments,setCatalogLabel,displayLabels} from './catalog-labels.mjs';
 import {referenceImage} from '../public/asset-presentation.mjs';
 import {scopeKinds} from '../public/workbench-scope.mjs';
+import {operationTiming} from './operation-timing.mjs';
 
 const assetId=id=>assert(typeof id==='string'&&/^a_[a-f0-9]{24}$/.test(id),'Invalid catalog asset.');
 export async function verifyNative(store,runtime,p) {
@@ -16,7 +17,11 @@ export async function verifyNative(store,runtime,p) {
   assert(result.ok===true,'Native catalog sources changed; review their pinned versions.',409);
 }
 export const withCatalog=Base=>class extends Base {
-  async state(...args){return displayLabels(this,await super.state(...args));}
+  async state(...args){
+    const state=await displayLabels(this,await super.state(...args));
+    state.runs=state.runs.map(run=>this.catalogProgress?.has(run.id)?structuredClone(this.catalogProgress.get(run.id)):run);
+    return state;
+  }
   async labelCatalog(...args){return setCatalogLabel(this,...args);}
   async catalogPage(id,{query='',offset=0,kind=null,activity='all',subcategory=null}={}) {
     await this.store.get(id);
@@ -72,12 +77,14 @@ export const withCatalog=Base=>class extends Base {
     const {assetId:aid,file,selection,operation='import',confirmed=false}=request;
     assert(typeof confirmed==='boolean','Confirmation must be an explicit boolean.');
     assert(['import','asset-contents'].includes(operation),'Unsupported catalog operation.');assetId(aid);
+    const diagnostic={requestedAt:now()};const timed=operationTiming(diagnostic);
     const p=await this.project(id,revision),s=this.scene(p,sceneId);
     await this.unlocked(p);assert(!s.candidate&&!s.task&&!s.run,'Finish the active task or candidate first.',409);
     assert((s.catalog||[]).includes(aid),'Select this catalog source for the scene first.',409);
     assert(operation!=='import'||s.stage==='world','Import ingredients inside Assemble world.',409);
-    await verifyNative(this.store,this.runtime,p);
-    const a=await this.catalogDetail(id,aid,true);
+    const [,a]=await timed('verify-sources',()=>Promise.all([
+      verifyNative(this.store,this.runtime,p),this.catalogDetail(id,aid,true)
+    ]));
     assert(typeof file==='string'&&a.models.includes(file),'Choose an exact supported model member.');
     if(operation==='import') {
       assert(['model','pack'].includes(a.kind),'World import accepts models and packs, not animation or look assets.',409);
@@ -92,55 +99,65 @@ export const withCatalog=Base=>class extends Base {
         assert(Array.isArray(selection)&&selection.length>0&&selection.length<=64&&new Set(selection).size===selection.length&&selection.every(n=>observed.collections.includes(n)),'Choose observed collections only.');
       }else assert(selection===undefined,'Collection selection only applies to Blender packages.');
     }
-    const cp=s.current?await this.verify(p,s):null;
+    // Native pins were just verified; retain the independent original-source and
+    // checkpoint byte checks without launching that same native verification twice.
+    const cp=s.current?await timed('verify-checkpoint',()=>super.verify(p,s)):null;
     const options=operation==='import'?{file,collection:sceneId,...(selection?{selection}: {})}:{file,request_scope:id+':'+sceneId};
-    const runId='run_'+randomUUID(),record={schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',assetId:aid,sourceVersion:a.version,checkpointId:cp?.id||null,startedAt:now(),authorization:confirmed?'explicit-launcher-user-action':'read-only',options};
+    const runId='run_'+randomUUID(),record=Object.assign(diagnostic,{schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',assetId:aid,sourceVersion:a.version,checkpointId:cp?.id||null,startedAt:now(),authorization:confirmed?'explicit-launcher-user-action':'read-only',options});
     await this.lock(p,runId);
     const receipt=await safe(p.directory,`Runs/${runId}.json`);
     try {
       await writeJson(receipt,record);
       const optionFile=await safe(p.directory,`Docs/Workbench/${runId}-options.json`);await writeJson(optionFile,options);
-      const job=await this.runtime.harness(['job-prepare',operation,'--asset',aid,...(operation==='import'&&cp?['--input',await safe(p.directory,cp.path)]:[]),'--options',optionFile]);
-      await this.store.bindJob(id,job);record.jobId=job.id;
+      const input=operation==='import'&&cp?['--input',await safe(p.directory,cp.path)]:[];
+      const job=await timed('prepare-job',()=>this.runtime.harness(['job-prepare',operation,'--asset',aid,...input,'--options',optionFile]));
+      record.jobId=job.id;
       assert(!['FAILED','INTERRUPTED','RUNNING'].includes(job.state),'Native job needs explicit retry or recovery.',409);
+      await timed('bind-job',()=>this.store.bindJob(id,job,q=>{
+        const scene=this.scene(q,sceneId);
+        assert(scene.current===(cp?.id||null)&&!scene.candidate&&!scene.task&&!scene.run,'Scene changed before this operation.',409);
+        scene.run=runId;
+      }));
       record.state='RUNNING';await writeJson(receipt,record);
-      const q=await this.project(id);this.scene(q,sceneId).run=runId;await this.store.save(q,q.revision);
       this.running.add(runId);
+      this.catalogProgress||=new Map();this.catalogProgress.set(runId,record);
       const complete=async()=>{
         try {
-          const output=await this.runtime.harness(['job-run',job.id,'--blender',this.config.blender,'--timeout','180'],195000);
-          const data=await this.result(output);
+          const output=await timed('blender-worker',()=>this.runtime.harness(['job-run',job.id,'--blender',this.config.blender,'--timeout','180'],195000));
+          const data=await timed('verify-result',()=>this.result(output));
           await this.serialize(async()=>{
             const q=await this.project(id),scene=this.scene(q,sceneId);
             assert(scene.run===runId&&scene.current===(cp?.id||null)&&!scene.candidate,'Scene changed during this operation.',409);
-            await verifyNative(this.store,this.runtime,q);
-            if(operation==='asset-contents') {
-              assert(data.asset_id===aid&&data.file===file&&Array.isArray(data.collections),'Invalid collection inspection result.');
-              scene.assetContents||={};scene.assetContents[aid]={jobId:job.id,version:a.version,file,collections:data.collections};
-            }else {
-              assert(data.source===aid&&Array.isArray(data.objects)&&data.objects.length&&data.scene_audit,'Native import did not produce observed objects.');
-              const created=data.scene_audit.objects.filter(o=>o.asset_id===aid&&o.import_job===job.id);
-              assert(data.objects.every(n=>created.some(o=>o.name===n)),'Import provenance was not observed in Blender.');
-              const member=output.outputs.find(f=>f.path===`jobs/${job.id}/result.blend`);assert(member,'Import omitted its working scene.');
-              const source=await safe(this.config.library,member.path),actual=await fileHash(source);
-              assert(actual.sha256===member.sha256&&actual.size===member.size,'Native output changed.',409);
-              const cpId='cp_'+randomUUID(),relative=`Scenes/${sceneId}--${cpId}.blend`,destination=await safe(q.directory,relative);
-              // The import worker made external references absolute before saving.
-              // Byte-identical copying preserves native grant derivations keyed by hash.
-              await fs.copyFile(source,destination,constants.COPYFILE_EXCL);
-              assert((await fileHash(destination)).sha256===member.sha256,'Candidate copy failed verification.',409);
-              const candidate={id:cpId,path:relative,...actual,parent:scene.current,stage:'world',createdAt:now(),source:'native-import-job',jobId:job.id,assetId:aid,audit:data.scene_audit};
-              await writeJson(await safe(q.directory,`Docs/Workbench/${cpId}.json`),candidate);
-              scene.checkpoints.push(candidate);scene.candidate=cpId;
-            }
-            scene.run=null;await this.store.save(q,q.revision);
+            await timed('reverify-sources',()=>verifyNative(this.store,this.runtime,q));
+            await timed('save-checkpoint',async()=>{
+              if(operation==='asset-contents') {
+                assert(data.asset_id===aid&&data.file===file&&Array.isArray(data.collections),'Invalid collection inspection result.');
+                scene.assetContents||={};scene.assetContents[aid]={jobId:job.id,version:a.version,file,collections:data.collections};
+              }else {
+                assert(data.source===aid&&Array.isArray(data.objects)&&data.objects.length&&data.scene_audit,'Native import did not produce observed objects.');
+                const created=data.scene_audit.objects.filter(o=>o.asset_id===aid&&o.import_job===job.id);
+                assert(data.objects.every(n=>created.some(o=>o.name===n)),'Import provenance was not observed in Blender.');
+                const member=output.outputs.find(f=>f.path===`jobs/${job.id}/result.blend`);assert(member,'Import omitted its working scene.');
+                const source=await safe(this.config.library,member.path),actual=await fileHash(source);
+                assert(actual.sha256===member.sha256&&actual.size===member.size,'Native output changed.',409);
+                const cpId='cp_'+randomUUID(),relative=`Scenes/${sceneId}--${cpId}.blend`,destination=await safe(q.directory,relative);
+                // The import worker made external references absolute before saving.
+                // Byte-identical copying preserves native grant derivations keyed by hash.
+                await fs.copyFile(source,destination,constants.COPYFILE_EXCL);
+                assert((await fileHash(destination)).sha256===member.sha256,'Candidate copy failed verification.',409);
+                const candidate={id:cpId,path:relative,...actual,parent:scene.current,stage:'world',createdAt:now(),source:'native-import-job',jobId:job.id,assetId:aid,audit:data.scene_audit};
+                await writeJson(await safe(q.directory,`Docs/Workbench/${cpId}.json`),candidate);
+                scene.checkpoints.push(candidate);scene.candidate=cpId;
+              }
+              scene.run=null;await this.store.save(q,q.revision);
+            });
           });
           record.state='SUCCEEDED';
         }catch(e){record.state='FAILED';record.error=e.message;}
         finally {
           record.finishedAt=now();await writeJson(receipt,record);
           await this.serialize(async()=>{const q=await this.project(id),scene=this.scene(q,sceneId);if(scene.run===runId){scene.run=null;await this.store.save(q,q.revision);}});
-          await this.unlock(p,runId);this.running.delete(runId);
+          await this.unlock(p,runId);this.running.delete(runId);this.catalogProgress.delete(runId);
         }
       };
       void complete().catch(e=>console.error('Catalog operation requires recovery: '+e.message));
