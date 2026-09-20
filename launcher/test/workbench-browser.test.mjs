@@ -14,6 +14,14 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const b=(label,action,data={},cls='',disabled=false)=>'<button data-action="'+action+'" '+(disabled?'disabled':'')+'>'+esc(label)+'</button>';
 const scene={id:'scene',name:'Synthetic scene',sources:[sid(0)],catalog:[aid(0)],checkpoints:[],current:null,candidate:null};
 const project={workbench:{catalogPins:[{id:aid(0),title:'Synthetic model',kind:'model',version:'b'.repeat(64),files:[{path:'not-for-summary'}]}],scenes:[scene]}};
+test('loading filters are disabled for keyboard as well as pointer interaction',()=>{
+  const ui={tab:'catalog',query:'',kind:{catalog:'',sources:''},selected:false,layout:'grid'};
+  const html=browserView({ui,page:null,project,scene,locked:false,esc,b});
+  for(const id of ['browser-query','browser-activity','browser-kind','browser-subcategory','browser-scope'])assert.match(html,new RegExp('id="'+id+'" disabled'));
+  assert.match(html,/aria-busy="true"/);
+  assert.match(html,/Loading assets/);
+  assert.doesNotMatch(html,/No matching assets/);
+});
 test('source paging bounds 0/1/24/25/1000/10000 records and does not expose file lists',()=>{
   for(const count of [0,1,24,25,1000,10000]){
     const registry={schema:1,sources:Array.from({length:count},(_,i)=>source(i))},before=JSON.stringify(registry);
@@ -56,7 +64,10 @@ test('scene panel remains compact and never claims selection imported an object'
 test('motion uses compact honest placeholders and browser exposes one search and explicit source tabs',()=>{
   const ui={tab:'catalog',query:'',kind:{catalog:'animation',sources:''},selected:false,layout:'grid'};
   const html=browserView({ui,page:{items:[{id:aid(0),title:'Motion <clip>',kind:'animation',package_images:['atlas.png']}],offset:0,total:1,next_offset:null},project,scene,locked:false,esc,b});
-  assert.ok(!html.includes('data-catalog-image'));assert.match(html,/browser-results list/);
+  assert.ok(!html.includes('data-catalog-image'));assert.ok(!html.includes('browser-results list'));
+  assert.match(html,/data-layout="grid" aria-pressed="true"/);
+  const list=browserView({ui:{...ui,layout:'list'},page:{items:[],total:0,offset:0,next_offset:null},project,scene,locked:false,esc,b});
+  assert.match(list,/browser-results list/);assert.match(list,/data-layout="list" aria-pressed="true"/);
   assert.equal((html.match(/id="browser-query"/g)||[]).length,1);assert.match(html,/Source packages/);
   assert.match(html,/Motion &lt;clip&gt;/);
   const detail=sourceDialog({source:source(3),scene,locked:false,esc,b});

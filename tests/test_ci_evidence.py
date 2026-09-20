@@ -33,8 +33,9 @@ class CoverageContractTests(unittest.TestCase):
     def test_exact_partitions_and_original_fixture_inventory(self):
         self.assertEqual(len(partitions()), 23)
         fixtures = [row for suite in BLENDER_SUITES.values() for row in suite]
-        self.assertEqual(len(fixtures), 20)
-        self.assertEqual(len({row[0] for row in fixtures}), 20)
+        self.assertEqual(len(fixtures), 21)
+        self.assertEqual(len({row[0] for row in fixtures}), 21)
+        self.assertIn('asset-preview', {row[0] for row in fixtures})
         for _, script, _, _, _ in fixtures:
             self.assertTrue((ROOT/'tools'/script).is_file())
         self.assertEqual(set(BLENDER_SUITES), {'authoring', 'motion', 'continuity'})

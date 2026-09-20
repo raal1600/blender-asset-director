@@ -75,6 +75,9 @@ def execute(job_path, *, live=False):
             elif op == "contact-check":
                 from asset_director.transfer_blender import contact_check
                 data = contact_check(options)
+            elif op == "asset-preview":
+                from asset_director.asset_preview_blender import create
+                data = create(lib, lib.get(spec["asset_id"]), options["file"])
             elif op == "asset-contents":
                 source = next(f for f in files if f["path"] == options["file"])
                 filename = lib.verify_file(source)

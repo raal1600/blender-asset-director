@@ -37,13 +37,14 @@ OPS = {
     "light-rig": {"subjects", "lights"},
     "index": {"max_clips", "sample"},
     "asset-contents": {"file", "request_scope"},
+    "asset-preview": {"file"},
     "import": {"collection", "selection", "file"},
     "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture", "transfer_binding", "max_output_intervals"},
     "assemble": {"target_object", "clips", "fps", "controller_speed", "direction", "terrain_object", "travel_frames"},
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage", "camera"},
 }
-MUTATIONS = {"sequence-execute", "bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
+MUTATIONS = {"asset-preview", "sequence-execute", "bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
              "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 TARGET_REQUIRED = {"render-readiness", "render-frames", "sequence-plan", "sequence-execute", "sequence-check", "bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
                    "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
@@ -174,6 +175,12 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
         validate_import(lib, asset, options)
         if operation == "asset-contents":
             require(not input_file and "file" in options, "SOURCE_ONLY_OPERATION", "Inspect one explicit source member, without a target")
+    if operation == "asset-preview":
+        from .asset_preview import FORMATS
+        require(not input_file and asset and asset.metadata.get("preview_only") is True,
+                "PREVIEW_ONLY", "Use a separately copied inspection asset, without a production input")
+        require(options.get("file") in [f["path"] for f in asset.local_files] and
+                Path(options["file"]).suffix.lower() in FORMATS, "FORMAT_UNSUPPORTED", "Choose an exact preview member")
     if operation == "native-clip":
         require(asset and asset.kind == "animation" and asset.metadata.get("action") and asset.metadata.get("fps"),
                 "INDEX_REQUIRED", "Choose an indexed animation clip for native playback")

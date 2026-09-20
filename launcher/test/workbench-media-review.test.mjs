@@ -74,7 +74,7 @@ test('optional source image absence is HTTP 204, but auth, unknown source and ta
   await fs.writeFile(path.join(f.root,'Database/Meshes/synthetic.obj'),'synthetic no-image model');
   await fs.mkdir(path.join(f.root,'Database/Characters/with-image'));
   await fs.writeFile(path.join(f.root,'Database/Characters/with-image/model.obj'),'synthetic model');
-  const image=path.join(f.root,'Database/Characters/with-image/image.png');await fs.writeFile(image,'synthetic image');
+  const image=path.join(f.root,'Database/Characters/with-image/thumbnail.png');await fs.writeFile(image,'synthetic image');
   const inventory=await f.store.scan(),missing=inventory.sources.find(s=>s.relative.endsWith('.obj')),present=inventory.sources.find(s=>s.relative.endsWith('with-image'));
   const app=await createApp({root:f.root,config:f.config,runtime:f.runtime,port:0});t.after(()=>new Promise(r=>app.server.close(r)));
   const url=id=>app.origin+'/api/workbench/source-image?'+new URLSearchParams({projectId:f.p.id,sourceId:id});
