@@ -9,7 +9,7 @@ MAX_BYTES = 512 * 1024 * 1024
 MAX_FILES = 4096
 
 
-def snapshot(request_file):
+def snapshot(request_file, *, embedded=False):
     request_file = Path(request_file).resolve()
     request = load_json(request_file, 2 * 1024 * 1024)
     fields(request, {'schema', 'id', 'title', 'version', 'source_kind', 'root', 'files', 'file', 'motion'},
@@ -29,7 +29,7 @@ def snapshot(request_file):
             'FORMAT_UNSUPPORTED', 'Choose one recorded blend, glTF, GLB, FBX or BVH member')
     source_root = Path(request['root']).resolve(strict=True)
     directory = request_file.parent
-    require(not directory.is_relative_to(source_root) and not source_root.is_relative_to(directory),
+    require(embedded or (not directory.is_relative_to(source_root) and not source_root.is_relative_to(directory)),
             'ORIGINAL_OVERWRITE', 'Preview output must be separate from its source root')
     destination = directory / 'library'
     require(not destination.exists(), 'PREVIEW_EXISTS', 'Preview attempts are immutable; request a new copy')
@@ -39,6 +39,7 @@ def snapshot(request_file):
     sources = []
     for f in records:
         p = within(source_root, f['path'])
+        require(not p.is_relative_to(directory), 'ORIGINAL_OVERWRITE', 'Preview source cannot be inside its own attempt')
         require(p.is_file() and p.stat().st_size == f['size'] and file_hash(p) == f['sha256'],
                 'STALE_SOURCE', 'Source changed; refresh its catalog/package record')
         sources.append(p)
@@ -57,6 +58,11 @@ def snapshot(request_file):
     # Inspection-only transient record in a separate SQLite library. It is not
     # intake into the user's catalog and carries no manufactured rights grant.
     meta = {'preview_only': True}
+    if embedded:
+        # Exact recorded files only. Allows absolute checkpoint texture paths to
+        # be rebound to their verified copies in this disposable worker.
+        meta['preview_original_root'] = str(source_root)
+        meta['preview_checkpoint'] = request['source_kind'] == 'checkpoint'
     motion = copy.deepcopy(request.get('motion') or {})
     if motion:
         fields(motion, {'file', 'action', 'slot', 'source_object', 'fps', 'frame_start', 'frame_end'},
@@ -71,7 +77,7 @@ def snapshot(request_file):
     return request, destination, asset
 
 
-def prepare(request_file, blender):
+def prepare(request_file, blender, *, embedded=False):
     from . import jobs
     request_file = Path(request_file).resolve()
     receipt = request_file.parent / 'receipt.json'
@@ -79,12 +85,12 @@ def prepare(request_file, blender):
               'selection_changed': False, 'production_use_approved': False}
     atomic_json(receipt, status)
     try:
-        request, directory, asset = snapshot(request_file)
+        request, directory, asset = snapshot(request_file, embedded=embedded)
         status.update(source_id=request['id'], source_version=request['version'],
                       source_kind=request['source_kind'], title=request['title'], file=request['file'])
         with Library(directory) as lib:
             job = jobs.prepare(lib, 'asset-preview', asset_id=asset.id,
-                               options={'file': 'incoming/package/' + request['file']})
+                               options={'file': 'incoming/package/' + request['file'], **({'embedded': True} if embedded else {})})
             status.update(job_id=job['id'], state='RUNNING')
             atomic_json(receipt, status)
             job = jobs.run(lib, job['id'], blender, timeout=180)
@@ -104,6 +110,10 @@ def prepare(request_file, blender):
             status.update(state='READY', blend={**blend, 'path': viewer.name},
                           job_blend={**blend,'path':'library/'+blend['path']},
                           report={**report, 'path': 'library/' + report['path']}, data=data)
+            if embedded:
+                model = next(f for f in job['outputs'] if f['path'].endswith('/preview.glb'))
+                lib.verify_file(model)
+                status['model'] = {**model, 'path': 'library/' + model['path']}
             atomic_json(receipt, status)
             return status
     except Exception as error:

@@ -37,7 +37,7 @@ OPS = {
     "light-rig": {"subjects", "lights"},
     "index": {"max_clips", "sample"},
     "asset-contents": {"file", "request_scope"},
-    "asset-preview": {"file"},
+    "asset-preview": {"file", "embedded"},
     "import": {"collection", "selection", "file"},
     "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture", "transfer_binding", "max_output_intervals"},
     "assemble": {"target_object", "clips", "fps", "controller_speed", "direction", "terrain_object", "travel_frames"},
@@ -177,6 +177,7 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
             require(not input_file and "file" in options, "SOURCE_ONLY_OPERATION", "Inspect one explicit source member, without a target")
     if operation == "asset-preview":
         from .asset_preview import FORMATS
+        require(type(options.get('embedded', False)) is bool, 'INVALID_PREVIEW', 'Embedded preview must be a boolean')
         require(not input_file and asset and asset.metadata.get("preview_only") is True,
                 "PREVIEW_ONLY", "Use a separately copied inspection asset, without a production input")
         require(options.get("file") in [f["path"] for f in asset.local_files] and

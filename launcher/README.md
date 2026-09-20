@@ -4,6 +4,11 @@ The scene workbench is the only client: `/`, `/index.html`, and `/workbench` ope
 
 Local Node 20+ application; no npm dependencies, build service, API key, or cloud storage. Double-click `Asset Director.exe` to open the dedicated desktop window. It uses the installed Microsoft Edge WebView2 runtime and starts or reuses the loopback server. Closing the desktop window stops the server when idle. The PowerShell script remains available for browser-only use; browser tabs do not control server lifetime.
 
+Embedded asset/checkpoint inspection uses a checksum-pinned, locally vendored
+Three.js 0.186.0 module set (MIT); no npm install or runtime CDN is used. See
+[the 3D preview contract](../docs/EMBEDDED_3D_PREVIEW.md) for controls, bounds,
+private derivative storage and the distinction from Blender editing and renders.
+
 The launcher is a project and environment adapter around the existing installed harness. It does not replace the harness catalog, change installed skill code, provide an arbitrary command endpoint, or imply license approval. Blender connection checks use only the add-on's read-only `get_addon_info` handshake. No second MCP provider or configuration is installed.
 
 ## Data ownership

@@ -7,7 +7,7 @@ import {assert, fileHash, json, safe, snapshot, writeJson} from './storage.mjs';
 export const previewMember = file => /\.(blend|gltf|glb|fbx|bvh)$/i.test(file);
 export const previewLimit = 512*1024*1024;
 
-export async function openAssetPreview(work,id,sceneId,revision,request) {
+export async function assetPreviewSource(work,id,sceneId,revision,request) {
   assert(request&&Object.keys(request).every(k=>['kind','id','version','file'].includes(k)), 'Unknown preview request fields.');
   assert(['catalog','source'].includes(request.kind),'Choose a catalog asset or original package.');
   assert(typeof request.file==='string'&&previewMember(request.file),'Preview supports blend, glTF, GLB, FBX and BVH. Other formats need the specialist workflow.');
@@ -38,13 +38,18 @@ export async function openAssetPreview(work,id,sceneId,revision,request) {
     assert(!directory||request.file.startsWith(source.relative+'/'),'Member leaves its package.');
   }
   assert(files.length<=4096&&files.reduce((n,f)=>n+f.size,0)<=previewLimit,'Preview copy exceeds 4096 files or 512 MiB; use a smaller reviewed package.');
+  return {schema:'asset-director.asset-preview/1',id:request.id,title,
+    version:request.version,source_kind:request.kind,root,files,file,motion};
+}
+
+export async function openAssetPreview(work,id,sceneId,revision,request) {
+  const source=await assetPreviewSource(work,id,sceneId,revision,request);
   const previewId='preview_'+randomUUID();
   const base=await safe(work.store.root,'SystemRuntime/UserData/AssetPreviews');
   await fs.mkdir(base,{recursive:true});
   const directory=await safe(base,previewId);await fs.mkdir(directory);
   const requestFile=path.join(directory,'request.json');
-  await writeJson(requestFile,{schema:'asset-director.asset-preview/1',id:request.id,title,
-    version:request.version,source_kind:request.kind,root,files,file,motion});
+  await writeJson(requestFile,source);
   try {
     const receipt=await work.runtime.harness(['workbench-preview','--request',requestFile,'--blender',work.config.blender],205000);
     assert(receipt.state==='READY'&&receipt.source_id===request.id&&receipt.source_version===request.version,'Preview preparation identity mismatch.',409);

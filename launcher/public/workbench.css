@@ -54,6 +54,17 @@ dialog h2{overflow-wrap:anywhere}
 .asset-facts{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.asset-facts .asset-type{margin:0}.asset-use{border-top:1px solid var(--line);padding-top:16px;margin-top:18px}
 .preview-explanation{background:var(--raised);border-left:3px solid var(--accent);padding:12px}.motion-facts{color:#c4dcf4}
 #asset-preview-status:not(:empty){padding:12px;border:1px solid var(--line);border-radius:4px}#dialog footer{flex-wrap:wrap}#dialog select{max-width:100%}
+.viewer-3d{background:#161c25;color:#edf2fa;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:12px 0;min-width:0}
+.detail-head{display:flex;align-items:center;gap:12px;position:sticky;top:-25px;z-index:2;background:#1b2533;padding:12px 0;border-bottom:1px solid var(--line);margin-bottom:12px}.detail-head h2{flex:1;margin:0}
+@media(max-width:760px){.detail-head{top:-21px}}
+.viewer-message{padding:26px 20px;min-height:100px}.viewer-message p{max-width:64ch}
+.viewer-toolbar,.viewer-animation,.viewer-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px}.viewer-toolbar strong{overflow-wrap:anywhere;font-size:13px}
+.viewer-toolbar button,.viewer-animation button{font-size:12px;padding:7px 10px}.viewer-toolbar [aria-pressed=true]{border-color:#81adf4;background:#263d5c}
+.viewer-canvas{height:360px;min-width:0;touch-action:none}.viewer-canvas canvas{display:block;width:100%;height:100%;outline-offset:-3px}.viewer-canvas canvas:focus-visible{outline:2px solid #91bdff}
+.viewer-animation label{display:flex;align-items:center;gap:8px;font-size:12px;min-width:0}.viewer-animation select{max-width:260px!important}.viewer-animation input[type=range]{flex:1;min-width:100px;width:auto}.viewer-animation output{font-variant-numeric:tabular-nums;font-size:12px;min-width:58px}
+.viewer-help,.viewer-status,.viewer-disclaimer{padding:0 12px;font-size:11px;color:#bdc8d8;line-height:1.5}.viewer-status{color:#e1e9f6}.viewer-disclaimer{padding-bottom:10px}
+.viewer-actions{padding-top:0}.rendered-evidence{padding:12px}.rendered-evidence img{width:100%;height:auto}.viewer-animation[hidden]{display:none}
+@media(max-width:640px){.viewer-canvas{height:270px}.viewer-toolbar strong{flex-basis:100%}.viewer-animation label{width:100%}.viewer-animation select{flex:1}.viewer-toolbar{gap:5px}}
 .browser-asset h3{font-size:13px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .browser-asset .copy>small{display:block;font-size:11px;margin-top:6px;overflow-wrap:anywhere}
 .asset-actions{display:flex;border-top:1px solid var(--line)}

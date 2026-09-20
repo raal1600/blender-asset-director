@@ -74,6 +74,14 @@ jobs:
     - name: Verify bounded catalog UI with 10000 synthetic records
       if: inputs.scenario == 'full' || inputs.scenario == ''
       run: python tools/catalog_browser_suite.py --evidence evidence/catalog-browser
+    - name: Verify embedded WebGL with generated native inputs
+      if: inputs.scenario == 'full' || inputs.scenario == ''
+      shell: python
+      run: |
+        import os, subprocess, sys
+        # Generated fixture only. No new screenshot/log publication is configured.
+        subprocess.run([sys.executable, 'tools/embedded_viewer_suite.py',
+            '--blender', os.environ['BLENDER'], '--evidence', 'evidence/embedded-viewer'], check=True)
     - name: Retain separate synthetic catalog UI evidence
       if: always() && (inputs.scenario == 'full' || inputs.scenario == '')
       uses: actions/upload-artifact@v4

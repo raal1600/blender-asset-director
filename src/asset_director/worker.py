@@ -78,6 +78,9 @@ def execute(job_path, *, live=False):
             elif op == "asset-preview":
                 from asset_director.asset_preview_blender import create
                 data = create(lib, lib.get(spec["asset_id"]), options["file"])
+                if options.get('embedded'):
+                    from asset_director.viewer_export import export
+                    data['embedded_viewer'] = export(directory / 'preview.glb', data)
             elif op == "asset-contents":
                 source = next(f for f in files if f["path"] == options["file"])
                 filename = lib.verify_file(source)

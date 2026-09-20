@@ -26,7 +26,7 @@ def parser():
     q=s.add_parser("transfer-prepare"); q.add_argument("--review",required=True,help="Explicit approval of a completed transfer-plan job")
     q=s.add_parser("configure"); q.add_argument("--blender"); q.add_argument("--skill-path")
     q=s.add_parser("film-assemble"); q.add_argument("--plan",required=True); q.add_argument("--project",required=True); q.add_argument("--ffmpeg",required=True); q.add_argument("--ffprobe",required=True)
-    q=s.add_parser("workbench-preview"); q.add_argument("--request",required=True); q.add_argument("--blender",required=True)
+    q=s.add_parser("workbench-preview"); q.add_argument("--request",required=True); q.add_argument("--blender",required=True); q.add_argument("--embedded",action="store_true")
     s.add_parser("workbench-capabilities")
     q=s.add_parser("workbench-catalog"); q.add_argument("--query",default=""); q.add_argument("--offset",type=int,default=0); q.add_argument("--limit",type=int,default=24); q.add_argument("--asset"); q.add_argument("--verify",action="store_true"); q.add_argument("--kind",choices=["model","pack","animation","material","hdri"]); q.add_argument("--kinds",nargs="+",choices=["model","pack","animation","material","hdri"]); q.add_argument("--subcategory"); q.add_argument("--labels")
     q=s.add_parser("workbench-verify"); q.add_argument("--project",required=True)
@@ -56,7 +56,7 @@ def main(argv=None):
         args = parser().parse_args(argv)
         if args.command == "workbench-preview":
             from .asset_preview import prepare
-            print(canonical(prepare(args.request, args.blender)))
+            print(canonical(prepare(args.request, args.blender, embedded=args.embedded)))
             return 0
         with Library(args.library) as lib:
             command=args.command

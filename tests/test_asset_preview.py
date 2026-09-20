@@ -56,6 +56,26 @@ class PreviewTests(unittest.TestCase):
             lib.put(asset)
             with self.assertRaisesRegex(DirectorError,'separately copied'):jobs.prepare(lib,'asset-preview',asset_id=asset.id,options={'file':'incoming/model.glb'})
 
+    def test_embedded_checkpoint_copies_only_exact_files_even_under_common_storage_root(self):
+        data={**self.data,'root':str(self.root),'file':'original/model.glb','source_kind':'checkpoint',
+              'files':[{**self.data['files'][0],'path':'original/model.glb'}]}
+        atomic_json(self.request,data)
+        _,directory,asset=snapshot(self.request,embedded=True)
+        self.assertTrue(asset.metadata['preview_checkpoint'])
+        self.assertEqual(asset.metadata['preview_original_root'],str(self.root.resolve()))
+        self.assertEqual(file_hash(directory/asset.local_files[0]['path']),file_hash(self.file))
+        with Library(directory) as lib:
+            for value in [1,'true',None,[]]:
+                with self.assertRaisesRegex(DirectorError,'boolean'):
+                    jobs.prepare(lib,'asset-preview',asset_id=asset.id,options={'file':asset.local_files[0]['path'],'embedded':value})
+
+    def test_embedded_mode_cannot_copy_from_its_own_attempt(self):
+        file=self.preview/'model.glb';file.write_bytes(b'fixture')
+        data={**self.data,'root':str(self.preview),'files':[{'path':'model.glb','size':file.stat().st_size,'sha256':file_hash(file)}]}
+        atomic_json(self.request,data)
+        with self.assertRaisesRegex(DirectorError,'own attempt'):snapshot(self.request,embedded=True)
+        self.assertFalse((self.preview/'library').exists())
+
     def test_taxonomy_is_factual_and_filters_before_paging_without_record_mutation(self):
         a=Asset('local','a','Character in marketing name','model','')
         self.assertEqual(classification(a)['id'],'model')
