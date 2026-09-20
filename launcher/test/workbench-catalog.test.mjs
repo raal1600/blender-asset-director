@@ -57,11 +57,16 @@ test('selection pins native bytes but creates no imported instance or authorizat
 });
 test('import runs through the bound native job and creates an unapproved audited checkpoint',async t=>{
   const f=await fixture(t);let p=await f.select();await f.work.attest(p.id,p.revision,true);
-  const before=await fs.readFile(f.source);
+  const before=await fs.readFile(f.source);let saves=0;const save=f.store.save.bind(f.store);
+  f.store.save=async(...args)=>{saves++;return save(...args);};
   await f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true});p=await f.wait();
   const s=p.workbench.scenes[0];assert.equal(s.current,null);assert.ok(s.candidate);assert.equal(s.completed.world,undefined);
   assert.equal(s.checkpoints[0].audit.objects[0].asset_id,f.aid);assert.deepEqual(await fs.readFile(f.source),before);
   assert.equal(await exists(path.join(p.directory,'Runs/.interactive-execution.lock')),false);
+  assert.equal(saves,2,'one atomic job/scene binding and one checkpoint publication');
+  const run=(await f.store.runs(p.id))[0];
+  assert.deepEqual(run.timings.map(t=>t.phase),['verify-sources','prepare-job','bind-job','blender-worker','verify-result','reverify-sources','save-checkpoint']);
+  assert.ok(run.timings.every(t=>t.outcome==='SUCCEEDED'&&Number.isInteger(t.milliseconds)&&t.milliseconds>=0));
   p=await f.work.keepBuilding(p.id,s.id,p.revision);assert.equal(p.workbench.scenes[0].stage,'world');assert.equal(p.workbench.scenes[0].candidate,null);
 });
 test('declining import, unowned files and invalid operations cannot prepare a job',async t=>{
@@ -86,9 +91,49 @@ test('deselection retains the production pin and cannot silently replace its ver
   f.asset.version='c'.repeat(64);await assert.rejects(f.work.selectCatalog(p.id,f.sceneId,p.revision,f.aid,true),/older version/);
 });
 
+test('changed source after Blender completes refuses publication and preserves failed timing',async t=>{
+ const f=await fixture(t),p=await f.select();await f.work.attest(p.id,p.revision,true);
+ const real=f.runtime.harness;
+ f.runtime.harness=async args=>{const result=await real(args);if(args[0]==='job-run')await fs.writeFile(f.source,'deliberately changed synthetic source');return result;};
+ await f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true});
+ const after=await f.wait();assert.equal(after.workbench.scenes[0].candidate,null);
+ const run=(await f.store.runs(p.id))[0];assert.equal(run.state,'FAILED');
+ assert.equal(run.timings.at(-1).phase,'reverify-sources');assert.equal(run.timings.at(-1).outcome,'FAILED');
+});
+
+test('job and scene are already durably bound before worker execution',async t=>{
+ const f=await fixture(t),p=await f.select();await f.work.attest(p.id,p.revision,true);
+ const real=f.runtime.harness;let release,entered;
+ const started=new Promise(r=>entered=r),waiting=new Promise(r=>release=r);
+ f.runtime.harness=async args=>{if(args[0]==='job-run'){entered();await waiting;}return real(args);};
+ const result=await f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true});
+ try{
+  await started;const saved=await f.fresh();
+  assert.ok(saved.jobs.some(j=>j.id===result.run.jobId));assert.equal(saved.workbench.scenes[0].run,result.run.id);
+  const state=await f.work.state(p.id);assert.equal(state.runs.find(r=>r.id===result.run.id).phase,'blender-worker');
+ }finally{release();await f.wait();}
+ assert.equal(f.work.catalogProgress.size,0);
+});
+
 test('animation found through Entire library cannot use World import',async t=>{
   const f=await fixture(t);f.asset.kind='animation';let p=await f.select();
   await f.work.attest(p.id,p.revision,true);
   await assert.rejects(f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true}),/models and packs/);
   assert.equal(f.calls.some(a=>a[0]==='job-prepare'),false);
+});
+
+test('import into a kept world still hashes its checkpoint and rechecks native sources',async t=>{
+ const f=await fixture(t);let p=await f.select();await f.work.attest(p.id,p.revision,true);
+ await f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true});p=await f.wait();
+ p=await f.work.keepBuilding(p.id,f.sceneId,p.revision);const cp=p.workbench.scenes[0].checkpoints[0];
+ const before=await fs.readFile(path.join(p.directory,cp.path));f.calls.length=0;
+ await f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true});p=await f.wait();
+ assert.equal(f.calls.filter(a=>a[0]==='workbench-verify').length,2,'preflight and publication both verify sources');
+ assert.equal(p.workbench.scenes[0].checkpoints.at(-1).parent,cp.id);
+ assert.deepEqual(await fs.readFile(path.join(p.directory,cp.path)),before);
+ p=await f.work.discard(p.id,f.sceneId,p.revision);
+ await fs.writeFile(path.join(p.directory,cp.path),'deliberately changed synthetic checkpoint');
+ const prepared=f.calls.filter(a=>a[0]==='job-prepare').length;
+ await assert.rejects(f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true}),/checkpoint changed/);
+ assert.equal(f.calls.filter(a=>a[0]==='job-prepare').length,prepared);
 });

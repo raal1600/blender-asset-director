@@ -84,6 +84,8 @@ test('paged source HTTP is authenticated, read-only, compact opt-in and compatib
   const before=await fileHash(registry),manifest=await fileHash(path.join(p.directory,'project.json'));
   const headers={Authorization:'Bearer '+app.token};
   assert.equal((await fetch(app.origin+'/api/workbench/sources?projectId='+p.id)).status,401);
+  const progress=await fetch(app.origin+'/workbench-progress.mjs');assert.equal(progress.status,200);
+  assert.match(await progress.text(),/export const progressLabel/);
   const get=async route=>{const r=await fetch(app.origin+'/api/'+route,{headers});assert.equal(r.status,200);return r.json();};
   assert.equal((await get('state?compact=true')).inventory,undefined);
   assert.equal((await get('state')).inventory.sources.length,1000);

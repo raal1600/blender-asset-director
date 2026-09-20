@@ -33,6 +33,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
       if (!url.pathname.startsWith('/api/')) {
         assert(req.method === 'GET','Method not allowed.',405);
         const assets = {'/asset-presentation.mjs':'asset-presentation.mjs','/workbench-browser.mjs':'workbench-browser.mjs','/workbench-images.mjs':'workbench-images.mjs','/':'workbench.html','/index.html':'workbench.html','/workbench-scope.mjs':'workbench-scope.mjs','/workbench-evidence.mjs':'workbench-evidence.mjs','/workbench-studio.mjs':'workbench-studio.mjs','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-task.mjs':'workbench-task.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
+        assets['/workbench-progress.mjs']='workbench-progress.mjs';
         assert(Object.hasOwn(assets,url.pathname),'Not found.',404);
         const ext = path.extname(assets[url.pathname]); res.setHeader('Content-Type',ext === '.html' ? 'text/html; charset=utf-8' : ext === '.css' ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8');
         return res.end(await fs.readFile(path.join(here,'public',assets[url.pathname])));
