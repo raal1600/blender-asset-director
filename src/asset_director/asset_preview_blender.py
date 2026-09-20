@@ -32,6 +32,14 @@ def create(lib, asset, member):
             if getattr(block, 'source', None) == 'GENERATED':
                 continue
             p = Path(bpy.path.abspath(value, library=getattr(block, 'library', None))).resolve()
+            original_root = asset.metadata.get('preview_original_root')
+            if p not in known and original_root and p.is_relative_to(Path(original_root)):
+                mapped = root / p.relative_to(Path(original_root))
+                require(mapped.resolve() in known, 'EXTERNAL_REFERENCE', 'Unrecorded checkpoint dependency')
+                block.filepath = str(mapped)
+                if isinstance(block, bpy.types.Image):
+                    block.reload()
+                p = mapped.resolve()
             require(p.is_relative_to(root) and p in known and p.is_file(), 'EXTERNAL_REFERENCE',
                     'Preview requires recorded, package-local dependencies; unrecorded external reference found')
     bpy.ops.file.make_paths_absolute()
@@ -46,7 +54,7 @@ def create(lib, asset, member):
     scene.name = 'Asset Director - PREVIEW COPY'
     for workspace in bpy.data.workspaces:
         if workspace.name == 'Layout': workspace.name = 'Asset Director - Preview'
-    return {'preview_only': True, 'objects': [{'name': o.name, 'type': o.type} for o in bpy.data.objects],
+    return {'preview_only': True, 'checkpoint': asset.metadata.get('preview_checkpoint', False), 'objects': [{'name': o.name, 'type': o.type} for o in bpy.data.objects],
             'takes': takes, 'unassigned_actions': unassigned, 'native_clip': native,
             'fps': scene.render.fps / scene.render.fps_base, 'blender_version': bpy.app.version_string,
             'notice': 'Inspection copy, not selected/imported, no rights or animation-quality approval.'}

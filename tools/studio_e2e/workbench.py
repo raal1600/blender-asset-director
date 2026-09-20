@@ -41,6 +41,10 @@ def review_scene(s):
         expect(page.locator('#notice')).to_be_hidden()
 
     def click(selector):
+        if selector == '[data-action="preview"]':
+            panel = page.locator('.rendered-evidence')
+            if panel.get_attribute('open') is None:
+                panel.locator('summary').click()
         page.locator(selector).click()
         idle()
 
@@ -178,6 +182,8 @@ def catalog_and_film(s, click, idle, check):
     assert scene['completed'] == before_completed
     assert scene['preview']['checkpointId'] == imported['id']
     preview = page.locator('img[data-media="preview"]')
+    if page.locator('.rendered-evidence').get_attribute('open') is None:
+        page.locator('.rendered-evidence summary').click()
     expect(preview).to_be_visible()
     deadline = time.monotonic() + 30
     while not preview.evaluate('(image) => image.complete && image.naturalWidth > 0'):

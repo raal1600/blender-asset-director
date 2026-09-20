@@ -25,7 +25,7 @@ export function motionSummary(asset) {
   return [seconds!==null?seconds.toFixed(2)+' s':null,Number.isFinite(fps)&&fps>0?fps+' fps':null,m.source_object?'Performer: '+m.source_object:null].filter(Boolean).join(' · ');
 }
 export function previewHint() {
-  return '<p class="preview-explanation">Orbit the real asset in a separate Blender <strong>preview copy</strong>. Play observed native takes with the Asset preview panel. Your current Blender scene stays untouched.</p><p class="muted">Inspection only: no selection, import, retargeting or rights approval. Copies at most 512 MiB / 4096 files; no render or download. Close the preview with X when finished.</p><p id="asset-preview-status" role="status" aria-live="polite"></p>';
+  return '<section class="viewer-3d" data-viewer-host aria-label="Interactive 3D preview"><div class="viewer-message"><strong>Explore before selecting</strong><p>Choose View in 3D to orbit, zoom and play embedded animation here. Open the separate Blender preview for full native inspection.</p></div></section><p class="muted">Inspection only: no selection, import, retargeting or rights approval. Blender uses a separate preview copy; your current scene stays untouched.</p><p id="asset-preview-status" role="status" aria-live="polite"></p>';
 }
 export function policyMessage(policy) {
   if(policy?.eligible)return 'Recorded source policy permits use; production source review and technical compatibility are separate.';

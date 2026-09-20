@@ -19,14 +19,14 @@ def check(value,name):
     checks.append(name)
 
 
-def preview(name,member,motion=None):
+def preview(name,member,motion=None,embedded=False,kind='source'):
     directory=out/name;directory.mkdir()
     files=[{'path':p.name,'size':p.stat().st_size,'sha256':file_hash(p)} for p in sorted(source.iterdir()) if p.is_file()]
     request={'schema':'asset-director.asset-preview/1','id':'synthetic-native-preview','title':'Synthetic preview fixture',
-             'version':'a'*64,'source_kind':'source','root':str(source),'files':files,'file':member}
+             'version':'a'*64,'source_kind':kind,'root':str(source),'files':files,'file':member}
     if motion:request['motion']=motion
     atomic_json(directory/'request.json',request)
-    result=prepare(directory/'request.json',bpy.app.binary_path)
+    result=prepare(directory/'request.json',bpy.app.binary_path,embedded=embedded)
     check(result['state']=='READY' and not result['selection_changed'] and not result['production_use_approved'],name+' isolated receipt')
     check(all(file_hash(source/f['path'])==f['sha256'] for f in files),name+' originals unchanged')
     return result,directory
@@ -68,6 +68,12 @@ try:
         scene.frame_set(int(frame));bpy.context.view_layer.update()
         positions.append(list(animated.pose.bones['SyntheticBone'].head))
     check(sum(abs(a-b) for a,b in zip(positions[0],positions[1]))>.1,'pose changes during genuine native playback')
+    embedded,directory=preview('embedded-asset','scene.blend',embedded=True)
+    model=directory/embedded['model']['path']
+    check(model.read_bytes()[:4]==b'glTF','real Blender exported a GLB for local WebGL')
+    check(file_hash(model)==embedded['model']['sha256'],'embedded derivative exact identity')
+    checkpoint,directory=preview('embedded-checkpoint','scene.blend',embedded=True,kind='checkpoint')
+    check(checkpoint['data']['checkpoint'] and checkpoint['data']['embedded_viewer']['kind']=='READ_ONLY_3D_INSPECTION','saved checkpoint uses scene playback, not a render camera')
     # Standalone copy cannot quietly adopt external source textures.
     bpy.ops.wm.read_factory_settings(use_empty=True);bpy.ops.mesh.primitive_cube_add()
     image=bpy.data.images.new('Unrecorded',width=1,height=1);image.source='FILE';image.filepath=str(out/'unrecorded.png');image.use_fake_user=True

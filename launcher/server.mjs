@@ -1,4 +1,5 @@
 import {unfinishedState} from './lib/lifecycle.mjs';
+import {EmbeddedPreviews} from './lib/embedded-preview.mjs';
 import {taskForExit,actOnExitTask} from './lib/exit-task.mjs';
 import {Console} from 'node:console';
 import {createWriteStream} from 'node:fs';
@@ -21,9 +22,10 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
   const token = randomBytes(32).toString('hex'); let queue = Promise.resolve(); let origin; let pending = 0; let stopping = false;
   const serialize = action => { const p = queue.then(action); queue = p.catch(()=>{}); return p; };
   const workbench=new Workbench(store,runtime,config,serialize);
+  const viewers=new EmbeddedPreviews(workbench);
   const server = http.createServer(async(req,res) => {
     res.setHeader('Cache-Control','no-store'); res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy','no-referrer');
-    res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     const send = (code,value) => {res.writeHead(code,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
     try {
       assert(req.headers.host === new URL(origin).host,'Invalid host.',403);
@@ -34,8 +36,11 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
         assert(req.method === 'GET','Method not allowed.',405);
         const assets = {'/asset-presentation.mjs':'asset-presentation.mjs','/workbench-browser.mjs':'workbench-browser.mjs','/workbench-images.mjs':'workbench-images.mjs','/':'workbench.html','/index.html':'workbench.html','/workbench-scope.mjs':'workbench-scope.mjs','/workbench-evidence.mjs':'workbench-evidence.mjs','/workbench-studio.mjs':'workbench-studio.mjs','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-task.mjs':'workbench-task.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
         assets['/workbench-progress.mjs']='workbench-progress.mjs';
+        assets['/viewer-3d.mjs']='viewer-3d.mjs';
+        assets['/icon.svg']='icon.svg';
+        for(const name of ['build/three.module.js','build/three.core.js','examples/jsm/loaders/GLTFLoader.js','examples/jsm/controls/OrbitControls.js','examples/jsm/utils/BufferGeometryUtils.js','examples/jsm/utils/SkeletonUtils.js'])assets['/vendor/three/'+name]='vendor/three/'+name;
         assert(Object.hasOwn(assets,url.pathname),'Not found.',404);
-        const ext = path.extname(assets[url.pathname]); res.setHeader('Content-Type',ext === '.html' ? 'text/html; charset=utf-8' : ext === '.css' ? 'text/css; charset=utf-8' : 'text/javascript; charset=utf-8');
+        const ext = path.extname(assets[url.pathname]); res.setHeader('Content-Type',ext === '.html' ? 'text/html; charset=utf-8' : ext === '.css' ? 'text/css; charset=utf-8' : ext === '.svg' ? 'image/svg+xml' : 'text/javascript; charset=utf-8');
         return res.end(await fs.readFile(path.join(here,'public',assets[url.pathname])));
       }
       const supplied = Buffer.from(req.headers.authorization?.replace(/^Bearer /,'') || '');
@@ -61,6 +66,10 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
         return send(200,{message:'Launcher stopped. Blender and Codex remain open.'});
       }
       assert(!stopping,'Launcher is shutting down.',503);
+      if(req.method==='GET'&&url.pathname==='/api/workbench/viewer-model') {
+        const data=await viewers.bytes(url.searchParams.get('projectId'),url.searchParams.get('sceneId'),url.searchParams.get('previewId'));
+        res.writeHead(200,{'Content-Type':'model/gltf-binary','Content-Length':data.length});return res.end(data);
+      }
       if(req.method==='GET'&&['/api/workbench/media','/api/workbench/source-image','/api/workbench/catalog-image'].includes(url.pathname)) {
         const parameters=Object.fromEntries(url.searchParams),id=parameters.projectId;
         const media=url.pathname.endsWith('catalog-image')?await workbench.catalogImage(id,parameters.assetId):url.pathname.endsWith('source-image')?await workbench.sourcePreview(id,parameters.sourceId):await workbench.media(id,parameters);
@@ -99,6 +108,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
             if(command==='catalog-select')return workbench.selectCatalog(id,sid,rev,body.assetId,body.selected);
             if(command==='catalog-label')return workbench.labelCatalog(id,sid,rev,body.request);
             if(command==='asset-preview')return workbench.previewAsset(id,sid,rev,body.request);
+            if(command==='viewer-prepare')return viewers.prepare(id,sid,rev,body.request);
             if(command==='catalog-job')return workbench.catalogJob(id,sid,rev,body.request);
             if(command==='keep-building')return workbench.keepBuilding(id,sid,rev);
             if(command==='source')return workbench.selectSource(id,sid,rev,body.sourceId,body.selected);

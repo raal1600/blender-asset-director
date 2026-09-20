@@ -56,10 +56,13 @@ test('checkpoint panel explains actual saved evidence and does not fake animatio
   assert.match(blank,/No saved scene yet/);assert.ok(!blank.includes('<img')&&!blank.includes('data-action="preview"'));
   const checkpoint={id:'cp_example'};scene.current=checkpoint.id;
   const missing=evidenceView({scene,checkpoint,esc,b,canPreview:true});
-  assert.match(missing,/No preview for this checkpoint/);assert.match(missing,/Generate preview/);
+  assert.match(missing,/No preview for this checkpoint/);assert.match(missing,/View saved scene in 3D/);
+  assert.match(missing,/No verified camera/);assert.match(missing,/data-action="preview" disabled/);
   scene.stage='action';scene.preview={checkpointId:checkpoint.id};
   const still=evidenceView({scene,checkpoint,esc,b,canPreview:false});
-  assert.match(still,/data-media="preview"/);assert.match(still,/A still cannot prove movement/);assert.match(still,/disabled/);
+  assert.match(still,/data-media="preview"/);assert.match(still,/Playback is inspection, not approval/);assert.match(still,/disabled/);
+  checkpoint.audit={objects:[{name:'RealCamera',type:'CAMERA'}]};
+  assert.match(evidenceView({scene,checkpoint,esc,b,canPreview:true}),/data-action="preview" >/);
   scene.preview.checkpointId='old';assert.ok(!evidenceView({scene,checkpoint,esc,b}).includes('<img'));
 });
 test('only new workbench is served; authenticated grouped catalog queries preserve detail API',async t=>{
