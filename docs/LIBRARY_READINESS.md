@@ -7,6 +7,16 @@ not a claim that a remote listing is downloaded. No online-provider UI or implic
 download is added by this change. Existing reviewed provider acquisition remains
 separate; no credentials, dependency installations or global paths change.
 
+The two scope buttons show matching counts for the current catalog/package tab,
+workflow, search and category, plus **Production references** versus **All shared
+assets/packages** subtitles. They are overlapping filters of shared files, not
+separate folders or per-production downloads. Selected-only remains a scene filter;
+the scope counts still describe all matches. A matching-view explanation is shown
+only when both complete bounded result sets have the same exact asset IDs and
+versions. Equal counts, matching names or one equal page of a larger result do not
+prove identical membership. A failed comparison shows an unknown count, never a
+false zero, and does not hide readable retained production references.
+
 Each row separates local availability/preparation from production usage. Current
 or candidate presence requires that exact checkpoint's object audit. Selection,
 historical pins, another scene's objects and a 3D preview never establish presence
