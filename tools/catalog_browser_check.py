@@ -80,6 +80,18 @@ def main():
             click('[data-action="browser-tab"][data-tab="catalog"]')
             expect(page.locator('.browser-asset')).to_have_count(24)
             capture('02-wide-catalog')
+            # Native dialog close events are queued. A fast return from Details
+            # can reopen the same catalog before its old close event arrives.
+            # Exercise that exact DOM lifecycle deterministically, without jobs.
+            await_close = '''async () => {
+                const dialog=document.querySelector('#library-dialog');
+                const closed=new Promise(resolve=>dialog.addEventListener('close',resolve,{once:true}));
+                dialog.close();dialog.showModal();await closed;
+            }'''
+            page.evaluate(await_close)
+            expect(page.locator('#library-dialog')).to_be_visible()
+            expect(page.locator('.browser-asset')).to_have_count(24)
+            assert page.locator('body').evaluate("e=>e.classList.contains('library-open')")
             page.locator('.browser-results').evaluate('(e)=>e.scrollTop=350')
             click('[data-action="browser-page"]:has-text("Next")')
             expect(page.locator('.browser-footer [role="status"]')).to_have_text('25–48 of 10000 assets')
@@ -145,6 +157,7 @@ def main():
             assert hashlib.sha256(registry.read_bytes()).hexdigest()==before
             assert not report['errors'],report['errors']
             report['checks']=['World: models/packs only','Action: movement only','Light: materials/HDRIs only','workflow filter before pagination','source packages filtered by activity','activity-specific browser state','legacy entry removed','explicit entire-library escape','lazy catalog/package requests','24-card bound with 10000 entries','next page','reopen restores page/scroll','search across full library','search retained across sources','source inspector','motion rows without atlas requests','native inspector refuses import','selection survives refresh without import','selected filter','empty search','modal keyboard containment','nested Escape and focus return','1024 and 390 responsive layouts','registry preserved']
+            report['checks'].append('queued close cannot clear a reopened catalog')
             report['status']='PASS'
         except Exception as e:
             report['status']='FAIL';report['failure']=str(e).replace(session['token'],'[REDACTED]')

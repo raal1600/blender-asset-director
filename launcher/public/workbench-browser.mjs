@@ -104,7 +104,12 @@ export function assetBrowser({dialog,context,api,esc,b,loadImages,releaseImages=
     await refresh({capture:false,focus:'#browser-query'});
   }
   function close() {remember();request++;dialog.close();}
-  dialog.addEventListener('close',()=>{request++;releaseImages(dialog);dialog.innerHTML='';document.body.classList.remove('library-open');const visible=e=>!e.disabled&&e.getClientRects().length;([...document.querySelectorAll('[data-action="browse-assets"]')].find(visible)||[...document.querySelectorAll('.world-next .primary')].find(visible))?.focus();});
+  dialog.addEventListener('close',()=>{
+    // A queued close event may arrive after a quick return from asset Details.
+    // It belongs to the previous opening, not the newly visible catalog.
+    if(dialog.open)return;
+    request++;releaseImages(dialog);dialog.innerHTML='';document.body.classList.remove('library-open');const visible=e=>!e.disabled&&e.getClientRects().length;([...document.querySelectorAll('[data-action="browse-assets"]')].find(visible)||[...document.querySelectorAll('.world-next .primary')].find(visible))?.focus();
+  });
   dialog.addEventListener('cancel',remember);
   dialog.addEventListener('keydown',event=>{
     const filters=dialog.querySelector('.browser-filters[open]');
