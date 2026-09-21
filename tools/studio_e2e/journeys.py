@@ -37,7 +37,15 @@ def onboarding(studio):
         finally:
             page.remove_listener('dialog', confirm_scan)
         expect(page.locator('.browser-asset')).to_have_count(1)
-        s.click('.browser-asset [data-action="source"]')
+        # Reference-only selection is deliberately behind package Details. It
+        # must not imply preparation, geometry import or permission to use it.
+        s.click('.browser-asset [data-action="source-detail"]')
+        s.click('#dialog details > summary')
+        s.click('#dialog [data-action="source"]')
+        state = s.api('workbench/state?projectId='+s.project['id'])
+        scene = state['project']['workbench']['scenes'][0]
+        assert len(scene['sources']) == 1 and not scene.get('catalog')
+        assert not scene['checkpoints'] and not scene.get('run')
         s.click('[data-action="browser-close"]')
         s.click('[data-action="settings"]')
         s.click('[data-action="diagnostics"]')
