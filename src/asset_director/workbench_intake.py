@@ -11,10 +11,21 @@ from .workbench_catalog import describe
 
 
 def validate_evidence(evidence):
-    fields(evidence, {'title', 'kind', 'source_url', 'license_id', 'license_url', 'author', 'price', 'tags', 'attested'},
+    fields(evidence, {'title', 'kind', 'source_url', 'license_id', 'license_url', 'author', 'price', 'tags', 'attested', 'local_confirmation'},
            {'title', 'kind', 'source_url', 'license_id', 'license_url', 'author', 'price', 'attested'})
     require(evidence['kind'] == 'model' and evidence['attested'] is True and type(evidence['price']) in {int, float}
             and evidence['price'] == 0, 'RIGHTS_REQUIRED', 'Confirm the actual zero-cost source and retained rights')
+    if 'local_confirmation' in evidence:
+        from .local_use import validate
+        validate(evidence['local_confirmation'])
+        require(evidence['license_id'] == 'UNKNOWN' and evidence['source_url'] == '' and
+                evidence['license_url'] == '' and evidence['author'] == '',
+                'LOCAL_USE_SCOPE_MISMATCH', 'A use confirmation must not invent source or license claims')
+        require(isinstance(evidence['title'], str) and 0 < len(evidence['title'].strip()) <= 2000 and
+                not any(ord(c) < 32 for c in evidence['title']), 'INVALID_SCHEMA', 'Invalid title')
+        require(isinstance(evidence.get('tags', []), list) and len(evidence.get('tags', [])) <= 16 and
+                all(isinstance(t, str) and len(t) <= 100 for t in evidence.get('tags', [])), 'INVALID_SCHEMA', 'Invalid tags')
+        return
     for key in ('title', 'source_url', 'license_id', 'license_url', 'author'):
         value = evidence[key]
         require(isinstance(value, str) and 0 < len(value.strip()) <= 2000 and not any(ord(c) < 32 for c in value),
@@ -38,6 +49,9 @@ def run(lib, request_file, evidence_file, blender):
     request = load_json(request_file)
     evidence = load_json(Path(evidence_file))
     validate_evidence(evidence)
+    if 'local_confirmation' in evidence:
+        from .local_use import validate
+        validate(evidence['local_confirmation'], request)
     require(request.get('source_kind') == 'source' and Path(request['file']).suffix.lower() in {'.blend', '.gltf', '.glb', '.fbx'},
             'FORMAT_UNSUPPORTED', 'Guided preparation supports registered World model packages; motion and conversion need review')
     require(sum(f['size'] for f in request['files']) <= MAX_DOWNLOAD, 'RESOURCE_LIMIT', 'Preparation is bounded to 500 MiB')
