@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {sourcePage,selectedSourceSummary} from '../lib/source-browser.mjs';
-import {pinnedPage,ingredientsView,browserView,ingredientStatus,sourceDialog} from '../public/workbench-browser.mjs';
+import {pinnedPage,ingredientsView,browserView,ingredientStatus,sourceDialog,compareLibraryViews,browserPage} from '../public/workbench-browser.mjs';
 import {createApp} from '../server.mjs';
 import {writeJson,fileHash} from '../lib/storage.mjs';
 const sid=i=>'src_00000000-0000-4000-8000-'+String(i).padStart(12,'0');
@@ -14,6 +14,64 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const b=(label,action,data={},cls='',disabled=false)=>'<button data-action="'+action+'" '+(disabled?'disabled':'')+'>'+esc(label)+'</button>';
 const scene={id:'scene',name:'Synthetic scene',sources:[sid(0)],catalog:[aid(0)],checkpoints:[],current:null,candidate:null};
 const project={workbench:{catalogPins:[{id:aid(0),title:'Synthetic model',kind:'model',version:'b'.repeat(64),files:[{path:'not-for-summary'}]}],scenes:[scene]}};
+
+const completePage=items=>({items,total:items.length,offset:0,next_offset:null});
+const browserUI=extra=>({activity:'world',tab:'catalog',production:false,query:'',kind:{catalog:'',sources:''},offset:{catalog:0,sources:0},selected:false,layout:'grid',...extra});
+test('matching-view explanation requires complete exact identities, not equal counts or thumbnails',()=>{
+  const a={id:aid(0),version:'a'},b={id:aid(1),version:'b'};
+  assert.deepEqual(compareLibraryViews(completePage([a,b]),completePage([b,a])),{production:2,library:2,same:true});
+  assert.equal(compareLibraryViews(completePage([a]),completePage([b])).same,false);
+  assert.equal(compareLibraryViews(completePage([a]),completePage([{...a,version:'new'}])).same,false);
+  assert.equal(compareLibraryViews(completePage([{id:a.id}]),completePage([{id:a.id}])).same,false);
+  assert.equal(compareLibraryViews(completePage([]),completePage([])).same,false);
+  const partial={items:[a],total:10000,offset:0,next_offset:24};
+  assert.deepEqual(compareLibraryViews(partial,partial),{production:10000,library:10000,same:false});
+  assert.deepEqual(compareLibraryViews(null,completePage([a])),{production:null,library:1,same:false});
+});
+test('catalog scope counts use full matching pins and one bounded shared-catalog query without mutation',async()=>{
+  const before=JSON.stringify(project),calls=[];
+  const api=async route=>{calls.push(route);return completePage(project.workbench.catalogPins);};
+  for(const production of [false,true]){
+    const result=await browserPage({project,scene,ui:browserUI({production}),api});
+    assert.deepEqual(result.locations,{production:1,library:1,same:true});
+    assert.equal(!!result.items[0].pinnedOnly,production);
+  }
+  assert.equal(calls.length,2);assert.ok(calls.every(r=>r.startsWith('workbench/catalog?')));
+  assert.equal(JSON.stringify(project),before);
+});
+test('source scopes keep independent counts and use the same search/category/workflow before paging',async()=>{
+  const calls=[],api=async route=>{
+    calls.push(route);const q=new URL('http://fixture/'+route).searchParams;
+    assert.equal(q.get('activity'),'world');assert.equal(q.get('query'),'Package');assert.equal(q.get('subcategory'),'environment');
+    return completePage(q.get('production')==='true'?[source(0)]:[source(0),source(2)]);
+  };
+  const result=await browserPage({project,scene,ui:browserUI({tab:'sources',query:'Package',subcategory:'environment',production:true}),api});
+  assert.deepEqual(result.locations,{production:1,library:2,same:false});assert.equal(result.items.length,1);assert.equal(calls.length,2);
+});
+test('unavailable comparison does not hide retained production references or pretend zero assets',async()=>{
+  const api=async()=>{throw new Error('Synthetic library unavailable');};
+  const result=await browserPage({project,scene,ui:browserUI({production:true}),api});
+  assert.deepEqual(result.locations,{production:1,library:null,same:false});assert.equal(result.items.length,1);
+  await assert.rejects(browserPage({project,scene,ui:browserUI(),api}),/Synthetic library unavailable/);
+});
+test('selected-only list does not redefine production membership or claim matching scene presence',async()=>{
+  const s={...scene,catalog:[]},ui=browserUI({production:true,selected:true});
+  const result=await browserPage({project,scene:s,ui,api:async()=>completePage(project.workbench.catalogPins)});
+  assert.equal(result.total,0);assert.equal(result.locations.production,1);
+  const html=browserView({ui,page:result,project,scene:s,locked:false,esc,b});
+  assert.match(html,/Selected references for this scene/);assert.doesNotMatch(html,/class="browser-same"/);
+});
+test('scope controls explain shared storage and why an identical small library shows the same assets',()=>{
+  const page={...completePage(project.workbench.catalogPins),locations:{production:1,library:1,same:true}};
+  for(const production of [false,true]){
+    const html=browserView({ui:browserUI({production}),page,project,scene,locked:false,esc,b});
+    assert.match(html,/This production <span class="location-count">\(1\)/);
+    assert.match(html,/My library <span class="location-count">\(1\)/);
+    assert.match(html,/Production references/);assert.match(html,/All shared assets/);
+    assert.match(html,/Same assets in both views/);assert.match(html,/not separate folders or per-production downloads/);
+    assert.doesNotMatch(html,/downloaded into this production/i);
+  }
+});
 test('loading filters are disabled for keyboard as well as pointer interaction',()=>{
   const ui={tab:'catalog',query:'',kind:{catalog:'',sources:''},selected:false,layout:'grid'};
   const html=browserView({ui,page:null,project,scene,locked:false,esc,b});
