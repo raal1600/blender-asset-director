@@ -23,6 +23,20 @@ sidebar for this activity. **More** retains selected ingredients, checkpoint
 history, scene details, saved-file import and the specialist route. Active tasks,
 failures and required rights decisions stay visible; they are not hidden in More.
 
+**Add assets** remains visible across selection, source review and candidate
+review (disabled during active writers). A collapsed, bounded **Ingredients**
+strip distinguishes selected-but-not-imported catalog assets, source packages,
+objects observed in the displayed checkpoint, and saved files whose contents
+have no audit. Missing audit evidence never means an asset is absent and does
+not prompt an automatic duplicate import. The strip preserves its disclosure
+state across refresh; its first four rows link to the existing exact-source
+inspectors, with the paged chosen-assets browser available for larger selections.
+The browser and asset inspector explicitly label a single-asset preview. Choosing
+several assets does not compose a preview scene: each reviewed **Add to world**
+uses the current kept world as input, and the main viewer shows their combined
+saved geometry. Keep each change before adding the next. No batch import,
+automatic placement, source-use attestation or checkpoint approval is implied.
+
 The browser exposes the actual harness catalog and independent original database
 packages, with separate **Catalog assets** and **Source packages** tabs, search,
 category and 24-result pages. World puts workflow scope, type/selected filters and

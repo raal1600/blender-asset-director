@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {worldState,worldView,addWorldAsset} from '../public/workbench-world.mjs';
+import {worldState,worldView,worldIngredients,addWorldAsset} from '../public/workbench-world.mjs';
 import {worldCatalogDialog} from '../public/workbench-library.mjs';
 const esc=v=>String(v??'').replaceAll('<','&lt;').replaceAll('"','&quot;');
 const b=(label,action,data={},cls='',disabled=false)=>`<button class="${cls}" data-action="${action}" ${disabled?'disabled':''}>${esc(label)}</button>`;
@@ -76,4 +76,48 @@ test('World detail keeps rights, active-work and exact collection requirements v
   const other=worldCatalogDialog({...args,asset:blend,scene:inspected,fileChoice:'second.blend'});
   assert.match(other.buttons,/Inspect collections/);assert.doesNotMatch(other.body,/name="catalog-collection"/);
   assert.match(worldCatalogDialog({...args,scene:{...scene,current:checkpoint.id,checkpoints:[checkpoint]}}).buttons,/Add another copy/);
+});
+
+test('multiple choices, observed imports, packages and unknown saved files have distinct status',()=>{
+  const second={...asset,id:'a_second',title:'Second prop'},source={id:'src_package',name:'Terrain package',kind:'Meshes'};
+  const p={workbench:{catalogPins:[asset,second]}};
+  const chosen={...scene,catalog:[asset.id,second.id],sources:[source.id]};
+  let rows=worldIngredients({project:p,scene:chosen,inventory:{sources:[source]}});
+  assert.equal(rows.toAdd,2);assert.equal(rows.inScene,0);assert.equal(rows.packages,1);
+  assert.ok(rows.rows.slice(0,2).every(r=>r.status==='Selected · not imported'));
+  const kept={...chosen,current:checkpoint.id,checkpoints:[checkpoint]};
+  rows=worldIngredients({project:p,scene:kept});assert.equal(rows.inScene,1);assert.equal(rows.toAdd,1);
+  const combined={id:'cp_combined',parent:checkpoint.id,audit:{objects:[...checkpoint.audit.objects,{asset_id:second.id,type:'MESH'}]}};
+  rows=worldIngredients({project:p,scene:{...kept,candidate:combined.id,checkpoints:[checkpoint,combined]}});
+  assert.equal(rows.inScene,2);assert.equal(rows.toAdd,0);assert.ok(rows.rows.every(r=>r.status==='In candidate'));
+  rows=worldIngredients({project:p,scene:{...kept,checkpoints:[{id:checkpoint.id,audit:null}]}});
+  assert.equal(rows.inScene,0);assert.equal(rows.toAdd,0);assert.equal(rows.unknown,2);
+  assert.ok(rows.rows.every(r=>r.status==='Presence not verified'));
+  rows=worldIngredients({project:p,scene:{...kept,catalog:[]}});
+  assert.equal(rows.inScene,1,'deselecting a reference does not remove observed scene geometry');
+});
+
+test('Add assets is consistently discoverable without bypassing review or active writers',()=>{
+  for(const patch of [{},{sourceUse:{ready:false}},{scene:{...scene,candidate:checkpoint.id,checkpoints:[checkpoint]}},{scene:{...scene,current:checkpoint.id,checkpoints:[checkpoint]}}]){
+    const html=view(patch);
+    assert.match(html,/data-action="browse-assets"[^>]*>Add assets<\/button>/);
+    assert.match(html,/imported assets appear together here/);
+    assert.match(html,/Only imported objects appear together/);
+    assert.doesNotMatch(html,/Choose another asset/);
+  }
+  for(const patch of [{locked:true},{scene:{...scene,task:'task'}},{scene:{...scene,run:'run'}},{cap:{task_workspace:false}}]){
+    assert.match(view(patch),/data-action="browse-assets" disabled>Add assets<\/button>/);
+  }
+});
+
+test('ingredient strip is bounded, escaped and never guesses presence from a parent checkpoint',()=>{
+  const pins=Array.from({length:100},(_,i)=>({...asset,id:'a_'+i,title:'<unsafe>'+i}));
+  const html=view({project:{workbench:{scenes:[scene],catalogPins:pins}},scene:{...scene,catalog:pins.map(a=>a.id)}});
+  assert.equal((html.match(/class="world-ingredient"/g)||[]).length,4);
+  assert.match(html,/Ingredients \(100\)/);assert.match(html,/Browse all chosen ingredients/);assert.match(html,/&lt;unsafe>/);
+  const unknown={...scene,current:checkpoint.id,catalog:[asset.id],candidate:'cp_unknown',checkpoints:[checkpoint,{id:'cp_unknown',parent:checkpoint.id,audit:null}]};
+  assert.equal(worldIngredients({project,scene:unknown}).unknown,1);
+  const detail=worldCatalogDialog({asset,scene:unknown,locked:false,sourceReady:true,esc,b});
+  assert.match(detail.body,/Presence in saved scene not verified/);assert.doesNotMatch(detail.body,/Preview · not in scene/);
+  assert.match(detail.body,/Single-asset preview/);assert.match(detail.body,/combines this asset with your existing saved scene/);
 });

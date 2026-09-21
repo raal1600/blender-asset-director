@@ -1,5 +1,6 @@
 /** Details, preselection preview, and guarded import are separate actions. */
 import {subcategories,typeLabel,humanBytes,motionSummary,previewMember,previewHint,policyMessage} from './asset-presentation.mjs';
+import {ingredientStatus} from './workbench-browser.mjs';
 export function catalogDialog({asset,scene,locked,sourceReady,fileChoice,esc,b}) {
   if(scene.stage==='world'&&['model','pack'].includes(asset.kind))return worldCatalogDialog({asset,scene,locked,sourceReady,fileChoice,esc,b});
   const selected=(scene.catalog||[]).includes(asset.id),observed=scene.assetContents?.[asset.id];
@@ -36,14 +37,15 @@ export function worldCatalogDialog({asset,scene,locked,sourceReady,fileChoice,es
   const blend=!!file?.toLowerCase().endsWith('.blend');
   const contents=observed?.version===asset.version&&observed.file===file?observed:null;
   const blocked=locked||!!scene.candidate||!!scene.task||!!scene.run;
-  const present=scene.checkpoints.find(c=>c.id===(scene.candidate||scene.current))?.audit?.objects?.some(o=>o.asset_id===asset.id);
+  const status=ingredientStatus(scene,asset.id),present=['In checkpoint','In candidate'].includes(status);
   let main;
   if(!asset.policy?.eligible)main=b('Source policy blocks import','catalog-import',{id:asset.id},'primary',true);
   else if(selected&&!sourceReady)main=b('Review source use','source-review',{},'primary',blocked);
   else if(blend&&!contents)main=b('Inspect collections','catalog-inspect',{id:asset.id},'primary',blocked);
   else main=b(present?'Add another copy':'Add to world','catalog-import',{id:asset.id},'primary',blocked||!models.includes(file)||(blend&&!contents?.collections?.length));
   const preview=previewMember(file||''),viewButton=preview?b('View in 3D','viewer-open',{kind:'catalog',id:asset.id,version:asset.version},'ghost'):'';
-  return {autoPreview:preview&&asset.policy?.eligible===true,body:`<div class="asset-facts"><span class="asset-type" title="${esc(asset.subcategory?.basis)}">${esc(typeLabel(asset))}</span><span>${present?'Already in the saved scene':'Preview · not in scene'}</span>${!asset.policy?.eligible?viewButton:''}</div>
+  return {autoPreview:preview&&asset.policy?.eligible===true,body:`<div class="asset-facts"><span class="asset-type" title="${esc(asset.subcategory?.basis)}">${esc(typeLabel(asset))}</span><span>${present?status==='In candidate'?'In the pending scene change':'Already in the saved scene':status==='Presence not verified'?'Presence in saved scene not verified':'Preview · not in scene'}</span>${!asset.policy?.eligible?viewButton:''}</div>
+    <p class="world-preview-scope">Single-asset preview. Add to world combines this asset with your existing saved scene; choosing it alone does not import it.</p>
     ${members.length?`<label class="world-member ${members.length===1?'single-member':''}">Source file<select id="catalog-file">${members.map(f=>`<option value="${esc(f)}" ${f===file?'selected':''}>${esc(f.split('/').at(-1))}</option>`).join('')}</select></label>`:'<p>No supported 3D member is recorded.</p>'}
     ${preview?previewHint():''}
     <p id="catalog-operation-status" role="status" hidden></p>

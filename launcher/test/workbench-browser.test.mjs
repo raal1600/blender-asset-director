@@ -60,6 +60,7 @@ test('scene panel remains compact and never claims selection imported an object'
   assert.equal(ingredientStatus(scene,aid(0)),'Selected · not imported');
   const observed={...scene,current:'cp',checkpoints:[{id:'cp',audit:{objects:[{asset_id:aid(0)}]}}]};
   assert.equal(ingredientStatus(observed,aid(0)),'In checkpoint');
+  assert.equal(ingredientStatus({...observed,checkpoints:[{id:'cp',audit:null}]},aid(0)),'Presence not verified');
 });
 test('motion uses compact honest placeholders and browser exposes one search and explicit source tabs',()=>{
   const ui={tab:'catalog',query:'',kind:{catalog:'animation',sources:''},selected:false,layout:'grid'};

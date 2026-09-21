@@ -2,7 +2,8 @@
 
 Scripted confirmations exercise controls; they are never human acceptance.
 """
-import argparse,hashlib,json,re,time,urllib.request
+import argparse,hashlib,json,re,struct,time,urllib.request
+from urllib.parse import urlsplit
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 
@@ -23,6 +24,13 @@ def main():
         context=browser.new_context(viewport={'width':1440,'height':960},service_workers='block');page=context.new_page();page.set_default_timeout(25000)
         page.on('pageerror',lambda e:report['errors'].append(str(e).replace(session['token'],'[REDACTED]')))
         page.on('console',lambda m:report['errors'].append(m.text.replace(session['token'],'[REDACTED]')) if m.type=='error' else None)
+        models=[]
+        def observed_model(response):
+            if urlsplit(response.url).path=='/api/workbench/viewer-model' and response.status==200:
+                raw=response.body();size,kind=struct.unpack_from('<II',raw,12)
+                assert raw[:4]==b'glTF' and kind==0x4e4f534a
+                value=json.loads(raw[20:20+size]);models.append({n['name'] for n in value['nodes'] if 'mesh' in n})
+        page.on('response',observed_model)
         accept=False
         page.on('dialog',lambda dialog:dialog.accept() if accept else dialog.dismiss())
         def idle():expect(page.locator('body')).not_to_have_class(re.compile(r'\bworking\b'),timeout=30000)
@@ -52,7 +60,7 @@ def main():
             expect(page.locator('[data-world-state]')).to_have_attribute('data-world-state','empty')
             expect(page.get_by_role('button',name='Find an asset',exact=True)).to_be_visible();capture('01-empty-world')
             report['checks'].append('Real page loads with one contextual next step and no console errors')
-            click('[data-action="browse-assets"]')
+            click('.world-canvas-actions [data-action="browse-assets"]')
             expect(page.locator('.browser-results')).to_have_attribute('aria-busy','false')
             expect(page.locator('.browser-filters')).not_to_have_attribute('open','')
             capture('02-simple-browser')
@@ -60,11 +68,11 @@ def main():
             expect(page.locator('#library-title')).to_have_text('Entire library')
             page.locator('#browser-activity').select_option('world');idle()
             click('.browser-filters summary')
-            click('[data-action="catalog-preview-detail"]');expect(page.locator('dialog[open]')).to_have_count(1)
+            click('[data-action="catalog-preview-detail"][data-id="'+session['assetId']+'"]');expect(page.locator('dialog[open]')).to_have_count(1)
             ready('#dialog [data-viewer-host]');capture('03-asset-preview')
             assert not scene().get('catalog') and not scene().get('candidate')
             page.keyboard.press('Escape');idle();expect(page.locator('#library-dialog')).to_be_visible()
-            click('[data-action="catalog-preview-detail"]');ready('#dialog [data-viewer-host]')
+            click('[data-action="catalog-preview-detail"][data-id="'+session['assetId']+'"]');ready('#dialog [data-viewer-host]')
             before=digest(session['projectManifest']);click('[data-action="catalog-import"]')
             assert digest(session['projectManifest'])==before
             report['checks'].append('Preview/Back preserve navigation; cancelled add writes no selection, job or checkpoint')
@@ -82,7 +90,7 @@ def main():
             ready('[data-scene-viewer]');capture('05-import-review')
             click('.world-more > summary');click('[data-action="world-ingredients"]')
             click('#dialog [data-action="browse-assets"].primary');page.keyboard.press('Escape');idle()
-            expect(page.get_by_role('button',name='Keep this change',exact=True)).to_be_focused()
+            expect(page.get_by_role('button',name='Add assets',exact=True)).to_be_focused()
             assert not current['current'] and not current['completed']
             canvas=page.locator('[data-scene-viewer] canvas');before_orbit=canvas.screenshot();box=canvas.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
             page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+90,y+20,steps=9);page.mouse.up();page.wait_for_timeout(300)
@@ -92,6 +100,41 @@ def main():
             assert digest(Path(session['projectManifest']).parent/cp['path'])==cp['sha256']
             report['checks'].append('Actual Blender import yields observed mesh; real 3D orbit; keep is distinct from World completion')
             capture('06-kept-world')
+            first_cp=cp;first_meshes=models[-1]
+            jobs_before=len(state()['project']['jobs'])
+            click('.world-canvas-actions [data-action="browse-assets"]')
+            click('[data-action="catalog-select"][data-id="'+session['secondAssetId']+'"]')
+            assert len(scene()['catalog'])==2 and scene()['current']==cp['id'] and not scene()['candidate']
+            assert len(state()['project']['jobs'])==jobs_before,'Selection must not run an import'
+            page.keyboard.press('Escape');idle()
+            expect(page.locator('[data-world-state]')).to_have_attribute('data-world-state','rights')
+            expect(page.get_by_role('button',name='Add assets',exact=True)).to_be_enabled()
+            click('.world-ingredient-list > summary')
+            expect(page.locator('.world-ingredient-list')).to_contain_text('1 in saved world · 1 to add')
+            expect(page.locator('.world-ingredient[data-id="'+session['secondAssetId']+'"]')).to_contain_text('Selected · not imported')
+            capture('06b-two-selected-one-imported')
+            click('.projectbar [data-action="refresh"]')
+            expect(page.locator('.world-ingredient-list')).to_have_attribute('open','')
+            assert len(state()['project']['jobs'])==jobs_before
+            click('[data-action="source-review"]');click('[data-action="source-confirm"]')
+            click('.world-next [data-action="catalog-detail"]');ready('#dialog [data-viewer-host]')
+            expect(page.locator('#dialog')).to_contain_text('Single-asset preview')
+            click('[data-action="catalog-import"]');combined=finish_job()
+            cp=next(c for c in combined['checkpoints'] if c['id']==combined['candidate'])
+            ids={o.get('asset_id') for o in cp['audit']['objects']}
+            assert {session['assetId'],session['secondAssetId']}<=ids and cp['parent']==first_cp['id']
+            ready('[data-scene-viewer]')
+            assert first_meshes<=models[-1] and 'SecondSyntheticTriangle' in models[-1] and len(models[-1])>=2
+            expect(page.locator('.world-ingredient-list')).to_contain_text('2 in this change')
+            capture('06c-combined-world-candidate')
+            click('[data-action="keep-building"]')
+            expect(page.locator('.world-ingredient-list')).to_contain_text('2 in saved world')
+            assert digest(Path(session['projectManifest']).parent/first_cp['path'])==first_cp['sha256']
+            assert digest(session['secondInput'])==session['secondOriginal']['sha256']
+            assert digest(session['secondBinary'])==session['secondBinaryOriginal']['sha256']
+            report['checks'].append('Two distinct selected assets do not auto-import; reviewed second import preserves first world and serves both real meshes together')
+            report['combined_meshes']=sorted(models[-1]);report['first_checkpoint_id']=first_cp['id']
+            click('.world-ingredient-list > summary')
             click('.world-inspection > summary');click('.rendered-evidence > summary')
             click('.projectbar [data-action="refresh"]')
             expect(page.locator('.world-inspection')).to_have_attribute('open','')
@@ -107,7 +150,7 @@ def main():
             primary=page.locator('.world-next .primary');primary.hover()
             assert primary.evaluate("e=>getComputedStyle(e).backgroundColor")=='rgb(197, 212, 255)','Primary hover must retain light background and readable contrast'
             page.set_viewport_size({'width':1440,'height':960})
-            click('.world-next [data-action="browse-assets"]');click('[data-action="catalog-preview-detail"]');ready('#dialog [data-viewer-host]')
+            click('.world-canvas-actions [data-action="browse-assets"]');click('[data-action="catalog-preview-detail"][data-id="'+session['assetId']+'"]');ready('#dialog [data-viewer-host]')
             expect(page.get_by_role('button',name='Add another copy',exact=True)).to_be_visible()
             click('[data-action="catalog-import"]');second=finish_job();second_cp=next(c for c in second['checkpoints'] if c['id']==second['candidate'])
             assert second_cp['id']!=cp['id'];click('[data-action="discard"]')

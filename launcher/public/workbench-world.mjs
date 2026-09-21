@@ -2,6 +2,27 @@
 import {taskBanner} from './workbench-task.mjs';
 import {progressLabel} from './workbench-progress.mjs';
 import {previewIsCurrent} from './workbench-lineage.mjs';
+import {ingredientStatus} from './workbench-browser.mjs';
+
+/** Presence comes only from the displayed checkpoint, never from a selected pin. */
+export function worldIngredients({project,scene,inventory={sources:[]}}) {
+  const cp=scene.checkpoints.find(c=>c.id===(scene.candidate||scene.current));
+  const observed=new Set((cp?.audit?.objects||[]).map(o=>o.asset_id).filter(Boolean));
+  const selected=new Set(scene.catalog||[]),packages=new Set(scene.sources||[]);
+  const catalog=(project.workbench.catalogPins||[]).filter(a=>['model','pack'].includes(a.kind)&&(selected.has(a.id)||observed.has(a.id)))
+    .map(a=>({id:a.id,name:a.title,action:'catalog-detail',status:ingredientStatus(scene,a.id),selected:selected.has(a.id),present:observed.has(a.id),source:false}));
+  const sources=(inventory.sources||[]).filter(a=>packages.has(a.id)&&['Meshes','Characters'].includes(a.kind))
+    .map(a=>({id:a.id,name:a.name,action:'source-detail',status:'Source package · review intake',selected:true,present:false,source:true}));
+  return {rows:[...catalog,...sources],inScene:catalog.filter(a=>a.present).length,
+    toAdd:catalog.filter(a=>a.status==='Selected · not imported').length,
+    unknown:catalog.filter(a=>a.status==='Presence not verified').length,packages:sources.length};
+}
+
+function ingredientStrip({project,scene,inventory,esc,b,disabled}) {
+  const v=worldIngredients({project,scene,inventory});
+  const counts=[v.inScene?`${v.inScene} in ${scene.candidate?'this change':'saved world'}`:'',v.toAdd?`${v.toAdd} to add`:'',v.packages?`${v.packages} source package${v.packages===1?'':'s'}`:'',v.unknown?`${v.unknown} not verified`:''].filter(Boolean).join(' · ');
+  return `<div class="world-ingredients-bar"><details class="world-ingredient-list"><summary>Ingredients${v.rows.length?' ('+v.rows.length+')':''}<span>${esc(counts||'Choose assets to build your world')}</span></summary><p>Choose several ingredients, then add them one at a time. Only imported objects appear together in the saved world above.</p>${v.rows.length?`<div class="world-ingredient-rows">${v.rows.slice(0,4).map(a=>`<button class="world-ingredient" data-action="${a.action}" data-id="${esc(a.id)}" ${disabled?'disabled':''}><span title="${esc(a.name)}">${esc(a.name)}</span><small>${esc(a.status)}</small></button>`).join('')}</div>`:''}${v.rows.length>4?b('Browse all chosen ingredients','browse-assets',{selected:'true'},'ghost',disabled):''}${v.unknown?'<p class="muted">This saved file has no object audit. Inspect it in 3D or Blender before adding another copy; missing evidence does not mean an asset is absent.</p>':''}</details></div>`;
+}
 
 export function worldState({project,scene,locked=false,sourceUse,runs=[]}) {
   const checkpoint=scene.checkpoints.find(c=>c.id===(scene.candidate||scene.current));
@@ -13,7 +34,7 @@ export function worldState({project,scene,locked=false,sourceUse,runs=[]}) {
   return {kind,checkpoint,pending,run,failed};
 }
 
-export function worldView({project,scene,stages,locked,sourceUse,runs,taskStatus,cap,esc,b}) {
+export function worldView({project,scene,stages,locked,sourceUse,runs,taskStatus,cap,inventory,esc,b}) {
   const v=worldState({project,scene,locked,sourceUse,runs}),cp=v.checkpoint;
   const blocked=locked||!!scene.task||!!scene.run,unsupported=!cap?.task_workspace;
   const button=(label,action,data={},style='',disabled=false)=>b(label,action,data,style,disabled||blocked||unsupported);
@@ -23,7 +44,7 @@ export function worldView({project,scene,stages,locked,sourceUse,runs,taskStatus
     add:['Add to your world',v.pending[0]?.title||'Review the selected source before adding it.','Add to world','catalog-detail',{id:v.pending[0]?.id}],
     rights:['Review source use','Confirm permission for the exact sources selected for this production.','Review source use','source-review'],
     review:['Review this change','Orbit the saved result. Keep it to continue building, or discard this change.','Keep this change','keep-building'],
-    ready:['Ready for action?','Add more ingredients or arrange them in Blender. Continue when your World is ready.','Continue to Action','approve'],
+    ready:['Keep building, or continue','Add assets to this same world, or arrange them in Blender. Continue when your World is ready.','Continue to Action','approve'],
     editing:['Arrange in Blender','Your saved scene stays here while you edit a separate working copy.'],
     working:[v.run?.action==='asset-contents'?'Inspecting source collections':'Building your scene',progressLabel(v.run)],
     locked:['Another operation is active','Wait for the project writer to finish. Your saved work is preserved.']
@@ -36,10 +57,11 @@ export function worldView({project,scene,stages,locked,sourceUse,runs,taskStatus
     ${unsupported?'<div class="note warn" role="alert">'+esc(cap?.message||'This runtime cannot open Blender tasks. Check Studio before continuing.')+'</div>':''}
     ${v.failed&&!scene.run?`<div class="note warn world-failure" role="alert"><strong>An earlier attempt needs attention</strong><p>${esc(v.failed.error||v.failed.state)}. Failed evidence is retained.</p>${b('Inspect / recover attempt','recover',{run:v.failed.id})}</div>`:''}
     ${v.kind==='review'&&sourceUse&&!sourceUse.ready?'<div class="note warn" role="alert">Source-use review is still required. '+button('Review source use','source-review')+'</div>':''}
-    <section class="world-canvas" aria-label="World scene"><header><h1>Build your world</h1><span class="world-status">${status}</span></header>
+    <section class="world-canvas" aria-label="World scene"><header><div><h1>Build your world</h1><p class="world-view-scope">Saved scene · imported assets appear together here</p></div><div class="world-canvas-actions"><span class="world-status">${status}</span>${button('Add assets','browse-assets',{},'ghost')}</div></header>
       ${cp?`<section class="viewer-3d" data-scene-viewer aria-label="Saved scene in 3D"><div class="viewer-message"><strong>Explore your saved scene</strong><p>${blocked?'Your current task is separate from this saved checkpoint.':'Loading saved geometry for inspection…'}</p>${b('View saved scene in 3D','scene-viewer',{},'ghost',blocked)}</div></section>`:`<div class="world-empty"><h2>${v.pending.length?'Your asset is chosen':'Every world starts with an ingredient'}</h2><p>${v.pending.length?'It is not in your scene yet. Add it below to create real scene objects.':'Find something to place in your scene, then make it your own.'}</p>${v.pending.length?b('Preview selected asset in 3D','catalog-preview-detail',{id:v.pending[0].id,preview:'true'},'ghost'):''}</div>`}
     </section>
-    <section class="world-next" aria-label="Next step" data-world-state="${v.kind}"><div class="grow"><h2>${esc(title)}</h2><p>${esc(hint)}</p></div><div class="world-next-actions">${action?button(label,action,data||{},'primary'):''}${v.kind==='review'?button('Inspect in Blender','inspect-candidate')+button('Discard change','discard',{},'ghost'):v.kind==='ready'?button('Arrange in Blender','task')+button('Add another asset','browse-assets',{},'ghost'):['empty','add','rights','package'].includes(v.kind)?button(v.kind==='empty'?'Arrange in Blender':'Choose another asset',v.kind==='empty'?'task':'browse-assets',{},'ghost'):v.kind==='working'?b('Inspect operation','recover',{run:scene.run},'ghost'):v.kind==='locked'?b('Refresh status','refresh',{},'ghost'):''}</div></section>
+    <section class="world-next" aria-label="Next step" data-world-state="${v.kind}"><div class="grow"><h2>${esc(title)}</h2><p>${esc(hint)}</p></div><div class="world-next-actions">${action?button(label,action,data||{},'primary'):''}${v.kind==='review'?button('Inspect in Blender','inspect-candidate')+button('Discard change','discard',{},'ghost'):['ready','empty'].includes(v.kind)?button('Arrange in Blender','task'):v.kind==='working'?b('Inspect operation','recover',{run:scene.run},'ghost'):v.kind==='locked'?b('Refresh status','refresh',{},'ghost'):''}</div></section>
+    ${ingredientStrip({project,scene,inventory,esc,b,disabled:blocked||unsupported})}
     ${scene.task?taskBanner(scene,taskStatus,esc,b):''}
     ${cp?`<details class="world-inspection"><summary>Inspection tools</summary><div class="row">${b('Reload saved scene in 3D','scene-viewer',{},'',blocked)}${button('Inspect saved file in Blender','inspect-candidate')}</div><p>Saved geometry only; unsaved Blender edits are not shown. Preview lighting and materials may differ from Blender.</p><details class="rendered-evidence"><summary>Rendered still${preview?' · available':''}</summary>${preview?'<img data-media="preview" alt="Rendered still of the current saved checkpoint">':''}<p>${camera?'A camera-rendered still is separate from this interactive view.':'A saved camera is needed for a rendered still.'}</p>${button('Render preview still','preview',{},'',!cap?.render_frames||!camera)}</details></details>`:''}
     `;
