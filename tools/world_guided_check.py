@@ -103,10 +103,43 @@ def main():
             first_cp=cp;first_meshes=models[-1]
             jobs_before=len(state()['project']['jobs'])
             click('.world-canvas-actions [data-action="browse-assets"]')
-            click('[data-action="catalog-select"][data-id="'+session['secondAssetId']+'"]')
+            click('[data-action="browser-location"][data-location="production"]')
+            expect(page.locator('.browser-asset')).to_have_count(1)
+            expect(page.locator('.browser-results')).to_contain_text('In this scene')
+            capture('06a-production-library')
+            click('[data-action="browser-location"][data-location="library"]')
+            click('[data-action="browser-tab"][data-tab="sources"]')
+            expect(page.locator('.browser-results')).to_contain_text('Local · needs preparation')
+            row=page.locator('[data-item-id="'+session['secondSourceId']+'"]')
+            row.get_by_role('button',name='Details',exact=True).click();idle()
+            click('[data-action="source-prepare-form"]')
+            expect(page.locator('#prepare-confirm')).not_to_be_checked()
+            expect(page.locator('#prepare-license')).to_have_value('')
+            before_prepare=digest(session['projectManifest'])
+            capture('06a-preparation-rights')
+            # Cancelled evidence form never reaches preparation or catalog intake.
+            click('#dialog [data-action="close"]')
+            assert digest(session['projectManifest'])==before_prepare
+            assert len(api('workbench/catalog?projectId='+session['projectId'])['items'])==1
+            row.get_by_role('button',name='Details',exact=True).click();idle()
+            click('[data-action="source-prepare-form"]')
+            page.locator('#prepare-source-url').fill('https://example.invalid/generated-second-fixture')
+            page.locator('#prepare-author').fill('Synthetic fixture generator')
+            page.locator('#prepare-license').select_option('CC0-1.0')
+            page.locator('#prepare-license-url').fill('https://example.invalid/synthetic-license')
+            page.locator('#prepare-confirm').check()
+            click('[data-action="source-prepare"]');finish_job()
+            prepared=next(r for r in state()['runs'] if r['action']=='source-prepare')
+            assert prepared['state']=='SUCCEEDED'
+            session['secondAssetId']=prepared['assetId']
+            assert session['secondAssetId']!=session['assetId']
+            assert len(api('workbench/catalog?projectId='+session['projectId'])['items'])==2
+            source=api('workbench/source-detail?projectId='+session['projectId']+'&sourceId='+session['secondSourceId'])
+            assert source['prepared']['assetId']==session['secondAssetId']
+            report['checks'].append('Production/library states; cancelled rights form writes nothing; real package inspection and intake create a reusable catalog version without importing or approving')
             assert len(scene()['catalog'])==2 and scene()['current']==cp['id'] and not scene()['candidate']
             assert len(state()['project']['jobs'])==jobs_before,'Selection must not run an import'
-            page.keyboard.press('Escape');idle()
+            idle()
             expect(page.locator('[data-world-state]')).to_have_attribute('data-world-state','rights')
             expect(page.get_by_role('button',name='Add assets',exact=True)).to_be_enabled()
             click('.world-ingredient-list > summary')
@@ -150,7 +183,7 @@ def main():
             primary=page.locator('.world-next .primary');primary.hover()
             assert primary.evaluate("e=>getComputedStyle(e).backgroundColor")=='rgb(197, 212, 255)','Primary hover must retain light background and readable contrast'
             page.set_viewport_size({'width':1440,'height':960})
-            click('.world-canvas-actions [data-action="browse-assets"]');click('[data-action="catalog-preview-detail"][data-id="'+session['assetId']+'"]');ready('#dialog [data-viewer-host]')
+            click('.world-canvas-actions [data-action="browse-assets"]');click('[data-action="browser-tab"][data-tab="catalog"]');click('[data-action="catalog-preview-detail"][data-id="'+session['assetId']+'"]');ready('#dialog [data-viewer-host]')
             expect(page.get_by_role('button',name='Add another copy',exact=True)).to_be_visible()
             click('[data-action="catalog-import"]');second=finish_job();second_cp=next(c for c in second['checkpoints'] if c['id']==second['candidate'])
             assert second_cp['id']!=cp['id'];click('[data-action="discard"]')

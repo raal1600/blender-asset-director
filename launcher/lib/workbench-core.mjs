@@ -11,6 +11,7 @@ import {assertObservedShot} from './workbench-shots.mjs';
 import {Interactions} from './interactions.mjs';
 import {buildSessionContext} from './onboarding.mjs';
 import {sourcePage,selectedSourceSummary} from './source-browser.mjs';
+import {preparedSource,prepareSource,preparedProductionSources} from './library-preparation.mjs';
 const uid = prefix => prefix+randomUUID();
 const lockName='Runs/.workbench-writer.lock';
 const sharedLock='Runs/.interactive-execution.lock';
@@ -31,17 +32,22 @@ export class Workbench {
       return {...await this.runtime.harness(['workbench-capabilities']),encoder};}
     catch(e) {return {schema:1,available:false,message:'This workbench needs the matching development harness. The installed runtime was not changed.',detail:e.message};}
   }
-  async sourcePage(id,{sceneId,selected=false,...options}={}) {
+  async prepareSource(...args){return prepareSource(this,...args);}
+  async sourcePage(id,{sceneId,selected=false,production=false,...options}={}) {
     const p=await this.project(id);
     assert(typeof selected==='boolean','Invalid source scope.');
-    const selectedIds=selected?this.scene(p,sceneId).sources:null;
-    return sourcePage(await this.store.inventory(),{...options,selectedIds});
+    assert(typeof production==='boolean','Invalid production scope.');
+    const inventory=await this.store.inventory();
+    const selectedIds=selected?this.scene(p,sceneId).sources:production?[...p.assets.map(a=>a.sourceId),...await preparedProductionSources(this,p,inventory)]:null;
+    const page=sourcePage(inventory,{...options,selectedIds});
+    page.items=await Promise.all(page.items.map(async source=>({...source,prepared:await preparedSource(this,source)})));
+    return page;
   }
   async sourceDetail(id,sourceId) {
     await this.store.get(id);
     assert(validId(sourceId,'src_'),'Invalid source identity.');
     const source=(await this.store.inventory()).sources.find(a=>a.id===sourceId);
-    assert(source,'Source not found.',404);return {...source,subcategory:sourceCategory(source)};
+    assert(source,'Source not found.',404);return {...source,subcategory:sourceCategory(source),prepared:await preparedSource(this,source)};
   }
   async state(id,{compact=false}={}) {
     const p=await this.project(id);
@@ -220,6 +226,15 @@ export class Workbench {
     assert(!this.running.has(runId),'This process still owns the running operation. Wait for it to finish.',409);
     const file=await safe(p.directory,`Runs/${runId}.json`),r=await json(file);
     assert(r.projectId===id&&r.sceneId===sceneId,'Operation belongs to another scene.',409);
+    if(r.action==='source-prepare') {
+      const attempt=await safe(this.store.root,`SystemRuntime/UserData/LibraryPreparations/${runId}`);
+      const jobs=await safe(attempt,'library/jobs');
+      if(await exists(jobs))for(const name of await fs.readdir(jobs)) {
+        if(!/^j_[a-f0-9]{24}$/.test(name))continue;
+        const native=await json(await safe(jobs,name+'/job.json'));
+        assert(native.state!=='RUNNING','The isolated preparation worker is still RUNNING or needs native recovery. Inspect its retained attempt before releasing this project.',409);
+      }
+    }
     if(r.jobId) {const native=await json(await safe(this.config.library,`jobs/${r.jobId}/job.json`));assert(native.state!=='RUNNING','Native job is still RUNNING. Inspect it before recovery.',409);}
     assert(r.state!=='SUCCEEDED','Collect the completed task instead of interrupting it.',409);
     // Explicit recovery never rewrites native job history or removes working files.

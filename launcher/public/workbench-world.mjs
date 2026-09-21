@@ -46,7 +46,7 @@ export function worldView({project,scene,stages,locked,sourceUse,runs,taskStatus
     review:['Review this change','Orbit the saved result. Keep it to continue building, or discard this change.','Keep this change','keep-building'],
     ready:['Keep building, or continue','Add assets to this same world, or arrange them in Blender. Continue when your World is ready.','Continue to Action','approve'],
     editing:['Arrange in Blender','Your saved scene stays here while you edit a separate working copy.'],
-    working:[v.run?.action==='asset-contents'?'Inspecting source collections':'Building your scene',progressLabel(v.run)],
+    working:[v.run?.action==='source-prepare'?'Preparing your library asset':v.run?.action==='asset-contents'?'Inspecting source collections':'Building your scene',progressLabel(v.run)],
     locked:['Another operation is active','Wait for the project writer to finish. Your saved work is preserved.']
   };
   const [title,hint,label,action,data]=guides[v.kind];

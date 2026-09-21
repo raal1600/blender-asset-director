@@ -36,6 +36,8 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assert(req.method === 'GET','Method not allowed.',405);
         const assets = {'/asset-presentation.mjs':'asset-presentation.mjs','/workbench-browser.mjs':'workbench-browser.mjs','/workbench-images.mjs':'workbench-images.mjs','/':'workbench.html','/index.html':'workbench.html','/workbench-scope.mjs':'workbench-scope.mjs','/workbench-evidence.mjs':'workbench-evidence.mjs','/workbench-studio.mjs':'workbench-studio.mjs','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-task.mjs':'workbench-task.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
         assets['/workbench-progress.mjs']='workbench-progress.mjs';
+        assets['/library-usage.mjs']='library-usage.mjs';
+        assets['/library-preparation.mjs']='library-preparation.mjs';
         assets['/workbench-world.mjs']='workbench-world.mjs';
         assets['/workbench-world.css']='workbench-world.css';
         assets['/viewer-3d.mjs']='viewer-3d.mjs';
@@ -86,7 +88,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
           if(p==='/api/lifecycle/task')return taskForExit(workbench,id,url.searchParams.get('runId'));
           if (p === '/api/workbench/catalog') return workbench.catalogPage(id,{query:url.searchParams.get('query')||'',offset:Number(url.searchParams.get('offset')||0),kind:url.searchParams.get('kind')||null,activity:url.searchParams.get('activity')||'all',subcategory:url.searchParams.get('subcategory')||null});
           if (p === '/api/workbench/catalog-detail') return workbench.catalogDetail(id,url.searchParams.get('assetId'));
-          if (p === '/api/workbench/sources') return workbench.sourcePage(id,{query:url.searchParams.get('query')||'',kind:url.searchParams.get('kind')||'',activity:url.searchParams.get('activity')||'all',offset:Number(url.searchParams.get('offset')||0),sceneId:url.searchParams.get('sceneId'),selected:url.searchParams.get('selected')==='true',subcategory:url.searchParams.get('subcategory')||null});
+          if (p === '/api/workbench/sources') return workbench.sourcePage(id,{query:url.searchParams.get('query')||'',kind:url.searchParams.get('kind')||'',activity:url.searchParams.get('activity')||'all',offset:Number(url.searchParams.get('offset')||0),sceneId:url.searchParams.get('sceneId'),selected:url.searchParams.get('selected')==='true',production:url.searchParams.get('production')==='true',subcategory:url.searchParams.get('subcategory')||null});
           if (p === '/api/workbench/source-detail') return workbench.sourceDetail(id,url.searchParams.get('sourceId'));
           if (p === '/api/workbench/state') return workbench.state(id,{compact:url.searchParams.get('compact')==='true'});
           if (p === '/api/workbench/capabilities') return workbench.available();
@@ -108,6 +110,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='shot-select')return workbench.selectShot(id,sid,rev,body.shotId);
             if(command==='enter')return workbench.enter(id,sid,rev,body.stage);
             if(command==='catalog-select')return workbench.selectCatalog(id,sid,rev,body.assetId,body.selected);
+            if(command==='source-prepare')return workbench.prepareSource(id,sid,rev,body.request);
             if(command==='catalog-label')return workbench.labelCatalog(id,sid,rev,body.request);
             if(command==='asset-preview')return workbench.previewAsset(id,sid,rev,body.request);
             if(command==='viewer-prepare')return viewers.prepare(id,sid,rev,body.request);

@@ -34,7 +34,8 @@ def describe(lib, asset, *, verify=False, labels=None):
         'source_url': asset.source_url, 'author': asset.author,
         'license_id': asset.license_id, 'license_url': asset.license_url,
         'evidence': asset.evidence,
-        'models': [f['path'] for f in asset.local_files if Path(f['path']).suffix.lower() in MODEL_SUFFIXES],
+        'models': [f['path'] for f in asset.local_files if Path(f['path']).suffix.lower() in MODEL_SUFFIXES
+                   and (not asset.metadata.get('prepared_member') or f['path'] == asset.metadata['prepared_member'])],
         'package_images': [f['path'] for f in asset.local_files if reference_image(f['path'])],
         'notice': 'Indexed metadata; not rig compatibility, artistic acceptance, or legal clearance.'
     }
@@ -75,6 +76,9 @@ def catalog(lib, query='', offset=0, limit=24, asset_id=None, verify=False, kind
 
 def validate_import(lib, asset, options):
     """An explicit file must be one exact recorded package member, not a path."""
+    if asset.metadata.get('prepared_member'):
+        require(options.get('file') == asset.metadata['prepared_member'], 'MEMBER_REVIEW_REQUIRED',
+                'This preparation checked one exact member; other package models need their own reviewed intake')
     if 'file' in options:
         require(isinstance(options['file'], str) and any(f['path'] == options['file'] for f in asset.local_files),
                 'SOURCE_NOT_IN_ASSET', 'Choose an exact acquired package member')

@@ -7,6 +7,10 @@ record `git rev-parse HEAD` and the separately tested PR merge SHA.
 
 ## A scene owns its work
 
+The [shared library readiness update](LIBRARY_READINESS.md) distinguishes local
+files, preparation and observed production use, with guided explicit package
+intake. It retains the existing scene workflow and normal reviewed import.
+
 Use `SystemRuntime/Launcher/Start Workbench.ps1` in the staging studio, or
 open `/workbench` in the existing authenticated local launcher. Productions has only **Scenes**
 and **Final film**. Each scene keeps its own **World → Action → Shots → Light →

@@ -25,6 +25,11 @@ def main():
               'tree': subprocess.check_output(['git','rev-parse','HEAD^{tree}'],cwd=ROOT,text=True).strip(),
               'worktree_dirty': bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT))}
     (output/'source.json').write_text(json.dumps(source,indent=2),encoding='utf-8')
+    if args.guided_world:
+        with (output/'package-preparation.log').open('wb') as log:
+            subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
+                            '--python-exit-code','11','--python',str(ROOT/'tools/library_preparation_fixture.py'),'--',str(output/'package-preparation')],
+                           cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
     generated = Path(args.native_fixture).resolve() if args.native_fixture else output / 'native'
     if not args.native_fixture:
         with (output / 'native.log').open('wb') as log:
