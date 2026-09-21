@@ -46,6 +46,12 @@ def onboarding(studio):
         scene = state['project']['workbench']['scenes'][0]
         assert len(scene['sources']) == 1 and not scene.get('catalog')
         assert not scene['checkpoints'] and not scene.get('run')
+        expect(page.locator('.browser-asset')).to_have_count(0)
+        expect(page.locator('[data-location="production"] .location-count')).to_have_text('(1)')
+        expect(page.locator('[data-location="library"] .location-count')).to_have_text('(0)')
+        s.click('.browser-locations [data-action="browser-location"][data-location="production"]')
+        expect(page.locator('.browser-asset')).to_have_count(1)
+        s.click('.browser-locations [data-action="browser-location"][data-location="library"]')
         s.click('[data-action="browser-close"]')
         s.click('[data-action="settings"]')
         s.click('[data-action="diagnostics"]')

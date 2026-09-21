@@ -66,6 +66,11 @@ def review_scene(s):
             click('[data-action="save-scene"]')
         click('[data-action="browse-assets"]:visible >> nth=0')
         click('[data-action="browser-tab"][data-tab="sources"]')
+        # Onboarding already added this source. Available-to-add must exclude it;
+        # inspect/reuse the retained reference through This production instead.
+        expect(page.locator('.browser-asset')).to_have_count(0)
+        expect(page.get_by_text('Already in this production',exact=True)).to_be_visible()
+        click('.browser-locations [data-action="browser-location"][data-location="production"]')
         expect(page.locator('.browser-asset')).to_have_count(1)
         if not page.locator('.browser-asset').evaluate("e=>e.classList.contains('selected')"):
             click('.browser-asset [data-action="source-detail"]')
@@ -113,7 +118,7 @@ def review_scene(s):
         page.set_viewport_size({'width': 1440, 'height': 1100})
         check.update(scene=scene['id'], checkpoint=candidate, sha256=checkpoint['sha256'],
                      original_preserved=True, approval_input='scripted synthetic user confirmation',
-                     blender_gui='NOT_TESTED')
+                     blender_gui='NOT_TESTED', production_library_lists='DISJOINT_RETAINED_SOURCE_REUSED')
         catalog_and_film(s, click, idle, check)
         assert package_images and all(status == 204 for status in package_images), package_images
         check.update(optional_package_images=package_images, missing_image_console_404=False)
@@ -141,6 +146,7 @@ def catalog_and_film(s, click, idle, check):
     click('[data-action="stage"][data-stage="world"]')
     click('.projectbar [data-action="refresh"]')
     click('[data-action="browse-assets"]:visible >> nth=0')
+    click('.browser-locations [data-action="browser-location"][data-location="library"]')
     click('[data-action="browser-tab"][data-tab="catalog"]')
     click('[data-action="catalog-detail"][data-id="' + aid + '"]')
     click('#dialog .asset-more > summary')
