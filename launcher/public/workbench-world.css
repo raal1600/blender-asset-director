@@ -43,6 +43,9 @@
 .browser-locations{display:flex;gap:8px;margin:0 0 10px}.browser-locations button{flex:1;border-color:var(--line)}
 .browser-locations button.active{background:#264960;border-color:#78b2d8;color:#fff}
 .browser-asset .asset-availability{color:#b6c9d9}.browser-asset .asset-actions{flex-wrap:wrap}
+.browser-asset .asset-actions .primary{color:#142038}
+.browser-results:not(.list) .asset-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.browser-results:not(.list) .asset-actions .primary{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}
 .preparation-steps{line-height:1.7;padding-left:24px}.preparation-fields{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
 .preparation-fields input,.preparation-fields select{width:100%}.preparation-confirm{display:flex;gap:10px;align-items:flex-start;line-height:1.5}
 .preparation-confirm input{width:18px;flex:0 0 18px;margin-top:3px}
