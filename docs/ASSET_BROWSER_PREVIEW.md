@@ -6,6 +6,10 @@ asset library, replace the catalog, or introduce global role pages.
 
 ## Browse, preview, add, import
 
+The [library readiness flow](LIBRARY_READINESS.md) adds This production / My library
+views and explicit **Prepare & add** for supported local World packages. Ordinary
+preview remains read-only and never silently intakes a source.
+
 - Browse defaults to assets relevant to the current activity. World includes
   environments, props and characters; Action contains animation; Light contains
   material/HDRI records. Entire library is an explicit escape.

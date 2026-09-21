@@ -27,6 +27,7 @@ def parser():
     q=s.add_parser("configure"); q.add_argument("--blender"); q.add_argument("--skill-path")
     q=s.add_parser("film-assemble"); q.add_argument("--plan",required=True); q.add_argument("--project",required=True); q.add_argument("--ffmpeg",required=True); q.add_argument("--ffprobe",required=True)
     q=s.add_parser("workbench-preview"); q.add_argument("--request",required=True); q.add_argument("--blender",required=True); q.add_argument("--embedded",action="store_true")
+    q=s.add_parser("workbench-intake"); q.add_argument("--request",required=True); q.add_argument("--evidence",required=True); q.add_argument("--blender",required=True)
     s.add_parser("workbench-capabilities")
     q=s.add_parser("workbench-catalog"); q.add_argument("--query",default=""); q.add_argument("--offset",type=int,default=0); q.add_argument("--limit",type=int,default=24); q.add_argument("--asset"); q.add_argument("--verify",action="store_true"); q.add_argument("--kind",choices=["model","pack","animation","material","hdri"]); q.add_argument("--kinds",nargs="+",choices=["model","pack","animation","material","hdri"]); q.add_argument("--subcategory"); q.add_argument("--labels")
     q=s.add_parser("workbench-verify"); q.add_argument("--project",required=True)
@@ -68,6 +69,9 @@ def main(argv=None):
             elif command == "workbench-verify":
                 from .workbench_catalog import verify_project
                 result=verify_project(lib,args.project)
+            elif command == "workbench-intake":
+                from .workbench_intake import run
+                result=run(lib,args.request,args.evidence,args.blender)
             elif command == "workbench-catalog":
                 from .workbench_catalog import catalog
                 from .catalog_labels import read as read_labels

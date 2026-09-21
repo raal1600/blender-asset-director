@@ -68,7 +68,9 @@ def review_scene(s):
         click('[data-action="browser-tab"][data-tab="sources"]')
         expect(page.locator('.browser-asset')).to_have_count(1)
         if not page.locator('.browser-asset').evaluate("e=>e.classList.contains('selected')"):
-            click('.browser-asset [data-action="source"]')
+            click('.browser-asset [data-action="source-detail"]')
+            click('#dialog details > summary')
+            click('#dialog [data-action="source"]')
         click('[data-action="browser-close"]')
         state = s.api('workbench/state?projectId=' + s.project['id'])
         scene = state['project']['workbench']['scenes'][0]
@@ -140,11 +142,15 @@ def catalog_and_film(s, click, idle, check):
     click('.projectbar [data-action="refresh"]')
     click('[data-action="browse-assets"]:visible >> nth=0')
     click('[data-action="browser-tab"][data-tab="catalog"]')
-    click('[data-action="catalog-select"][data-id="' + aid + '"]')
+    click('[data-action="catalog-detail"][data-id="' + aid + '"]')
+    click('#dialog .asset-more > summary')
+    click('[data-action="catalog-detail-select"]')
+    page.keyboard.press('Escape')
+    idle()
     click('[data-action="browser-close"]')
     use = s.api('workbench/state?projectId=' + s.project['id'])['sourceUse']
     assert not use['ready'] and any(a['sourceId'] == aid for a in use['scope']['sources'])
-    click('[data-action="source-review"]')
+    click('[data-action="source-review"]:visible')
     click('[data-action="source-confirm"]')
 
     def state():

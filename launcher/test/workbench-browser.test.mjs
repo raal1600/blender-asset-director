@@ -78,6 +78,10 @@ test('paged source HTTP is authenticated, read-only, compact opt-in and compatib
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'ad-library-browser-'));
   const runtime={health:null,harness:async()=>({schema:1,catalog:true,task_workspace:true})};
   const app=await createApp({root,config:{},port:0,runtime});
+  for(const module of ['library-usage.mjs','library-preparation.mjs']) {
+    const response=await fetch(app.origin+'/'+module);assert.equal(response.status,200);
+    assert.match(response.headers.get('content-type'),/javascript/);
+  }
   t.after(async()=>{await new Promise(r=>app.server.close(r));await fs.rm(root,{recursive:true,force:true});});
   const p=await app.store.create('Synthetic browser production'),created=await app.workbench.create(p.id,p.revision,'Synthetic scene');
   const registry=path.join(root,'Database/Registry/sources.json');

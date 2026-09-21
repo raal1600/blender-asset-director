@@ -9,7 +9,7 @@ const labels=Object.freeze({
   'reverify-sources':'Rechecking source integrity',
   'save-checkpoint':'Saving and verifying the new checkpoint'
 });
-export const progressLabel=run=>labels[run?.phase]||'Working from the frozen checkpoint';
+export const progressLabel=run=>labels[run?.phase]||(run?.action==='source-prepare'?'Checking source files, dependencies and the shared catalog copy':'Working from the frozen checkpoint');
 export const progressKey=runs=>JSON.stringify((runs||[]).map(r=>[r.id,r.state,r.phase]));
 export function statusPoller(){
   let inFlight=false,last=-Infinity;

@@ -40,6 +40,17 @@
 .world-next h2{font-size:20px;margin-bottom:5px}.world-next p{max-width:620px}
 .world-next-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .world-next-actions .primary{white-space:nowrap}.world-inspection{margin-top:18px}.world-inspection>summary{font-size:14px;cursor:pointer;padding:6px 0}
+.browser-locations{display:flex;gap:8px;margin:0 0 10px}.browser-locations button{flex:1;border-color:var(--line)}
+.browser-locations button.active{background:#264960;border-color:#78b2d8;color:#fff}
+.browser-asset .asset-availability{color:#b6c9d9}.browser-asset .asset-actions{flex-wrap:wrap}
+.browser-asset .asset-actions .primary{color:#142038}
+.browser-results:not(.list) .asset-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.browser-results:not(.list) .asset-actions .primary{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}
+.preparation-steps{line-height:1.7;padding-left:24px}.preparation-fields{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.preparation-fields input,.preparation-fields select{width:100%}.preparation-confirm{display:flex;gap:10px;align-items:flex-start;line-height:1.5}
+.preparation-confirm input{width:18px;flex:0 0 18px;margin-top:3px}
+.preparation-dialog .primary:hover,.preparation-dialog .primary:focus-visible,.browser-asset .primary:hover{background:#c5d4ff;color:#162137}
+@media(max-width:640px){.preparation-fields{grid-template-columns:1fr}.browser-locations{margin-bottom:6px}.browser-locations button{padding:8px}}
 .world-inspection .row{margin:16px 0}.world-inspection .rendered-evidence img{max-width:100%;max-height:500px}
 .world-failure{margin-bottom:18px}.world-workspace .note button{margin-top:8px}
 dialog.world-asset-dialog{width:min(1050px,calc(100vw - 36px));max-width:1050px;padding:24px;max-height:94vh}

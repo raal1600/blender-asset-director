@@ -39,6 +39,18 @@ def main():
             panel=page.locator('.browser-filters')
             if panel.count() and panel.get_attribute('open') is None:click('.browser-filters > summary')
         def capture(name):
+            # DOM visibility alone does not prove a label can be read. Primary
+            # card actions must contrast in both default and hovered states.
+            issues=page.locator('.browser-asset .asset-actions button').evaluate_all("""buttons=>{
+                const luminance=color=>{const values=color.match(/[0-9.]+/g).slice(0,3).map(n=>{const v=Number(n)/255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return values[0]*.2126+values[1]*.7152+values[2]*.0722};
+                return buttons.flatMap(button=>{
+                    const r=button.getBoundingClientRect(),card=button.closest('.browser-asset').getBoundingClientRect(),style=getComputedStyle(button),errors=[];
+                    if(r.left<card.left-1||r.right>card.right+1||r.top<card.top-1||r.bottom>card.bottom+1)errors.push('clipped action: '+button.textContent);
+                    if(button.classList.contains('primary')&&!button.disabled){const a=luminance(style.color),b=luminance(style.backgroundColor),contrast=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);if(contrast<4.5)errors.push('low contrast '+contrast.toFixed(2)+': '+button.textContent);}
+                    return errors;
+                });
+            }""")
+            assert not issues,issues
             page.screenshot(path=str(output/(name+'.png')))
             metrics=page.evaluate('''() => ({width:innerWidth,height:innerHeight,pageWidth:document.documentElement.scrollWidth,pageHeight:document.documentElement.scrollHeight,
                 cards:document.querySelectorAll('.browser-asset').length,dialog:(()=>{const r=document.querySelector('#library-dialog').getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})()})''')
@@ -62,6 +74,11 @@ def main():
                 assert set(page.locator('.browser-asset').evaluate_all('(rows)=>rows.map(r=>r.dataset.kind)'))<=kinds
                 assert 'of '+str(catalog_count)+' assets' in page.locator('.browser-footer [role="status"]').inner_text()
                 capture('workflow-'+activity+'-catalog')
+                primary=page.locator('.browser-asset .primary:enabled').first
+                if primary.count():
+                    primary.hover()
+                    capture('workflow-'+activity+'-primary-hover')
+                    page.locator('#library-title').hover()
                 click('[data-action="browser-tab"][data-tab="sources"]')
                 expect(page.locator('.browser-asset')).to_have_count(min(source_count,24))
                 assert 'of '+str(source_count)+' packages' in page.locator('.browser-footer [role="status"]').inner_text()
@@ -130,11 +147,14 @@ def main():
             page.keyboard.press('Escape');expect(page.locator('#dialog')).not_to_be_visible()
             expect(page.locator('#library-dialog')).to_be_visible()
             if not page.locator('.browser-asset').evaluate("(e)=>e.classList.contains('selected')"):
-                click('[data-action="catalog-select"]')
+                click('#library-dialog [data-action="catalog-detail"]')
+                click('#dialog .asset-more > summary')
+                click('[data-action="catalog-detail-select"]')
+                page.keyboard.press('Escape');idle()
             expect(page.locator('.browser-asset')).to_have_class(__import__('re').compile(r'\bselected\b'))
             filters();page.locator('#browser-scope').select_option('selected');idle()
             expect(page.locator('.browser-asset')).to_have_count(1)
-            assert 'Selected · not imported' in page.locator('.browser-asset').inner_text()
+            assert 'Chosen · not imported' in page.locator('.browser-asset').inner_text()
             page.locator('#browser-query').fill('missing');page.locator('#browser-query').press('Enter');idle()
             expect(page.get_by_text('No matching assets',exact=True)).to_be_visible()
             page.locator('#browser-query').fill('');page.locator('#browser-query').press('Enter');idle()
@@ -158,6 +178,7 @@ def main():
             assert not report['errors'],report['errors']
             report['checks']=['World: models/packs only','Action: movement only','Light: materials/HDRIs only','workflow filter before pagination','source packages filtered by activity','activity-specific browser state','legacy entry removed','explicit entire-library escape','lazy catalog/package requests','24-card bound with 10000 entries','next page','reopen restores page/scroll','search across full library','search retained across sources','source inspector','motion rows without atlas requests','native inspector refuses import','selection survives refresh without import','selected filter','empty search','modal keyboard containment','nested Escape and focus return','1024 and 390 responsive layouts','registry preserved']
             report['checks'].append('queued close cannot clear a reopened catalog')
+            report['checks'].append('card actions contained; enabled primary labels meet 4.5:1 default and hover contrast')
             report['status']='PASS'
         except Exception as e:
             report['status']='FAIL';report['failure']=str(e).replace(session['token'],'[REDACTED]')

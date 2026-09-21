@@ -39,7 +39,8 @@ export function worldCatalogDialog({asset,scene,locked,sourceReady,fileChoice,es
   const blocked=locked||!!scene.candidate||!!scene.task||!!scene.run;
   const status=ingredientStatus(scene,asset.id),present=['In checkpoint','In candidate'].includes(status);
   let main;
-  if(!asset.policy?.eligible)main=b('Source policy blocks import','catalog-import',{id:asset.id},'primary',true);
+  if(!models.includes(file))main=b('Preview only · import preparation required','catalog-import',{id:asset.id},'primary',true);
+  else if(!asset.policy?.eligible)main=b('Source policy blocks import','catalog-import',{id:asset.id},'primary',true);
   else if(selected&&!sourceReady)main=b('Review source use','source-review',{},'primary',blocked);
   else if(blend&&!contents)main=b('Inspect collections','catalog-inspect',{id:asset.id},'primary',blocked);
   else main=b(present?'Add another copy':'Add to world','catalog-import',{id:asset.id},'primary',blocked||!models.includes(file)||(blend&&!contents?.collections?.length));
