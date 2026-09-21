@@ -8,14 +8,24 @@ download is added by this change. Existing reviewed provider acquisition remains
 separate; no credentials, dependency installations or global paths change.
 
 The two scope buttons show matching counts for the current catalog/package tab,
-workflow, search and category, plus **Production references** versus **All shared
-assets/packages** subtitles. They are overlapping filters of shared files, not
-separate folders or per-production downloads. Selected-only remains a scene filter;
-the scope counts still describe all matches. A matching-view explanation is shown
-only when both complete bounded result sets have the same exact asset IDs and
-versions. Equal counts, matching names or one equal page of a larger result do not
-prove identical membership. A failed comparison shows an unknown count, never a
-false zero, and does not hide readable retained production references.
+workflow, search and category, plus **Added to production** versus **Available to
+add** subtitles. They are distinct lists: This production contains retained
+references; My library excludes those references before counting and paging.
+Adding an asset removes it from My library for this production and makes it
+available under This production, including for reuse in another scene. The
+underlying shared files remain in the library and are still available to other
+productions. No folder move, deletion or per-production download occurs.
+
+Catalog exclusion uses stable asset IDs, including when a production retains an
+older pinned version; listing never replaces that version. Source package
+exclusion includes retained/selected original references and exact-version
+preparation links to catalog pins, never matching names. Selected-only switches
+to This production and narrows to the current scene without redefining membership.
+Removing a scene selection does not remove historical production references.
+An exhausted library offers View This production, and an empty production offers
+Browse My library. A failed query shows an unknown count, never a false zero, and
+does not hide readable retained production references. The unscoped read-only API
+retains its full-library behavior; browser requests explicitly exclude production.
 
 Each row separates local availability/preparation from production usage. Current
 or candidate presence requires that exact checkpoint's object audit. Selection,

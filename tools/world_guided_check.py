@@ -103,11 +103,15 @@ def main():
             first_cp=cp;first_meshes=models[-1]
             jobs_before=len(state()['project']['jobs'])
             click('.world-canvas-actions [data-action="browse-assets"]')
-            click('[data-action="browser-location"][data-location="production"]')
+            click('.browser-locations [data-action="browser-location"][data-location="production"]')
             expect(page.locator('.browser-asset')).to_have_count(1)
             expect(page.locator('.browser-results')).to_contain_text('In this scene')
             capture('06a-production-library')
-            click('[data-action="browser-location"][data-location="library"]')
+            click('.browser-locations [data-action="browser-location"][data-location="library"]')
+            expect(page.locator('.browser-asset')).to_have_count(0)
+            expect(page.get_by_text('Already in this production',exact=True)).to_be_visible()
+            expect(page.locator('[data-location="production"] .location-count')).to_have_text('(1)')
+            expect(page.locator('[data-location="library"] .location-count')).to_have_text('(0)')
             click('[data-action="browser-tab"][data-tab="sources"]')
             expect(page.locator('.browser-results')).to_contain_text('Local · needs preparation')
             row=page.locator('[data-item-id="'+session['secondSourceId']+'"]')
@@ -136,6 +140,9 @@ def main():
             assert len(api('workbench/catalog?projectId='+session['projectId'])['items'])==2
             source=api('workbench/source-detail?projectId='+session['projectId']+'&sourceId='+session['secondSourceId'])
             assert source['prepared']['assetId']==session['secondAssetId']
+            available=api('workbench/sources?projectId='+session['projectId']+'&activity=world&excludeProduction=true')
+            assert session['secondSourceId'] not in {s['id'] for s in available['items']}
+            assert api('workbench/catalog?projectId='+session['projectId']+'&activity=world&excludeProduction=true')['total']==0
             report['checks'].append('Production/library states; cancelled rights form writes nothing; real package inspection and intake create a reusable catalog version without importing or approving')
             assert len(scene()['catalog'])==2 and scene()['current']==cp['id'] and not scene()['candidate']
             assert len(state()['project']['jobs'])==jobs_before,'Selection must not run an import'
@@ -183,7 +190,11 @@ def main():
             primary=page.locator('.world-next .primary');primary.hover()
             assert primary.evaluate("e=>getComputedStyle(e).backgroundColor")=='rgb(197, 212, 255)','Primary hover must retain light background and readable contrast'
             page.set_viewport_size({'width':1440,'height':960})
-            click('.world-canvas-actions [data-action="browse-assets"]');click('[data-action="browser-tab"][data-tab="catalog"]');click('[data-action="catalog-preview-detail"][data-id="'+session['assetId']+'"]');ready('#dialog [data-viewer-host]')
+            click('.world-canvas-actions [data-action="browse-assets"]');click('[data-action="browser-tab"][data-tab="catalog"]')
+            expect(page.locator('.browser-asset')).to_have_count(0)
+            click('.browser-locations [data-action="browser-location"][data-location="production"]')
+            expect(page.locator('.browser-asset')).to_have_count(2)
+            click('[data-action="catalog-preview-detail"][data-id="'+session['assetId']+'"]');ready('#dialog [data-viewer-host]')
             expect(page.get_by_role('button',name='Add another copy',exact=True)).to_be_visible()
             click('[data-action="catalog-import"]');second=finish_job();second_cp=next(c for c in second['checkpoints'] if c['id']==second['candidate'])
             assert second_cp['id']!=cp['id'];click('[data-action="discard"]')

@@ -33,13 +33,15 @@ export class Workbench {
     catch(e) {return {schema:1,available:false,message:'This workbench needs the matching development harness. The installed runtime was not changed.',detail:e.message};}
   }
   async prepareSource(...args){return prepareSource(this,...args);}
-  async sourcePage(id,{sceneId,selected=false,production=false,...options}={}) {
+  async sourcePage(id,{sceneId,selected=false,production=false,excludeProduction=false,...options}={}) {
     const p=await this.project(id);
     assert(typeof selected==='boolean','Invalid source scope.');
     assert(typeof production==='boolean','Invalid production scope.');
+    assert(typeof excludeProduction==='boolean'&&!(excludeProduction&&(production||selected)),'Invalid library scope.');
     const inventory=await this.store.inventory();
-    const selectedIds=selected?this.scene(p,sceneId).sources:production?[...p.assets.map(a=>a.sourceId),...await preparedProductionSources(this,p,inventory)]:null;
-    const page=sourcePage(inventory,{...options,selectedIds});
+    const productionIds=production||excludeProduction?[...p.assets.map(a=>a.sourceId),...p.workbench.scenes.flatMap(s=>s.sources),...await preparedProductionSources(this,p,inventory)]:null;
+    const selectedIds=selected?this.scene(p,sceneId).sources:production?productionIds:null;
+    const page=sourcePage(inventory,{...options,selectedIds,excludedIds:excludeProduction?productionIds:null});
     page.items=await Promise.all(page.items.map(async source=>({...source,prepared:await preparedSource(this,source)})));
     return page;
   }

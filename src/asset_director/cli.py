@@ -30,6 +30,7 @@ def parser():
     q=s.add_parser("workbench-intake"); q.add_argument("--request",required=True); q.add_argument("--evidence",required=True); q.add_argument("--blender",required=True)
     s.add_parser("workbench-capabilities")
     q=s.add_parser("workbench-catalog"); q.add_argument("--query",default=""); q.add_argument("--offset",type=int,default=0); q.add_argument("--limit",type=int,default=24); q.add_argument("--asset"); q.add_argument("--verify",action="store_true"); q.add_argument("--kind",choices=["model","pack","animation","material","hdri"]); q.add_argument("--kinds",nargs="+",choices=["model","pack","animation","material","hdri"]); q.add_argument("--subcategory"); q.add_argument("--labels")
+    q.add_argument("--exclude-project", help="Exclude retained catalog identities in this launcher project")
     q=s.add_parser("workbench-verify"); q.add_argument("--project",required=True)
     s.add_parser("doctor"); s.add_parser("providers"); s.add_parser("report"); s.add_parser("rebuild-catalog")
     q=s.add_parser("plan"); q.add_argument("brief")
@@ -73,9 +74,10 @@ def main(argv=None):
                 from .workbench_intake import run
                 result=run(lib,args.request,args.evidence,args.blender)
             elif command == "workbench-catalog":
-                from .workbench_catalog import catalog
+                from .workbench_catalog import catalog, production_catalog_ids
                 from .catalog_labels import read as read_labels
-                result=catalog(lib,args.query,args.offset,args.limit,args.asset,args.verify,args.kind,args.kinds,args.subcategory,read_labels(args.labels))
+                result=catalog(lib,args.query,args.offset,args.limit,args.asset,args.verify,args.kind,args.kinds,args.subcategory,read_labels(args.labels),
+                               exclude_ids=production_catalog_ids(args.exclude_project) if args.exclude_project else None)
             elif command == "film-assemble":
                 from .film import assemble
                 result=assemble(lib,load_json(Path(args.plan)),args.project,args.ffmpeg,args.ffprobe)

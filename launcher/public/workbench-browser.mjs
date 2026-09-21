@@ -4,19 +4,15 @@ import {catalogKinds,sourceKinds,workflowScopes,scopeKinds,inScope} from './work
 import {libraryUsage,libraryAvailability} from './library-usage.mjs';
 export const PAGE_SIZE=24;
 /** Counts describe the active type/search, never file downloads or scene presence. */
-export function compareLibraryViews(production,library) {
+export function libraryViewCounts(production,library) {
   const known=p=>p&&!p.error&&Number.isSafeInteger(p.total)&&p.total>=0;
-  const complete=p=>known(p)&&p.offset===0&&p.items.length===p.total&&p.total<=PAGE_SIZE;
-  const exact=p=>p.items.every(a=>typeof a.id==='string'&&typeof a.version==='string');
-  const identities=p=>p.items.map(a=>a.id+':'+a.version).sort();
-  return {production:known(production)?production.total:null,library:known(library)?library.total:null,
-    same:!!(complete(production)&&complete(library)&&production.total>0&&exact(production)&&exact(library)&&JSON.stringify(identities(production))===JSON.stringify(identities(library)))};
+  return {production:known(production)?production.total:null,library:known(library)?library.total:null};
 }
 export async function browserPage({project,scene,ui,api}) {
   const params={projectId:project.id,activity:ui.activity,query:ui.query,offset:ui.offset[ui.tab],kind:ui.kind[ui.tab],...(ui.subcategory?{subcategory:ui.subcategory}:{})};
   const catalog=ui.tab==='catalog';
-  const load=async production=>catalog?production?pinnedPage(project,scene,{...params,production:true}):api('workbench/catalog?'+new URLSearchParams(params)):
-    api('workbench/sources?'+new URLSearchParams({...params,sceneId:scene.id,selected:false,production}));
+  const load=async production=>catalog?production?pinnedPage(project,scene,{...params,production:true}):api('workbench/catalog?'+new URLSearchParams({...params,excludeProduction:true})):
+    api('workbench/sources?'+new URLSearchParams({...params,sceneId:scene.id,selected:false,production,excludeProduction:!production}));
   const results=await Promise.allSettled([load(true),load(false)]);
   const pages=results.map(r=>r.status==='fulfilled'?r.value:null),active=ui.production?0:1;
   let result;
@@ -25,7 +21,7 @@ export async function browserPage({project,scene,ui,api}) {
     if(results[active].status==='rejected')throw results[active].reason;
     result=pages[active];
   }
-  return {...result,locations:compareLibraryViews(...pages)};
+  return {...result,locations:libraryViewCounts(...pages)};
 }
 export function pinnedPage(project,scene,{query='',kind='',offset=0,activity='all',subcategory=null,production=false}={}) {
   const ids=new Set(production?(project.workbench.catalogPins||[]).map(a=>a.id):scene.catalog||[]),words=query.toLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -78,17 +74,21 @@ export function browserView({ui,page,project,scene,locked,esc,b}) {
     .replace('<button','<button aria-pressed="'+(!!ui.production===(location==='production'))+'" aria-describedby="browser-'+location+'-hint"')
     .replace('</button>',' <span class="location-count">('+esc(locations?.[location]??'—')+')</span><small id="browser-'+location+'-hint">'+esc(subtitle)+'</small></button>');
   const explanation=ui.selected?'Selected references for this scene. Tab counts include unselected matches. Selection is not import.':ui.production?
-    'References chosen for this production, including earlier use. Not necessarily imported into this scene.':
-    'All matching shared '+noun+', including those referenced by this production.';
+    'Added to this production, including earlier use and other scenes. Not necessarily imported into this scene.':
+    'Available to add. '+(source?'Packages':'Assets')+' already added to this production are hidden here.';
+  const empty=filtered?`<h3>No matching assets</h3><p>Nothing matches these filters in ${ui.production?'this production':'the assets available to add'}. No sources were removed.</p>${b('Clear filters','browser-reset')}`:
+    ui.production?`<h3>No ${noun} added yet</h3><p>Choose from My library to add references to this production.</p>${b('Browse My library','browser-location',{location:'library'},'primary')}`:
+    locations?.production>0?`<h3>Already in this production</h3><p>All ${noun} for this activity have been added. Find them in This production to use them in another scene.</p>${b('View This production','browser-location',{location:'production'},'primary')}`:
+    `<h3>No ${noun} to add</h3><p>No library ${noun} match this activity yet. Your shared files have not been moved or removed.</p>`;
   const category=`<label><span>Category</span><select id="browser-subcategory"${pending}><option value="">All categories</option>${categories.map(([v,label])=>`<option value="${v}" ${ui.subcategory===v?'selected':''}>${label}</option>`).join('')}</select></label>`;
   const advanced=`<label><span>Workflow scope</span><select id="browser-activity"${pending}><option value="${esc(scene.stage||'world')}" ${activity!=='all'?'selected':''}>${esc(scope.label)}</option><option value="all" ${activity==='all'?'selected':''}>Entire library</option></select></label><label><span>Asset type</span><select id="browser-kind"${pending}><option value="">All relevant types</option>${kinds.map(([v,label])=>`<option value="${v}" ${ui.kind[ui.tab]===v?'selected':''}>${label}</option>`).join('')}</select></label><label><span>Selection</span><select id="browser-scope"${pending}><option value="all">All items</option><option value="selected" ${ui.selected?'selected':''}>Selected only</option></select></label><div class="view-switch" aria-label="Result layout"><button type="button"${pending} data-action="browser-layout" data-layout="grid" aria-pressed="${ui.layout==='grid'}">Grid</button><button type="button"${pending} data-action="browser-layout" data-layout="list" aria-pressed="${ui.layout==='list'}">List</button></div>`;
   return `<header class="browser-heading"><div><div class="eyebrow">Ingredients for ${esc(scene.name)}</div><h2 id="library-title">${activity==='all'?'Entire library':esc(scope.label)}</h2></div>${b('Done','browser-close',{},'ghost')}</header>
-    <nav class="browser-locations" aria-label="Filter shared library">${locationButton('This production','production','Production references')}${locationButton('My library','library','All shared '+noun)}</nav>
+    <nav class="browser-locations" aria-label="Asset location">${locationButton('This production','production','Added to production')}${locationButton('My library','library','Available to add')}</nav>
     <nav class="browser-tabs" aria-label="Library source">${b('Catalog assets','browser-tab',{tab:'catalog'},!source?'active':'').replace('<button','<button aria-pressed="'+!source+'"')}${b('Source packages','browser-tab',{tab:'sources'},source?'active':'').replace('<button','<button aria-pressed="'+source+'"')}<span class="grow"></span><small>${count} selected · not necessarily imported</small></nav>
     <form id="browser-search" class="browser-toolbar"><label class="browser-query"><span>Search ${source?'packages':'assets'}</span><input id="browser-query"${pending} maxlength="2000" placeholder="Name or recorded tag…" value="${esc(ui.query)}"></label><button type="submit"${pending}>Search</button>
     ${category}${scene.stage==='world'?`<details class="browser-filters" ${ui.filtersOpen?'open':''}><summary>Filters & view${ui.kind[ui.tab]||ui.selected||activity==='all'?' · active':''}</summary><div class="browser-filter-fields">${advanced}</div></details>`:advanced}</form>
-    <div class="browser-description"><p>${esc(explanation)} <span class="muted">Shared files—not separate folders or per-production downloads.</span></p>${locations?.same&&!ui.selected?'<p class="browser-same" role="status"><strong>Same '+noun+' in both views.</strong> Every matching library item is already referenced by this production.</p>':''}${filtered?b('Clear filters','browser-reset',{},'ghost small'):''}</div><p id="browser-notice" class="note warn" role="alert" hidden></p>
-    <div class="browser-results ${ui.layout==='list'?'list':''}" tabindex="0" aria-label="Asset results" aria-busy="${!page}">${!page?'<p class="empty" role="status">Loading assets…</p>':page.error?`<div class="empty"><p class="warn">${esc(page.error)}</p>${b('Retry','browser-retry')}</div>`:page.items.map(a=>itemView(a,{source,project,scene,locked,esc,b})).join('')||`<div class="empty"><h3>No matching assets</h3><p>Nothing matches these filters. No sources were removed.</p>${b('Clear filters','browser-reset')}</div>`}</div>
+    <div class="browser-description"><p>${esc(explanation)} <span class="muted">Shared files stay in the library; adding creates a production reference.</span></p>${filtered?b('Clear filters','browser-reset',{},'ghost small'):''}</div><p id="browser-notice" class="note warn" role="alert" hidden></p>
+    <div class="browser-results ${ui.layout==='list'?'list':''}" tabindex="0" aria-label="Asset results" aria-busy="${!page}">${!page?'<p class="empty" role="status">Loading assets…</p>':page.error?`<div class="empty"><p class="warn">${esc(page.error)}</p>${b('Retry','browser-retry')}</div>`:page.items.map(a=>itemView(a,{source,project,scene,locked,esc,b})).join('')||`<div class="empty">${empty}</div>`}</div>
     <footer class="browser-footer"><div><span role="status">${page?.error?'Library unavailable':page?`${page.total? page.offset+1:0}–${Math.min((page.offset||0)+page.items.length,page.total)} of ${page.total} ${source?'packages':'assets'}`:'Loading library'}</span><small>Reference images are not live 3D previews. Preview copies never approve source use.</small></div><div class="row">${source?b('Refresh library','scan',{},'ghost small',locked):''}${b('Previous','browser-page',{offset:Math.max(0,(page?.offset||0)-PAGE_SIZE)},'small',!page||!!page.error||!page.offset)}${b('Next','browser-page',{offset:page?.next_offset},'small',!page||!!page.error||page.next_offset===null)}</div></footer>`;
 }
 export function sourceDialog({source,scene,locked,esc,b}) {
@@ -175,7 +175,7 @@ export function assetBrowser({dialog,context,api,esc,b,loadImages,releaseImages=
       else if(action==='browser-subcategory'){ui.subcategory=data.value||null;await refresh({reset:true,focus:'#browser-subcategory'});}
       else if(action==='browser-reset'){ui.query='';ui.kind={catalog:'',sources:''};ui.subcategory=null;ui.selected=false;await refresh({reset:true,focus:'#browser-query'});}
       else if(action==='browser-kind'){ui.subcategory=null;ui.kind[ui.tab]=data.value;await refresh({reset:true,focus:'#browser-kind'});}
-      else if(action==='browser-scope'){ui.selected=data.value==='selected';await refresh({reset:true,focus:'#browser-scope'});}
+      else if(action==='browser-scope'){ui.selected=data.value==='selected';if(ui.selected)ui.production=true;await refresh({reset:true,focus:'#browser-scope'});}
       else if(action==='browser-retry')await refresh();
       else onError('Unknown library action.');
       return true;

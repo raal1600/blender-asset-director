@@ -17,8 +17,10 @@ export async function fixture(root,count=10000) {
     if(args.includes('--asset')){const a=assets.find(a=>a.id===get('--asset'));if(!a)throw Error('Unknown synthetic asset');return a;}
     const query=get('--query','').toLowerCase(),kind=get('--kind',null),offset=Number(get('--offset',0));
     const group=args.includes('--kinds')?args.slice(args.indexOf('--kinds')+1):null;
-    const matched=assets.filter(a=>(!kind||a.kind===kind)&&(!group||group.includes(a.kind))&&a.title.toLowerCase().includes(query));
-    return {schema:1,items:matched.slice(offset,offset+24),offset,total:matched.length,next_offset:offset+24<matched.length?offset+24:null};
+    const excluded=args.includes('--exclude-project')?new Set(JSON.parse(await fs.readFile(get('--exclude-project'),'utf8')).workbench.catalogPins?.map(a=>a.id)||[]):new Set();
+    const matched=assets.filter(a=>!excluded.has(a.id)&&(!kind||a.kind===kind)&&(!group||group.includes(a.kind))&&a.title.toLowerCase().includes(query));
+    const start=args.includes('--exclude-project')?(matched.length?Math.min(offset,Math.floor((matched.length-1)/24)*24):0):offset;
+    return {schema:1,items:matched.slice(start,start+24),offset:start,total:matched.length,next_offset:start+24<matched.length?start+24:null};
   }};
   const app=await createApp({root,config:{},runtime,port:0});
   const project=await app.store.create('Synthetic large library','Disposable UI regression only; no Blender or human approval.');

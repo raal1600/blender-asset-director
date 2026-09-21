@@ -45,8 +45,6 @@
 .browser-locations button{min-width:0;text-align:left;padding:10px 14px;font-weight:600}
 .browser-locations button small{display:block;margin-top:3px;color:#bac9d8;font-size:12px;font-weight:400}
 .browser-locations .location-count{font-variant-numeric:tabular-nums}
-.browser-description .browser-same{padding:7px 10px;background:#203b4d;border-left:3px solid #78b2d8;color:#dfebf4;border-radius:3px}
-@media(max-width:640px){.browser-description:has(.browser-same){flex-wrap:wrap}.browser-description .browser-same{flex-basis:100%;order:3}}
 .browser-asset .asset-availability{color:#b6c9d9}.browser-asset .asset-actions{flex-wrap:wrap}
 .browser-asset .asset-actions .primary{color:#142038}
 .browser-results:not(.list) .asset-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}

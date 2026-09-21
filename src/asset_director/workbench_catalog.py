@@ -41,10 +41,35 @@ def describe(lib, asset, *, verify=False, labels=None):
     }
 
 
-def catalog(lib, query='', offset=0, limit=24, asset_id=None, verify=False, kind=None, kinds=None, subcategory=None, labels=None):
+def production_catalog_ids(project_file):
+    """Read retained membership, without verifying or replacing pinned versions."""
+    from .core import load_json
+    project = load_json(Path(project_file))
+    require(isinstance(project, dict) and project.get('owner') == 'asset-director-launcher',
+            'PROJECT_REQUIRED', 'Use a launcher project')
+    workbench = project.get('workbench', {})
+    require(isinstance(workbench, dict), 'PROJECT_REQUIRED', 'Invalid launcher workbench')
+    refs = workbench.get('catalogPins', [])
+    require(isinstance(refs, list) and len(refs) <= 2000, 'RESOURCE_LIMIT', 'Too many catalog pins')
+    ids = []
+    for ref in refs:
+        require(isinstance(ref, dict) and isinstance(ref.get('id'), str) and
+                re.fullmatch(r'a_[a-f0-9]{24}', ref['id']) and ref['id'] not in ids and
+                isinstance(ref.get('version'), str) and re.fullmatch(r'[a-f0-9]{64}', ref['version']),
+                'INVALID_PIN', 'Invalid or duplicate catalog pin')
+        ids.append(ref['id'])
+    return ids
+
+
+def catalog(lib, query='', offset=0, limit=24, asset_id=None, verify=False, kind=None, kinds=None, subcategory=None, labels=None, exclude_ids=None):
     require(isinstance(query, str) and len(query) <= 2000, 'INVALID_QUERY', 'Search is limited to 2000 characters')
     require(type(offset) is int and offset >= 0 and type(limit) is int and 1 <= limit <= 50,
             'RESOURCE_LIMIT', 'Use a nonnegative offset and 1..50 records per page')
+    require(exclude_ids is None or isinstance(exclude_ids, list) and len(exclude_ids) <= 2000 and
+            all(isinstance(a, str) and re.fullmatch(r'a_[a-f0-9]{24}', a) for a in exclude_ids) and
+            len(set(exclude_ids)) == len(exclude_ids), 'INVALID_QUERY', 'Invalid excluded catalog identities')
+    require(exclude_ids is None or asset_id is None, 'INVALID_QUERY', 'Exclusion is a list filter only')
+    excluded = set(exclude_ids or [])
     if asset_id is not None:
         require(isinstance(asset_id, str) and re.fullmatch(r'a_[a-f0-9]{24}', asset_id), 'INVALID_ASSET', 'Invalid catalog identity')
         return describe(lib, lib.get(asset_id), verify=verify,labels=labels)
@@ -56,10 +81,14 @@ def catalog(lib, query='', offset=0, limit=24, asset_id=None, verify=False, kind
     search = tokens(query)
     require(subcategory is None or isinstance(subcategory, str) and subcategory in SUBCATEGORIES,
             'INVALID_QUERY', 'Invalid subcategory')
-    matched = [asset for asset in lib.all() if asset.local_files and (kind is None or asset.kind == kind) and (kinds is None or asset.kind in kinds) and
+    matched = [asset for asset in lib.all() if asset.id not in excluded and asset.local_files and (kind is None or asset.kind == kind) and (kinds is None or asset.kind in kinds) and
                (subcategory is None or describe(lib,asset,labels=labels)['subcategory']['id'] == subcategory) and
                (not search or search <= tokens(asset.title + ' ' + ' '.join(asset.tags)))]
     matched.sort(key=lambda asset:(asset.title.casefold(),asset.id))
+    # Adding the final item on a page can shrink the available-to-add list.
+    # Keep the unscoped CLI's existing offset contract unchanged.
+    if exclude_ids is not None:
+        offset = min(offset, ((len(matched)-1)//limit)*limit) if matched else 0
     selected = matched[offset:offset + limit]
     summaries=[]
     for asset in selected:

@@ -87,10 +87,10 @@ def main():
                 assert 'of '+str(source_count)+' packages' in page.locator('.browser-footer [role="status"]').inner_text()
                 expect(page.locator('[data-location="production"] .location-count')).to_have_text('(0)')
                 expect(page.locator('[data-location="library"] .location-count')).to_have_text('('+str(source_count)+')')
-                click('[data-action="browser-location"][data-location="production"]')
+                click('.browser-locations [data-action="browser-location"][data-location="production"]')
                 expect(page.locator('.browser-asset')).to_have_count(0)
-                expect(page.locator('.browser-description')).to_contain_text('References chosen for this production')
-                click('[data-action="browser-location"][data-location="library"]')
+                expect(page.locator('.browser-description')).to_contain_text('Added to this production')
+                click('.browser-locations [data-action="browser-location"][data-location="library"]')
                 expect(page.locator('.browser-asset')).to_have_count(min(source_count,24))
                 capture('workflow-'+activity+'-sources')
                 click('[data-action="browser-close"]')
@@ -161,20 +161,21 @@ def main():
                 click('#dialog .asset-more > summary')
                 click('[data-action="catalog-detail-select"]')
                 page.keyboard.press('Escape');idle()
-            expect(page.locator('.browser-asset')).to_have_class(__import__('re').compile(r'\bselected\b'))
-            # Identical views are explained, but selection still does not import.
+            expect(page.locator('.browser-asset')).to_have_count(0)
+            # Adding moves the reference to production, never duplicates lists or imports.
             for location in ('production','library'):
-                click('[data-action="browser-location"][data-location="'+location+'"]')
+                click('.browser-locations [data-action="browser-location"][data-location="'+location+'"]')
                 expect(page.locator('[data-location="production"] .location-count')).to_have_text('(1)')
-                expect(page.locator('[data-location="library"] .location-count')).to_have_text('(1)')
-                expect(page.locator('.browser-same')).to_contain_text('Same assets in both views.')
-                expect(page.locator('.browser-asset')).to_have_count(1)
-                assert 'Chosen · not imported' in page.locator('.browser-asset').inner_text()
-                capture('matching-views-'+location)
+                expect(page.locator('[data-location="library"] .location-count')).to_have_text('(0)')
+                expect(page.locator('.browser-same')).to_have_count(0)
+                expect(page.locator('.browser-asset')).to_have_count(1 if location=='production' else 0)
+                if location=='production':assert 'Chosen · not imported' in page.locator('.browser-asset').inner_text()
+                else:expect(page.locator('.browser-description')).to_contain_text('already added to this production are hidden here')
+                capture('distinct-views-'+location)
             for width,height in [(1024,768),(390,844)]:
                 page.set_viewport_size({'width':width,'height':height})
-                capture('matching-views-'+str(width))
-                notice=page.locator('.browser-same').bounding_box()
+                capture('distinct-views-'+str(width))
+                notice=page.locator('.browser-description').bounding_box()
                 results=page.locator('.browser-results').bounding_box()
                 assert notice['x']>=0 and notice['x']+notice['width']<=width
                 assert results['height']>=100, 'Scope explanation leaves no usable results area'
@@ -208,7 +209,7 @@ def main():
             report['checks']=['World: models/packs only','Action: movement only','Light: materials/HDRIs only','workflow filter before pagination','source packages filtered by activity','activity-specific browser state','legacy entry removed','explicit entire-library escape','lazy catalog/package requests','24-card bound with 10000 entries','next page','reopen restores page/scroll','search across full library','search retained across sources','source inspector','motion rows without atlas requests','native inspector refuses import','selection survives refresh without import','selected filter','empty search','modal keyboard containment','nested Escape and focus return','1024 and 390 responsive layouts','registry preserved']
             report['checks'].append('queued close cannot clear a reopened catalog')
             report['checks'].append('card actions contained; enabled primary labels meet 4.5:1 default and hover contrast')
-            report['checks'].extend(['matching production/library counts for workflow and search','different scopes retain independent package counts','exact matching views explicitly explained without implying import'])
+            report['checks'].extend(['distinct production/available counts for workflow and search','different scopes retain independent package counts','adding removes the asset from My library and preserves This production without implying import'])
             report['status']='PASS'
         except Exception as e:
             report['status']='FAIL';report['failure']=str(e).replace(session['token'],'[REDACTED]')
