@@ -1,0 +1,31 @@
+name: Maintenance · Branch cleanup dry run
+'on':
+  workflow_dispatch: null
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Read-only, manifest-bound cleanup audit
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: python tools/cleanup_merged_branches.py --target-sha "${{ github.sha }}" --dry-run
+    - name: Retain exact-commit evidence on success or failure
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: branch-cleanup-dry-run-${{ github.sha }}
+        path: cleanup-evidence/
+        if-no-files-found: error
+        overwrite: true
+        retention-days: 14

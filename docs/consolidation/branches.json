@@ -53,7 +53,7 @@
   ],
   "integration_branch": "fix/published-installer-defaults-20260916",
   "required_workflows": [
-    "Asset Director Tests",
+    "00 \u00b7 Harness acceptance",
     "Transition Lab \u00b7 Build and publish",
     "Source package",
     "Published installer defaults"

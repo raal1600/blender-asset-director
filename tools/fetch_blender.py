@@ -9,6 +9,7 @@ import re
 import shutil
 import sys
 import tarfile
+import zipfile
 import urllib.error
 import urllib.request
 
@@ -27,7 +28,9 @@ def main(version, directory):
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise SystemExit("Invalid fixed version")
     suffix = "Blender" + ".".join(version.split(".")[:2]) + "/"
-    filename = f"blender-{version}-linux-x64.tar.xz"
+    windows = sys.platform == 'win32'
+    platform = 'windows-x64' if windows else 'linux-x64'
+    filename = f"blender-{version}-{platform}." + ('zip' if windows else 'tar.xz')
     dest = Path(directory).resolve()
     dest.mkdir(parents=True, exist_ok=True)
     opener = urllib.request.build_opener(SecureRedirect())
@@ -62,10 +65,18 @@ def main(version, directory):
     if actual != expected:
         archive.unlink(missing_ok=True)
         raise SystemExit("Official Blender checksum mismatch")
-    with tarfile.open(archive) as tar:
-        tar.extractall(dest, filter="data")
+    if windows:
+        with zipfile.ZipFile(archive) as zipped:
+            for member in zipped.infolist():
+                target = (dest / member.filename).resolve()
+                if not target.is_relative_to(dest) or '\\' in member.filename or ':' in member.filename:
+                    raise SystemExit('Unsafe Blender archive member')
+            zipped.extractall(dest)
+    else:
+        with tarfile.open(archive) as tar:
+            tar.extractall(dest, filter="data")
     archive.unlink()
-    executable = dest / f"blender-{version}-linux-x64" / "blender"
+    executable = dest / f"blender-{version}-{platform}" / ('blender.exe' if windows else 'blender')
     if not executable.is_file():
         raise SystemExit("Verified archive did not contain the expected executable")
     print(executable)

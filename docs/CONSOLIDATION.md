@@ -1,5 +1,11 @@
 # Current development handoff — September 15, 2026
 
+**September 17 workflow update:** the [CI workflow map](CI_WORKFLOWS.md)
+supersedes the workflow names and job counts below. The aggregate is now
+**00 · Harness acceptance**, with separate real user journeys and explicit
+supporting checks. Historical evidence and private-input/release requirements
+below remain unchanged; this note does not claim a current run passed.
+
 For the final installer-default correction and new live download checks, read
 [the September 16 follow-up](INSTALLER_DEFAULTS.md).
 

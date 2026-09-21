@@ -1,0 +1,30 @@
+name: Checks · Portable contracts and policies
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  portable:
+    name: Contracts · ${{ matrix.os }} · Python ${{ matrix.python }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.11'
+          - os: ubuntu-latest
+            python: '3.13'
+          - os: windows-latest
+            python: '3.11'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Offline contracts, policies and installed-skill round trip
+        run: python tools/run_checks.py --offline
