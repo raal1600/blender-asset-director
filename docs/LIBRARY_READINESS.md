@@ -39,13 +39,17 @@ link, never by a matching asset name.
 
 World offers guided preparation for registered Meshes/Characters packages with an
 explicit blend, glTF, GLB or FBX member. A package is already local; preparation is
-not another download. Other formats, animation indexing, custom rights and look
-assets retain their reviewed specialist workflows.
+not another download. Other formats, animation indexing and look assets retain
+their reviewed specialist workflows.
 
-1. Select the exact source member. Supply the actual creator, HTTPS source/terms
-   references and verified license, and explicitly confirm zero-cost source
-   evidence. No license or attestation is preselected. Unsupported/custom rights
-   fail closed; the form is not a way to assign a more permissive license.
+1. Select the exact source member. The compact popup has one unchecked box:
+   confirm you have the right to use and adapt this asset in your productions and
+   will follow its original terms, including required credits. **Confirm & prepare**
+   stays disabled until checked. There are no source URL, creator or license fields.
+   Cancel, Escape and an unchecked request start no preparation or job.
+   This is the user's declaration for the exact existing local version, not an
+   automatically verified license. No future files, raw redistribution, model
+   training, download or purchase is authorized.
 2. Acquire the existing project writer semaphore and retain a run/authorization
    record. Validate registry version, package containment, at most 4096 files and
    500 MiB. A separate verified inspection copy is checked in real Blender with
@@ -70,6 +74,29 @@ This deliberately separates source evidence, project-use confirmation, technical
 import and creative acceptance. Cancelling the form starts no preparation/job.
 Stale versions, active writers and unresolved candidates refuse preparation.
 
+### Honest local-use confirmation
+
+New local World intake may retain a `local-project-use-v1` declaration bound to
+the original registry ID/version, selected member, confirming production and time.
+The resulting immutable catalog-version metadata binds its exact intake file
+hashes and inspected member. The creator, source page and license remain unrecorded
+(`UNKNOWN` license), never fabricated as Creative Commons. The UI calls this
+**Use confirmed by you**, not verified licensing or commercial clearance. The
+user remains responsible for original terms and required credits.
+
+This explicit local-only path does not make ordinary unknown-license catalog
+records eligible, and cannot replace an existing reviewed or blocked record for
+the same package. Existing evidence wins; changed/malformed confirmations fail
+closed. No provider/acquisition policy or Mixamo grant is replaced. Native jobs
+using a confirmed catalog model freeze its confirmation/catalog identity and
+refuse changed evidence before execution. Catalog pins and job history retain
+the declaration; this is not a new embedded Blender licensing/DRM system.
+
+The previous detailed evidence API remains available for reviewed specialist and
+existing integration callers, with the same validation. The new checkbox route
+accepts no caller-supplied creator/license fields. Production-wide source-use and
+individual import/creative decisions remain separate and are not auto-answered.
+
 ## Persistence, failure and compatibility
 
 No catalog/project schema migration, original-folder move or production rewrite is
@@ -89,8 +116,8 @@ studio or restore obsolete manifests over newer work.
 
 ## Tests and scope
 
-Unit coverage exercises production membership, unavailable/unknown states, empty
-rights forms, stale inputs, refusal, reuse and preserved originals. The existing
+Unit coverage exercises production membership, unavailable/unknown states, the
+single unchecked confirmation, stale inputs, refusal, reuse and preserved originals. The existing
 guided World browser journey now prepares a generated local glTF package, then
 uses the normal reviewed import to combine it with an existing saved world.
 `library_preparation_fixture.py` checks an actual blend package, observed collection

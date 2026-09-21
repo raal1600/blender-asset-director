@@ -215,6 +215,9 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     specification = {"schema_version": SCHEMA, "operation": operation, "inputs": inputs, "asset_id": asset_id,
                      "source_files": source_files, "source_file": asset.metadata.get("file") if asset else None, "options": options, "implementation": implementation_hash(),
                      "license_grants": grant_ids, "license_files": license_files}
+    if asset and asset.metadata.get('local_use_confirmation'):
+        from .local_use import job_binding
+        specification['local_use'] = job_binding(asset)
     jid = "j_" + digest(specification)[:24]
     path = lib.root / "jobs" / jid / "job.json"
     if path.exists():
@@ -240,6 +243,10 @@ def read_job(lib: Library, jid: str) -> tuple[dict, Path]:
         p = Path(f["path"])
         require(p.is_file() and p.stat().st_size == f["size"] and file_hash(p) == f["sha256"], "STALE_INPUT", "Target input changed; prepare a new job")
     for f in job["specification"]["source_files"]: lib.verify_file(f)
+    if 'local_use' in job['specification']:
+        from .local_use import job_binding
+        require(job_binding(lib.get(job['specification']['asset_id'])) == job['specification']['local_use'],
+                'LOCAL_USE_SCOPE_MISMATCH', 'Local source confirmation changed; prepare a new job')
     from . import license_policy as lp
     current = lp.dependencies(lib, job["specification"].get("license_grants", []))
     require(current == job["specification"].get("license_files", []), "LICENSE_EVIDENCE_CHANGED", "Prepared license evidence changed")

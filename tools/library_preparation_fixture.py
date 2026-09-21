@@ -62,6 +62,32 @@ try:
         data=load_json(lib.root/'jobs'/imported['id']/'result.json')['data']
         check(imported['state']=='SUCCEEDED' and {o['name'] for o in data['scene_audit']['objects']} >= {'ExistingSyntheticSubject','SyntheticEnvironmentMesh'},'real bounded collection import preserves existing world')
         check(all(file_hash(source/f['path'])==f['sha256'] for f in source_request['files']) and file_hash(baseline)==baseline_hash,'original package, texture and previous world bytes unchanged')
+        # The compact checkbox declares actual fixture use, not a guessed CC license.
+        declared_attempt,declared_request=request('declared-native-attempt','environment.blend')
+        declared_request['id']='src_'+'d'*36;atomic_json(declared_attempt/'request.json',declared_request)
+        declared_evidence=out/'synthetic-declaration.json'
+        atomic_json(declared_evidence,dict(title='Synthetic declared environment',kind='model',source_url='',
+          license_id='UNKNOWN',license_url='',author='',price=0,attested=True,tags=['environment'],
+          local_confirmation=dict(policy='local-project-use-v1',confirmed=True,source_id=declared_request['id'],
+            source_version=declared_request['version'],member=declared_request['file'],project_id='prj_'+'e'*36,
+            confirmed_at='2026-09-21T12:00:00Z')))
+        with Library(out/'declared-catalog') as declared_lib:
+            declared=run(declared_lib,declared_attempt/'request.json',declared_evidence,bpy.app.binary_path)
+            check(declared['asset']['license_id']=='UNKNOWN' and declared['asset']['author']=='' and
+                  declared['asset']['policy']['basis']=='USER_CONFIRMED_LOCAL_USE','real native preparation retains honest user declaration without invented license')
+            declared_contents=jobs.prepare(declared_lib,'asset-contents',asset_id=declared['asset_id'],options={'file':declared['file']})
+            declared_contents=jobs.run(declared_lib,declared_contents['id'],bpy.app.binary_path,timeout=180)
+            declared_data=load_json(declared_lib.root/'jobs'/declared_contents['id']/'result.json')['data']
+            check('SyntheticEnvironment' in declared_data['collections'],'user-confirmed native package has real observed collections')
+            declared_import=jobs.prepare(declared_lib,'import',asset_id=declared['asset_id'],input_file=str(baseline),
+              options={'file':declared['file'],'selection':['SyntheticEnvironment'],'collection':'Declared environment'})
+            declared_import=jobs.run(declared_lib,declared_import['id'],bpy.app.binary_path,timeout=180)
+            declared_data=load_json(declared_lib.root/'jobs'/declared_import['id']/'result.json')['data']
+            check(declared_import['state']=='SUCCEEDED' and
+                  {o['name'] for o in declared_data['scene_audit']['objects']} >= {'ExistingSyntheticSubject','SyntheticEnvironmentMesh'},
+                  'user-confirmed blend imports its observed collection into a separate preserved-world candidate')
+            report['declared_native']={'asset_id':declared['asset_id'],'asset_version':declared['asset_version'],
+                                      'import_job':declared_import['id'],'confirmation':declared['asset']['metadata']['local_use_confirmation']['id']}
         # This separate source deliberately references a missing texture.
         image.filepath='//missing-texture.png';bpy.ops.wm.save_as_mainfile(filepath=str(source/'broken.blend'))
         bad,_=request('missing-dependency-attempt','broken.blend');count=len(lib.all())

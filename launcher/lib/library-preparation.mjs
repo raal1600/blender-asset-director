@@ -34,13 +34,18 @@ export async function preparedProductionSources(work,project,inventory) {
 }
 
 export async function prepareSource(work,id,sceneId,revision,request) {
-  assert(request&&typeof request==='object'&&Object.keys(request).every(k=>['id','version','file','evidence','confirmed'].includes(k)),'Unknown preparation fields.');
+  assert(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).every(k=>['id','version','file','evidence','confirmed','confirmation'].includes(k)),'Unknown preparation fields.');
   assert(request.confirmed===true,'Preparation requires your explicit rights confirmation.');
-  const e=request.evidence;
+  const local=request.confirmation==='local-project-use-v1';
+  assert(request.confirmation===undefined||local,'Unknown preparation confirmation.');
+  assert(!local||request.evidence===undefined,'A local-use confirmation must not supply invented license fields.');
+  let e=request.evidence;
+  if(!local){
   assert(e&&Object.keys(e).every(k=>['source_url','license_id','license_url','author'].includes(k)),'Unknown rights fields.');
   for(const key of ['source_url','license_id','license_url','author'])assert(typeof e[key]==='string'&&e[key].trim().length>0&&e[key].length<=2000&&!/[\x00-\x1f]/.test(e[key]),'Provide actual source, creator and license evidence.');
   assert(['CC0','CC0-1.0','CC-BY-4.0','CC-BY-3.0'].includes(e.license_id),'These rights require the existing specialist review.');
   for(const key of ['source_url','license_url']){let url;try{url=new URL(e[key]);}catch{}assert(url?.protocol==='https:'&&url.hostname&&!url.username&&!url.password,'Use HTTPS evidence references without credentials.');}
+  }
   const p=await work.project(id,revision),s=work.scene(p,sceneId);await work.unlocked(p);
   assert(s.stage==='world'&&!s.candidate&&!s.task&&!s.run,'Finish the current task or candidate before preparing a World asset.',409);
   const source=await work.sourceDetail(id,request.id);
@@ -50,6 +55,9 @@ export async function prepareSource(work,id,sceneId,revision,request) {
   const input=await assetPreviewSource(work,id,sceneId,revision,{kind:'source',id:request.id,version:request.version,file:request.file});
   assert(/\.(blend|gltf|glb|fbx)$/i.test(input.file),'This package needs reviewed format conversion.');
   assert(input.files.reduce((n,f)=>n+f.size,0)<=500*1024*1024,'Prepare a package of at most 500 MiB.');
+  if(local)e={source_url:'',author:'',license_id:'UNKNOWN',license_url:'',local_confirmation:{
+    policy:'local-project-use-v1',confirmed:true,source_id:source.id,source_version:source.version,
+    member:input.file,project_id:id,confirmed_at:now()}};
   const root=await base(work);await fs.mkdir(root,{recursive:true});
   const runId='run_'+randomUUID(),directory=await safe(root,runId);
   const record={schema:1,id:runId,projectId:id,sceneId,action:'source-prepare',state:'PREPARING',startedAt:now(),sourceId:source.id,sourceVersion:source.version,checkpointId:s.current,authorization:'explicit-launcher-user-action'};
@@ -60,7 +68,7 @@ export async function prepareSource(work,id,sceneId,revision,request) {
     const evidence={...e,title:source.name,kind:'model',price:0,tags:[source.subcategory.id],attested:true};
     await writeJson(path.join(directory,'request.json'),input);
     await writeJson(path.join(directory,'evidence.json'),evidence);
-    await writeJson(path.join(directory,'authorization.json'),{projectId:id,sceneId,revision,sourceId:source.id,version:source.version,member:input.file,confirmedAt:now(),transport:'launcher-ui-package-preparation',notice:'User-supplied source evidence; no source-use or creative approval is generated.'});
+    await writeJson(path.join(directory,'authorization.json'),{projectId:id,sceneId,revision,sourceId:source.id,version:source.version,member:input.file,confirmedAt:now(),transport:'launcher-ui-package-preparation',confirmation:local?'local-project-use-v1':'recorded-source-evidence',notice:local?'User confirmed rights to use and adapt this exact local asset in their productions and follow its original terms. No license/creator is inferred; future files, raw redistribution and model training are excluded. Production-scope and creative approvals remain separate.':'User-supplied source evidence; no source-use or creative approval is generated.'});
     s.run=runId;await work.store.save(p,p.revision);
     record.state='RUNNING';await writeJson(runFile,record);work.running.add(runId);
   }catch(error){record.state='FAILED';record.error=error.message;record.finishedAt=now();await writeJson(runFile,record);await work.unlock(p,runId);throw error;}

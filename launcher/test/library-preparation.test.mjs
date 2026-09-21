@@ -25,11 +25,13 @@ test('production membership never upgrades selection or historical evidence to c
  assert.equal(libraryAvailability({available:false},{source:true}),'Files unavailable');
 });
 
-test('preparation form has no default permission or invented license',()=>{
- const esc=s=>String(s??'').replaceAll('<','&lt;'),b=(s,a)=>'<button data-action="'+a+'">'+s+'</button>';
+test('preparation popup has one unchecked checkbox, no text fields and a disabled confirm action',()=>{
+ const esc=s=>String(s??'').replaceAll('<','&lt;'),b=(s,a,d,c,disabled)=>'<button '+(disabled?'disabled ':'')+'data-action="'+a+'">'+s+'</button>';
  const view=preparationDialog({source:{name:'<source>',id:'id',version:'v'},file:'model.blend',esc,b});
- assert.match(view.body,/&lt;source>/);assert.match(view.body,/value="">Choose the verified license/);
- assert.doesNotMatch(view.body,/\bchecked\b|value="https:/);assert.match(view.body,/No download/);
+ assert.match(view.body,/&lt;source>/);assert.equal((view.body.match(/<input\b/g)||[]).length,1);
+ assert.match(view.body,/type="checkbox"/);assert.doesNotMatch(view.body,/<select|<textarea|\bchecked\b|value="https:/);
+ assert.match(view.body,/No download/);assert.match(view.body,/not a verified license/);
+ assert.match(view.buttons,/disabled/);assert.match(view.buttons,/Confirm & prepare/);
 });
 
 async function fixture(t){
@@ -98,6 +100,24 @@ test('source changes during worker execution refuse the production pin and keep 
  assert.equal(p.workbench.catalogPins,undefined);assert.equal(p.workbench.scenes[0].candidate,null);
  assert.equal((await f.store.runs(p.id))[0].state,'FAILED');
  assert.equal((await f.work.sourceDetail(p.id,f.source.id)).prepared,null);
+});
+
+test('single-checkbox preparation binds the observed package and records unknown metadata honestly',async t=>{
+ const f=await fixture(t),{evidence,...request}=f.request;
+ request.confirmation='local-project-use-v1';
+ const harness=f.work.runtime.harness;let saved,inspected;
+ f.work.runtime.harness=async args=>{if(args[0]==='workbench-intake'){saved=await json(args[4]);inspected=await json(args[2]);}return harness(args);};
+ for(const invalid of [{...request,confirmed:false},{...request,confirmed:'true'},{...request,confirmation:'all-future-files'},
+   {...request,evidence},{...request,version:'c'.repeat(64)}])await assert.rejects(f.work.prepareSource(f.p.id,f.sid,f.p.revision,invalid));
+ assert.equal(f.calls.length,0);assert.equal(await exists(path.join(f.root,'SystemRuntime/UserData/LibraryPreparations')),false);
+ await f.work.prepareSource(f.p.id,f.sid,f.p.revision,request);const p=await f.wait();
+ assert.equal(saved.license_id,'UNKNOWN');assert.equal(saved.author,'');assert.equal(saved.source_url,'');assert.equal(saved.license_url,'');
+ assert.deepEqual([saved.local_confirmation.source_id,saved.local_confirmation.source_version,saved.local_confirmation.member],
+   [f.source.id,f.source.version,inspected.file]);
+ assert.equal(saved.local_confirmation.project_id,p.id);assert.equal(saved.local_confirmation.confirmed,true);
+ assert.equal(p.workbench.scenes[0].candidate,null);assert.equal((await f.work.interactions(p.id).sourceStatus()).ready,false);
+ const run=(await f.store.runs(p.id))[0],auth=await json(path.join(f.root,'SystemRuntime/UserData/LibraryPreparations',run.id,'authorization.json'));
+ assert.equal(auth.confirmation,'local-project-use-v1');assert.match(auth.notice,/future files, raw redistribution and model training are excluded/);
 });
 
 test('explicit recovery cannot release a preparation with a native worker still recorded RUNNING',async t=>{

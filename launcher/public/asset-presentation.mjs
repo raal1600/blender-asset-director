@@ -28,6 +28,7 @@ export function previewHint() {
   return '<section class="viewer-3d" data-viewer-host aria-label="Interactive 3D preview"><div class="viewer-message"><strong>Explore before selecting</strong><p>Choose View in 3D to orbit, zoom and play embedded animation here. Open the separate Blender preview for full native inspection.</p></div></section><p class="muted">Inspection only: no selection, import, retargeting or rights approval. Blender uses a separate preview copy; your current scene stays untouched.</p><p id="asset-preview-status" role="status" aria-live="polite"></p>';
 }
 export function policyMessage(policy) {
+  if(policy?.eligible&&policy.basis==='USER_CONFIRMED_LOCAL_USE')return 'Use confirmed by you for this exact asset. License and creator are not recorded; follow the original terms and required credits. No raw redistribution or model training is authorized.';
   if(policy?.eligible)return 'Recorded source policy permits use; production source review and technical compatibility are separate.';
   const labels={PRICE_UNVERIFIED:'Free-use or price evidence has not been verified',FORMAT_UNSUPPORTED:'Production-import format has not been recorded as supported',LICENSE_EVIDENCE_MISSING:'Retained license evidence is missing',LICENSE_UNSUPPORTED:'The recorded license needs review'};
   return policy?.reasons?.map(reason=>labels[reason]||String(reason).replaceAll('_',' ').toLowerCase()).join('. ')||'Source-use evidence is required before production use.';

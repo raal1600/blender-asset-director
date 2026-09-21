@@ -118,27 +118,39 @@ def main():
             row.get_by_role('button',name='Details',exact=True).click();idle()
             click('[data-action="source-prepare-form"]')
             expect(page.locator('#prepare-confirm')).not_to_be_checked()
-            expect(page.locator('#prepare-license')).to_have_value('')
+            expect(page.locator('#dialog input')).to_have_count(1)
+            expect(page.locator('#dialog select, #dialog textarea')).to_have_count(0)
+            expect(page.locator('[data-action="source-prepare"]')).to_be_disabled()
+            page.locator('#prepare-confirm').check()
+            expect(page.locator('[data-action="source-prepare"]')).to_be_enabled()
+            page.locator('#prepare-confirm').uncheck()
+            expect(page.locator('[data-action="source-prepare"]')).to_be_disabled()
             before_prepare=digest(session['projectManifest'])
             capture('06a-preparation-rights')
+            expect(page.locator('.preparation-details')).not_to_have_attribute('open','')
+            page.set_viewport_size({'width':390,'height':844});capture('06a-preparation-mobile')
+            assert page.locator('#dialog').bounding_box()['width']<=374
+            page.set_viewport_size({'width':1440,'height':960})
             # Cancelled evidence form never reaches preparation or catalog intake.
             click('#dialog [data-action="close"]')
             assert digest(session['projectManifest'])==before_prepare
             assert len(api('workbench/catalog?projectId='+session['projectId'])['items'])==1
             row.get_by_role('button',name='Details',exact=True).click();idle()
             click('[data-action="source-prepare-form"]')
-            page.locator('#prepare-source-url').fill('https://example.invalid/generated-second-fixture')
-            page.locator('#prepare-author').fill('Synthetic fixture generator')
-            page.locator('#prepare-license').select_option('CC0-1.0')
-            page.locator('#prepare-license-url').fill('https://example.invalid/synthetic-license')
+            expect(page.locator('#prepare-confirm')).not_to_be_checked()
             page.locator('#prepare-confirm').check()
             click('[data-action="source-prepare"]');finish_job()
             prepared=next(r for r in state()['runs'] if r['action']=='source-prepare')
             assert prepared['state']=='SUCCEEDED'
             session['secondAssetId']=prepared['assetId']
+            declared=api('workbench/catalog-detail?projectId='+session['projectId']+'&assetId='+session['secondAssetId'])
+            assert declared['license_id']=='UNKNOWN' and declared['author']=='' and declared['license_url']==''
+            assert declared['policy']['basis']=='USER_CONFIRMED_LOCAL_USE' and declared['policy']['eligible']
             assert session['secondAssetId']!=session['assetId']
             assert len(api('workbench/catalog?projectId='+session['projectId'])['items'])==2
             source=api('workbench/source-detail?projectId='+session['projectId']+'&sourceId='+session['secondSourceId'])
+            assert declared['metadata']['local_use_confirmation']['confirmation']['source_version']==source['version']
+            assert declared['metadata']['local_use_confirmation']['confirmation']['source_id']==source['id']
             assert source['prepared']['assetId']==session['secondAssetId']
             available=api('workbench/sources?projectId='+session['projectId']+'&activity=world&excludeProduction=true')
             assert session['secondSourceId'] not in {s['id'] for s in available['items']}

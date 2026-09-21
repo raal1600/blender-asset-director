@@ -10,8 +10,14 @@ def intake(lib: Library, selected: str, evidence_file: str, *, preserve_existing
     source = Path(selected).expanduser().resolve()
     require(source.exists(), "FILE_NOT_FOUND", "Selected local asset does not exist")
     evidence = load_json(Path(evidence_file))
-    fields(evidence, {"title", "kind", "source_url", "license_id", "license_url", "author", "price", "tags", "attested"}, {"title", "kind", "source_url"})
+    fields(evidence, {"title", "kind", "source_url", "license_id", "license_url", "author", "price", "tags", "attested", "local_confirmation"}, {"title", "kind", "source_url"})
     require(type(evidence.get("attested", False)) is bool, "INVALID_SCHEMA", "attested must be an explicit boolean")
+    if 'local_confirmation' in evidence:
+        from .workbench_intake import validate_evidence
+        validate_evidence(evidence)
+        require(preserve_existing is True, 'LOCAL_USE_SCOPE_MISMATCH', 'Local confirmation must preserve existing catalog evidence')
+        require(prepared_member == evidence['local_confirmation']['member'],
+                'LOCAL_USE_SCOPE_MISMATCH', 'Local confirmation requires exact-member preparation')
     files = [source] if source.is_file() else sorted(source.rglob("*"))
     require(len(files) <= 4096, "RESOURCE_LIMIT", "Selected package contains too many entries")
     root = source.parent if source.is_file() else source
@@ -75,5 +81,8 @@ def intake(lib: Library, selected: str, evidence_file: str, *, preserve_existing
                 return {"status": "ALREADY_INTAKEN", "asset_id": existing.id,
                         "files": len(existing.local_files), "evidence": existing.evidence,
                         "catalog_evidence_preserved": True}
+        if 'local_confirmation' in evidence:
+            from .local_use import bind
+            bind(a, evidence['local_confirmation'])
         lib.put(a)
     return {"status": "INTAKEN", "asset_id": a.id, "files": len(usable), "evidence": a.evidence}

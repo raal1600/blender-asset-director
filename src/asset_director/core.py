@@ -135,6 +135,9 @@ class Asset:
 def rights(a: Asset, *, commercial: bool = True, lib=None, purpose="project_use") -> dict:
     """Conservative policy classification, not legal advice or third-party-rights clearance."""
     require(purpose in {"project_use", "raw_redistribution"}, "INVALID_SCHEMA", "Unknown usage scope")
+    if 'local_use_confirmation' in a.metadata:
+        from .local_use import asset_gate
+        return asset_gate(a, purpose)
     if (a.license_id == "LicenseRef-Adobe-Mixamo" or a.metadata.get("license_grant")
             or a.provider == "mixamo" or a.metadata.get("local_motion", {}).get("provider_hint") == "mixamo"):
         from .license_policy import asset_gate
