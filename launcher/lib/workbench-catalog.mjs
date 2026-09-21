@@ -23,13 +23,14 @@ export const withCatalog=Base=>class extends Base {
     return state;
   }
   async labelCatalog(...args){return setCatalogLabel(this,...args);}
-  async catalogPage(id,{query='',offset=0,kind=null,activity='all',subcategory=null}={}) {
-    await this.store.get(id);
+  async catalogPage(id,{query='',offset=0,kind=null,activity='all',subcategory=null,excludeProduction=false}={}) {
+    const p=await this.store.get(id);
+    assert(typeof excludeProduction==='boolean','Invalid library scope.');
     assert(typeof query==='string'&&query.length<=2000&&Number.isSafeInteger(offset)&&offset>=0,'Invalid catalog search.');
     assert(kind===null||['model','pack','animation','material','hdri'].includes(kind),'Invalid catalog type.');
     let kinds;try{kinds=scopeKinds(activity);}catch{assert(false,'Invalid workflow activity.');}
     if(!kinds.length||kind&&!kinds.includes(kind))return {schema:1,items:[],total:0,offset:0,next_offset:null};
-    return this.runtime.harness(['workbench-catalog','--query',query,'--offset',String(offset),'--limit','24',...(subcategory?['--subcategory',subcategory]:[]),...(kind?['--kind',kind]:[]),...(activity==='all'?[]:['--kinds',...kinds]),...await labelArguments(this)]);
+    return this.runtime.harness(['workbench-catalog','--query',query,'--offset',String(offset),'--limit','24',...(excludeProduction?['--exclude-project',await safe(p.directory,'project.json')]:[]),...(subcategory?['--subcategory',subcategory]:[]),...(kind?['--kind',kind]:[]),...(activity==='all'?[]:['--kinds',...kinds]),...await labelArguments(this)]);
   }
   async catalogDetail(id,aid,verify=false) {
     await this.store.get(id);assetId(aid);

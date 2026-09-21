@@ -57,6 +57,8 @@ test('decline, changed version, nonmember and unsupported rights create no job o
 });
 test('successful preparation creates a shared reference, never a candidate or permission; second use reuses catalog bytes',async t=>{
  const f=await fixture(t),before=await fileHash(f.input);
+ const other=await f.store.create('Other production');
+ assert.equal((await f.work.sourcePage(f.p.id,{excludeProduction:true})).total,1);
  await f.work.prepareSource(f.p.id,f.sid,f.p.revision,f.request);let p=await f.wait(),s=p.workbench.scenes[0];
  assert.equal(s.current,null);assert.equal(s.candidate,null);assert.equal(s.checkpoints.length,0);assert.deepEqual(s.catalog,[f.asset.id]);
  assert.equal((await f.work.interactions(p.id).sourceStatus()).ready,false);assert.deepEqual(await fileHash(f.input),before);
@@ -65,8 +67,21 @@ test('successful preparation creates a shared reference, never a candidate or pe
  await f.work.prepareSource(p.id,result.sceneId,p.revision,f.request);p=await f.wait();
  assert.equal(f.calls.filter(c=>c==='workbench-intake').length,1);assert.equal(p.workbench.catalogPins.length,1);
  assert.equal((await f.work.sourcePage(p.id,{sceneId:result.sceneId,production:true})).total,1,'Prepared package is associated through its exact catalog version, not a guessed name');
+ assert.equal((await f.work.sourcePage(p.id,{excludeProduction:true})).total,0,'Added package is not repeated in available-to-add');
+ assert.equal((await f.work.sourcePage(other.id,{excludeProduction:true})).total,1,'Other productions can still reuse the shared package');
+ assert.equal((await f.work.sourcePage(p.id)).total,1,'Full read-only API remains compatible');
+ await assert.rejects(f.work.sourcePage(p.id,{excludeProduction:true,production:true}),/Invalid library scope/);
  assert.deepEqual(p.assets,[],'The original source reference is not silently attached');
  assert.equal(await exists(path.join(p.directory,'Runs/.interactive-execution.lock')),false);
+});
+
+test('source membership excludes historical and other-scene references without relying on matching names',async t=>{
+ const f=await fixture(t),p=await f.store.get(f.p.id);
+ p.assets.push({sourceId:f.source.id,version:f.source.version});
+ await f.store.save(p,p.revision);
+ assert.equal((await f.work.sourcePage(p.id,{production:true})).total,1);
+ assert.equal((await f.work.sourcePage(p.id,{excludeProduction:true})).total,0);
+ assert.equal((await fileHash(f.input)).sha256,f.asset.files[0].sha256);
 });
 test('failed preparation retains its attempt and releases only its own writer without adding a catalog pin',async t=>{
  const f=await fixture(t);f.setFail();await f.work.prepareSource(f.p.id,f.sid,f.p.revision,f.request);const p=await f.wait();

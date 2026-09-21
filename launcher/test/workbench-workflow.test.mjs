@@ -81,6 +81,10 @@ test('only new workbench is served; authenticated grouped catalog queries preser
   assert.equal((await fetch(url+'&activity=world',{headers})).status,200);
   assert.deepEqual(calls.at(-1).slice(-3),['--kinds','model','pack']);
   await fetch(url+'&activity=action',{headers});assert.deepEqual(calls.at(-1).slice(-2),['--kinds','animation']);
+  assert.ok(!calls.at(-1).includes('--exclude-project'),'Unscoped API stays compatible');
+  await fetch(url+'&activity=world&excludeProduction=true',{headers});
+  assert.equal(calls.at(-1)[calls.at(-1).indexOf('--exclude-project')+1],path.join(p.directory,'project.json'));
+  assert.deepEqual(calls.at(-1).slice(-3),['--kinds','model','pack']);
   assert.equal((await fetch(url+'&activity=wrong',{headers})).status,400);
   const count=calls.length;
   const none=await (await fetch(url+'&activity=world&kind=animation',{headers})).json();
