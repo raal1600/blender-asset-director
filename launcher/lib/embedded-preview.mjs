@@ -7,6 +7,11 @@ import {assetPreviewSource} from './asset-preview.mjs';
 import {assert,digest,fileHash,inside,json,safe,slash,walk,writeJson} from './storage.mjs';
 import {MAX_VIEWER_BYTES,packageGLTF,validateGLB,verifiedPackage} from './viewer-gltf.mjs';
 
+export const MAX_PREVIEW_STORAGE_BYTES=100*1024**3;
+export function assertPreviewStorageBudget(disk,sourceBytes) {
+  assert(disk+sourceBytes*2+MAX_VIEWER_BYTES<MAX_PREVIEW_STORAGE_BYTES,'Private 3D preview storage would exceed 100 GiB. Review ViewerPreviews before preparing more; nothing was deleted.');
+}
+
 async function checkpointSource(work,id,sceneId,revision,request) {
   assert(Object.keys(request).every(k=>['kind','id'].includes(k)),'Unknown checkpoint preview fields.');
   const p=await work.project(id,revision),scene=work.scene(p,sceneId);
@@ -42,7 +47,7 @@ export class EmbeddedPreviews {
     const base=await safe(w.store.root,'SystemRuntime/UserData/ViewerPreviews');await fs.mkdir(base,{recursive:true});
     // Never delete user data or historical failure evidence to make room.
     const names=await walk(base,50000);let disk=0;for(const name of names)disk+=(await fs.stat(await safe(base,name))).size;
-    assert(disk+source.files.reduce((n,f)=>n+f.size*2,0)+MAX_VIEWER_BYTES<2*1024**3,'Private 3D preview storage would exceed 2 GiB. Review ViewerPreviews before preparing more; nothing was deleted.');
+    assertPreviewStorageBudget(disk,source.files.reduce((n,f)=>n+f.size,0));
     const previewId='view_'+randomUUID(),directory=await safe(base,previewId);await fs.mkdir(directory);
     const requestFile=path.join(directory,'request.json');await writeJson(requestFile,source);
     try {
