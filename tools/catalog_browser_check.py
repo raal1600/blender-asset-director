@@ -42,9 +42,13 @@ def main():
             # DOM visibility alone does not prove a label can be read. Primary
             # card actions must contrast in both default and hovered states.
             issues=page.locator('.browser-asset .asset-actions button').evaluate_all("""buttons=>{
-                const luminance=color=>{const values=color.match(/[0-9.]+/g).slice(0,3).map(n=>{const v=Number(n)/255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return values[0]*.2126+values[1]*.7152+values[2]*.0722};
+                const luminance=color=>{const channels=color.match(/[0-9.]+/g);if(!channels||channels.length<3)throw Error('Unresolved visible button color: '+color);const values=channels.slice(0,3).map(n=>{const v=Number(n)/255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return values[0]*.2126+values[1]*.7152+values[2]*.0722};
                 return buttons.flatMap(button=>{
                     const r=button.getBoundingClientRect(),card=button.closest('.browser-asset').getBoundingClientRect(),style=getComputedStyle(button),errors=[];
+                    // Closed dialog descendants can have unresolved system colors
+                    // on Windows. They have no visible labels to contrast-audit.
+                    // Every rendered, enabled primary action retains the 4.5:1 gate.
+                    if(button.closest('dialog:not([open])')||r.width===0||r.height===0)return [];
                     if(r.left<card.left-1||r.right>card.right+1||r.top<card.top-1||r.bottom>card.bottom+1)errors.push('clipped action: '+button.textContent);
                     if(button.classList.contains('primary')&&!button.disabled){const a=luminance(style.color),b=luminance(style.backgroundColor),contrast=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);if(contrast<4.5)errors.push('low contrast '+contrast.toFixed(2)+': '+button.textContent);}
                     return errors;
