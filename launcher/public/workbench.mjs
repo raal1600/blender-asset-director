@@ -24,6 +24,7 @@ function clearSceneViewer(){sceneViewer?.dispose();sceneViewer=null;sceneViewerK
 const sceneViewKey=()=>cp()?projectId+':'+sceneId+':'+cp().id+':'+cp().sha256:null;
 function showSceneViewer(host){clearSceneViewer();sceneViewer=startViewer(host,{kind:'checkpoint',id:cp().id});sceneViewerKey=sceneViewKey();}
 function startViewer(host,request){const context={projectId,sceneId,revision:p().revision};return openViewer({host,
+ inspectInBlender:request.kind==='checkpoint'?undefined:()=>perform(async()=>{if(projectId!==context.projectId||sceneId!==context.sceneId||$(request.kind==='catalog'?'catalog-file':'source-file')?.value!==request.file)throw Error('Preview context changed; reopen the asset first.');await dispatch('asset-preview-open',request);}),
  prepare:()=>api('workbench/viewer-prepare',{...context,request}),
  fetchModel:async(record,signal)=>{const r=await fetch('/api/workbench/viewer-model?'+new URLSearchParams({projectId:context.projectId,sceneId:context.sceneId,previewId:record.previewId}),{headers:requestHeaders(),signal});if(!r.ok)throw Error((await r.json()).error);return r.arrayBuffer();}});}
 const requestHeaders=()=>({'Authorization':`Bearer ${token}`,'Content-Type':'application/json'});

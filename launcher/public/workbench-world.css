@@ -34,6 +34,8 @@
 .world-canvas .viewer-help,.world-canvas .viewer-status,.world-canvas .viewer-disclaimer{font-size:12px;padding:4px 18px;line-height:1.5}
 .world-canvas .viewer-disclaimer{padding-bottom:12px}
 .world-canvas .viewer-disclaimer,.world-asset-dialog .viewer-disclaimer{display:none}
+.world-canvas .viewer-texture-note,.world-asset-dialog .viewer-texture-note{display:block}
+.viewer-message details{overflow-wrap:anywhere}
 .world-canvas [data-viewer-state="ready"] .viewer-status,.world-asset-dialog [data-viewer-state="ready"] .viewer-status{display:none}
 .world-canvas .viewer-toolbar{padding:10px 18px}.world-canvas .viewer-toolbar button{font-size:12px;min-height:34px}
 .world-next{display:flex;gap:22px;align-items:center;padding:22px 0 20px;border-bottom:1px solid var(--line)}

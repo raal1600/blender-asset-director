@@ -36,6 +36,8 @@ refused. Native files use the existing isolated, script-disabled, two-thread
 Blender preview worker, a 180-second deadline and a separate library. Absolute
 checkpoint dependencies may only resolve to verified copied files from its
 retained catalog/package pins; arbitrary external references are refused.
+Embedded BLEND copies use short, source-mapped paths for both catalog assets and
+checkpoints, avoiding nested Windows path failures without altering source paths.
 
 Private outputs and failures live in `SystemRuntime/UserData/ViewerPreviews`.
 Successful previews are reused within the running server session, bound to exact
@@ -46,6 +48,21 @@ Conversion supports up to 3600 frames per take / saved scene and 20000 total tak
 frames. Before another copy it reserves space under a 2 GiB preview-folder budget.
 No automatic deletion of old copies or failed evidence is performed. Very large
 packages, procedural/simulation/volume content and rig-only files use Blender.
+
+Native Blender conversion now reduces static textures only in temporary image
+datablocks: at most 2048 pixels per edge and 16 Mi pixels total (smaller when
+necessary). Original files and the saved Blender inspection copy retain their
+full-resolution textures. Bindings are restored even if export fails. The
+receipt records source/preview dimensions; the viewer labels optimized previews.
+Input conversion remains bounded to 128 images, 8192 pixels per source edge and
+128 Mi source pixels. Movie, sequence and UDIM textures still require Blender.
+The direct glTF/GLB fast path does not resize textures; its existing limits and
+the final GLB validator remain unchanged. Reduction does not make unsupported
+shaders or simulations faithful: use Blender for exact material inspection.
+
+Failed previews show an explanation, retained technical details and an explicit
+Blender-preview button for assets. Failure never imports, selects or approves
+an asset, and never automatically opens another application.
 
 The app uses inspection lighting and glTF material approximations, not Cycles,
 saved scene look, compositor or final render evidence. A played clip is not human

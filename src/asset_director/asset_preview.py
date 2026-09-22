@@ -45,11 +45,11 @@ def snapshot(request_file, *, embedded=False):
         sources.append(p)
     destination.mkdir()
     files = []
-    # A checkpoint spans project and catalog roots. Mirroring those long paths
-    # under ViewerPreviews can exceed Blender's Windows path support. Only the
-    # disposable BLEND inspection bundle is flattened; source packages (including
-    # glTF relative resources) retain their original layout.
-    compact = embedded and request['source_kind'] == 'checkpoint' and Path(request['file']).suffix.lower() == '.blend'
+    # Catalog BLEND members and checkpoints can both exceed Blender's Windows
+    # path support under ViewerPreviews. Flatten only disposable embedded BLEND
+    # inspection bundles, rebinding dependencies through the exact source map.
+    # Other formats (including glTF relative resources) retain their layout.
+    compact = embedded and Path(request['file']).suffix.lower() == '.blend'
     source_map = {}
     for index, (source, f) in enumerate(zip(sources, records)):
         relative = ('incoming/package/f%04d%s' % (index, Path(f['path']).suffix.lower())

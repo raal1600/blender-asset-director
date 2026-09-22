@@ -8,7 +8,13 @@ import {fileURLToPath} from 'node:url';
 import {createApp} from '../server.mjs';
 import {fileHash} from '../lib/storage.mjs';
 import {packageGLTF,validateGLB} from '../lib/viewer-gltf.mjs';
-import {animationEntries} from '../public/viewer-3d.mjs';
+import {animationEntries,previewFailure} from '../public/viewer-3d.mjs';
+
+test('preview failure explains texture limits without hiding retained technical evidence',()=>{
+  const raw='Command failed (2): Textures exceed the interactive preview budget; retained attempt view_test';
+  const result=previewFailure(new Error(raw));assert.match(result.message,/texture conversion limits/);assert.equal(result.detail,raw);
+  assert.match(previewFailure(Error('GPU unavailable')).message,/could not prepare/);
+});
 
 test('static poses remain inspectable, distinguished from actual timed animation',()=>{
   const entries=animationEntries([{name:'walk',duration:2,tracks:[{}]},{name:'rest pose',duration:0,tracks:[{}]},{name:'empty',duration:0,tracks:[]}]);
@@ -55,6 +61,23 @@ test('glTF package conversion refuses external, escaped and unrecorded resource 
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'synthetic-gltf-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));const source=await triangle(root);
   const filename=path.join(root,'model.gltf'),document=JSON.parse(await fs.readFile(filename));
   for(const uri of ['https://example.invalid/texture','file:///private','../secret.bin','%2e%2e/private','C:/private.bin','missing.bin']){document.buffers[0].uri=uri;await fs.writeFile(filename,JSON.stringify(document));await assert.rejects(packageGLTF(source));}
+});
+
+test('retained preview refusal preserves its client-error status and changes no project data',async t=>{
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'synthetic-viewer-refusal-')),library=path.join(root,'Database/AssetDirector');
+  const source=await triangle(library),filename=path.join(library,'model.gltf'),doc=JSON.parse(await fs.readFile(filename));
+  doc.nodes[0].children=[0];await fs.writeFile(filename,JSON.stringify(doc));
+  source.files[0]={path:'model.gltf',...await fileHash(filename)};
+  const asset={id:'a_'+'3'.repeat(24),version:'4'.repeat(64),kind:'model',title:'Synthetic refusal',files:source.files,metadata:{}};
+  const app=await createApp({root,config:{library},runtime:{harness:async args=>{assert.equal(args[0],'workbench-catalog');return asset;}},port:0});
+  t.after(async()=>{app.server.closeAllConnections();await new Promise(r=>app.server.close(r));await fs.rm(root,{recursive:true,force:true});});
+  let p=await app.store.create('Synthetic refusal');const created=await app.workbench.create(p.id,p.revision,'Refusal scene');p=await app.store.get(p.id);
+  const manifest=path.join(p.directory,'project.json'),before=await fileHash(manifest);
+  const response=await fetch(app.origin+'/api/workbench/viewer-prepare',{method:'POST',headers:{Authorization:'Bearer '+app.token,'Content-Type':'application/json'},body:JSON.stringify({projectId:p.id,sceneId:created.sceneId,revision:p.revision,request:{kind:'catalog',id:asset.id,version:asset.version,file:'model.gltf'}})});
+  assert.equal(response.status,400);const failure=await response.json();assert.match(failure.error,/Invalid\/cyclic node hierarchy.*3D attempt retained:/);
+  const folder=path.join(root,'SystemRuntime/UserData/ViewerPreviews'),copies=await fs.readdir(folder);assert.equal(copies.length,1);
+  const record=JSON.parse(await fs.readFile(path.join(folder,copies[0],'viewer-failure.json')));assert.equal(record.state,'FAILED');
+  assert.deepEqual(await fileHash(manifest),before);
 });
 
 test('vendor payload exactly matches pinned integrity records and local module dependencies',async()=>{

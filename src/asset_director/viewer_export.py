@@ -1,6 +1,47 @@
 """Read-only GLB inspection derivative from an isolated, verified preview copy."""
 import bpy
+from contextlib import contextmanager
+from array import array
 from .core import require
+from .viewer_textures import plan
+
+
+@contextmanager
+def preview_textures():
+    """Remap temporary image buffers and restore even after export failure.
+
+    scale() alone does not mark Blender images dirty. The exporter otherwise
+    reuses full-size packed/file bytes instead of encoding the resized buffer.
+    """
+    require(bpy.app.background and bpy.context.scene.get('asset_director_preview_only') is True,
+            'PREVIEW_ONLY', 'Texture reduction requires a separate preview worker')
+    originals = list(bpy.data.images)
+    report = plan([{'name': i.name, 'size': list(i.size), 'source': i.source} for i in originals])
+    copies = []
+    try:
+        for original, record in zip(originals, report['images']):
+            if record['source_size'] == record['preview_size']:
+                continue
+            temporary = original.copy()
+            copies.append((original, temporary))
+            # Image.copy() omits unsaved pixel edits, including generated images.
+            if original.is_dirty:
+                pixels = array('f', [0]) * len(original.pixels)
+                original.pixels.foreach_get(pixels)
+                temporary.scale(*original.size)
+                temporary.pixels.foreach_set(pixels)
+                del pixels
+            temporary.scale(*record['preview_size'])
+            temporary.pixels[0] = temporary.pixels[0]
+            temporary.update()
+            require(list(temporary.size) == record['preview_size'] and temporary.is_dirty,
+                    'VIEWER_EXPORT_FAILED', 'Preview texture reduction did not produce an exportable buffer')
+            original.user_remap(temporary)
+        yield report
+    finally:
+        for original, temporary in reversed(copies):
+            temporary.user_remap(original)
+            bpy.data.images.remove(temporary)
 
 
 def export(destination, observed):
@@ -26,11 +67,6 @@ def export(destination, observed):
             'RESOURCE_LIMIT', 'A native take exceeds the 3600-frame interactive conversion limit')
     require(sum(t['end'] - t['start'] + 1 for t in takes) <= 20000,
             'RESOURCE_LIMIT', 'Combined native takes exceed the conversion limit')
-    pixels = sum(int(i.size[0]) * int(i.size[1]) for i in bpy.data.images)
-    require(all(i.source not in {'SEQUENCE', 'MOVIE', 'TILED'} for i in bpy.data.images),
-            'VIEWER_UNSUPPORTED', 'Sequence/movie/UDIM textures require Blender inspection')
-    require(pixels <= 64 * 1024**2 and all(max(i.size) <= 8192 for i in bpy.data.images),
-            'RESOURCE_LIMIT', 'Textures exceed the interactive preview budget')
     # Export only the currently saved scene, preserving native timebase. Materials
     # are glTF approximations; scene cameras/lights and compositor are not a render.
     # Honor object/collection render visibility, including explicitly repaired
@@ -45,9 +81,10 @@ def export(destination, observed):
         args['export_unused_animations'] = False
     if 'export_frame_range' in supported:
         args['export_frame_range'] = bool(observed.get('checkpoint'))
-    result = bpy.ops.export_scene.gltf(**args)
+    with preview_textures() as textures:
+        result = bpy.ops.export_scene.gltf(**args)
     require('FINISHED' in result and destination.is_file() and destination.stat().st_size <= 128 * 1024**2,
             'VIEWER_EXPORT_FAILED', 'GLB export failed or exceeds 128 MiB')
     return {'kind': 'READ_ONLY_3D_INSPECTION', 'vertices': vertices, 'source_objects': len(objects),
-            'material_fidelity': 'GLTF_APPROXIMATION', 'human_acceptance': 'NOT_EVALUATED',
+            'material_fidelity': 'GLTF_APPROXIMATION', 'human_acceptance': 'NOT_EVALUATED', 'textures': textures,
             'notice': 'Saved data, not a live Blender link or rendered evidence. No approval, import or scene edit.'}

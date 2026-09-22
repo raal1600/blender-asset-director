@@ -21,7 +21,7 @@ def main():
     assert session.get('fixture')=='synthetic-embedded-viewer','Refuse live or unrelated sessions'
     output=Path(args.evidence);output.mkdir(parents=True,exist_ok=False)
     before=sha(session['projectManifest']);catalog_before=sha(session['catalog'])
-    report={'kind':'real-webgl-synthetic-viewer','checks':[],'errors':[],'requests':[],'external_requests':[],
+    report={'kind':'real-webgl-synthetic-viewer','checks':[],'errors':[],'requests':[],'external_requests':[],'expected_refusals':[],
             'not_tested':['human creative acceptance','licensed inputs','native desktop host','live Blender link (not implemented)']}
     with sync_playwright() as pw:
         browser=pw.chromium.launch(**({'executable_path':args.chrome} if args.chrome else {'channel':'chrome'}))
@@ -29,7 +29,13 @@ def main():
         context=browser.new_context(viewport={'width':1280,'height':900},service_workers='block')
         page=context.new_page();page.set_default_timeout(20000)
         page.on('pageerror',lambda e:report['errors'].append(str(e).replace(session['token'],'[REDACTED]')))
-        page.on('console',lambda m:report['errors'].append({'text':m.text.replace(session['token'],'[REDACTED]'),'location':m.location}) if m.type=='error' else None)
+        refusal={'active':False}
+        def console(m):
+            if m.type!='error':return
+            record={'text':m.text.replace(session['token'],'[REDACTED]'),'location':m.location}
+            expected=refusal['active'] and urlsplit(m.location.get('url','')).path=='/api/workbench/viewer-prepare' and '400' in m.text
+            report['expected_refusals' if expected else 'errors'].append(record)
+        page.on('console',console)
         def request(r):
             if r.url.startswith(('data:','blob:')):return
             if not r.url.startswith(session['origin']+'/'):report['external_requests'].append(urlsplit(r.url).netloc)
@@ -39,7 +45,8 @@ def main():
         def click(selector):page.locator(selector).click();idle()
         def ready(selector):
             host=page.locator(selector)
-            expect(host).to_have_attribute('data-viewer-state','ready',timeout=205000)
+            expect(host).to_have_attribute('data-viewer-state',re.compile(r'^(ready|failed)$'),timeout=205000)
+            assert host.get_attribute('data-viewer-state')=='ready',host.inner_text()
             expect(host.locator('canvas')).to_be_visible()
             return host
         try:
@@ -83,6 +90,26 @@ def main():
             click('.asset-more > summary');expect(page.locator('#dialog [data-action="asset-preview-open"]')).to_be_visible()
             select.select_option(next(v for v in values if v.endswith('.blend')));idle();expect(asset.locator('canvas')).to_have_count(0)
             report['checks'].append('Member change disposes obsolete view; native Blender option remains separate')
+            select.select_option(next(v for v in values if v.endswith('/large-textures.blend')));idle()
+            click('#dialog [data-action="viewer-open"]:visible >> nth=0');asset=ready('#dialog [data-viewer-host]')
+            expect(asset.locator('.viewer-texture-note')).to_contain_text('2 lighter textures')
+            expect(asset.locator('.viewer-texture-note')).to_be_visible()
+            expect(asset.locator('.viewer-texture-note')).to_contain_text('originals and Blender copies are unchanged')
+            page.screenshot(path=str(output/'09-optimized-texture-preview.png'))
+            report['checks'].append('Native reduced-texture GLB renders with accurate optimization disclosure')
+            select.select_option(next(v for v in values if v.endswith('/oversized.gltf')));idle();refusal['active']=True
+            with page.expect_response(lambda r:urlsplit(r.url).path=='/api/workbench/viewer-prepare') as response:
+                click('#dialog [data-action="viewer-open"]:visible >> nth=0')
+            assert response.value.status==400
+            expect(asset).to_have_attribute('data-viewer-state','failed')
+            expect(asset.get_by_role('alert')).to_contain_text('texture conversion limits')
+            expect(asset.get_by_role('alert')).to_contain_text('Nothing was imported or changed')
+            expect(asset.locator('[data-viewer-fallback]')).to_be_visible()
+            asset.get_by_text('Technical details',exact=True).click()
+            expect(asset.get_by_role('alert')).to_contain_text('3D attempt retained:')
+            expect(asset.locator('canvas')).to_have_count(0)
+            page.screenshot(path=str(output/'10-explicit-preview-failure.png'));refusal['active']=False
+            report['checks'].append('Real backend bounds refusal is visible with retained detail and explicit native fallback; no auto launch')
             select.select_option(next(v for v in values if v.endswith('.glb')));idle();click('#dialog [data-action="viewer-open"]:visible >> nth=0');asset=ready('#dialog [data-viewer-host]')
             page.set_viewport_size({'width':390,'height':844});page.screenshot(path=str(output/'08-mobile.png'))
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
