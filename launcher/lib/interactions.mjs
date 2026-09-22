@@ -42,14 +42,14 @@ export class Interactions {
   const prior=records.find(r=>r.scopeHash===context.scopeHash&&acceptedSource(r));
   return {ready:context.scope.sources.length===0||!!prior,scope:context.scope,scopeHash:context.scopeHash,message:sourceUseMessage(context),notice:disclaimer};
  }
- async attestFromLauncher(revision,confirmed){
+ async attestFromLauncher(revision,confirmed,preparationConfirmation){
   const context=await this.context();
   assert(context.p.revision===revision,'Project changed. Review the current source list.',409);
   assert(confirmed===true,'Source use needs an explicit user confirmation.');
   assert((await this.verifySources()).ok,'Pinned source bytes changed. Confirmation refused.',409);
   const id=randomUUID(),record={schema:1,id,kind:'source-use',projectId:this.projectId,sessionId:this.sessionId,
    scopeHash:context.scopeHash,scope:context.scope,state:'ANSWERED',createdAt:now(),finishedAt:now(),
-   answer:{decision:'Confirm project use'},message:sourceUseMessage(context),transport:'launcher-ui-source-confirmation',notice:disclaimer};
+   answer:{decision:'Confirm project use'},message:sourceUseMessage(context),transport:'launcher-ui-source-confirmation',notice:disclaimer,...(preparationConfirmation?{preparationConfirmation}: {})};
   await writeJson(path.join(await this.directory(context.p),id+'.json'),record);
   // This is a distinct, honest UI transport, never a fabricated MCP response.
   return {ready:true,receipt:id,scopeHash:context.scopeHash,message:sourceUseMessage(context),notice:disclaimer};

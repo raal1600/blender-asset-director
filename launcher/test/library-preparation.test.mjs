@@ -57,6 +57,18 @@ test('decline, changed version, nonmember and unsupported rights create no job o
  assert.deepEqual(f.calls,[]);assert.equal(await exists(path.join(f.root,'SystemRuntime/UserData/LibraryPreparations')),false);
  assert.equal((await f.store.get(f.p.id)).revision,f.p.revision);
 });
+
+test('explicit combined checkbox carries only verified package use into the named production, never scene approval',async t=>{
+ const f=await fixture(t),request={id:f.source.id,version:f.source.version,file:f.request.file,confirmed:true,confirmation:'local-project-use-v1',projectUse:true};
+ await f.work.prepareSource(f.p.id,f.sid,f.p.revision,request);const p=await f.wait();
+ assert.equal((await f.work.interactions(p.id).sourceStatus()).ready,true);
+ const s=p.workbench.scenes[0];assert.equal(s.current,null);assert.equal(s.candidate,null);assert.deepEqual(s.completed,{});
+ const records=await f.work.interactions(p.id).records(p),use=records.find(r=>r.preparationConfirmation);
+ assert.equal(use.preparationConfirmation.sourceVersion,f.source.version);assert.equal(use.preparationConfirmation.preparedVersion,f.asset.version);
+ assert.equal(use.transport,'launcher-ui-source-confirmation');assert.equal(use.scope.projectId,p.id);
+ const other=await f.store.create('Unrelated production');const made=await f.work.create(other.id,other.revision,'Other world');let q=await f.store.get(other.id);
+ await f.work.selectCatalog(q.id,made.sceneId,q.revision,f.asset.id,true);assert.equal((await f.work.interactions(q.id).sourceStatus()).ready,false);
+});
 test('successful preparation creates a shared reference, never a candidate or permission; second use reuses catalog bytes',async t=>{
  const f=await fixture(t),before=await fileHash(f.input);
  const other=await f.store.create('Other production');

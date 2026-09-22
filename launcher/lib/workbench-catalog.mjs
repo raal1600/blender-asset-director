@@ -39,7 +39,8 @@ export const withCatalog=Base=>class extends Base {
   async selectCatalog(id,sceneId,revision,aid,selected) {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);await this.unlocked(p);assetId(aid);
     assert(typeof selected==='boolean','Selection must be explicit.');
-    assert(!s.candidate,'Review the current candidate before changing ingredients.',409);
+    assert(!s.task&&!s.run,'Finish the active Blender task or operation first.',409);
+    assert(!s.candidate||s.stage==='world'&&checkpointFor(s,s.candidate)?.stage==='world','Review the current candidate before changing ingredients.',409);
     p.workbench.catalogPins||=[];s.catalog||=[];
     if(selected) {
       const a=await this.catalogDetail(id,aid,true),prior=p.workbench.catalogPins.find(a=>a.id===aid);
@@ -73,19 +74,37 @@ export const withCatalog=Base=>class extends Base {
     await writeJson(await safe(p.directory,`Docs/Workbench/review_${randomUUID()}.json`),{projectId:id,sceneId,checkpointId:cp.id,sha256:cp.sha256,stage:s.stage,decision:'KEEP_WORKING',createdAt:now(),transport:'launcher-ui'});
     approveCheckpoint(s,s.stage,cp.id,false);return this.store.save(p,p.revision);
   }
+  async undoWorld(id,sceneId,revision) {
+    const p=await this.project(id,revision),s=this.scene(p,sceneId);await this.unlocked(p);
+    assert(s.stage==='world'&&s.candidate&&!s.task&&!s.run,'No idle World change to undo.',409);
+    const cp=await this.verify(p,s,s.candidate);
+    assert(cp.stage==='world','This change belongs to another activity.',409);
+    const parent=cp.parent||null;
+    if(parent&&parent!==s.current){
+      const prior=await this.verify(p,s,parent);assert(prior.stage==='world','Draft parent belongs to another activity.',409);
+      // Only an earlier checkpoint may be restored; never accept cycles or forward links.
+      assert(s.checkpoints.indexOf(prior)<s.checkpoints.indexOf(cp),'Invalid draft history.',409);
+    }
+    await writeJson(await safe(p.directory,`Docs/Workbench/undo_${randomUUID()}.json`),{projectId:id,sceneId,checkpointId:cp.id,sha256:cp.sha256,restored:parent,decision:'UNDO_WORKING_CHANGE',createdAt:now(),transport:'launcher-ui'});
+    s.candidate=parent===s.current?null:parent;
+    return this.store.save(p,p.revision);
+  }
   async catalogJob(id,sceneId,revision,request={}) {
-    assert(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).every(k=>['assetId','file','selection','operation','confirmed'].includes(k)),'Unknown catalog request fields.');
+    assert(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).every(k=>['assetId','file','selection','operation','confirmed','version'].includes(k)),'Unknown catalog request fields.');
     const {assetId:aid,file,selection,operation='import',confirmed=false}=request;
     assert(typeof confirmed==='boolean','Confirmation must be an explicit boolean.');
     assert(['import','asset-contents'].includes(operation),'Unsupported catalog operation.');assetId(aid);
     const diagnostic={requestedAt:now()};const timed=operationTiming(diagnostic);
     const p=await this.project(id,revision),s=this.scene(p,sceneId);
-    await this.unlocked(p);assert(!s.candidate&&!s.task&&!s.run,'Finish the active task or candidate first.',409);
+    await this.unlocked(p);assert(!s.task&&!s.run,'Finish the active task first.',409);
+    assert(!s.candidate||s.stage==='world'&&checkpointFor(s,s.candidate)?.stage==='world','Finish the active candidate first.',409);
+    const savedBase=s.current,draftBase=s.candidate;
     assert((s.catalog||[]).includes(aid),'Select this catalog source for the scene first.',409);
     assert(operation!=='import'||s.stage==='world','Import ingredients inside Assemble world.',409);
     const [,a]=await timed('verify-sources',()=>Promise.all([
       verifyNative(this.store,this.runtime,p),this.catalogDetail(id,aid,true)
     ]));
+    assert(request.version===undefined||request.version===a.version,'The requested asset version changed. Choose it again.',409);
     assert(typeof file==='string'&&a.models.includes(file),'Choose an exact supported model member.');
     if(operation==='import') {
       assert(['model','pack'].includes(a.kind),'World import accepts models and packs, not animation or look assets.',409);
@@ -102,7 +121,8 @@ export const withCatalog=Base=>class extends Base {
     }
     // Native pins were just verified; retain the independent original-source and
     // checkpoint byte checks without launching that same native verification twice.
-    const cp=s.current?await timed('verify-checkpoint',()=>super.verify(p,s)):null;
+    const baseId=s.candidate||s.current;
+    const cp=baseId?await timed('verify-checkpoint',()=>super.verify(p,s,baseId)):null;
     const options=operation==='import'?{file,collection:sceneId,...(selection?{selection}: {})}:{file,request_scope:id+':'+sceneId};
     const runId='run_'+randomUUID(),record=Object.assign(diagnostic,{schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',assetId:aid,sourceVersion:a.version,checkpointId:cp?.id||null,startedAt:now(),authorization:confirmed?'explicit-launcher-user-action':'read-only',options});
     await this.lock(p,runId);
@@ -116,7 +136,7 @@ export const withCatalog=Base=>class extends Base {
       assert(!['FAILED','INTERRUPTED','RUNNING'].includes(job.state),'Native job needs explicit retry or recovery.',409);
       await timed('bind-job',()=>this.store.bindJob(id,job,q=>{
         const scene=this.scene(q,sceneId);
-        assert(scene.current===(cp?.id||null)&&!scene.candidate&&!scene.task&&!scene.run,'Scene changed before this operation.',409);
+        assert(scene.current===savedBase&&scene.candidate===draftBase&&!scene.task&&!scene.run,'Scene changed before this operation.',409);
         scene.run=runId;
       }));
       record.state='RUNNING';await writeJson(receipt,record);
@@ -128,7 +148,7 @@ export const withCatalog=Base=>class extends Base {
           const data=await timed('verify-result',()=>this.result(output));
           await this.serialize(async()=>{
             const q=await this.project(id),scene=this.scene(q,sceneId);
-            assert(scene.run===runId&&scene.current===(cp?.id||null)&&!scene.candidate,'Scene changed during this operation.',409);
+            assert(scene.run===runId&&scene.current===savedBase&&scene.candidate===draftBase,'Scene changed during this operation.',409);
             await timed('reverify-sources',()=>verifyNative(this.store,this.runtime,q));
             await timed('save-checkpoint',async()=>{
               if(operation==='asset-contents') {
@@ -146,7 +166,7 @@ export const withCatalog=Base=>class extends Base {
                 // Byte-identical copying preserves native grant derivations keyed by hash.
                 await fs.copyFile(source,destination,constants.COPYFILE_EXCL);
                 assert((await fileHash(destination)).sha256===member.sha256,'Candidate copy failed verification.',409);
-                const candidate={id:cpId,path:relative,...actual,parent:scene.current,stage:'world',createdAt:now(),source:'native-import-job',jobId:job.id,assetId:aid,audit:data.scene_audit};
+                const candidate={id:cpId,path:relative,...actual,parent:cp?.id||null,stage:'world',createdAt:now(),source:'native-import-job',jobId:job.id,assetId:aid,audit:data.scene_audit};
                 await writeJson(await safe(q.directory,`Docs/Workbench/${cpId}.json`),candidate);
                 scene.checkpoints.push(candidate);scene.candidate=cpId;
               }

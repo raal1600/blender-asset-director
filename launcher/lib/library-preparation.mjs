@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {assert,exists,json,now,safe,writeJson,snapshot} from './storage.mjs';
+import {assert,exists,json,now,safe,writeJson,snapshot,digest} from './storage.mjs';
 import {assetPreviewSource} from './asset-preview.mjs';
 
 async function base(work) {
@@ -34,9 +34,11 @@ export async function preparedProductionSources(work,project,inventory) {
 }
 
 export async function prepareSource(work,id,sceneId,revision,request) {
-  assert(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).every(k=>['id','version','file','evidence','confirmed','confirmation'].includes(k)),'Unknown preparation fields.');
+  assert(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).every(k=>['id','version','file','evidence','confirmed','confirmation','projectUse'].includes(k)),'Unknown preparation fields.');
   assert(request.confirmed===true,'Preparation requires your explicit rights confirmation.');
   const local=request.confirmation==='local-project-use-v1';
+  assert(request.projectUse===undefined||typeof request.projectUse==='boolean','Project use must be explicit.');
+  assert(!request.projectUse||local,'Combined project use needs the local confirmation checkbox.');
   assert(request.confirmation===undefined||local,'Unknown preparation confirmation.');
   assert(!local||request.evidence===undefined,'A local-use confirmation must not supply invented license fields.');
   let e=request.evidence;
@@ -47,7 +49,10 @@ export async function prepareSource(work,id,sceneId,revision,request) {
   for(const key of ['source_url','license_url']){let url;try{url=new URL(e[key]);}catch{}assert(url?.protocol==='https:'&&url.hostname&&!url.username&&!url.password,'Use HTTPS evidence references without credentials.');}
   }
   const p=await work.project(id,revision),s=work.scene(p,sceneId);await work.unlocked(p);
-  assert(s.stage==='world'&&!s.candidate&&!s.task&&!s.run,'Finish the current task or candidate before preparing a World asset.',409);
+  const priorUse=request.projectUse?await work.interactions(id).sourceStatus():null;
+  assert(!request.projectUse||priorUse.ready,'Review previously selected production sources before adding this package.',409);
+  assert(s.stage==='world'&&!s.task&&!s.run,'Finish the current task before preparing a World asset.',409);
+  const draftBase=s.candidate;
   const source=await work.sourceDetail(id,request.id);
   assert(['Meshes','Characters'].includes(source.kind),'Animation intake and transfer use the reviewed Action specialist workflow.');
   const prior=p.assets.find(a=>a.sourceId===source.id);
@@ -68,7 +73,7 @@ export async function prepareSource(work,id,sceneId,revision,request) {
     const evidence={...e,title:source.name,kind:'model',price:0,tags:[source.subcategory.id],attested:true};
     await writeJson(path.join(directory,'request.json'),input);
     await writeJson(path.join(directory,'evidence.json'),evidence);
-    await writeJson(path.join(directory,'authorization.json'),{projectId:id,sceneId,revision,sourceId:source.id,version:source.version,member:input.file,confirmedAt:now(),transport:'launcher-ui-package-preparation',confirmation:local?'local-project-use-v1':'recorded-source-evidence',notice:local?'User confirmed rights to use and adapt this exact local asset in their productions and follow its original terms. No license/creator is inferred; future files, raw redistribution and model training are excluded. Production-scope and creative approvals remain separate.':'User-supplied source evidence; no source-use or creative approval is generated.'});
+    await writeJson(path.join(directory,'authorization.json'),{projectId:id,sceneId,revision,sourceId:source.id,version:source.version,member:input.file,confirmedAt:now(),transport:'launcher-ui-package-preparation',confirmation:local?'local-project-use-v1':'recorded-source-evidence',projectUse:request.projectUse===true,priorScope:priorUse?.scopeHash||null,notice:request.projectUse?'User checked permission to prepare and use this exact package in this named production. The verified prepared member may carry this same confirmation; no scene or creative approval.':local?'User confirmed rights to use and adapt this exact local asset in their productions and follow its original terms. No license/creator is inferred; future files, raw redistribution and model training are excluded. Production-scope and creative approvals remain separate.':'User-supplied source evidence; no source-use or creative approval is generated.'});
     s.run=runId;await work.store.save(p,p.revision);
     record.state='RUNNING';await writeJson(runFile,record);work.running.add(runId);
   }catch(error){record.state='FAILED';record.error=error.message;record.finishedAt=now();await writeJson(runFile,record);await work.unlock(p,runId);throw error;}
@@ -90,7 +95,7 @@ export async function prepareSource(work,id,sceneId,revision,request) {
       assert((await snapshot(await safe(work.store.database,source.relative))).version===source.version,'Original changed during preparation. Catalog copy is retained, but scene selection is refused.',409);
       await work.serialize(async()=>{
         const q=await work.project(id),scene=work.scene(q,sceneId);
-        assert(scene.run===runId&&scene.current===record.checkpointId&&!scene.candidate&&scene.stage==='world','Scene changed during preparation.',409);
+        assert(scene.run===runId&&scene.current===record.checkpointId&&scene.candidate===draftBase&&scene.stage==='world','Scene changed during preparation.',409);
         q.workbench.catalogPins||=[];scene.catalog||=[];
         const pin=q.workbench.catalogPins.find(a=>a.id===asset.id);
         assert(!pin||pin.version===asset.version,'Production already pins another catalog version.',409);
@@ -98,6 +103,17 @@ export async function prepareSource(work,id,sceneId,revision,request) {
         if(!scene.catalog.includes(asset.id))scene.catalog.push(asset.id);
         scene.run=null;await work.store.save(q,q.revision);
         await writeJson(await safe(root,`links/${source.id}-${source.version}.json`),prepared);
+        if(request.projectUse){
+          const expected=structuredClone(priorUse.scope);
+          if(!expected.sources.some(x=>x.sourceId===asset.id))expected.sources.push({sourceId:asset.id,version:asset.version,relative:'Catalog/'+asset.title});
+          expected.sources.sort((a,b)=>a.sourceId.localeCompare(b.sourceId));
+          const interactions=work.interactions(id),context=await interactions.context();
+          assert(digest(expected)===context.scopeHash,'Production scope changed during preparation; review source use again.',409);
+          // Carry the actual checkbox across a verified source-to-catalog mapping.
+          // Do not invent an MCP response or widen permission to unrelated sources.
+          const use=await interactions.attestFromLauncher(context.p.revision,true,{preparationRun:runId,sourceId:source.id,sourceVersion:source.version,member:input.file,preparedAssetId:asset.id,preparedVersion:asset.version});
+          record.sourceUseReceipt=use.receipt;
+        }
       });
       record.state='SUCCEEDED';record.assetId=asset.id;record.assetVersion=asset.version;record.file=prepared.file;
       record.message='Prepared in My library and chosen for this scene. Review production source use and exact collections, then Add to world. No scene objects were imported.';

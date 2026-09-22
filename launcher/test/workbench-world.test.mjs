@@ -37,7 +37,7 @@ test('World stays compact, escapes data, retains details and offers one primary 
   }
   assert.match(view({project:{...project,workbench:{...project.workbench,scenes:[{...scene,name:'<unsafe> name'}]}}}),/&lt;unsafe>/);
   const review=view({scene:{...scene,candidate:checkpoint.id,checkpoints:[checkpoint]}});
-  assert.match(review,/New change · not kept/);assert.match(review,/Keep this change/);assert.match(review,/Discard change/);
+  assert.match(review,/Unsaved changes/);assert.match(review,/Save changes/);assert.match(review,/Undo/);
   assert.doesNotMatch(review,/data-action="approve"/);
   const locked=view({locked:true});assert.doesNotMatch(locked,/class="primary"/);
   assert.match(view({cap:{task_workspace:false}}),/data-action="browse-assets" disabled/);
@@ -65,16 +65,16 @@ test('confirmed, already selected and reviewed source executes exactly once',asy
 
 test('World detail keeps rights, active-work and exact collection requirements visible',()=>{
   const args={asset,scene,locked:false,sourceReady:true,esc,b};
-  assert.match(worldCatalogDialog(args).buttons,/Add to world/);
-  assert.match(worldCatalogDialog({...args,scene:{...scene,catalog:[asset.id]},sourceReady:false}).buttons,/Review source use/);
+  assert.match(worldCatalogDialog(args).buttons,/Add to scene/);
+  assert.match(worldCatalogDialog({...args,scene:{...scene,catalog:[asset.id]},sourceReady:false}).buttons,/Add to scene/);
   assert.match(worldCatalogDialog({...args,asset:{...asset,policy:{eligible:false}}}).buttons,/disabled/);
-  assert.match(worldCatalogDialog({...args,scene:{...scene,candidate:'cp'}}).buttons,/disabled/);
+  assert.doesNotMatch(worldCatalogDialog({...args,scene:{...scene,candidate:'cp'}}).buttons,/disabled/);
   assert.match(worldCatalogDialog({...args,scene:{...scene,run:'run'}}).buttons,/disabled/);
   const blend={...asset,models:['first.blend','second.blend'],files:[{path:'first.blend',size:1},{path:'second.blend',size:1}]};
   const inspected={...scene,assetContents:{[asset.id]:{version:asset.version,file:'first.blend',collections:['Observed']}}};
-  assert.match(worldCatalogDialog({...args,asset:blend,scene:inspected}).body,/name="catalog-collection"/);
+  assert.match(worldCatalogDialog({...args,asset:blend,scene:inspected}).buttons,/Add to scene/);
   const other=worldCatalogDialog({...args,asset:blend,scene:inspected,fileChoice:'second.blend'});
-  assert.match(other.buttons,/Inspect collections/);assert.doesNotMatch(other.body,/name="catalog-collection"/);
+  assert.match(other.buttons,/Add to scene/);assert.doesNotMatch(other.body,/name="catalog-collection"/);
   assert.match(worldCatalogDialog({...args,scene:{...scene,current:checkpoint.id,checkpoints:[checkpoint]}}).buttons,/Add another copy/);
 });
 
@@ -119,5 +119,5 @@ test('ingredient strip is bounded, escaped and never guesses presence from a par
   assert.equal(worldIngredients({project,scene:unknown}).unknown,1);
   const detail=worldCatalogDialog({asset,scene:unknown,locked:false,sourceReady:true,esc,b});
   assert.match(detail.body,/Presence in saved scene not verified/);assert.doesNotMatch(detail.body,/Preview · not in scene/);
-  assert.match(detail.body,/Single-asset preview/);assert.match(detail.body,/combines this asset with your existing saved scene/);
+  assert.match(detail.body,/Single-asset preview/);assert.match(detail.body,/combines this asset with your current draft or saved scene/);
 });
