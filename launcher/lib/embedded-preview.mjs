@@ -46,7 +46,7 @@ export class EmbeddedPreviews {
     const previewId='view_'+randomUUID(),directory=await safe(base,previewId);await fs.mkdir(directory);
     const requestFile=path.join(directory,'request.json');await writeJson(requestFile,source);
     try {
-      let model,adapter,nativeJob=null,nativeImplementation=null;
+      let model,adapter,nativeJob=null,nativeImplementation=null,texturePreview=null;
       if(/\.(gltf|glb)$/i.test(source.file)&&!Object.keys(source.motion||{}).length) {
         model=await packageGLTF(source);adapter='verified-gltf';
       } else {
@@ -58,14 +58,17 @@ export class EmbeddedPreviews {
         const file=await safe(directory,receipt.model.path),actual=await fileHash(file);
         assert(actual.sha256===receipt.model.sha256&&actual.size===receipt.model.size,'Converted model changed.',409);
         model=await fs.readFile(file);adapter='isolated-blender-gltf';
+        const textures=receipt.data?.embedded_viewer?.textures;
+        assert(textures?.scope==='PREVIEW_ONLY'&&textures.originals_changed===false&&Number.isInteger(textures.reduced_images)&&textures.reduced_images>=0&&textures.reduced_images<=128,'Missing preview texture preservation evidence.');
+        texturePreview={reducedImages:textures.reduced_images,sourcePixels:textures.source_pixels,previewPixels:textures.preview_pixels,originalsChanged:false};
       }
       const observed=validateGLB(model);await verifiedPackage(source);
       const filename=path.join(directory,'model.glb');await fs.writeFile(filename,model,{flag:'wx'});
       const record={previewId,projectId:id,sceneId,sourceId:source.id,version:source.version,title:source.title,kind:source.source_kind,
-        ...await fileHash(filename),adapter,implementation,nativeJob,nativeImplementation,observed,cached:false,inspectionOnly:true,selectionChanged:false,approved:false};
+        ...await fileHash(filename),adapter,implementation,nativeJob,nativeImplementation,texturePreview,observed,cached:false,inspectionOnly:true,selectionChanged:false,approved:false};
       await writeJson(path.join(directory,'viewer.json'),record);
       this.owned.set(previewId,{record,filename,source});this.cache.set(key,record);return record;
-    }catch(error){await writeJson(path.join(directory,'viewer-failure.json'),{previewId,state:'FAILED',error:error.message});throw new Error(error.message+' 3D attempt retained: '+previewId);}
+    }catch(error){await writeJson(path.join(directory,'viewer-failure.json'),{previewId,state:'FAILED',error:error.message});throw Object.assign(new Error(error.message+' 3D attempt retained: '+previewId),{status:error.status});}
   }
   async bytes(projectId,sceneId,previewId) {
     const item=this.owned.get(previewId);

@@ -106,6 +106,17 @@ class PreviewTests(unittest.TestCase):
             self.assertEqual([a.to_dict() for a in lib.all()],before)
             with self.assertRaises(DirectorError):catalog(lib,subcategory='invented')
 
+    def test_catalog_blend_also_uses_short_exact_copy_paths_without_checkpoint_claim(self):
+        scene=self.source/'scene.blend';scene.write_bytes(b'synthetic catalog bytes')
+        data={**self.data,'source_kind':'catalog','file':'scene.blend',
+              'files':[{'path':'scene.blend','size':scene.stat().st_size,'sha256':file_hash(scene)},*self.data['files']]}
+        atomic_json(self.request,data)
+        _,directory,asset=snapshot(self.request,embedded=True)
+        self.assertFalse(asset.metadata['preview_checkpoint'])
+        self.assertEqual(asset.metadata['preview_member'],'incoming/package/f0000.blend')
+        self.assertEqual(asset.metadata['preview_source_map']['incoming/package/f0001.glb'],'model.glb')
+        self.assertEqual(file_hash(directory/asset.metadata['preview_member']),file_hash(scene))
+
     def test_texture_maps_are_not_reference_thumbnails(self):
         for name in ['body_baseColor.png','textures/diffuse.jpg','atlas.png','image.png']:
             self.assertFalse(reference_image(name))

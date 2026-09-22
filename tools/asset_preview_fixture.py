@@ -93,6 +93,9 @@ try:
     copied=Path(bpy.data.images['RecordedPreviewColor'].filepath).resolve()
     check(copied.is_relative_to((directory/'library/incoming/package').resolve()),'relative checkpoint texture resolves inside the verified short-path copy')
     check(file_hash(copied)==file_hash(texture_dir/'color.png'),'short-path texture copy preserves exact source bytes')
+    sys.path.insert(0, str(ROOT/'tools'))
+    from viewer_texture_fixture import run as check_preview_textures
+    check_preview_textures(source, preview, check)
     # Standalone copy cannot quietly adopt external source textures.
     bpy.ops.wm.read_factory_settings(use_empty=True);bpy.ops.mesh.primitive_cube_add()
     image=bpy.data.images.new('Unrecorded',width=1,height=1);image.source='FILE';image.filepath=str(out/'unrecorded.png');image.use_fake_user=True

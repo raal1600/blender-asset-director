@@ -17,7 +17,13 @@ function releaseTree(root) {
   for(const t of textures){t.source?.data?.close?.();t.dispose();}for(const g of geometries)g.dispose();for(const s of skeletons)s.dispose();
 }
 
-export function openViewer({host,prepare,fetchModel}) {
+export function previewFailure(error) {
+  const detail=String(error?.message||error||'Unknown preview error');
+  const textures=/texture|image dimensions/i.test(detail)&&/budget|limit|exceed|width|height/i.test(detail);
+  return {title:'3D preview unavailable',message:textures?'This asset exceeds the in-app texture conversion limits. You can inspect the full-resolution asset in Blender.':'Director could not prepare this in-app preview. You can inspect the asset separately in Blender.',detail};
+}
+
+export function openViewer({host,prepare,fetchModel,inspectInBlender}) {
   let disposed=false,renderer,controls,world,mixer,frame=0,observer,model,action,playing=false,last=0,dirty=true,resize,loadedScenes=[];
   const abort=new AbortController(),cleanups=[];
   host.dataset.viewerState='loading';delete host.dataset.previewId;
@@ -36,6 +42,7 @@ export function openViewer({host,prepare,fetchModel}) {
       model=gltf.scene;loadedScenes=gltf.scenes;if(disposed){releaseTree(loadedScenes);return;}
       host.innerHTML='<div class="viewer-toolbar"><strong data-viewer-title></strong><span class="grow"></span><button type="button" data-view="reset">Reset view</button><button type="button" data-view="grid" aria-pressed="true">Grid</button><button type="button" data-view="wire" aria-pressed="false">Wireframe</button></div><div class="viewer-canvas"></div><div class="viewer-animation"><label>Animation <select data-view="take" aria-label="Animation take"></select></label><button type="button" data-view="play">Play</button><input data-view="time" aria-label="Animation time" type="range" min="0" max="1" step="0.001" value="0"><output data-view="clock">0.00 s</output></div><p class="viewer-help">Drag to orbit · scroll to zoom · right-drag / Shift-drag to pan · focus view and use arrow keys to pan; F to reset.</p><p class="viewer-status" data-viewer-status role="status" aria-live="polite"></p><p class="viewer-disclaimer">Saved geometry with inspection lighting. Materials may differ from Blender. No import, edit, render or approval.</p>';
       host.querySelector('[data-viewer-title]').textContent=record.title;
+      if(record.texturePreview?.reducedImages>0){const label=document.createElement('p');label.className='viewer-texture-note viewer-disclaimer';label.textContent='Optimized 3D preview · '+record.texturePreview.reducedImages+' lighter texture'+(record.texturePreview.reducedImages===1?'':'s')+'. Full-resolution originals and Blender copies are unchanged.';host.querySelector('.viewer-disclaimer').before(label);}
       const node=k=>host.querySelector('[data-view="'+k+'"]'),surface=host.querySelector('.viewer-canvas');
       renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'low-power'});
       renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -88,7 +95,14 @@ export function openViewer({host,prepare,fetchModel}) {
       function animate(now){if(disposed)return;frame=requestAnimationFrame(animate);if(document.hidden||(!host.closest('dialog')&&document.querySelector('dialog[open]'))){last=now;return;}const dt=Math.min((now-(last||now))/1000,.1);last=now;if(playing){mixer.update(dt);clock();dirty=true;}controls.update();if(dirty){renderer.render(world,camera);dirty=false;}}
       frame=requestAnimationFrame(animate);
       return record;
-    }catch(error){if(disposed)return;cancelAnimationFrame(frame);observer?.disconnect();controls?.dispose();releaseTree([world,...loadedScenes]);renderer?.dispose();world=null;loadedScenes=[];model=null;renderer=null;controls=null;host.replaceChildren();const message=document.createElement('p');message.className='viewer-message warn';message.setAttribute('role','alert');message.textContent='3D preview unavailable: '+error.message+' Use the separate Blender preview for inspection.';host.append(message);host.dataset.viewerState='failed';}
+    }catch(error){
+      if(disposed)return;cancelAnimationFrame(frame);observer?.disconnect();controls?.dispose();releaseTree([world,...loadedScenes]);renderer?.dispose();world=null;loadedScenes=[];model=null;renderer=null;controls=null;host.replaceChildren();
+      const failure=previewFailure(error),box=document.createElement('div');box.className='viewer-message warn';box.setAttribute('role','alert');
+      const title=document.createElement('strong');title.textContent=failure.title;box.append(title);
+      for(const text of [failure.message,'Nothing was imported or changed in your scene.']){const p=document.createElement('p');p.textContent=text;box.append(p);}
+      if(inspectInBlender){const button=document.createElement('button');button.type='button';button.textContent='Preview in Blender';button.dataset.viewerFallback='';listen(button,'click',async()=>{button.disabled=true;try{await inspectInBlender();}finally{if(!disposed)button.disabled=false;}});box.append(button);}
+      const details=document.createElement('details'),summary=document.createElement('summary'),reason=document.createElement('p');summary.textContent='Technical details';reason.textContent=failure.detail;details.append(summary,reason);box.append(details);host.append(box);host.dataset.viewerState='failed';
+    }
   })();
   return {dispose,ready};
 }
