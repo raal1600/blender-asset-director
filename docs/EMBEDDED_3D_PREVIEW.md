@@ -45,7 +45,9 @@ sources. The implementation refuses more than 64 session copies, a 512 MiB /
 4096-file source package, 128 MiB GLB, 10000 nodes, 2 million displayed vertices,
 128 textures, 8192-pixel texture dimensions or 64 million decoded texture pixels.
 Conversion supports up to 3600 frames per take / saved scene and 20000 total take
-frames. Before another copy it reserves space under a 2 GiB preview-folder budget.
+frames. Before another copy it reserves space under a 100 GiB preview-folder budget.
+This is a cumulative storage ceiling, not preallocated disk space; the per-preview
+source, conversion and GLB limits above remain unchanged.
 No automatic deletion of old copies or failed evidence is performed. Very large
 packages, procedural/simulation/volume content and rig-only files use Blender.
 

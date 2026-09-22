@@ -9,6 +9,18 @@ import {createApp} from '../server.mjs';
 import {fileHash} from '../lib/storage.mjs';
 import {packageGLTF,validateGLB} from '../lib/viewer-gltf.mjs';
 import {animationEntries,previewFailure} from '../public/viewer-3d.mjs';
+import {MAX_PREVIEW_STORAGE_BYTES,assertPreviewStorageBudget} from '../lib/embedded-preview.mjs';
+import {MAX_VIEWER_BYTES} from '../lib/viewer-gltf.mjs';
+
+test('preview storage permits more than 2 GiB but reserves copies and output below 100 GiB',()=>{
+  const gib=1024**3,sourceBytes=160*1024**2;
+  assert.equal(MAX_PREVIEW_STORAGE_BYTES,100*gib);
+  assert.doesNotThrow(()=>assertPreviewStorageBudget(2*gib,sourceBytes));
+  const boundary=MAX_PREVIEW_STORAGE_BYTES-sourceBytes*2-MAX_VIEWER_BYTES;
+  assert.doesNotThrow(()=>assertPreviewStorageBudget(boundary-1,sourceBytes));
+  for(const disk of [boundary,boundary+1,MAX_PREVIEW_STORAGE_BYTES])
+    assert.throws(()=>assertPreviewStorageBudget(disk,sourceBytes),/exceed 100 GiB.*nothing was deleted/);
+});
 
 test('preview failure explains texture limits without hiding retained technical evidence',()=>{
   const raw='Command failed (2): Textures exceed the interactive preview budget; retained attempt view_test';
