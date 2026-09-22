@@ -52,7 +52,7 @@ const browser=assetBrowser({dialog:$('library-dialog'),context:()=>({project:p()
 const additions=worldAddQueue({context:()=>({projectId,sceneId}),run:processWorldAdd,
  changed:()=>{if(state)render();if(browser.isOpen)void browser.refresh().catch(e=>notice(e.message));},failed:e=>notice(e.message)});
 window.addEventListener('beforeunload',e=>{if(additions.state().count){e.preventDefault();e.returnValue='';}});
-function askAdd(title,body,buttons,kind,extra={}){browser.close();modal(title,body,buttons,'Cancel addition');return new Promise(resolve=>{addPrompt={resolve,kind,...extra};});}
+function askAdd(title,body,buttons,kind,extra={}){browser.close();modal(title,body,buttons,'Cancel addition');if(kind==='prepare'||kind==='use')$('dialog').classList.add('preparation-dialog');return new Promise(resolve=>{addPrompt={resolve,kind,...extra};});}
 async function askSourcePermission(snapshot){
  const use=snapshot.sourceUse;
  return askAdd('Permission to use these assets',`<p>For production <strong>${esc(snapshot.project.name)}</strong></p><label class="preparation-confirm"><input id="world-use-confirm" type="checkbox"><span>I have the right to use and adapt these exact assets for this production and will follow their terms and required credits.</span></label><p>No permission for future versions, redistribution or model training.</p><details><summary>Assets and exact scope</summary><pre>${esc(use.message)}</pre></details>`,b('Confirm & continue','world-use-confirm',{},'primary',true),'use',{revision:snapshot.project.revision,projectId:snapshot.project.id,scopeHash:use.scopeHash});
