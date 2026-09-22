@@ -38,6 +38,11 @@
 .viewer-message details{overflow-wrap:anywhere}
 .world-canvas [data-viewer-state="ready"] .viewer-status,.world-asset-dialog [data-viewer-state="ready"] .viewer-status{display:none}
 .world-canvas .viewer-toolbar{padding:10px 18px}.world-canvas .viewer-toolbar button{font-size:12px;min-height:34px}
+.world-savebar{position:sticky;top:0;z-index:8;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;margin:0 0 16px;background:var(--raised);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 14px #0003}
+.world-savebar>div{display:flex;gap:8px;flex-shrink:0}.world-savebar [role=status]{font-size:13px;color:var(--sub)}
+[data-add-queue]{padding:10px 16px;margin-bottom:12px;background:var(--raised);border:1px solid var(--line);border-radius:6px}[data-add-queue]:empty{display:none}
+.world-savebar button{min-height:42px}.world-savebar button:focus-visible{outline:2px solid #b7d8ff;outline-offset:3px}
+@media(max-width:500px){.world-savebar{align-items:flex-start;flex-direction:column}.world-savebar>div{width:100%}.world-savebar button{flex:1}}
 .world-next{display:flex;gap:22px;align-items:center;padding:22px 0 20px;border-bottom:1px solid var(--line)}
 .world-next h2{font-size:20px;margin-bottom:5px}.world-next p{max-width:620px}
 .world-next-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}

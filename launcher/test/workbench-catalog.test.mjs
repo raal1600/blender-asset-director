@@ -137,3 +137,30 @@ test('import into a kept world still hashes its checkpoint and rechecks native s
  await assert.rejects(f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true}),/checkpoint changed/);
  assert.equal(f.calls.filter(a=>a[0]==='job-prepare').length,prepared);
 });
+
+test('several draft additions need one save; undo restores the parent without deleting history',async t=>{
+ const f=await fixture(t);let p=await f.select();await f.work.attest(p.id,p.revision,true);
+ const add=async()=>{p=await f.fresh();await f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,version:f.asset.version,file:f.file,confirmed:true});p=await f.wait();return p.workbench.scenes[0].checkpoints.at(-1);};
+ const first=await add(),firstBytes=await fs.readFile(path.join(p.directory,first.path));
+ const second=await add();let s=p.workbench.scenes[0];
+ assert.equal(second.parent,first.id);assert.equal(s.current,null);assert.equal(s.candidate,second.id);assert.deepEqual(s.completed,{});
+ const prepare=f.calls.filter(a=>a[0]==='job-prepare').at(-1);assert.equal(prepare[prepare.indexOf('--input')+1],path.join(p.directory,first.path));
+ p=await f.work.undoWorld(p.id,f.sceneId,p.revision);s=p.workbench.scenes[0];assert.equal(s.candidate,first.id);assert.equal(s.checkpoints.length,2);
+ assert.deepEqual(await fs.readFile(path.join(p.directory,first.path)),firstBytes);assert.ok(await exists(path.join(p.directory,second.path)));
+ const third=await add();assert.equal(third.parent,first.id);
+ p=await f.work.keepBuilding(p.id,f.sceneId,p.revision);s=p.workbench.scenes[0];assert.equal(s.current,third.id);assert.equal(s.candidate,null);assert.equal(s.stage,'world');assert.deepEqual(s.completed,{});
+ await assert.rejects(f.work.undoWorld(p.id,f.sceneId,p.revision),/No idle/);
+});
+
+test('failed, stale-version and changed-input additions cannot replace the existing draft',async t=>{
+ const f=await fixture(t);let p=await f.select();await f.work.attest(p.id,p.revision,true);
+ await f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true});p=await f.wait();const cp=p.workbench.scenes[0].checkpoints[0];
+ await assert.rejects(f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,version:'0'.repeat(64),file:f.file,confirmed:true}),/version changed/);
+ const real=f.runtime.harness;f.runtime.harness=async args=>{if(args[0]==='job-run')throw Error('synthetic worker failure');return real(args);};
+ const failed=await f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true});p=await f.wait();
+ assert.equal(p.workbench.scenes[0].candidate,cp.id);assert.equal(p.workbench.scenes[0].checkpoints.length,1);
+ assert.equal((await f.store.runs(p.id)).find(r=>r.id===failed.run.id).state,'FAILED');
+ f.runtime.harness=real;await fs.writeFile(path.join(p.directory,cp.path),'changed synthetic draft');
+ await assert.rejects(f.work.catalogJob(p.id,f.sceneId,p.revision,{assetId:f.aid,file:f.file,confirmed:true}),/checkpoint changed/);
+ await assert.rejects(f.work.keepBuilding(p.id,f.sceneId,p.revision),/Candidate changed/);
+});

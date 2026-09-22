@@ -39,6 +39,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assets['/library-usage.mjs']='library-usage.mjs';
         assets['/library-preparation.mjs']='library-preparation.mjs';
         assets['/workbench-world.mjs']='workbench-world.mjs';
+        assets['/world-add-flow.mjs']='world-add-flow.mjs';
         assets['/workbench-world.css']='workbench-world.css';
         assets['/viewer-3d.mjs']='viewer-3d.mjs';
         assets['/icon.svg']='icon.svg';
@@ -116,6 +117,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='viewer-prepare')return viewers.prepare(id,sid,rev,body.request);
             if(command==='catalog-job')return workbench.catalogJob(id,sid,rev,body.request);
             if(command==='keep-building')return workbench.keepBuilding(id,sid,rev);
+            if(command==='world-undo')return workbench.undoWorld(id,sid,rev);
             if(command==='source')return workbench.selectSource(id,sid,rev,body.sourceId,body.selected);
             if(command==='inspect')return workbench.inspect(id,sid,rev,body.checkpointId);
             if(command==='import')return workbench.importCheckpoint(id,sid,rev,body.sourceScene);

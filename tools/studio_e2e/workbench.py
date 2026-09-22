@@ -95,7 +95,7 @@ def review_scene(s):
             dialog.accept()
         page.on('dialog', confirm)
         try:
-            click('[data-action="keep-building"]')
+            click('[data-action="save-world"]')
             assert not s.api('workbench/state?projectId='+s.project['id'])['project']['workbench']['scenes'][0]['completed']
             click('[data-action="approve"]')
         finally:
@@ -176,19 +176,42 @@ def catalog_and_film(s, click, idle, check):
         raise AssertionError('Workbench native operation did not finish')
 
     click('.ingredient[data-action="catalog-detail"][data-id="' + aid + '"]')
-    click('[data-action="catalog-inspect"]')
-    scene = settle()
-    assert scene['assetContents'][aid]['collections']
-    click('.ingredient[data-action="catalog-detail"][data-id="' + aid + '"]')
-    page.locator('[name="catalog-collection"]').first.check()
     def confirm(dialog):
         dialog.accept()
     page.on('dialog', confirm)
-    click('[data-action="catalog-import"]')
-    scene = settle()
+    def add_and_wait(previous=None):
+        click('[data-action="world-add"]')
+        deadline = time.monotonic() + 220
+        while True:
+            snapshot = state()
+            result = snapshot['project']['workbench']['scenes'][0]
+            if result['candidate'] and result['candidate'] != previous and not snapshot['locked']:
+                break
+            if page.locator('#dialog[open] [name="world-collection"]').count():
+                page.locator('#dialog[open] [name="world-collection"]').first.check()
+                click('#dialog[open] [data-action="world-collections-selected"]')
+            assert time.monotonic() < deadline, 'Automatic add did not finish'
+            page.wait_for_timeout(200)
+        expect(page.locator('.world-savebar [data-action="save-world"]')).to_be_enabled(timeout=30000)
+        return result
+
+    scene = add_and_wait()
     imported = next(c for c in scene['checkpoints'] if c['id'] == scene['candidate'])
     assert any(o.get('asset_id') == aid and o.get('import_job') == imported['jobId'] for o in imported['audit']['objects'])
     assert scene['current'] != imported['id']
+    saved_before_add = scene['current']
+    click('.ingredient[data-action="catalog-detail"][data-id="' + aid + '"]')
+    scene = add_and_wait(imported['id'])
+    second = next(c for c in scene['checkpoints'] if c['id'] == scene['candidate'])
+    assert second['parent'] == imported['id'] and scene['current'] == saved_before_add
+    assert any(o.get('import_job') == imported['jobId'] for o in second['audit']['objects'])
+    assert any(o.get('import_job') == second['jobId'] for o in second['audit']['objects'])
+    click('[data-action="world-undo"]')
+    scene = state()['project']['workbench']['scenes'][0]
+    assert scene['candidate'] == imported['id'] and scene['current'] == saved_before_add
+    assert digest(s.project_dir / imported['path']) == imported['sha256']
+    assert digest(s.project_dir / second['path']) == second['sha256']
+    check.update(unsaved_draft_extension=second['id'], undo_preserves_checkpoints=True)
     # Preview the still-unapproved candidate through the actual UI and worker.
     # Cancelling the dialog must not prepare a job or synthesize a review.
     before_jobs = len(state()['project']['jobs'])
@@ -218,7 +241,7 @@ def catalog_and_film(s, click, idle, check):
     page.screenshot(path=str(s.evidence.directory / 'workbench-candidate-preview.png'))
     check.update(candidate_preview_job=scene['preview']['jobId'],
                  candidate_preview_without_approval=True, candidate_preview_browser_decoded=True)
-    click('[data-action="keep-building"]')
+    click('[data-action="save-world"]')
     scene = state()['project']['workbench']['scenes'][0]
     assert scene['stage'] == 'world' and scene['current'] == imported['id'] and not scene['candidate']
     assert not scene['completed'].get('world')

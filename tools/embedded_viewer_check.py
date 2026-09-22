@@ -52,7 +52,8 @@ def main():
         try:
             page.goto(session['origin']+'/workbench#'+session['token']);idle()
             click('[data-action="project"][data-id="'+session['projectId']+'"]')
-            assert 'New change · not kept' in page.locator('body').inner_text()
+            expect(page.locator('.world-savebar')).to_contain_text('Unsaved changes')
+            expect(page.locator('.world-savebar [data-action="save-world"]')).to_be_enabled()
             host=ready('[data-scene-viewer]')
             page.screenshot(path=str(output/'01-saved-checkpoint.png'))
             report['checks'].append('Camera-free checkpoint conversion and actual WebGL canvas')
@@ -120,7 +121,7 @@ def main():
             assert sha(session['catalog'])==catalog_before,'Viewer changed live synthetic catalog'
             assert all(sha(f['path'])==f['sha256'] for f in session['sourceFiles'])
             assert not report['errors'],report['errors'];assert not report['external_requests'],report['external_requests']
-            forbidden=['asset-preview','catalog-select','catalog-job','approve','keep-building','run','task-open']
+            forbidden=['asset-preview','catalog-select','catalog-job','approve','keep-building','world-undo','source-prepare','source-confirm','run','task-open']
             assert not any(r['method']=='POST' and r['path'].split('/')[-1] in forbidden for r in report['requests'])
             report['checks'].extend(['Scene navigation releases canvas','Originals, catalog and manifest unchanged','No external fetches or scene/approval/native-window requests'])
             report['status']='PASS'
