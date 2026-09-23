@@ -1,3 +1,4 @@
+import {validateRenderDevice} from './render-device.mjs';
 /** Real local scene work. No prototype fixtures, fake progress, or model calls. */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -266,6 +267,7 @@ export class Workbench {
       assert(confirmed===true,'Explicit render authorization required.');assert(cap.encoder,'Configure FFmpeg and FFprobe before rendering a review movie.',409);
       assert(s.readiness?.checkpointId===cp.id,'Check render readiness for this exact checkpoint first.',409);
       if(shot)assert(options?.camera===shot.camera&&options.start===shot.start&&options.end===shot.end,'Render camera or timing differs from the selected shot. Edit the shot definition first.',409);
+      validateRenderDevice(options?.render_device,s.readiness.data,cap);
       options={...options,readiness_job:s.readiness.jobId};
     }
     if(operation==='preview') {

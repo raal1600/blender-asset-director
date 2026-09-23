@@ -1,9 +1,11 @@
-"""Blender-only read-only readiness and bounded CPU sequence rendering."""
+"""Blender-only readiness and explicitly selected, bounded CPU/OptiX rendering."""
 from fractions import Fraction
 from pathlib import Path
 import bpy
 from .core import file_hash, require
 from .render_sequence import readiness, validate
+from . import render_devices_blender as devices
+from .render_devices import selection
 
 
 def dependencies():
@@ -64,7 +66,9 @@ def audit():
         blockers.append("Render source scenes, not a scene with an active sequencer")
     if (getattr(scene, "use_nodes", False) or getattr(scene, "compositing_node_group", None)) and scene.render.use_compositing:
         blockers.append("Compositor output requires a separately reviewed adapter")
-    return {"kind": "RENDER_READINESS", "frame_range": [scene.frame_start, scene.frame_end],
+    observed_devices, device_warnings = devices.discover()
+    return {"render_devices": observed_devices, "device_warnings": device_warnings,
+            "kind": "RENDER_READINESS", "frame_range": [scene.frame_start, scene.frame_end],
             "fps": {"numerator": fps.numerator, "denominator": fps.denominator},
             "cameras": sorted(o.name for o in scene.objects if o.type == "CAMERA"),
             "camera": scene.camera.name if scene.camera else None,
@@ -79,7 +83,8 @@ def render(lib, spec, directory):
     count = validate(options)
     before = audit()
     approved, _ = readiness(lib, options["readiness_job"], spec["inputs"][0]["path"])
-    require(before == approved, "STALE_READINESS", "Scene or external dependencies changed after readiness review")
+    scene_fields = lambda record: {k: v for k, v in record.items() if k not in {"render_devices", "device_warnings"}}
+    require(scene_fields(before) == scene_fields(approved), "STALE_READINESS", "Scene or external dependencies changed after readiness review")
     require(not before["blockers"], "RENDER_BLOCKED", "; ".join(before["blockers"]))
     scene = bpy.context.scene
     camera = scene.objects.get(options["camera"])
@@ -90,7 +95,7 @@ def render(lib, spec, directory):
         marker.camera = None
     scene.camera = camera
     scene.render.engine = "CYCLES"
-    scene.cycles.device = "CPU"
+    device_evidence = devices.configure(options, approved)
     scene.cycles.samples = options["samples"]
     scene.cycles.use_adaptive_sampling = False
     scene.render.resolution_x, scene.render.resolution_y = options["width"], options["height"]
@@ -117,9 +122,11 @@ def render(lib, spec, directory):
     after, blockers = dependencies()
     require(after == before["dependencies"] and not blockers,
             "STALE_RENDER_DEPENDENCIES", "External inputs changed during rendering; output is not accepted")
-    return {"kind": "RENDERED_FRAME_SEQUENCE", "delivery_master": False,
+    require(devices.evidence(selection(options), device_evidence["name"]) == device_evidence,
+            "RENDER_DEVICE_CHANGED", "Render device evidence changed during execution")
+    return {"render_device": device_evidence, "kind": "RENDERED_FRAME_SEQUENCE", "delivery_master": False,
             "width": options["width"], "height": options["height"], "fps": before["fps"],
             "frame_count": count, "frames": frames, "camera": camera.name,
             "source_sha256": spec["inputs"][0]["sha256"], "dependencies": after,
-            "engine": "CYCLES_CPU", "samples": options["samples"],
+            "engine": "CYCLES_" + device_evidence["backend"], "samples": options["samples"],
             "human_acceptance": "PENDING", "audio": "NONE"}

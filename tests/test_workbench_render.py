@@ -88,6 +88,22 @@ class RenderContractTests(unittest.TestCase):
                 self.refusal(lambda: contract.validate(value), 'INVALID_SCHEMA')
         self.refusal(lambda: contract.validate({**self.options, 'script': 'anything'}), 'INVALID_SCHEMA')
 
+    def test_gpu_selection_is_observed_and_bound_to_job_identity(self):
+        gpu = {'backend': 'OPTIX', 'id': 'synthetic-gpu'}
+        self.refusal(lambda: jobs.prepare(self.lib, 'render-frames', str(self.source),
+                     options={**self.options, 'render_device': gpu}), 'RENDER_DEVICE_UNAVAILABLE')
+        self.audit['render_devices'] = [{**gpu, 'name': 'Synthetic GPU'}]
+        synthetic_success(self.lib, self.ready, self.audit)
+        cpu = jobs.prepare(self.lib, 'render-frames', str(self.source), options=self.options)
+        options = {**self.options, 'render_device': gpu}
+        native = jobs.prepare(self.lib, 'render-frames', str(self.source), options=options)
+        self.assertNotEqual(cpu['id'], native['id'])
+        self.assertEqual(native['specification']['options']['render_device'], gpu)
+        self.assertEqual(native, jobs.prepare(self.lib, 'render-frames', str(self.source), options=options))
+        self.refusal(lambda: jobs.prepare(self.lib, 'render-frames', str(self.source),
+                     options={**options, 'end': 360, 'width': 1920, 'height': 1080, 'samples': 128}), 'RESOURCE_LIMIT')
+        self.assertEqual(self.source.read_bytes(), b'BLENDER-v420SYNTHETIC UNIT TEST ONLY')
+
     def test_rejects_boolean_noninteger_and_unbounded_values(self):
         for key in ['start', 'end', 'width', 'height', 'samples']:
             for value in [True, '32', 1.5]:
