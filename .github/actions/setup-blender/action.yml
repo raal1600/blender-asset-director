@@ -19,8 +19,13 @@ runs:
         from pathlib import Path
         destination = Path(os.environ['RUNNER_TEMP']) / 'verified-blender'
         result = subprocess.run([sys.executable, 'tools/fetch_blender.py',
-            os.environ['BLENDER_VERSION'], str(destination)], check=True,
-            capture_output=True, text=True, encoding='utf-8')
+            os.environ['BLENDER_VERSION'], str(destination)],
+            stdout=subprocess.PIPE, text=True, encoding='utf-8')
+        # Inherit stderr: transport errors/progress must remain visible even on
+        # failure or cancellation. stdout is reserved for the verified path.
+        if result.returncode:
+            print(result.stdout, end='')
+            raise SystemExit(result.returncode)
         executable = result.stdout.strip().splitlines()[-1]
         if not Path(executable).is_file():
             raise RuntimeError('Verified Blender executable not found')

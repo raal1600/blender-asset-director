@@ -176,7 +176,9 @@ decodes H.264 MP4 using configured FFmpeg/FFprobe. No encoder is downloaded by
 normal launcher usage. Preview artifacts are not delivery masters.
 
 The initial output contract is silent, square-pixel H.264/yuv420p, up to 360 frames
-per shot, 1920×1080, 3600 assembled frames and bounded CPU execution. Clips must
+per shot, 1920×1080, 3600 assembled frames and bounded execution. CPU remains the
+default; an explicitly selected, observed OptiX GPU is supported for shot rendering
+(see [device selection](GPU_RENDERING.md)). Encoding still uses bounded CPU. Clips must
 share an exact frame rate and dimensions. The assembler refuses silent retiming,
 rescaling or missing/tampered frames. Audio, transitions, compositor/VSE scenes,
 and broader simulation delivery need explicit additional engineering.

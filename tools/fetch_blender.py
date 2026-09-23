@@ -6,65 +6,64 @@ A fallback to the original publisher is bounded; TLS/checksum checks stay enable
 from pathlib import Path
 import hashlib
 import re
-import shutil
 import sys
 import tarfile
 import zipfile
-import urllib.error
-import urllib.request
+import time
+from blender_download import download
 
 BASES = ("https://mirror.blender.org/release/", "https://download.blender.org/release/")
-USER_AGENT = "BlenderAssetDirector/0.1 (+https://github.com/raal1600/blender-asset-director)"
+ARCHIVE_LIMIT = 2 * 1024**3
 
 
-class SecureRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if not newurl.startswith("https://"):
-            raise RuntimeError("Refusing a non-HTTPS Blender mirror redirect")
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
+def checksum(manifest, filename):
+    lines = [line.split() for line in manifest.decode("utf-8").splitlines() if line.strip()]
+    matches = [parts[0] for parts in lines if len(parts) == 2 and parts[1].lstrip("*") == filename]
+    if len(matches) != 1 or not re.fullmatch(r"[0-9a-fA-F]{64}", matches[0]):
+        raise SystemExit("Official checksum entry missing or ambiguous")
+    return matches[0].lower()
+
+
+def acquire(version, filename, dest):
+    suffix = "Blender" + ".".join(version.split(".")[:2]) + "/"
+    expected = None
+    for index, root in enumerate(BASES):
+        manifest = dest / ("checksum-attempt-" + str(index) + ".txt")
+        if download(root + suffix + f"blender-{version}.sha256", manifest, seconds=40, maximum=65536):
+            expected = checksum(manifest.read_bytes(), filename)
+            break
+    if expected is None:
+        raise SystemExit("Official checksum download failed after both bounded sources")
+    # Keep one trusted checksum across archive mirrors and every retry.
+    for attempt in range(4):
+        if attempt >= len(BASES):
+            time.sleep(2)
+        root = BASES[attempt % len(BASES)]
+        archive = dest / (filename + ".attempt-" + str(attempt))
+        if not download(root + suffix + filename, archive, seconds=150, maximum=ARCHIVE_LIMIT):
+            print("Retrying official source after transport failure; attempt retained", file=sys.stderr, flush=True)
+            continue
+        with archive.open("rb") as stream:
+            actual = hashlib.file_digest(stream, "sha256").hexdigest()
+        if actual != expected:
+            # Never retry corrupt bytes into a passing integrity claim.
+            raise SystemExit("Official Blender checksum mismatch; failed archive retained")
+        print("Verified Blender archive SHA256: " + actual, file=sys.stderr, flush=True)
+        return archive
+    raise SystemExit("Official archive download failed after four bounded attempts")
 
 
 def main(version, directory):
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise SystemExit("Invalid fixed version")
-    suffix = "Blender" + ".".join(version.split(".")[:2]) + "/"
     windows = sys.platform == 'win32'
     platform = 'windows-x64' if windows else 'linux-x64'
     filename = f"blender-{version}-{platform}." + ('zip' if windows else 'tar.xz')
     dest = Path(directory).resolve()
     dest.mkdir(parents=True, exist_ok=True)
-    opener = urllib.request.build_opener(SecureRedirect())
-    def get(url, timeout):
-        return opener.open(urllib.request.Request(url, headers={"User-Agent": USER_AGENT}), timeout=timeout)
-    errors = []
-    manifest = None
-    for root in BASES:
-        base = root + suffix
-        try:
-            with get(base + f"blender-{version}.sha256", 60) as response:
-                manifest = response.read(65537)
-            if len(manifest) > 65536:
-                raise RuntimeError("Unexpectedly large Blender checksum manifest")
-            manifest = manifest.decode("utf-8")
-            break
-        except (urllib.error.URLError, OSError) as exc:
-            errors.append(type(exc).__name__ + ": " + str(exc))
-            print("Blender checksum source unavailable: " + root, file=sys.stderr)
-    if manifest is None:
-        raise SystemExit("Official checksum download failed: " + "; ".join(errors))
-    lines = [line.split() for line in manifest.splitlines() if line.strip()]
-    matches = [parts[0] for parts in lines if len(parts) == 2 and parts[1].lstrip("*") == filename]
-    if len(matches) != 1 or not re.fullmatch(r"[0-9a-fA-F]{64}", matches[0]):
-        raise SystemExit("Official checksum entry missing or ambiguous")
-    expected = matches[0].lower()
-    archive = dest / filename
-    with get(base + filename, 120) as response, archive.open("wb") as out:
-        shutil.copyfileobj(response, out, 1024 * 1024)
-    with archive.open("rb") as stream:
-        actual = hashlib.file_digest(stream, "sha256").hexdigest()
-    if actual != expected:
-        archive.unlink(missing_ok=True)
-        raise SystemExit("Official Blender checksum mismatch")
+    if any(dest.iterdir()):
+        raise SystemExit("Use a new empty Blender download directory; previous attempts are preserved")
+    archive = acquire(version, filename, dest)
     if windows:
         with zipfile.ZipFile(archive) as zipped:
             for member in zipped.infolist():

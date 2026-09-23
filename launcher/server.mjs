@@ -36,6 +36,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assert(req.method === 'GET','Method not allowed.',405);
         const assets = {'/asset-presentation.mjs':'asset-presentation.mjs','/workbench-browser.mjs':'workbench-browser.mjs','/workbench-images.mjs':'workbench-images.mjs','/':'workbench.html','/index.html':'workbench.html','/workbench-scope.mjs':'workbench-scope.mjs','/workbench-evidence.mjs':'workbench-evidence.mjs','/workbench-studio.mjs':'workbench-studio.mjs','/workbench':'workbench.html','/workbench.mjs':'workbench.mjs','/workbench.css':'workbench.css','/workbench-library.mjs':'workbench-library.mjs','/workbench-task.mjs':'workbench-task.mjs','/workbench-shots.mjs':'workbench-shots.mjs','/workbench-lineage.mjs':'workbench-lineage.mjs'};
         assets['/workbench-progress.mjs']='workbench-progress.mjs';
+        assets['/workbench-render-device.mjs']='workbench-render-device.mjs';
         assets['/library-usage.mjs']='library-usage.mjs';
         assets['/library-preparation.mjs']='library-preparation.mjs';
         assets['/workbench-world.mjs']='workbench-world.mjs';

@@ -153,7 +153,7 @@ test('paged source HTTP is authenticated, read-only, compact opt-in and compatib
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'ad-library-browser-'));
   const runtime={health:null,harness:async()=>({schema:1,catalog:true,task_workspace:true})};
   const app=await createApp({root,config:{},port:0,runtime});
-  for(const module of ['library-usage.mjs','library-preparation.mjs']) {
+  for(const module of ['library-usage.mjs','library-preparation.mjs','workbench-render-device.mjs']) {
     const response=await fetch(app.origin+'/'+module);assert.equal(response.status,200);
     assert.match(response.headers.get('content-type'),/javascript/);
   }

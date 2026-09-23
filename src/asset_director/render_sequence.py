@@ -5,14 +5,17 @@ scene ownership, distribution rights, or human approval happens in this module.
 """
 from pathlib import Path
 from .core import fields, file_hash, load_json, require
+from .render_devices import selection, require_observed
 
-FIELDS = {"readiness_job", "camera", "start", "end", "width", "height", "samples"}
+REQUIRED = {"readiness_job", "camera", "start", "end", "width", "height", "samples"}
+FIELDS = REQUIRED | {"render_device"}
 MAX_FRAMES = 360
 MAX_PIXEL_SAMPLES = 2_000_000_000
 
 
 def validate(options):
-    fields(options, FIELDS, FIELDS)
+    fields(options, FIELDS, REQUIRED)
+    selection(options)
     require(isinstance(options["readiness_job"], str) and
             len(options["readiness_job"]) == 26 and options["readiness_job"].startswith("j_") and
             all(c in "0123456789abcdef" for c in options["readiness_job"][2:]),
@@ -28,9 +31,9 @@ def validate(options):
     require(16 <= options["width"] <= 1920 and 16 <= options["height"] <= 1080 and
             options["width"] % 2 == options["height"] % 2 == 0,
             "RESOURCE_LIMIT", "Use even dimensions from 16x16 through 1920x1080")
-    require(1 <= options["samples"] <= 128, "RESOURCE_LIMIT", "Use one to 128 CPU samples")
+    require(1 <= options["samples"] <= 128, "RESOURCE_LIMIT", "Use one to 128 samples")
     require(count * options["width"] * options["height"] * options["samples"] <= MAX_PIXEL_SAMPLES,
-            "RESOURCE_LIMIT", "This shot exceeds the CPU work budget; reduce range, dimensions or samples")
+            "RESOURCE_LIMIT", "This shot exceeds the bounded render work budget; reduce range, dimensions or samples")
     return count
 
 
@@ -62,6 +65,7 @@ def prepare(lib, options, input_file):
             "TARGET_REQUIRED", "Render a saved .blend checkpoint")
     audit, dependency = readiness(lib, options["readiness_job"], input_file)
     verify_external(audit)
+    require_observed(selection(options), audit)
     require(not audit["blockers"], "RENDER_BLOCKED", "; ".join(audit["blockers"]))
     require(options["camera"] in audit["cameras"], "CAMERA_REQUIRED", "Camera was not observed in this checkpoint")
     require(audit["frame_range"][0] <= options["start"] <= options["end"] <= audit["frame_range"][1],
