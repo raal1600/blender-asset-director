@@ -158,6 +158,21 @@ repository-settings change is introduced here.
 
 ## Reproduce and diagnose
 
+Blender setup now streams downloader errors to the job log instead of hiding
+stderr inside a failed subprocess. Checksum fetches have a 40-second wall-clock
+deadline per official source. Archive transport tries the existing official
+mirror and publisher, at most twice each, with 150 seconds per attempt and two
+seconds of backoff in the second round. A separate owned download process makes
+the deadline apply to slow trickle transfers as well as stalled sockets.
+
+Every archive attempt uses the same verified-manifest SHA256. Checksum mismatch,
+invalid/ambiguous manifest, TLS verification failure, insecure redirect, excessive
+size, and non-transient HTTP errors remain terminal failures. Interrupted attempts
+are retained in the disposable runner directory, never appended to or treated as
+verified archives. Setup requires an empty destination. No checksum, fixture,
+required evidence partition, native test or job deadline is relaxed. A retry
+passing is not a retroactive pass for the failed attempt.
+
 ```sh
 python tools/run_checks.py --offline
 python tools/ci/run_bootstrap.py --shell sh --evidence /temporary/install-evidence
