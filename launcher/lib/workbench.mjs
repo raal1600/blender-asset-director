@@ -1,5 +1,6 @@
 import {openAssetPreview} from './asset-preview.mjs';
 import {focusTask} from './workbench-task.mjs';
+import {syncTask} from './task-save.mjs';
 /** Scene workbench facade: native file/catalog adapters over the shared job lifecycle. */
 import fs from 'node:fs/promises';
 import {constants} from 'node:fs';
@@ -14,6 +15,7 @@ import {assertBlendEnvelope} from './workbench-files.mjs';
 export class Workbench extends withCatalog(WorkbenchCore) {
   previewAsset(...args){return openAssetPreview(this,...args);}
   focusTask(...args){return focusTask(this,...args);}
+  syncTask(...args){return syncTask(this,...args);}
   saveShot(...args){return saveShot(this,...args);}
   selectShot(...args){return selectShot(this,...args);}
   async openTask(id,sceneId,revision,context={}) {

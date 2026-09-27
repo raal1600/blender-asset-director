@@ -188,12 +188,12 @@ export class Workbench {
     const taskId=uid('task_');await this.lock(p,taskId);
     const task={schema:1,id:taskId,projectId:id,sceneId,stage:s.stage,projectDirectory:p.directory,library:this.config.library,
       input,workingScene:`Scenes/${sceneId}--edit-${taskId}.blend`,checkpointScene:`Scenes/${sceneId}--saved-${taskId}.blend`,
-      returnFile:`Docs/Workbench/${taskId}-return.json`,selectedSources,targets,camera,frame,...(frameRange?{frameRange}:{}),action:'workbench-edit',state:'RUNNING',startedAt:now()};
+      returnFile:`Docs/Workbench/${taskId}-return.json`,selectedSources,targets,camera,frame,...(frameRange?{frameRange}:{}),...(cap.explicit_save_handoff?{handoff:'explicit-save-v1'}:{}),action:'workbench-edit',state:'RUNNING',startedAt:now()};
     const file=await safe(p.directory,`Runs/${taskId}.json`);
     try {
       await writeJson(file,task);s.task=taskId;await this.store.save(p,p.revision);
       task.processId=await this.runtime.launchWorkbenchTask(p,file);await writeJson(file,task);
-      return {task,project:await this.store.get(id),message:'A dedicated Blender working window was requested. Its existing MCP connection is not claimed. Save using F3 → Save checkpoint and return to launcher.'};
+      return {task,project:await this.store.get(id),message:task.handoff?'Blender editing copy opened. Save to keep changes, then close Blender to return. Don’t Save discards edits since your last save. Saving is not approval.':'A dedicated Blender working window was requested. Its existing MCP connection is not claimed. Save using F3 → Save checkpoint and return to launcher.'};
     } catch(e) {task.state='FAILED';task.error=e.message;await writeJson(file,task);
       const q=await this.project(id);this.scene(q,sceneId).task=null;await this.store.save(q,q.revision);
       await this.unlock(p,taskId);throw e;}
@@ -201,6 +201,7 @@ export class Workbench {
   async collectTask(id,sceneId,revision) {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);assert(validId(s.task,'task_'),'No task is waiting.');
     const task=await json(await safe(p.directory,`Runs/${s.task}.json`));
+    assert(!task.handoff,'This task returns saved changes automatically after Blender closes.',409);
     assert(task.projectId===id&&task.sceneId===sceneId,'Task identity mismatch.');
     const returned=await safe(p.directory,task.returnFile);
     const statusFile=await safe(p.directory,`Docs/Workbench/${task.id}-status.json`);
@@ -229,6 +230,11 @@ export class Workbench {
     assert(!this.running.has(runId),'This process still owns the running operation. Wait for it to finish.',409);
     const file=await safe(p.directory,`Runs/${runId}.json`),r=await json(file);
     assert(r.projectId===id&&r.sceneId===sceneId,'Operation belongs to another scene.',409);
+    if(r.handoff==='explicit-save-v1') {
+      assert(this.runtime.inspectWorkbenchTask&&(await this.runtime.inspectWorkbenchTask(p,r)).state==='stopped','The dedicated Blender process has not been confirmed stopped.',409);
+      assert(!await exists(await safe(p.directory,`Docs/Workbench/${r.id}-explicit-save.json`)),
+        'Explicit saved changes exist. Return them with task-sync; recovery must not discard them.',409);
+    }
     if(r.action==='source-prepare') {
       const attempt=await safe(this.store.root,`SystemRuntime/UserData/LibraryPreparations/${runId}`);
       const jobs=await safe(attempt,'library/jobs');

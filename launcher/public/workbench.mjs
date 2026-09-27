@@ -36,7 +36,7 @@ const thumbnails=imageLoader({fetchImage:async url=>{const r=await fetch(url,{he
 const p=()=>state?.project,s=()=>p()?.workbench.scenes.find(x=>x.id===sceneId),cp=()=>s()?.checkpoints.find(c=>c.id===(s().candidate||s().current));
 const b=(text,action,data={},cls='',disabled=false)=>`<button class="${cls}" data-action="${action}" ${Object.entries(data).map(([k,v])=>`data-${k}="${esc(v)}"`).join(' ')} ${disabled?'disabled':''}>${esc(text)}</button>`;
 const next=(name,args={})=>api('workbench/'+name,{projectId,sceneId,revision:p().revision,...args});
-function notice(message){$('notice').hidden=!message;$('notice').textContent=message||'';const local=$('browser-notice');if(local){local.hidden=!message;local.textContent=message||'';}}
+function notice(message,kind='error'){$('notice').hidden=!message;$('notice').textContent=message||'';$('notice').dataset.kind=kind;$('notice').setAttribute('role',kind==='success'?'status':'alert');const local=$('browser-notice');if(local){local.hidden=!message;local.textContent=message||'';}}
 async function perform(fn){if(busy)return;busy=true;document.body.classList.add('working');$('app').classList.add('busy');notice('');try{await fn();}catch(e){try{if(projectId)await load();}catch{}notice(e.message);}finally{busy=false;document.body.classList.remove('working');$('app').classList.remove('busy');syncConsentButtons();}}
 async function load(){overview=await api('state?compact=true');if(projectId&&!overview.projects.some(x=>x.id===projectId))projectId=null;if(projectId){state=await api('workbench/state?'+new URLSearchParams({projectId,compact:true}));if(!p().workbench.scenes.some(x=>x.id===sceneId))sceneId=p().workbench.scenes[0]?.id;sessionStorage.setItem('wb-project',projectId);sessionStorage.setItem('wb-scene',sceneId||'');}else state=null;render();if(browser.isOpen)await browser.refresh();}
 function modal(title,body,buttons,back='Cancel'){clearAssetViewer();$('dialog').className='';delete $('dialog').dataset.returnLibrary;delete $('dialog').dataset.catalogId;$('dialog').setAttribute('aria-labelledby','detail-title');$('dialog').innerHTML=`<header class="detail-head"><h2 id="detail-title">${esc(title)}</h2>${b('Close','dismiss',{},'ghost small')}</header>${body}<footer>${b(back,'close',{},'ghost')}${buttons||''}</footer>`;if(!$('dialog').open)$('dialog').showModal();$('dialog').querySelector('input,button')?.focus();}
@@ -231,7 +231,13 @@ setInterval(async()=>{
  if(!projectId||!state||busy||$('dialog').open||browser.isOpen||!state.locked)return;
  const selectedProject=projectId,selectedScene=sceneId;
  try {
-  const v=await pollStatus(!!s()?.run,Date.now(),()=>api('workbench/state?projectId='+encodeURIComponent(selectedProject)+'&compact=true'));
+  const v=await pollStatus(!!s()?.run,Date.now(),async()=>{
+   if(s()?.task) {
+    try {const result=await api('workbench/task-sync',{projectId:selectedProject,sceneId:selectedScene,revision:p().revision});if(result.changed)notice(result.message,'success');}
+    catch(e){notice(e.message);}
+   }
+   return api('workbench/state?projectId='+encodeURIComponent(selectedProject)+'&compact=true');
+  });
   if(!v)return;
   if(projectId!==selectedProject||sceneId!==selectedScene||busy||$('dialog').open)return;
   const at=Date.now();
