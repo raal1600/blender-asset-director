@@ -89,6 +89,10 @@ def export(destination, observed):
     if 'export_frame_range' in supported:
         args['export_frame_range'] = bool(observed.get('checkpoint'))
     from .world_preview import frozen_meshes
+    placement = None
+    if static and observed.get('checkpoint'):
+        from .world_transform import audit as placement_audit
+        placement = placement_audit()
     with frozen_meshes(static) as static_objects, preview_textures() as textures:
         result = bpy.ops.export_scene.gltf(**args)
     require('FINISHED' in result and destination.is_file() and destination.stat().st_size <= 128 * 1024**2,
@@ -96,5 +100,6 @@ def export(destination, observed):
     return {'kind': 'READ_ONLY_3D_INSPECTION', 'vertices': vertices, 'source_objects': len(objects),
             'preview_profile': profile, 'reference_frame': reference_frame,
             'static_objects': static_objects,
+            'placement': placement,
             'material_fidelity': 'GLTF_APPROXIMATION', 'human_acceptance': 'NOT_EVALUATED', 'textures': textures,
             'notice': 'Saved data, not a live Blender link or rendered evidence. No approval, import or scene edit.'}

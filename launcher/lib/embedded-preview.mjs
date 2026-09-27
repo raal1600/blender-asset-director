@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {assetPreviewSource} from './asset-preview.mjs';
 import {assert,digest,fileHash,inside,json,safe,slash,walk,writeJson} from './storage.mjs';
 import {MAX_VIEWER_BYTES,packageGLTF,validateGLB,verifiedPackage} from './viewer-gltf.mjs';
+import {bindWorldPreview} from './world-preview-bindings.mjs';
 
 export const MAX_PREVIEW_STORAGE_BYTES=100*1024**3;
 export const previewProfile = stage => stage==='world'?'world-static-v1':'inspection-v1';
@@ -34,7 +35,7 @@ async function checkpointSource(work,id,sceneId,revision,request) {
 }
 
 export class EmbeddedPreviews {
-  constructor(work){this.work=work;this.cache=new Map();this.owned=new Map();this.identity=Promise.all(['./embedded-preview.mjs','./viewer-gltf.mjs','./asset-preview.mjs','../public/viewer-3d.mjs','../public/vendor/three/VENDOR.json'].map(async name=>({name,...await fileHash(fileURLToPath(new URL(name,import.meta.url)))}))).then(digest);}
+  constructor(work){this.work=work;this.cache=new Map();this.owned=new Map();this.identity=Promise.all(['./embedded-preview.mjs','./viewer-gltf.mjs','./asset-preview.mjs','./world-preview-bindings.mjs','../public/world-draft.mjs','../public/world-editor.mjs','../public/viewer-3d.mjs','../public/vendor/three/VENDOR.json'].map(async name=>({name,...await fileHash(fileURLToPath(new URL(name,import.meta.url)))}))).then(digest);}
   async prepare(id,sceneId,revision,request) {
     assert(request&&typeof request==='object'&&!Array.isArray(request),'Expected a preview source.');
     const w=this.work,source=request.kind==='checkpoint'?await checkpointSource(w,id,sceneId,revision,request):await assetPreviewSource(w,id,sceneId,revision,request);
@@ -54,7 +55,7 @@ export class EmbeddedPreviews {
     const previewId='view_'+randomUUID(),directory=await safe(base,previewId);await fs.mkdir(directory);
     const requestFile=path.join(directory,'request.json');await writeJson(requestFile,source);
     try {
-      let model,adapter,nativeJob=null,nativeImplementation=null,texturePreview=null,referenceFrame=null;
+      let model,adapter,nativeJob=null,nativeImplementation=null,texturePreview=null,referenceFrame=null,placement=null;
       if(/\.(gltf|glb)$/i.test(source.file)&&!Object.keys(source.motion||{}).length) {
         model=await packageGLTF(source);adapter='verified-gltf';
       } else {
@@ -69,13 +70,14 @@ export class EmbeddedPreviews {
         const textures=receipt.data?.embedded_viewer?.textures;
         assert(receipt.data?.embedded_viewer?.preview_profile===profile,'Preview profile differs from this activity.',409);
         referenceFrame=receipt.data.embedded_viewer.reference_frame;
+        if(source.source_kind==='checkpoint'&&profile==='world-static-v1')placement=bindWorldPreview(model,receipt.data.embedded_viewer);
         assert(textures?.scope==='PREVIEW_ONLY'&&textures.originals_changed===false&&Number.isInteger(textures.reduced_images)&&textures.reduced_images>=0&&textures.reduced_images<=128,'Missing preview texture preservation evidence.');
         texturePreview={reducedImages:textures.reduced_images,sourcePixels:textures.source_pixels,previewPixels:textures.preview_pixels,originalsChanged:false};
       }
       const observed=validateGLB(model);await verifiedPackage(source);
       const filename=path.join(directory,'model.glb');await fs.writeFile(filename,model,{flag:'wx'});
       const record={previewId,projectId:id,sceneId,sourceId:source.id,version:source.version,title:source.title,kind:source.source_kind,
-        ...await fileHash(filename),profile,referenceFrame,adapter,implementation,nativeJob,nativeImplementation,texturePreview,observed,cached:false,inspectionOnly:true,selectionChanged:false,approved:false};
+        ...await fileHash(filename),profile,referenceFrame,placement,adapter,implementation,nativeJob,nativeImplementation,texturePreview,observed,cached:false,inspectionOnly:true,selectionChanged:false,approved:false};
       await writeJson(path.join(directory,'viewer.json'),record);
       this.owned.set(previewId,{record,filename,source});this.cache.set(key,record);return record;
     }catch(error){await writeJson(path.join(directory,'viewer-failure.json'),{previewId,state:'FAILED',error:error.message});throw Object.assign(new Error(error.message+' 3D attempt retained: '+previewId),{status:error.status});}

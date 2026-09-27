@@ -1,9 +1,18 @@
-# World direct editing: bounded Save foundation
+# World direct editing: visual draft and bounded Save
 
-This is an incremental implementation of the layered-editor plan. The native
-worker and authenticated Save boundary exist; viewer picking/gizmos, browser
-draft/undo controls, explicit preparation of older scenes and full browser E2E
-integration are still outstanding. This is not a completed interactive editor.
+This is an incremental implementation of the layered-editor plan. Prepared World
+instances support picking, Shift-click multi-selection, Ctrl+A, move/rotate/uniform
+scale handles, optional exact placement, local undo/discard and one explicit Save.
+Orbiting or dragging never starts Blender; Save submits one authenticated batch.
+Source assets remain inspection-only. Older/unsupported scenes retain the Blender
+route; explicit in-app preparation and the remaining layers are still outstanding.
+
+The converter binds native instance membership to exact exported GLB node indices.
+The client never guesses ownership from similar names or treats separate skin
+parts as independent characters. Blender Z-up matrices are transformed into the
+viewer coordinate system and back. Local changes do not approve World or write
+project metadata. Navigation and new mutations offer Save/Discard/Stay only when
+needed; failed saves and stale checkpoint refreshes preserve the local draft.
 
 `world-transform` is an isolated mutation on an exact saved `.blend` input. Its
 versioned options contain 1–64 distinct observed instance IDs with the expected
@@ -51,5 +60,19 @@ instead of hiding the worker error behind an eventual generic add timeout.
 
 These tests run through the existing embedded-viewer suite; workflow names and
 historical evidence are unchanged. Synthetic confirmations are not human review.
-Native desktop gestures, complete interactive browser Save/recovery, private
-licensed inputs and packaged/live deployment remain separate acceptance gates.
+`tools/world_edit_check.mjs` exercises real Chrome picking and a group gizmo,
+undo/discard, unsaved-navigation protection, one Save through actual Blender,
+rotation/scale persistence, original preservation, transport failure and stale
+draft handling. It reuses the installed Playwright driver and Chrome, not a CDN.
+Native desktop gestures, interruption/recovery, private licensed inputs and
+packaged/live deployment remain separate acceptance gates.
+
+## Windows path compatibility
+
+New manual tasks retain the existing filenames when bounded; deeper Windows
+projects use full task-ID-only working/checkpoint filenames. Reconciliation accepts
+both exact formats, never arbitrary names. Preflight checks working files and
+save/return receipts before taking a writer lease. Too-deep paths refuse without
+moving files or changing Windows policy. New immutable save observations use the
+unique save ID in their filename; their contents still bind the task/project/scene.
+Existing task files, receipts and checkpoints are not renamed or rewritten.

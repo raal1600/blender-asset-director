@@ -38,11 +38,15 @@ if mode in {'save', 'saved-then-unsaved', 'repeat-save', 'world-save'}:
     assert save_file(task).exists()
     first = load_json(save_file(task))
     assert first['sha256'] == file_hash(working)
+    history = project / 'Docs' / 'Workbench' / ('save-' + first['saveId'] + '.json')
+    assert load_json(history) == first
+    history_hash = file_hash(history)
     if mode in {'saved-then-unsaved', 'repeat-save'}:
         obj.location.x = 9
     if mode == 'repeat-save':
         bpy.ops.wm.save_as_mainfile(filepath=str(working), check_existing=False)
         assert first['saveId'] != load_json(save_file(task))['saveId']
+        assert file_hash(history) == history_hash
 elif mode == 'recovery-copy':
     bpy.ops.wm.save_as_mainfile(filepath=str(project / 'Scenes' / 'recovery-only.blend'), check_existing=False, copy=True)
     assert not save_file(task).exists(), 'A different recovery/copy destination must not publish'

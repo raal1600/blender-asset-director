@@ -27,6 +27,10 @@
       "upstream_sha256": "3d79d07ecb686b4e5d93232eedab255331c1beef711e13164eaa1f68655a5f2b",
       "sha256": "2edf5d7099c54de0abb4b90873c98f35eb8984a56c83163527f885f907c17d3c"
     },
+    "examples/jsm/controls/TransformControls.js": {
+      "upstream_sha256": "151befe25bb0d68626f9a6b033625b7b0cf6848e39ba71623b7bed8e3df565d6",
+      "sha256": "7b67177751833791732f2fdcd5774b6d0517a02a8611bea3b931bbde74b0f96a"
+    },
     "examples/jsm/utils/BufferGeometryUtils.js": {
       "upstream_sha256": "9fb63427ce6641fa14fd0baff9cc4d1b5f9c3d85fd084bf2e90e803c44ec1797",
       "sha256": "25d8fffde3d48fa5a219e1ff9ffa02566f99222c71e3e57ae979075eaf52f2d6"

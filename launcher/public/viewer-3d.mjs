@@ -24,14 +24,14 @@ export function previewFailure(error) {
   return {title:'3D preview unavailable',message:textures?'This asset exceeds the in-app texture conversion limits. You can inspect the full-resolution asset in Blender.':'Director could not prepare this in-app preview. You can inspect the asset separately in Blender.',detail};
 }
 
-export function openViewer({host,prepare,fetchModel,inspectInBlender}) {
-  let disposed=false,renderer,controls,world,mixer,frame=0,observer,model,action,playing=false,last=0,dirty=true,resize,loadedScenes=[];
+export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit}) {
+  let disposed=false,renderer,controls,world,mixer,editor,frame=0,observer,model,action,playing=false,last=0,dirty=true,resize,loadedScenes=[];
   const abort=new AbortController(),cleanups=[];
   host.dataset.viewerState='loading';delete host.dataset.previewId;
   host.innerHTML='<div class="viewer-message" role="status" aria-live="polite">Verifying this exact source and preparing 3D geometry… Native files may need up to three minutes. No scene changes or render.</div>';
   const status=()=>host.querySelector('[data-viewer-status]');
   const listen=(node,type,fn,options)=>{node.addEventListener(type,fn,options);cleanups.push(()=>node.removeEventListener(type,fn,options));};
-  const dispose=()=>{if(disposed)return;disposed=true;abort.abort();cancelAnimationFrame(frame);observer?.disconnect();for(const f of cleanups)f();controls?.dispose();mixer?.stopAllAction();if(model)mixer?.uncacheRoot(model);releaseTree([world,...loadedScenes]);renderer?.dispose();renderer?.forceContextLoss();host.replaceChildren();delete host.dataset.viewerState;delete host.dataset.previewId;};
+  const dispose=()=>{if(disposed)return;disposed=true;abort.abort();cancelAnimationFrame(frame);observer?.disconnect();for(const f of cleanups)f();editor?.dispose();controls?.dispose();mixer?.stopAllAction();if(model)mixer?.uncacheRoot(model);releaseTree([world,...loadedScenes]);renderer?.dispose();renderer?.forceContextLoss();host.replaceChildren();delete host.dataset.viewerState;delete host.dataset.previewId;};
   const ready=(async()=>{
     try {
       const [record,THREE,{GLTFLoader},{OrbitControls}]=await Promise.all([prepare(),import('./vendor/three/build/three.module.js'),import('./vendor/three/examples/jsm/loaders/GLTFLoader.js'),import('./vendor/three/examples/jsm/controls/OrbitControls.js')]);
@@ -85,7 +85,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender}) {
       const clock=()=>{node('clock').textContent=(action?.time||0).toFixed(2)+' s';node('time').value=String(action?.time||0);};
       const select=()=>{mixer.stopAllAction();playing=false;node('play').textContent='Play';const clip=takes[Number(node('take').value)],staticPose=clip.duration===0;action=mixer.clipAction(clip);action.reset().setLoop(staticPose?THREE.LoopOnce:THREE.LoopRepeat,Infinity);action.clampWhenFinished=staticPose;action.play();mixer.update(0);node('time').max=String(clip.duration);node('play').disabled=staticPose;node('time').disabled=staticPose;clock();reset();dirty=true;};
       if(takes.length)select();else{host.querySelector('.viewer-animation').hidden=true;}
-      if(record.profile==='world-static-v1')host.querySelector('.viewer-disclaimer').textContent='Static World preview'+(Number.isInteger(record.referenceFrame)?' at frame '+record.referenceFrame:'')+'. Animation and rig editing belong in Action. Original materials and motion are preserved.';
+      if(record.profile==='world-static-v1')host.querySelector('.viewer-disclaimer:not(.viewer-texture-note)').textContent='Static World preview'+(Number.isInteger(record.referenceFrame)?' at frame '+record.referenceFrame:'')+'. Animation and rig editing belong in Action. Original materials and motion are preserved.';
       listen(node('take'),'change',select);
       listen(node('play'),'click',()=>{playing=!playing;node('play').textContent=playing?'Pause':'Play';last=performance.now();});
       listen(node('time'),'input',()=>{playing=false;node('play').textContent='Play';action.time=Number(node('time').value);mixer.update(0);clock();dirty=true;});
@@ -94,12 +94,17 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender}) {
       const poseCount=entries.filter(e=>e.staticPose).length,playable=takes.length-poseCount;
       const motionStatus=record.profile==='world-static-v1'?'static World':`${playable} playable take${playable===1?'':'s'}${poseCount?' · '+poseCount+' static pose'+(poseCount===1?'':'s'):''}`;
       status().textContent=`${record.observed.vertices.toLocaleString()} vertices · ${motionStatus} · source ${record.version.slice(0,12)} · ${record.cached?'verified cached copy':'verified preview copy'}`;
+      if(worldEdit&&record.kind==='checkpoint'&&record.profile==='world-static-v1'&&record.placement?.instances.length){
+        const {attachWorldEditor}=await import('./world-editor.mjs');if(disposed)return;
+        editor=attachWorldEditor({THREE,host,model,gltf,world,camera,orbit:controls,canvas,record,...worldEdit,invalidate:()=>{dirty=true;}});
+        worldEdit.changed?.(editor.state);
+      }
       host.dataset.viewerState='ready';host.dataset.previewId=record.previewId;
       function animate(now){if(disposed)return;frame=requestAnimationFrame(animate);if(document.hidden||(!host.closest('dialog')&&document.querySelector('dialog[open]'))){last=now;return;}const dt=Math.min((now-(last||now))/1000,.1);last=now;if(playing){mixer.update(dt);clock();dirty=true;}controls.update();if(dirty){renderer.render(world,camera);dirty=false;}}
       frame=requestAnimationFrame(animate);
       return record;
     }catch(error){
-      if(disposed)return;cancelAnimationFrame(frame);observer?.disconnect();controls?.dispose();releaseTree([world,...loadedScenes]);renderer?.dispose();world=null;loadedScenes=[];model=null;renderer=null;controls=null;host.replaceChildren();
+      if(disposed)return;cancelAnimationFrame(frame);observer?.disconnect();editor?.dispose();editor=null;controls?.dispose();releaseTree([world,...loadedScenes]);renderer?.dispose();world=null;loadedScenes=[];model=null;renderer=null;controls=null;host.replaceChildren();
       const failure=previewFailure(error),box=document.createElement('div');box.className='viewer-message warn';box.setAttribute('role','alert');
       const title=document.createElement('strong');title.textContent=failure.title;box.append(title);
       for(const text of [failure.message,'Nothing was imported or changed in your scene.']){const p=document.createElement('p');p.textContent=text;box.append(p);}
@@ -107,5 +112,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender}) {
       const details=document.createElement('details'),summary=document.createElement('summary'),reason=document.createElement('p');summary.textContent='Technical details';reason.textContent=failure.detail;details.append(summary,reason);box.append(details);host.append(box);host.dataset.viewerState='failed';
     }
   })();
-  return {dispose,ready};
+  return {dispose,ready,get dirty(){return !!editor?.dirty;},get draft(){return editor?.state;},
+    request:id=>{if(!editor)throw Error('This saved scene needs placement preparation in Blender.');return editor.request(id);},
+    targets:()=>editor?.targets()||[],undo:()=>editor?.undo(),discard:()=>editor?.discard(),setEnabled:value=>editor?.setEnabled(value)};
 }

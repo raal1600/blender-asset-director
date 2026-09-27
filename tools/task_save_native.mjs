@@ -13,7 +13,7 @@ const [out,blender,worldFixture]=process.argv.slice(2);
 assert(out&&path.isAbsolute(out)&&blender&&path.isAbsolute(blender),'Explicit new output and Blender paths required');
 assert(!await exists(out),'Output must be new');await fs.mkdir(out,{recursive:true});
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url))),children=new Map(),results=[];
-let mode;
+let mode,activeProject;
 const runtime={harness:async()=>({task_workspace:true,explicit_save_handoff:true}),
   launchWorkbenchTask:async(p,manifest)=>{
     const child=spawn(blender,['--background','--factory-startup','--disable-autoexec','--python-exit-code','12','--python',path.join(root,'tools/task_save_native.py'),'--',manifest,mode],{windowsHide:true});
@@ -28,6 +28,7 @@ try {
   if(worldFixture)assert.equal((await json(path.join(worldFixture,'world_layers_report.json'))).status,'PASS','Use only generated World regression input');
   for(mode of ['no-save','save','saved-then-unsaved','repeat-save','recovery-copy',...(worldFixture?['world-no-save','world-save']:[])]) {
     let p=await app.store.create('Synthetic Save Return '+mode),c=await app.workbench.create(p.id,p.revision,'Test scene');p=c.project;
+    activeProject=p;
     let baseline=null;
     if(mode.startsWith('world-')){
       const cpId='cp_'+randomUUID(),relative='Scenes/'+cpId+'.blend';
@@ -55,4 +56,8 @@ try {
   }
   await writeJson(path.join(out,'RESULTS.json'),{status:'PASS',scope:'REAL_HEADLESS_SAVE_AND_HTTP',native_dialogs:'NOT_TESTED',results});
   console.log(JSON.stringify({status:'PASS',cases:results.length,output:out}));
+}catch(error){
+  const native=activeProject?await fs.readFile(path.join(activeProject.directory,'Docs/native-save.log'),'utf8').catch(()=>null):null;
+  await writeJson(path.join(out,'RESULTS.json'),{status:'FAIL',scope:'REAL_HEADLESS_SAVE_AND_HTTP',mode,error:error.stack,native,results});
+  console.error(JSON.stringify({status:'FAIL',mode,error:error.message,native:native?.slice(-5000)}));process.exitCode=1;
 }finally{await new Promise(resolve=>app.server.close(resolve));}

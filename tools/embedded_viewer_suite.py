@@ -39,14 +39,26 @@ def main():
                         '--python-exit-code','11','--python',str(ROOT/'tools/world_append_fixture.py'),'--',str(output/'world-append')],
                        cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
     with (output/'world-save-return.log').open('wb') as log:
-        subprocess.run([args.node,str(ROOT/'tools/task_save_native.mjs'),str(output/'world-save-return'),
+        saved = subprocess.run([args.node,str(ROOT/'tools/task_save_native.mjs'),str(output/'world-save-return'),
                         args.blender,str(output/'world-layers')],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,
-                       timeout=180,check=True)
+                       timeout=180)
+    if saved.returncode:
+        print((output/'world-save-return.log').read_text(encoding='utf-8',errors='replace')[-6000:],file=sys.stderr)
+        saved.check_returncode()
     if args.guided_world:
         with (output/'package-preparation.log').open('wb') as log:
             subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
                             '--python-exit-code','11','--python',str(ROOT/'tools/library_preparation_fixture.py'),'--',str(output/'package-preparation')],
-                           cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
+    else:
+        # Reuse Playwright's installed Node driver package; no npm/CDN download.
+        import playwright
+        module = Path(playwright.__file__).parent / 'driver/package/index.mjs'
+        command = [args.node, str(ROOT/'tools/world_edit_check.mjs'), str(output/'world-direct-edit'),
+                   str(output/'world-layers'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        with (output/'world-direct-edit.log').open('wb') as log:
+            subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300, check=True)
     generated = Path(args.native_fixture).resolve() if args.native_fixture else output / 'native'
     if not args.native_fixture:
         with (output / 'native.log').open('wb') as log:

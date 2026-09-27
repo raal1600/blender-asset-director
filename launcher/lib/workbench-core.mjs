@@ -1,4 +1,5 @@
 import {validateRenderDevice} from './render-device.mjs';
+import {taskScenePaths} from './task-paths.mjs';
 /** Real local scene work. No prototype fixtures, fake progress, or model calls. */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -185,9 +186,9 @@ export class Workbench {
       const v=await json(await safe(this.store.registry,`versions/${ref.sourceId}/${ref.version}.json`));
       selectedSources.push({sourceId:ref.sourceId,version:ref.version,path:await safe(this.store.database,v.relative)});
     }
-    const taskId=uid('task_');await this.lock(p,taskId);
+    const taskId=uid('task_'),taskPaths=taskScenePaths(p.directory,sceneId,taskId);await this.lock(p,taskId);
     const task={schema:1,id:taskId,projectId:id,sceneId,stage:s.stage,projectDirectory:p.directory,library:this.config.library,
-      input,workingScene:`Scenes/${sceneId}--edit-${taskId}.blend`,checkpointScene:`Scenes/${sceneId}--saved-${taskId}.blend`,
+      input,...taskPaths,
       returnFile:`Docs/Workbench/${taskId}-return.json`,selectedSources,targets,camera,frame,...(frameRange?{frameRange}:{}),...(cap.explicit_save_handoff?{handoff:'explicit-save-v1'}:{}),action:'workbench-edit',state:'RUNNING',startedAt:now()};
     const file=await safe(p.directory,`Runs/${taskId}.json`);
     try {

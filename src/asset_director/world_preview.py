@@ -45,7 +45,8 @@ def frozen_meshes(enabled):
                     'Evaluated geometry exceeds the two-million-vertex preview limit; inspect in Blender')
             copy.matrix_world = evaluated.matrix_world.copy()
             scene.collection.objects.link(copy)
-            mapping.append({'source': source.name, 'node': copy.name})
+            mapping.append({'source': source.name, 'node': copy.name,
+                            'instance': source.get('bad_placement_instance')})
         for source in original:
             if source.type in {'MESH', 'ARMATURE'} or source in helpers:
                 flags[source] = source.hide_render

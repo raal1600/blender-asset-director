@@ -76,7 +76,11 @@ def install(task, initialized):
                           size=working.stat().st_size, audit=audit, saved_at=time.time(),
                           human_acceptance="PENDING", source="blender-explicit-save")
             # Preserve small immutable observations, not another .blend per save.
-            history = within(project, "Docs/Workbench/" + task["id"] + "-save-" + record["saveId"] + ".json")
+            # The immutable record already binds task/project/scene. Repeating
+            # both UUIDs in its filename exceeded native Windows path limits.
+            # Existing history is untouched; only new observations use this name.
+            history = within(project, "Docs/Workbench/save-" + record["saveId"] + ".json")
+            require(not history.exists(), "OUTPUT_EXISTS", "Save observation already exists")
             atomic_json(history, record)
             atomic_json(receipt_path, record)
             session.update(state="SAVED", message=None)
