@@ -109,6 +109,9 @@ def execute(job_path, *, live=False):
             elif op in {'world-transform', 'world-placement-audit'}:
                 from asset_director import world_transform
                 data = world_transform.apply(options) if op == 'world-transform' else world_transform.audit()
+            elif op in {'action-audit', 'action-edit'}:
+                from asset_director import action_layer
+                data = action_layer.apply(options, job['id']) if op == 'action-edit' else action_layer.audit()
             elif op == "camera-fit": data = scene_ops.camera_fit(options, job["id"])
             elif op == "camera-plan": data = scene_ops.camera_plan(options, job["id"])
             elif op == "look-audit": data = scene_ops.look_audit()
@@ -241,6 +244,8 @@ def execute(job_path, *, live=False):
                 bpy.ops.wm.save_as_mainfile(filepath=str(dest), check_existing=False)
                 if op == 'world-transform':
                     world_transform.verify_saved(data, dest)
+                if op == 'action-edit':
+                    action_layer.verify_saved(data, dest)
                 lp.retain_derivation(lib, dest, spec.get("license_grants", []))
             if spec.get("license_grants"):
                 data["project_rights"] = {"grants": spec["license_grants"], "raw_redistribution": "DENIED", "scope": lp.SCOPE}

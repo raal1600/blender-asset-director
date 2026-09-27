@@ -96,9 +96,10 @@ Those remain separately recorded gates. Deployment requires exact-commit CI,
 private-input checks, packaged staging, backups and reversible coherent replacement
 of launcher plus harness. Do not patch an installed runtime under its old identity.
 
-The [direct-edit Save foundation](WORLD_DIRECT_EDIT.md) adds a bounded native
-batch worker and authenticated save endpoint. Its frontend integration remains
-in progress. Not implemented yet: in-app picking/transform gizmos, transform-draft
-undo/Save controls, performer-first motion assignment, new shot/light controls,
-live unsaved Blender streaming, or automatic recovery of earlier lost placement.
+The [direct-edit implementation](WORLD_DIRECT_EDIT.md) adds in-app picking,
+whole-instance/group gizmos, draft undo/discard and explicit Save through a bounded
+native worker. The [Action backend](ACTION_LAYER.md) adds native performer inspection,
+timing and hold-pose transactions; its performer-first UI is still in progress.
+New shot/light controls and automatic recovery of earlier lost placement are not
+implemented yet. Live unsaved Blender streaming remains outside this plan.
 Earlier checkpoints are not repaired merely by switching to a static viewer.

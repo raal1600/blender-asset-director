@@ -121,6 +121,8 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='keep-building')return workbench.keepBuilding(id,sid,rev);
             if(command==='world-undo')return workbench.undoWorld(id,sid,rev);
             if(command==='world-save')return workbench.saveWorld(id,sid,rev,body.request);
+            if(command==='action-inspect')return workbench.inspectAction(id,sid,rev,body.request);
+            if(command==='action-save')return workbench.saveAction(id,sid,rev,body.request);
             if(command==='source')return workbench.selectSource(id,sid,rev,body.sourceId,body.selected);
             if(command==='inspect')return workbench.inspect(id,sid,rev,body.checkpointId);
             if(command==='import')return workbench.importCheckpoint(id,sid,rev,body.sourceScene);

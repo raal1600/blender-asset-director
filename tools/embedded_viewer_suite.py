@@ -34,6 +34,15 @@ def main():
                         '--python-exit-code','11','--python',str(ROOT/'tools/world_transform_fixture.py'),'--',
                         str(output/'world-layers/placed.blend'),str(output/'world-transform')],
                        cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
+    with (output/'action-layer.log').open('wb') as log:
+        subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
+                        '--python-exit-code','11','--python',str(ROOT/'tools/action_layer_fixture.py'),'--',
+                        str(output/'world-layers/placed.blend'),str(output/'action-layer')],
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
+    with (output/'action-http.log').open('wb') as log:
+        subprocess.run([args.node,str(ROOT/'tools/action_layer_check.mjs'),str(output/'action-http'),
+                        str(output/'action-layer'),sys.executable,args.blender],
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
     with (output/'world-append.log').open('wb') as log:
         subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
                         '--python-exit-code','11','--python',str(ROOT/'tools/world_append_fixture.py'),'--',str(output/'world-append')],

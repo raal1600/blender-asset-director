@@ -2,6 +2,7 @@ import {openAssetPreview} from './asset-preview.mjs';
 import {focusTask} from './workbench-task.mjs';
 import {syncTask} from './task-save.mjs';
 import {saveWorld} from './world-transform.mjs';
+import {inspectAction,saveAction} from './action-layer.mjs';
 /** Scene workbench facade: native file/catalog adapters over the shared job lifecycle. */
 import fs from 'node:fs/promises';
 import {constants} from 'node:fs';
@@ -15,6 +16,8 @@ import {assertBlendEnvelope} from './workbench-files.mjs';
 
 export class Workbench extends withCatalog(WorkbenchCore) {
   saveWorld(...args){return saveWorld(this,...args);}
+  inspectAction(...args){return inspectAction(this,...args);}
+  saveAction(...args){return saveAction(this,...args);}
   previewAsset(...args){return openAssetPreview(this,...args);}
   focusTask(...args){return focusTask(this,...args);}
   syncTask(...args){return syncTask(this,...args);}

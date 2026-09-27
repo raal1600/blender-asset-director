@@ -15,8 +15,11 @@ from . import bone_display_contract
 from . import sequence_contract
 from . import render_sequence
 from . import world_transform_contract
+from . import action_layer_contract
 
 OPS = {
+    "action-audit": set(),
+    "action-edit": action_layer_contract.FIELDS,
     "world-transform": world_transform_contract.FIELDS,
     "world-placement-audit": set(),
     "render-readiness": set(),
@@ -47,9 +50,9 @@ OPS = {
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage", "camera"},
 }
-MUTATIONS = {"world-transform", "asset-preview", "sequence-execute", "bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
+MUTATIONS = {"action-edit", "world-transform", "asset-preview", "sequence-execute", "bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
              "light-adjust", "world-adjust", "look-adjust", "light-rig"}
-TARGET_REQUIRED = {"world-transform", "world-placement-audit", "render-readiness", "render-frames", "sequence-plan", "sequence-execute", "sequence-check", "bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
+TARGET_REQUIRED = {"action-audit", "action-edit", "world-transform", "world-placement-audit", "render-readiness", "render-frames", "sequence-plan", "sequence-execute", "sequence-check", "bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
                    "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 
 OPS.update(motion_contract.OPS)
@@ -65,6 +68,10 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
     options = copy.deepcopy(options or {})
     fields(options, OPS[operation])
+    if operation in {'action-audit', 'action-edit'}:
+        if operation == 'action-edit':action_layer_contract.validate(options)
+        require(input_file is not None and asset_id is None and Path(input_file).suffix.lower() == '.blend',
+                'TARGET_REQUIRED', 'Action editing requires an inspected saved scene, not a guessed source asset')
     if operation in {'world-transform', 'world-placement-audit'}:
         if operation == 'world-transform':
             world_transform_contract.validate(options)
