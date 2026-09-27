@@ -4,6 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {randomUUID,createHash} from 'node:crypto';
+import {spawn} from 'node:child_process';
 import {createApp} from '../launcher/server.mjs';
 import {exists,fileHash,json,writeJson} from '../launcher/lib/storage.mjs';
 const [out,generated,previewFixture,python,blender,playwright,chrome]=process.argv.slice(2);
@@ -32,7 +33,11 @@ try{
  const idle=()=>page.waitForFunction(()=>!document.body.classList.contains('working'));
  const click=async selector=>{await page.locator('body').ariaSnapshot();await page.locator(selector).click();await idle();};
  const ready=async()=>{await page.waitForFunction(()=>document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready'&&!!document.querySelector('[data-action-field="performer"]')&&!document.querySelector('[data-action-field="performer"]').disabled,null,{timeout:205000});await idle();};
- await page.goto(app.origin+'/workbench#'+app.token);await idle();await click('[data-action="project"][data-id="'+project.id+'"]');await ready();await Promise.all(pending);
+ await page.goto(app.origin+'/workbench#'+app.token);await idle();
+ const inspectionStarted=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/workbench/action-inspect'&&r.ok());
+ await click('[data-action="project"][data-id="'+project.id+'"]');await inspectionStarted;await page.reload();await ready();await Promise.all(pending);
+ assert.equal(await page.locator('#notice').isVisible(),false);
+ assert.equal(report.requests.filter(r=>r.path.endsWith('/action-inspect')).length,1,'Reload must reuse the running inspection, not start another');
  assert.equal(await page.locator('.action-workspace').count(),1);assert.equal(await page.getByLabel('Animation take').isVisible(),false);assert.match(await page.locator('.scene-playback-label').innerText(),/Whole scene.*24 fps/);
  await page.screenshot({path:path.join(out,'01-action-ready.png'),fullPage:true});await fs.writeFile(path.join(out,'01-action-ready.txt'),safe(await page.locator('body').ariaSnapshot()),{flag:'wx'});
  assert.deepEqual(report.errors,[]);report.checks.push('Action opens with automatic real performer inspection and whole-scene playback, no arbitrary global take selector');
@@ -64,6 +69,24 @@ try{
  await page.getByRole('combobox',{name:'Performer',exact:true}).selectOption('SyntheticRig1');await page.getByRole('combobox',{name:'Performance',exact:true}).selectOption('hold');await click('[data-action="action-discard"]');await ready();assert.equal((await app.store.get(project.id)).workbench.scenes[0].current,cp.id);report.checks.push('Discard removes only the local Action draft');
  await click('[data-action="stage"][data-stage="world"]');await page.waitForFunction(()=>document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready',null,{timeout:205000});assert.equal(await page.locator('.viewer-animation').isVisible(),false);assert.match(await page.locator('.viewer-disclaimer:not(.viewer-texture-note)').innerText(),/Static World/);report.checks.push('Returning to World freezes saved Action at its recorded frame without changing native motion');
  await click('[data-action="stage"][data-stage="action"]');await ready();await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'04-action-mobile.png'),fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
- assert.deepEqual(await fileHash(source),original);assert.deepEqual(await fileHash(path.join(project.directory,relative)),original);assert.deepEqual(report.errors,[]);report.checks.push('Originals preserved, responsive 390px view, no browser errors or external requests');report.status='PASS';
+ assert.deepEqual(await fileHash(source),original);assert.deepEqual(await fileHash(path.join(project.directory,relative)),original);assert.deepEqual(report.errors,[]);report.checks.push('Originals preserved, responsive 390px view, no browser errors or external requests');
+ // Real browser request and owned native task, but not a native desktop-window claim.
+ let child,finished,handed;
+ app.runtime.launchWorkbenchTask=async(p,manifest)=>{
+  handed=await json(manifest);const chunks=[];
+  child=spawn(blender,['--background','--factory-startup','--disable-autoexec','--threads','2','--python-exit-code','12','--python',path.join(repo,'tools/action_task_native.py'),'--',manifest,'no-save'],{windowsHide:true});
+  child.stdout.on('data',x=>chunks.push(x));child.stderr.on('data',x=>chunks.push(x));
+  finished=new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',async code=>{await fs.writeFile(path.join(out,'manual-handoff.log'),Buffer.concat(chunks));resolve(code);});});return child.pid;
+ };
+ app.runtime.inspectWorkbenchTask=async()=>({state:child?.exitCode===null?'verified':'stopped'});
+ await page.getByRole('combobox',{name:'Performer',exact:true}).selectOption('SyntheticRig1');
+ await page.locator('[data-view="time"]').fill((4/24).toFixed(3));await page.locator('[data-view="time"]').dispatchEvent('input');assert.match(await page.locator('[data-view="clock"]').innerText(),/Frame 5/);
+ await page.locator('.action-details summary').click();await page.screenshot({path:path.join(out,'05-explicit-rig-access.png'),fullPage:true});
+ await click('[data-action="action-rig"]');assert(handed);assert.equal(handed.rigControls,true);assert.equal(handed.actionContext.performer,'SyntheticRig1');assert.equal(handed.frame,5);
+ assert.equal(await finished,0,'Native manual-handoff fixture failed');
+ await page.waitForFunction(()=>!document.querySelector('[data-action="focus-task"]'),null,{timeout:30000});await ready();
+ const returned=(await app.store.get(project.id)).workbench.scenes[0];assert.equal(returned.task,null);assert.equal(returned.current,cp.id);assert.equal(returned.lastEdit.outcome,'no-save');assert.equal(returned.completed.action,undefined);
+ report.nativeHandoff=await json(path.join(project.directory,'Docs/action-task-native.json'));assert.deepEqual(report.errors,[]);
+ report.checks.push('Explicit rig button carries selected saved performer/frame through API to real background Blender and returns without saving or approving');report.status='PASS';
 }catch(error){report.status='FAIL';report.error=String(error).replaceAll(app?.token||'never-match-token','[REDACTED]');process.exitCode=1;if(page){await page.screenshot({path:path.join(out,'failure.png'),fullPage:true}).catch(()=>{});await fs.writeFile(path.join(out,'failure.txt'),await page.locator('body').innerText()).catch(()=>{});}}
 finally{await browser?.close();if(app){app.server.closeAllConnections();await new Promise(resolve=>app.server.close(resolve));}await writeJson(path.join(out,'RESULTS.json'),report);console.log(JSON.stringify({status:report.status,checks:report.checks.length,error:report.error}));}

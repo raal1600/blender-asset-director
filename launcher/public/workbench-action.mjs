@@ -2,6 +2,18 @@
 import {taskBanner} from './workbench-task.mjs';
 import {progressLabel} from './workbench-progress.mjs';
 
+// Automatic read-only inspection can race a reload/second tab. Refresh once,
+// reuse its exact native receipt, and never retry a mutation or failed job.
+export async function ensureActionInspection({read,create,sceneId,checkpointId,sha256}){
+  for(let attempt=0;attempt<2;attempt++){
+    const state=await read(),scene=state.project.workbench.scenes.find(s=>s.id===sceneId);
+    const cp=scene?.checkpoints.find(c=>c.id===(scene.candidate||scene.current));
+    if(scene?.stage!=='action'||cp?.id!==checkpointId||cp.sha256!==sha256||state.locked)return;
+    if(state.runs.some(r=>r.action==='action-audit'&&r.sceneId===sceneId&&r.checkpointId===checkpointId&&r.checkpointSha256===sha256))return;
+    try{await create(state.project.revision);return;}catch(error){if(error.status!==409||attempt===1)throw error;}
+  }
+}
+
 export function actionInspection(runs,scene,checkpoint){
   return runs.find(r=>r.action==='action-audit'&&r.sceneId===scene.id&&r.checkpointId===checkpoint?.id&&r.checkpointSha256===checkpoint?.sha256&&r.state==='SUCCEEDED')||null;
 }
@@ -14,6 +26,7 @@ export function actionDraft(checkpoint,run){
     get selected(){return selected;},select:name=>{performer(name);selected=name;},
     get dirty(){return changes.size>0;},get canUndo(){return history.length>0;},get count(){return changes.size;},
     get changes(){return [...changes.values()].map(v=>({...v}));},
+    handoff(frame){if(this.dirty)throw Error('Save or discard Action changes before opening another editor.');performer(selected);frame=frame??audit.reference_frame;if(!Number.isInteger(frame)||frame<audit.frame_range[0]||frame>audit.frame_range[1])throw Error('Choose a frame in the saved scene.');return {version:'action-layer-v1',checkpointId:checkpoint.id,sha256:checkpoint.sha256,inspectionId:run.id,audit_sha256:audit.sha256,performer:selected,frame};},
     get playbackRange(){const range=[...audit.frame_range];for(const c of changes.values())if(c.mode==='clip'){const take=performer(c.performer).takes.find(t=>t.id===c.take_id);range[0]=Math.min(range[0],c.start);range[1]=Math.max(range[1],Math.ceil(c.start+(take.range[1]-take.range[0])/c.speed));}return range;},
     value:name=>changes.get(name)||{performer:name,mode:'keep'},
     change(name,value){const p=performer(name);if(p.unsupported)throw Error(p.unsupported);
@@ -46,6 +59,6 @@ export function actionView({project,scene,stages,checkpoint,runs,locked,taskStat
   ${controls}
   ${checkpoint?'<section class="viewer-3d" data-scene-viewer aria-label="Saved scene in 3D"></section>':'<p>No saved World yet. Return to World to add your scene.</p>'}
   <p class="action-preview-scope">${stale?'Older saved checkpoint · local draft retained':draft?.dirty?'Playback shows the saved scene. Save changes to preview the new motion. Planned playback: frames '+esc(draft.playbackRange.join('–'))+'; expanded if needed to include each full take.':'Play the whole saved scene together. Inspection lighting is approximate; playback does not approve motion.'}</p>
-  ${draft?`${p?.unsupported?`<p class="note warn">${esc(p.unsupported)}. Use Blender or the reviewed specialist.</p>`:''}<details class="action-details"><summary>Timing and motion details</summary><p>${esc(draft.audit.fps)} fps · scene frames ${esc(draft.audit.frame_range.join('–'))}. Native source keys and World placement stay intact. Timing changes use the complete take; no loop, retarget or inferred mapping.</p>${button('Hold whole scene at current frame','action-hold-all','ghost',disabled)}${button('Inspect performers again','action-inspect','ghost',!!draft.dirty)}${draft.audit.unassigned.length?`<p>${draft.audit.unassigned.length} unbound action slot(s) need reviewed binding in Blender; they are not assigned by name.</p>`:''}</details>`:checkpoint?`<p role="status">${attempt?.state==='FAILED'?esc(attempt.error):'Inspecting saved performers and their native motion…'}</p>${attempt&&['FAILED','INTERRUPTED'].includes(attempt.state)?button('Retry performer inspection','action-inspect'):''}`:''}
+  ${draft?`${p?.unsupported?`<p class="note warn">${esc(p.unsupported)}. Use Blender or the reviewed specialist.</p>`:''}<details class="action-details"><summary>Timing and motion details</summary><p>${esc(draft.audit.fps)} fps · scene frames ${esc(draft.audit.frame_range.join('–'))}. Native source keys and World placement stay intact. Timing changes use the complete take; no loop, retarget or inferred mapping.</p>${button('Hold whole scene at current frame','action-hold-all','ghost',disabled)}${p?.type==='ARMATURE'?button('Edit rig controls in Blender','action-rig','ghost',!cap?.action_task||!!draft.dirty):''}${button('Inspect performers again','action-inspect','ghost',!!draft.dirty)}${draft.audit.unassigned.length?`<p>${draft.audit.unassigned.length} unbound action slot(s) need reviewed binding in Blender; they are not assigned by name.</p>`:''}</details>`:checkpoint?`<p role="status">${attempt?.state==='FAILED'?esc(attempt.error):'Inspecting saved performers and their native motion…'}</p>${!active?button(attempt?'Retry performer inspection':'Inspect performers','action-inspect'):''}`:''}
   <section class="world-next"><div class="grow"><h2>Review the motion, then continue</h2><p>Check timing, deformation and contacts. A still scene is valid too. Saving and playback are not approval.</p></div>${button('Action ready · continue to Shots','action-ready','primary',!checkpoint||!!draft?.dirty||stale||!draft)}</section></section>`;
 }

@@ -3,6 +3,7 @@ import {focusTask} from './workbench-task.mjs';
 import {syncTask} from './task-save.mjs';
 import {saveWorld} from './world-transform.mjs';
 import {inspectAction,saveAction} from './action-layer.mjs';
+import {resolveActionContext} from './action-context.mjs';
 /** Scene workbench facade: native file/catalog adapters over the shared job lifecycle. */
 import fs from 'node:fs/promises';
 import {constants} from 'node:fs';
@@ -25,6 +26,11 @@ export class Workbench extends withCatalog(WorkbenchCore) {
   selectShot(...args){return selectShot(this,...args);}
   async openTask(id,sceneId,revision,context={}) {
     const p=await this.project(id,revision),scene=this.scene(p,sceneId);
+    if(context.actionContext){
+      const selected=await resolveActionContext(this,p,scene,context.actionContext);
+      assert(!context.rigControls||selected.performer.type==='ARMATURE','This performer has no armature controls.');
+      context={...context,targets:[selected.performer.name],frame:selected.request.frame};
+    }
     return super.openTask(id,sceneId,revision,taskShotContext(scene,checkpointFor(scene),context));
   }
   async importCheckpoint(id,sceneId,revision,sourceScene) {

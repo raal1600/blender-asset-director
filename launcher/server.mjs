@@ -141,7 +141,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='arrange')return workbench.arrange(id,rev,body.clips);
             if(command==='assemble')return workbench.assemble(id,rev,body.confirmed);
             if(command==='approve-cut')return workbench.approveCut(id,rev,body.cutId);
-            if(command==='codex')return workbench.codex(id,sid,rev);
+            if(command==='codex')return workbench.codex(id,sid,rev,body.context);
             assert(false,'Unknown workbench action.',404);
           }
           // Legacy manifest edits cannot retarget an in-flight workbench writer.

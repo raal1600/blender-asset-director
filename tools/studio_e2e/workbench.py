@@ -109,7 +109,9 @@ def review_scene(s):
         assert digest(s.scene) == s.scene_hash
         page.reload()
         idle()
-        expect(page.locator('h1')).to_have_text('Synthetic workbench scene')
+        expect(page.locator('h1')).to_have_text('Bring your world to life')
+        expect(page.locator('#scene-picker option:checked')).to_have_text('Synthetic workbench scene')
+        expect(page.locator('#scene-picker')).to_have_value(scene['id'])
         page.screenshot(path=str(s.evidence.directory / 'workbench-desktop.png'))
         page.set_viewport_size({'width': 390, 'height': 844})
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Mobile page overflow'
@@ -254,7 +256,11 @@ def catalog_and_film(s, click, idle, check):
     # These confirmations test state transitions, not manual authoring/quality.
     for activity in ['world', 'action']:
         assert state()['project']['workbench']['scenes'][0]['stage'] == activity
-        click('[data-action="approve"]')
+        if activity == 'action':
+            expect(page.locator('[data-action="action-ready"]')).to_be_enabled(timeout=220000)
+            click('[data-action="action-ready"]')
+        else:
+            click('[data-action="approve"]')
     # Save a named shot from observed camera metadata; never invent cameras.
     camera_names = [o['name'] for o in imported['audit']['objects'] if o['type'] == 'CAMERA']
     assert len(camera_names) >= 2

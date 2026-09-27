@@ -62,7 +62,7 @@ export const withCatalog=Base=>class extends Base {
   async verify(p,scene,checkpointId=scene.current){await verifyNative(this.store,this.runtime,p);return super.verify(p,scene,checkpointId);}
   async approve(...args){const p=await this.project(args[0],args[2]);await verifyNative(this.store,this.runtime,p);return super.approve(...args);}
   async openTask(...args){const p=await this.project(args[0],args[2]);await verifyNative(this.store,this.runtime,p);return super.openTask(...args);}
-  async codex(id,sceneId,revision){const p=await this.project(id,revision);await verifyNative(this.store,this.runtime,p);return startSpecialist(this,p,sceneId);}
+  async codex(id,sceneId,revision,context={}){const p=await this.project(id,revision);await verifyNative(this.store,this.runtime,p);return startSpecialist(this,p,sceneId,context);}
   async clips(p,refs){await verifyNative(this.store,this.runtime,p);return super.clips(p,refs);}
   async keepBuilding(id,sceneId,revision) {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);await this.unlocked(p);

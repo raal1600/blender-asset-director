@@ -5,17 +5,21 @@ import {randomUUID} from 'node:crypto';
 import {buildSessionContext} from './onboarding.mjs';
 import {checkpointFor,stages,stageIndex} from './workbench-model.mjs';
 import {assert,now,safe,writeJson} from './storage.mjs';
-export async function startSpecialist(work,p,sceneId) {
+import {resolveActionContext} from './action-context.mjs';
+export async function startSpecialist(work,p,sceneId,selection={}) {
   const scene=work.scene(p,sceneId);await work.unlocked(p);
+  assert(selection&&typeof selection==='object'&&!Array.isArray(selection)&&Object.keys(selection).every(k=>k==='actionContext'),'Unknown specialist context.');
   assert(!scene.candidate,'Review the current candidate before starting another writer.',409);
   assert((await work.store.verify(p.id)).ok,'Pinned sources changed.',409);
   assert(p.brief.trim(),'Add the production intent before asking a specialist to propose work.');
   if(scene.current)await work.verify(p,scene);
+  const performance=selection.actionContext?await resolveActionContext(work,p,scene,selection.actionContext):null;
   const context=await buildSessionContext(work.store,work.config,p.id);
   const task={projectId:p.id,sceneId,activity:scene.stage,checkpoint:checkpointFor(scene),
     selectedSources:p.assets.filter(a=>scene.sources.includes(a.sourceId)),
     nativeCatalog:(p.workbench.catalogPins||[]).filter(a=>(scene.catalog||[]).includes(a.id)),
-    selectedMotion:scene.selectedMotion||null,selectedShot:shotFor(scene),role:stages[stageIndex(scene.stage)].role};
+    selectedMotion:scene.selectedMotion||null,selectedShot:shotFor(scene),role:stages[stageIndex(scene.stage)].role,
+    ...(performance?{performance}:{}),reviewStatus:'PROPOSAL_REQUIRED_NOT_APPROVED'};
   context.prompt+='\n\n## Scene-scoped workbench task\n'+JSON.stringify(task,null,2)+'\n\n'+
     'This exact scene is the target, not the legacy scene pointer. Native catalog IDs and pinned versions are selected ingredients, not imported objects, rig compatibility or license grants. Search existing sources first. For animation, inspect source motion and target rig, propose transfer-plan, then request its explicit review before transfer-prepare and mediated execution. Do not guess mappings. '+
     'Use the installed specialist and its existing bounded operations. Call prepare_project; bind prepared jobs before run_project_job. Respect the shared project writer semaphore. Never overwrite checkpoints, originals or live Blender edits. A dedicated manual Blender window does not establish ownership of the existing MCP socket. '+

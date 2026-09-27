@@ -3,7 +3,7 @@ import {worldView,addWorldAsset} from './workbench-world.mjs';
 import {worldAddQueue,addCatalogFlow} from './world-add-flow.mjs';
 import {openViewer} from './viewer-3d.mjs';
 import {worldActionNeedsSave} from './world-draft.mjs';
-import {actionView,actionDraft,actionInspection} from './workbench-action.mjs';
+import {actionView,actionDraft,actionInspection,ensureActionInspection} from './workbench-action.mjs';
 import {evidenceView} from './workbench-evidence.mjs';
 import {imageLoader} from './workbench-images.mjs';
 import {taskBanner,observationKey} from './workbench-task.mjs';
@@ -24,6 +24,7 @@ let returnToFilm=false,filmTime=0;
 let assetViewer=null,sceneViewer=null,sceneViewerKey=null;
 let draftDestination=null,worldSave=null,actionSave=null;
 const actionDrafts=new Map();
+const actionInspectionAttempts=new Set();
 let addPrompt=null;
 const worldPanels=new Map();
 function clearAssetViewer(){assetViewer?.dispose();assetViewer=null;}
@@ -36,7 +37,7 @@ function startViewer(host,request){const context={projectId,sceneId,revision:p()
  prepare:()=>api('workbench/viewer-prepare',{...context,request}),
  fetchModel:async(record,signal)=>{const r=await fetch('/api/workbench/viewer-model?'+new URLSearchParams({projectId:context.projectId,sceneId:context.sceneId,previewId:record.previewId}),{headers:requestHeaders(),signal});if(!r.ok)throw Error((await r.json()).error);return r.arrayBuffer();}});}
 const requestHeaders=()=>({'Authorization':`Bearer ${token}`,'Content-Type':'application/json'});
-async function api(route,data){const r=await fetch('/api/'+route,{method:data===undefined?'GET':'POST',headers:requestHeaders(),...(data===undefined?{}:{body:JSON.stringify(data)})});const v=await r.json();if(!r.ok)throw new Error(v.error||'Request failed.');return v;}
+async function api(route,data){const r=await fetch('/api/'+route,{method:data===undefined?'GET':'POST',headers:requestHeaders(),...(data===undefined?{}:{body:JSON.stringify(data)})});const v=await r.json();if(!r.ok)throw Object.assign(new Error(v.error||'Request failed.'),{status:r.status});return v;}
 const thumbnails=imageLoader({fetchImage:async url=>{const r=await fetch(url,{headers:requestHeaders()});if(r.status===204)return null;if(!r.ok)throw new Error((await r.json()).error||'Package image request failed.');return r.blob();}});
 const p=()=>state?.project,s=()=>p()?.workbench.scenes.find(x=>x.id===sceneId),cp=()=>s()?.checkpoints.find(c=>c.id===(s().candidate||s().current));
 const b=(text,action,data={},cls='',disabled=false)=>`<button class="${cls}" data-action="${action}" ${Object.entries(data).map(([k,v])=>`data-${k}="${esc(v)}"`).join(' ')} ${disabled?'disabled':''}>${esc(text)}</button>`;
@@ -44,7 +45,7 @@ const next=(name,args={})=>api('workbench/'+name,{projectId,sceneId,revision:p()
 function notice(message,kind='error'){$('notice').hidden=!message;$('notice').textContent=message||'';$('notice').dataset.kind=kind;$('notice').setAttribute('role',kind==='success'?'status':'alert');const local=$('browser-notice');if(local){local.hidden=!message;local.textContent=message||'';}}
 async function perform(fn){if(busy)return;busy=true;syncWorldDraftUI();document.body.classList.add('working');$('app').classList.add('busy');notice('');try{await fn();}catch(e){try{if(projectId)await load();}catch{}notice(e.message);}finally{busy=false;document.body.classList.remove('working');$('app').classList.remove('busy');syncConsentButtons();syncWorldDraftUI();scheduleActionInspection();}}
 function acceptSnapshot(value){if(currentActionDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='action')throw Error('Activity changed elsewhere. Your Action draft is retained; discard it before reloading.');if(sceneViewer?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='world')throw Error('This scene or activity changed elsewhere. Your local placement draft remains open. Discard it before reloading the changed activity.');state=value;reconcileWorldSave();if(actionSave){const run=state.runs.find(r=>r.id===actionSave.body.request.requestId);if(run?.state==='SUCCEEDED'){if(!s().checkpoints.some(c=>c.id===run.resultCheckpointId))throw Error('Action Save receipt has no matching checkpoint.');actionSave.draft.discard();actionDrafts.delete(projectId+':'+sceneId);actionSave=null;}else if(run&&['FAILED','INTERRUPTED'].includes(run.state)){actionSave=null;notice(run.error||'Action Save failed. Your draft is preserved.');}}}
-async function load(){overview=await api('state?compact=true');if(projectId&&!overview.projects.some(x=>x.id===projectId)){if(sceneViewer?.dirty)throw Error('This production is no longer available. Your placement draft remains open; restore the production before saving.');projectId=null;}if(projectId){acceptSnapshot(await api('workbench/state?'+new URLSearchParams({projectId,compact:true})));if(!p().workbench.scenes.some(x=>x.id===sceneId))sceneId=p().workbench.scenes[0]?.id;sessionStorage.setItem('wb-project',projectId);sessionStorage.setItem('wb-scene',sceneId||'');}else state=null;render();if(browser.isOpen)await browser.refresh();}
+async function load(){overview=await api('state?compact=true');if(projectId&&!overview.projects.some(x=>x.id===projectId)){if(sceneViewer?.dirty||currentActionDraft()?.dirty||actionSave)throw Error('This production is no longer available. Your local draft remains open; restore the production before saving.');projectId=null;}if(projectId){acceptSnapshot(await api('workbench/state?'+new URLSearchParams({projectId,compact:true})));if(!p().workbench.scenes.some(x=>x.id===sceneId))sceneId=p().workbench.scenes[0]?.id;sessionStorage.setItem('wb-project',projectId);sessionStorage.setItem('wb-scene',sceneId||'');}else state=null;render();if(browser.isOpen)await browser.refresh();}
 function reconcileWorldSave(){
  if(!worldSave)return;const run=state?.runs.find(r=>r.id===worldSave.body.request.requestId);
  if(run?.state==='SUCCEEDED'){if(!s()?.checkpoints.some(c=>c.id===run.resultCheckpointId))throw Error('Saved receipt has no matching checkpoint. Inspect the retained run.');worldSave.viewer.discard();worldSave=null;}
@@ -61,8 +62,12 @@ function currentActionDraft(){
 function scheduleActionInspection(){
  setTimeout(()=>{
   if(busy||tab!=='scenes'||s()?.stage!=='action'||!cp()||state.locked||cap?.action_layer!=='action-layer-v1'||currentActionDraft())return;
-  const attempted=state.runs.some(r=>r.action==='action-audit'&&r.sceneId===sceneId&&r.checkpointId===cp().id);
-  if(!attempted)perform(()=>dispatch('action-inspect',{}));
+  const key=projectId+':'+sceneId+':'+cp().id+':'+cp().sha256;
+  const attempted=actionInspectionAttempts.has(key)||state.runs.some(r=>r.action==='action-audit'&&r.sceneId===sceneId&&r.checkpointId===cp().id&&r.checkpointSha256===cp().sha256);
+  if(!attempted){actionInspectionAttempts.add(key);const chosen={projectId,sceneId,checkpointId:cp().id,sha256:cp().sha256};perform(async()=>{
+   await ensureActionInspection({...chosen,read:()=>api('workbench/state?'+new URLSearchParams({projectId:chosen.projectId,compact:true})),create:revision=>api('workbench/action-inspect',{projectId:chosen.projectId,sceneId:chosen.sceneId,revision,request:{version:'action-layer-v1',requestId:'run_'+crypto.randomUUID(),checkpointId:chosen.checkpointId,sha256:chosen.sha256}})});
+   await load();
+  });}
  },0);
 }
 async function saveActionDraft(){
@@ -183,7 +188,7 @@ function render(){const priorWorld=document.querySelector('.world-workspace');if
  root.innerHTML=`<header class="projectbar">${b(p().name+' ▾','picker',{},'production ghost')}<nav aria-label="Production">${b('Scenes','tab',{tab:'scenes'},tab==='scenes'?'active':'')}${b('Final film','tab',{tab:'film'},tab==='film'?'active':'')}</nav><span class="grow"></span><span class="status">${state.locked?'Adding / preparing':s()?.candidate?'Unsaved scene changes':'Saved · revision '+p().revision}</span>${b('Refresh','refresh',{},'ghost')}${b('Studio','settings',{},'ghost')}</header>${returnToFilm&&tab==='scenes'?'<div class="note">Editing a source scene. The film arrangement is preserved. '+b('Return to Final film','return-film')+'</div>':''}${tab==='film'?film():scenePage()}`;
  root.querySelectorAll('[data-media]').forEach(loadMedia);root.querySelectorAll('[data-source-image]').forEach(loadSourceImage);root.querySelectorAll('[data-catalog-image]').forEach(loadCatalogImage);
  const world=root.querySelector('.world-workspace');if(world){const key=projectId+':'+sceneId;world.dataset.contextKey=key;for(const [name,open] of Object.entries(worldPanels.get(key)||{})){const panel=world.querySelector('.'+name);if(panel)panel.open=open;}}
- const worldHost=root.querySelector('.world-workspace [data-scene-viewer],.action-workspace [data-scene-viewer]');if(worldHost){if(keptHost)worldHost.replaceWith(keptHost);else if(cp()&&!state.locked&&!s().task&&!s().run)showSceneViewer(worldHost);}
+ const worldHost=root.querySelector('.world-workspace [data-scene-viewer],.action-workspace [data-scene-viewer]');if(worldHost){if(keptHost)worldHost.replaceWith(keptHost);else if(cp()&&!state.locked&&!s().task&&!s().run&&(s().stage!=='action'||currentActionDraft()))showSceneViewer(worldHost);}
  syncWorldDraftUI();
 }
 function scenePage(){const scene=s();if(scene?.stage==='action')return `<section class="workspace layered-action">${actionView({project:p(),scene,stages:state.stages,checkpoint:cp(),runs:state.runs,locked:state.locked,taskStatus:state.taskStatuses?.[scene.id],cap,draft:currentActionDraft(),saving:actionSave,esc,b})}${sourceUseBanner()}${runList(scene)}</section>`;if(scene?.stage==='world')return `<section class="workspace world-workspace">${worldView({project:p(),scene,stages:state.stages,locked:state.locked,sourceUse:state.sourceUse,runs:state.runs,taskStatus:state.taskStatuses?.[scene.id],cap,inventory:state.inventory,queueCount:additions.state().count,esc,b})}</section>`;return `<div class="shell"><aside class="scenes"><h2>Scenes</h2>${p().workbench.scenes.map((x,i)=>b(`${String(i+1).padStart(2,'0')}  ${x.name} · ${activityName(x.stage)}`,'scene',{id:x.id},'scene-link'+(x.id===sceneId?' active':''))).join('')}${b('+ Add scene','new-scene',{},'ghost')}</aside><section class="workspace">${!scene?`<div class="empty"><h1>Build your first scene</h1><p>Start with your library. Assemble a world, stage the action, then decide how to film it.</p>${b('Create scene','new-scene',{},'primary')}</div>`:sceneBody(scene)}</section></div>`;}
@@ -311,7 +316,7 @@ if(a==='source-detail'){const source=await api('workbench/source-detail?'+new UR
  if(a==='keep-building'){if(s().stage!=='world'&&!confirm('Keep this reviewed checkpoint and stay in the same activity?'))return;await next('keep-building');await load();return;}
 if(a==='scan'){if(!confirm('Rescan the original database packages? This updates the source registry; existing pins and originals are preserved.'))return;await api('library/scan',{});thumbnails.clear();await load();return;}
  if(a==='source'){await next('source',{sourceId:d.id,selected:!s().sources.includes(d.id)});if($('dialog').open)close();await load();return;}
- if(a==='task'){const shot=shotFor(s()),context={targets:s().stage==='world'?sceneViewer?.targets()||[]:s().stage==='action'?currentActionDraft()?.selected?[currentActionDraft().selected]:[]:target?[target]:[],...(s().stage==='action'&&sceneViewer?.currentFrame!==null?{frame:sceneViewer?.currentFrame}:{}),camera:shot&&['shots','light','render'].includes(s().stage)?shot.camera:s().stage==='shots'?target:null};await next('task-open',{context});await load();return;}
+ if(a==='task'||a==='action-rig'){const shot=shotFor(s()),context={targets:s().stage==='world'?sceneViewer?.targets()||[]:s().stage==='action'?currentActionDraft()?.selected?[currentActionDraft().selected]:[]:target?[target]:[],...(s().stage==='action'&&sceneViewer?.currentFrame!==null?{frame:sceneViewer?.currentFrame}:{}),...(s().stage==='action'&&currentActionDraft()?.selected?{actionContext:currentActionDraft().handoff(sceneViewer?.currentFrame),rigControls:a==='action-rig'}:{}),camera:shot&&['shots','light','render'].includes(s().stage)?shot.camera:s().stage==='shots'?target:null};await next('task-open',{context});await load();return;}
  if(a==='focus-task'){const r=await next('task-focus');notice(r.focused?'Blender task focused.':r.message||'Task window requested; select it on the taskbar.');return;}
  if(a==='collect'){await next('task-collect');await load();return;}
  if(a==='approve'){if(!confirm('Have you inspected this saved checkpoint in Blender? Keep it for '+activityName(s().stage)+'?'))return;await next('approve',{stage:s().stage,checkpointId:cp().id});target=null;await load();return;}
@@ -319,7 +324,7 @@ if(a==='scan'){if(!confirm('Rescan the original database packages? This updates 
  if(a==='inspect-candidate'){await next('inspect',{checkpointId:cp().id});return;}
  if(a==='import'){modal('Import a saved working scene',`<p>Copies the file to a new frozen checkpoint. Originals and their relative asset paths are preserved. This is not an approval.</p><label>Project Scenes folder<select id="import-file">${state.savedScenes.map(f=>`<option value="${esc(f)}">${esc(f.slice(7))}</option>`).join('')}</select></label>`,b('Copy as candidate','save-import',{},'primary',!state.savedScenes.length));return;}
  if(a==='save-import'){await next('import',{sourceScene:$('import-file').value});close();await load();return;}
- if(a==='codex'){await next('codex');modal('Specialist session requested','<p>Your configured Codex terminal receives this exact scene task and selected sources. Respond to its normal trust, source-use and job-review prompts. Save results to this project’s Scenes folder, then import the working scene here. This does not attach to the dedicated manual Blender task.</p>');return;}
+ if(a==='codex'){await next('codex',{context:s().stage==='action'&&currentActionDraft()?.selected?{actionContext:currentActionDraft().handoff(sceneViewer?.currentFrame)}:{}});modal('Specialist session requested','<p>Your configured Codex terminal receives this exact scene task and selected sources. Respond to its normal trust, source-use and job-review prompts. Save results to this project’s Scenes folder, then import the working scene here. This does not attach to the dedicated manual Blender task.</p>');return;}
  if(a==='preview'){const shot=shotFor(s());modal('One CPU preview frame',`<p>Produces a 640 × 360, 4-sample still from the displayed ${s().candidate?'unapproved candidate':'kept checkpoint'}. This does not keep the candidate or approve any activity. ${shot?'Shot: '+esc(shot.name)+' · '+esc(shot.camera)+'.':'An existing saved camera is required.'}</p><label>Frame<input id="preview-frame" type="number" value="${shot?.start??cp()?.audit?.frame_range?.[0]??1}"></label>`,b('Authorize preview','save-preview',{},'primary'));return;}
  if(a==='save-preview'){await next('run',{operation:'preview',options:{frame:Number($('preview-frame').value)},confirmed:true});close();await load();return;}
  if(a==='readiness'){await next('run',{operation:'render-readiness'});await load();return;}

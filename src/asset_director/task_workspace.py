@@ -11,11 +11,13 @@ import sys
 from .core import Library, atomic_json, fields, file_hash, load_json, require, within
 
 STAGES = {"world": "Layout", "action": "Animation", "shots": "Layout", "light": "Shading", "render": "Rendering"}
-TASK_FIELDS = {"schema", "id", "projectId", "sceneId", "stage", "projectDirectory", "library", "input", "workingScene", "checkpointScene", "returnFile", "targets", "camera", "frame", "action", "state", "startedAt", "processId", "selectedSources", "frameRange", "handoff"}
+TASK_FIELDS = {"schema", "id", "projectId", "sceneId", "stage", "projectDirectory", "library", "input", "workingScene", "checkpointScene", "returnFile", "targets", "camera", "frame", "action", "state", "startedAt", "processId", "selectedSources", "frameRange", "handoff", "actionContext", "rigControls"}
 
 
 def validate(task):
-    fields(task, TASK_FIELDS, TASK_FIELDS - {"processId", "frameRange", "handoff"})
+    fields(task, TASK_FIELDS, TASK_FIELDS - {"processId", "frameRange", "handoff", "actionContext", "rigControls"})
+    from .action_task import validate_context
+    validate_context(task)
     require(task.get("handoff") in (None, "explicit-save-v1"), "INVALID_TASK", "Unknown editing handoff")
     require(task["schema"] == 1 and task["stage"] in STAGES, "INVALID_TASK", "Unknown task schema or stage")
     for key, prefix in (("id", "task_"), ("projectId", "prj_"), ("sceneId", "sc_")):
@@ -118,6 +120,9 @@ def configure(task, project):
         require(isinstance(embedded, list) and set(embedded) <= set(baseline),
                 "LICENSE_SCOPE_MISMATCH", "Use the library that owns this checkpoint's restricted lineage")
     configured = False
+    if task['stage'] == 'action':
+        from .action_task import verify_observed
+        verify_observed(task)
     window = bpy.context.window
     if window and not bpy.app.background:
         workspace = (bpy.data.workspaces.get("Asset Director - " + task["stage"].title()) or
@@ -171,9 +176,11 @@ def configure(task, project):
     active = bpy.context.view_layer.objects.active
     if placement and task['targets'] and all(world_placement.ancestor_control(scene.objects[n]) for n in task['targets']):
         world_placement.select_instances([scene.objects[n] for n in task['targets']])
-    if task["stage"] == "action" and active and active.type == "ARMATURE":
-        if bpy.ops.object.mode_set.poll():
-            bpy.ops.object.mode_set(mode="POSE")
+    if task['stage'] == 'action':
+        from .action_task import presentation
+        presentation(task, task.get('rigControls', False))
+        # A saved shot preview window must not silently restrict Action playback.
+        scene.use_preview_range = False
     if window and scene.camera and task["stage"] in {"shots", "light"}:
         for area in window.screen.areas:
             if area.type == "VIEW_3D" and area.spaces.active.region_3d:
@@ -264,6 +271,11 @@ def main(filename):
             layout.label(text="Task: " + task["id"][5:13])
             layout.label(text="Save to keep changes. Unsaved edits stay out of Director." if task.get("handoff") else "Your original checkpoint is preserved.")
             layout.operator(AD_OT_checkpoint.bl_idname)
+            if task['stage'] == 'action' and task.get('actionContext'):
+                layout.separator()
+                layout.label(text='Performer: ' + task['actionContext']['performer'])
+                layout.operator('asset_director.action_controls', text='Show rig controls').enabled = True
+                layout.operator('asset_director.action_controls', text='Hide rig controls').enabled = False
             if task["selectedSources"]:
                 layout.separator()
                 layout.label(text="Selected sources (not imported):")
@@ -278,6 +290,9 @@ def main(filename):
 
     bpy.utils.register_class(AD_OT_checkpoint)
     bpy.utils.register_class(AD_PT_task)
+    if task['stage'] == 'action':
+        from .action_task import install_tools
+        install_tools(task)
     if task['stage'] == 'world' and not bpy.app.background:
         from .world_placement import install_tools
         install_tools(task, state['world_placement'])

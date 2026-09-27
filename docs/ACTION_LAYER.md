@@ -6,6 +6,10 @@ Action view automatically inspects the exact saved checkpoint, offers performer-
 owned native takes or a held pose, and keeps timing choices in a local draft.
 Undo, Discard and navigation protection do not run Blender. Explicit Save runs
 one bounded batch, refreshes the saved scene and does not complete the activity.
+Automatic inspection precedes preview creation; reloads reuse an already recorded
+inspection. One fresh-state retry is permitted only for a read-only revision
+conflict. Failed jobs are retained and require explicit retry; Saves are not
+automatically replayed with a new identity or weaker revision check.
 The preview is labelled as saved performance while a timing draft is unsaved.
 The visible planned playback range expands when needed to include complete takes;
 Save includes that exact range, within the existing 3600-interval bound. It never
@@ -19,6 +23,22 @@ together. Confirmed rig widgets are hidden only in the disposable derivative;
 skin, native keys, original helper visibility and source files remain intact.
 Returning to World produces its separate frozen-frame profile without removing
 motion from the scene. Materials and viewer lighting remain approximations.
+
+Manual handoff uses the selected saved performer and current playback frame,
+bound to the exact checkpoint and successful native inspection. The separate
+Action task rechecks the native fingerprint before setup. Ordinary performance
+editing starts in Object mode with bone overlays and observed rig widgets hidden;
+an explicit **Edit rig controls in Blender** command opens Pose mode for the
+observed armature. Task-local Show/Hide rig controls preserve native keys, rest/
+skin data, widget references and render flags. No global preferences are saved.
+Uninspectable or ambiguous contexts are refused rather than guessed.
+
+The existing reviewed specialist receives that same saved performer, instance,
+native takes, frame/timebase and checkpoint context alongside pinned source
+versions. Unsaved choices must first be saved or discarded. Handoff is a request
+for a proposal, not approval, retarget permission or proof of model execution.
+Old tasks without the optional context remain readable. New context requires the
+matching `action-task-v1` capability; no silent fallback to an older runtime.
 
 `action-audit` observes actual object/action/slot bindings from active actions and
 NLA strips. Unbound lookalike actions are reported separately, never offered by
@@ -74,6 +94,7 @@ blender --background --factory-startup --disable-autoexec --threads 2 --python-e
 node tools/action_layer_check.mjs <new-http-output> <action-output> <python> <blender>
 blender --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/action_preview_fixture.py -- <action-output>/source.blend <new-preview-output>
 node tools/action_browser_check.mjs <new-browser-output> <action-output> <preview-output> <python> <blender> <installed-playwright-module> [installed-chrome]
+node tools/action_task_check.mjs <new-task-output> <action-output> <python> <blender>
 ```
 
 The existing embedded-viewer CI journey runs these fixtures without changing its
@@ -88,7 +109,10 @@ Blender samples, then exercise timing/hold, Undo, Save, Discard and return to Wo
 Legacy preview-only tests precompute performer inspection before their unchanged-
 manifest baseline; they still forbid scene mutations and approvals.
 
-Intentional manual rig access, private licensed inputs, interruption/stale-draft
-edge cases, exact-commit CI, full-film acceptance, packaging and live rollout must
-still be recorded separately. No native Windows UI proof follows from Playwright.
+Generated Action task tests cover real selection/frame, deliberate rig show/hide,
+preserved motion/render flags, exact-context refusals and explicit Save/no-save/
+saved-then-unsaved reconciliation. They run background Blender, not native dialogs.
+Private licensed inputs, interruption/stale-draft browser edges, exact-commit CI,
+full-film acceptance, packaging and live rollout must still be recorded separately.
+No native Windows UI proof follows from Playwright or a background task fixture.
 No installed runtime is changed merely by committing this source slice.
