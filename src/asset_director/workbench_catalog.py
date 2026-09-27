@@ -105,6 +105,9 @@ def catalog(lib, query='', offset=0, limit=24, asset_id=None, verify=False, kind
 
 def validate_import(lib, asset, options):
     """An explicit file must be one exact recorded package member, not a path."""
+    if 'placement' in options:
+        require(options['placement'] == 'world-v1' and asset.kind in {'model', 'pack'},
+                'INVALID_PLACEMENT', 'World placement is an explicit model-import profile')
     if asset.metadata.get('prepared_member'):
         require(options.get('file') == asset.metadata['prepared_member'], 'MEMBER_REVIEW_REQUIRED',
                 'This preparation checked one exact member; other package models need their own reviewed intake')

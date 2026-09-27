@@ -127,6 +127,22 @@ def configure(task, project):
             workspace.name = "Asset Director - " + task["stage"].title()
             configured = True
     scene = bpy.context.scene
+    from . import world_placement
+    world_placement.restore_widgets(scene)
+    placement = None
+    if task['stage'] == 'world':
+        # Only the separate task copy is prepared. Don't Save still retains the
+        # input checkpoint; explicit Save records the new placement structure.
+        placement = world_placement.prepare(scene)
+        world_placement.hide_widgets(scene)
+        if window:
+            for area in window.screen.areas:
+                if area.type == 'VIEW_3D':
+                    space = area.spaces.active
+                    space.overlay.show_bones = False
+                    space.show_gizmo_object_translate = False
+                    space.show_gizmo_object_rotate = False
+                    space.show_gizmo_object_scale = False
     if task.get("frameRange"):
         start, end = task["frameRange"]
         require(scene.frame_start <= start <= end <= scene.frame_end, "TARGET_CHANGED", "Shot range leaves the saved scene")
@@ -153,6 +169,8 @@ def configure(task, project):
     if task["camera"]:
         scene.camera = camera  # Preserve the requested camera after timeline markers.
     active = bpy.context.view_layer.objects.active
+    if placement and task['targets'] and all(world_placement.ancestor_control(scene.objects[n]) for n in task['targets']):
+        world_placement.select_instances([scene.objects[n] for n in task['targets']])
     if task["stage"] == "action" and active and active.type == "ARMATURE":
         if bpy.ops.object.mode_set.poll():
             bpy.ops.object.mode_set(mode="POSE")
@@ -163,7 +181,7 @@ def configure(task, project):
     bpy.ops.wm.save_as_mainfile(filepath=str(within(project, task["workingScene"])), check_existing=False, relative_remap=True)
     with Library(task["library"]) as lib:
         lp.retain_derivation(lib, within(project, task["workingScene"]), baseline)
-    return {"project": project, "baseline": baseline, "gui_configured": configured}
+    return {"project": project, "baseline": baseline, "gui_configured": configured, 'world_placement': placement}
 
 
 def checkpoint(task, initialized):
@@ -260,6 +278,9 @@ def main(filename):
 
     bpy.utils.register_class(AD_OT_checkpoint)
     bpy.utils.register_class(AD_PT_task)
+    if task['stage'] == 'world' and not bpy.app.background:
+        from .world_placement import install_tools
+        install_tools(task, state['world_placement'])
     # Search (F3) can find the operator in every workspace, not only VIEW_3D.
     atomic_json(status_file, {"taskId": task["id"], "projectId": task["projectId"], "sceneId": task["sceneId"],
                               "state": "READY", "gui_configured": state["gui_configured"],

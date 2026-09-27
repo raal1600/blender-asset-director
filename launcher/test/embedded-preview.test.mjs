@@ -9,7 +9,7 @@ import {createApp} from '../server.mjs';
 import {fileHash} from '../lib/storage.mjs';
 import {packageGLTF,validateGLB} from '../lib/viewer-gltf.mjs';
 import {animationEntries,previewFailure} from '../public/viewer-3d.mjs';
-import {MAX_PREVIEW_STORAGE_BYTES,assertPreviewStorageBudget} from '../lib/embedded-preview.mjs';
+import {MAX_PREVIEW_STORAGE_BYTES,assertPreviewStorageBudget,previewProfile} from '../lib/embedded-preview.mjs';
 import {MAX_VIEWER_BYTES} from '../lib/viewer-gltf.mjs';
 
 test('preview storage permits more than 2 GiB but reserves copies and output below 100 GiB',()=>{
@@ -34,6 +34,16 @@ test('static poses remain inspectable, distinguished from actual timed animation
   assert.throws(()=>animationEntries([{duration:NaN,tracks:[{}]}]),/Invalid animation/);
 });
 
+test('World has a static profile; motion controls stay in other activities',()=>{
+  const clip={name:'native motion',duration:2,tracks:[{}]};
+  assert.equal(previewProfile('world'),'world-static-v1');
+  assert.deepEqual(animationEntries([clip],previewProfile('world')),[]);
+  for(const stage of ['action','shots','light','render']){
+    assert.equal(previewProfile(stage),'inspection-v1');
+    assert.equal(animationEntries([clip],previewProfile(stage)).length,1);
+  }
+});
+
 export async function triangle(folder) {
   const bytes=Buffer.from(new Float32Array([-1,0,0,1,0,0,0,1,0]).buffer);
   const doc={asset:{version:'2.0'},scene:0,scenes:[{nodes:[0]}],nodes:[{name:'Synthetic triangle',mesh:0}],meshes:[{primitives:[{attributes:{POSITION:0}}]}],buffers:[{uri:'geometry.bin',byteLength:bytes.length}],bufferViews:[{buffer:0,byteLength:bytes.length}],accessors:[{bufferView:0,componentType:5126,count:3,type:'VEC3',min:[-1,0,0],max:[1,1,0]}]};
@@ -54,6 +64,8 @@ test('embedded viewer is authenticated, scoped, cached by exact bytes and cannot
   assert.equal((await post(body,{'Content-Type':'application/json'})).status,401);
   for(const change of [{file:'../private.gltf'},{version:'3'.repeat(64)},{url:'https://example.invalid'}])assert.equal((await post({...body,request:{...request,...change}})).ok,false);
   const response=await post();assert.equal(response.status,200,await response.clone().text());const prepared=await response.json();
+  assert.equal(prepared.profile,'world-static-v1');
+  assert.equal((await post({...body,request:{...request,preview_profile:'inspection-v1'}})).ok,false,'Client cannot override the stage profile');
   assert.equal(prepared.observed.vertices,3);assert.equal(prepared.selectionChanged,false);assert.equal(prepared.approved,false);assert.equal(native,0);
   const media=new URL('/api/workbench/viewer-model',app.origin);media.search=new URLSearchParams({projectId:p.id,sceneId:created.sceneId,previewId:prepared.previewId});
   assert.equal((await fetch(media)).status,401);const read=await fetch(media,{headers});assert.equal(read.status,200);
@@ -65,6 +77,11 @@ test('embedded viewer is authenticated, scoped, cached by exact bytes and cannot
   await fs.writeFile(cachedFile,bytes);
   media.searchParams.set('sceneId','sc_foreign');assert.equal((await fetch(media,{headers})).status,404);
   assert.deepEqual(await fileHash(path.join(p.directory,'project.json')),before);
+  // Synthetic state navigation only: the same source cannot reuse another mode.
+  p=await app.store.get(p.id);p.workbench.scenes[0].stage='action';p=await app.store.save(p,p.revision);body.revision=p.revision;
+  const animated=await (await post()).json();assert.equal(animated.profile,'inspection-v1');assert.notEqual(animated.previewId,prepared.previewId);
+  p.workbench.scenes[0].stage='world';p=await app.store.save(p,p.revision);body.revision=p.revision;
+  const back=await (await post()).json();assert.equal(back.profile,'world-static-v1');assert.equal(back.previewId,prepared.previewId);
   await fs.appendFile(path.join(library,'geometry.bin'),'changed');assert.equal((await post()).status,409);
   media.searchParams.set('sceneId',created.sceneId);assert.equal((await fetch(media,{headers})).status,409);
 });

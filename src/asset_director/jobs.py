@@ -38,7 +38,7 @@ OPS = {
     "index": {"max_clips", "sample"},
     "asset-contents": {"file", "request_scope"},
     "asset-preview": {"file", "embedded"},
-    "import": {"collection", "selection", "file"},
+    "import": {"collection", "selection", "file", "placement"},
     "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture", "transfer_binding", "max_output_intervals"},
     "assemble": {"target_object", "clips", "fps", "controller_speed", "direction", "terrain_object", "travel_frames"},
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},

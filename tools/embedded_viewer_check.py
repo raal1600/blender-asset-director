@@ -20,7 +20,7 @@ def main():
     root=Path(args.fixture);session=json.loads((root/'browser-session.json').read_text())
     assert session.get('fixture')=='synthetic-embedded-viewer','Refuse live or unrelated sessions'
     output=Path(args.evidence);output.mkdir(parents=True,exist_ok=False)
-    before=sha(session['projectManifest']);catalog_before=sha(session['catalog'])
+    before=sha(session['projectManifest']);action_before=sha(session['actionManifest']);catalog_before=sha(session['catalog'])
     report={'kind':'real-webgl-synthetic-viewer','checks':[],'errors':[],'requests':[],'external_requests':[],'expected_refusals':[],
             'not_tested':['human creative acceptance','licensed inputs','native desktop host','live Blender link (not implemented)']}
     with sync_playwright() as pw:
@@ -65,17 +65,11 @@ def main():
             page.mouse.move(x,y);page.mouse.down(button='right');page.mouse.move(x+55,y+20,steps=8);page.mouse.up(button='right');page.wait_for_timeout(350)
             canvas.screenshot(path=str(output/'04-pan-zoom.png'));host.get_by_role('button',name='Reset view',exact=True).click()
             report['checks'].append('Real pointer orbit, wheel zoom, right-drag pan and reset')
-            expect(host.locator('[data-view="take"] option')).to_have_count(1)
-            host.locator('[data-view="time"]').fill('0');host.locator('[data-view="time"]').dispatch_event('input');page.wait_for_timeout(100)
-            at_start=canvas.screenshot(path=str(output/'05-animation-start.png'))
-            duration=float(host.locator('[data-view="time"]').get_attribute('max'));assert duration>0
-            midpoint=round(duration*.5,3)
-            host.locator('[data-view="time"]').fill(str(midpoint));host.locator('[data-view="time"]').dispatch_event('input');page.wait_for_timeout(100)
-            at_mid=canvas.screenshot(path=str(output/'06-animation-middle.png'));assert at_start!=at_mid,'Skinned animation did not change pixels'
-            host.get_by_role('button',name='Play',exact=True).click();page.wait_for_timeout(180)
-            assert float(host.locator('[data-view="time"]').input_value())!=midpoint
-            host.get_by_role('button',name='Pause',exact=True).click()
-            report['checks'].append('Actual skinned playback, pause and timeline change rendered pixels')
+            expect(host.locator('.viewer-animation')).to_be_hidden()
+            expect(host.locator('.viewer-disclaimer')).to_contain_text('Static World preview at frame')
+            page.wait_for_timeout(250);static_frame=canvas.screenshot();page.wait_for_timeout(250)
+            assert canvas.screenshot()==static_frame,'World changed without user interaction'
+            report['checks'].append('World is a stable evaluated frame with no animation controls')
             host.get_by_role('button',name='Grid',exact=True).click();expect(host.get_by_role('button',name='Grid',exact=True)).to_have_attribute('aria-pressed','false')
             host.get_by_role('button',name='Wireframe',exact=True).click();expect(host.get_by_role('button',name='Wireframe',exact=True)).to_have_attribute('aria-pressed','true')
             report['graphics']=canvas.evaluate("e=>{const g=e.getContext('webgl2');return {version:g.getParameter(g.VERSION),renderer:g.getParameter(g.RENDERER)}}")
@@ -83,7 +77,7 @@ def main():
             select=page.locator('#catalog-file');values=select.locator('option').evaluate_all('(rows)=>rows.map(n=>n.value)');select.select_option(next(v for v in values if v.endswith('.glb')));idle()
             click('#dialog [data-action="viewer-open"]:visible >> nth=0');asset=ready('#dialog [data-viewer-host]')
             page.screenshot(path=str(output/'07-asset-in-app.png'))
-            assert asset.locator('[data-view="take"] option').count()>=1
+            expect(asset.locator('.viewer-animation')).to_be_hidden()
             first=asset.get_attribute('data-preview-id');click('#dialog [data-action="viewer-open"]:visible >> nth=0');asset=ready('#dialog [data-viewer-host]')
             assert asset.get_attribute('data-preview-id')==first
             assert 'verified cached copy' in asset.locator('.viewer-status').text_content()
@@ -117,7 +111,21 @@ def main():
             page.keyboard.press('Escape');expect(page.locator('#dialog')).not_to_be_visible();expect(page.locator('#dialog canvas')).to_have_count(0)
             report['checks'].append('Responsive 390px layout and Escape releases the asset canvas')
             page.keyboard.press('Escape');click('[data-action="tab"][data-tab="film"]');expect(page.locator('[data-scene-viewer] canvas')).to_have_count(0)
+            click('[data-action="picker"]');click('[data-action="project"][data-id="'+session['actionProjectId']+'"]')
+            click('[data-action="scene-viewer"]');host=ready('[data-scene-viewer]');canvas=host.locator('canvas')
+            expect(host.locator('[data-view="take"] option')).to_have_count(1)
+            host.locator('[data-view="time"]').fill('0');host.locator('[data-view="time"]').dispatch_event('input');page.wait_for_timeout(100)
+            at_start=canvas.screenshot(path=str(output/'05-action-start.png'))
+            duration=float(host.locator('[data-view="time"]').get_attribute('max'));assert duration>0
+            midpoint=round(duration*.5,3)
+            host.locator('[data-view="time"]').fill(str(midpoint));host.locator('[data-view="time"]').dispatch_event('input');page.wait_for_timeout(100)
+            assert canvas.screenshot(path=str(output/'06-action-middle.png'))!=at_start,'Skinned Action animation did not change pixels'
+            host.get_by_role('button',name='Play',exact=True).click();page.wait_for_timeout(180)
+            assert float(host.locator('[data-view="time"]').input_value())!=midpoint
+            host.get_by_role('button',name='Pause',exact=True).click()
+            report['checks'].append('Action retains actual skinned playback, pause and timeline pixel changes')
             assert sha(session['projectManifest'])==before,'Viewer changed project manifest'
+            assert sha(session['actionManifest'])==action_before,'Viewer changed Action manifest'
             assert sha(session['catalog'])==catalog_before,'Viewer changed live synthetic catalog'
             assert all(sha(f['path'])==f['sha256'] for f in session['sourceFiles'])
             assert not report['errors'],report['errors'];assert not report['external_requests'],report['external_requests']

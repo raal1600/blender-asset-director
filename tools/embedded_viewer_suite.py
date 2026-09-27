@@ -25,6 +25,14 @@ def main():
               'tree': subprocess.check_output(['git','rev-parse','HEAD^{tree}'],cwd=ROOT,text=True).strip(),
               'worktree_dirty': bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT))}
     (output/'source.json').write_text(json.dumps(source,indent=2),encoding='utf-8')
+    with (output/'world-layers.log').open('wb') as log:
+        subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
+                        '--python-exit-code','11','--python',str(ROOT/'tools/world_layers_fixture.py'),'--',str(output/'world-layers')],
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=180,check=True)
+    with (output/'world-save-return.log').open('wb') as log:
+        subprocess.run([args.node,str(ROOT/'tools/task_save_native.mjs'),str(output/'world-save-return'),
+                        args.blender,str(output/'world-layers')],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,
+                       timeout=180,check=True)
     if args.guided_world:
         with (output/'package-preparation.log').open('wb') as log:
             subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',

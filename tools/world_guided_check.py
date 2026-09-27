@@ -172,7 +172,7 @@ def main():
             ids={o.get('asset_id') for o in cp['audit']['objects']}
             assert {session['assetId'],session['secondAssetId']}<=ids and cp['parent']==first_cp['id']
             ready('[data-scene-viewer]')
-            assert first_meshes<=models[-1] and 'SecondSyntheticTriangle' in models[-1] and len(models[-1])>=2
+            assert first_meshes<=models[-1] and 'World preview - SecondSyntheticTriangle' in models[-1] and len(models[-1])>=2
             expect(page.locator('.world-ingredient-list')).to_contain_text('2 in this change')
             capture('06c-combined-world-candidate')
             click('[data-action="save-world"]')

@@ -25,6 +25,15 @@ class PreviewTests(unittest.TestCase):
         atomic_json(self.request,data or self.data)
         return snapshot(self.request)
 
+    def test_world_profile_is_validated_and_reaches_only_the_separate_preview(self):
+        before=file_hash(self.file)
+        for invalid in ['world',None,False,[],{}]:
+            with self.assertRaisesRegex(DirectorError,'Unknown preview profile'):
+                self.run_snapshot({**self.data,'preview_profile':invalid})
+        _,_,asset=self.run_snapshot({**self.data,'preview_profile':'world-static-v1'})
+        self.assertEqual(asset.metadata['preview_profile'],'world-static-v1')
+        self.assertEqual(file_hash(self.file),before)
+
     def test_copy_has_separate_library_unknown_rights_and_no_original_changes(self):
         before=file_hash(self.file);request,directory,asset=self.run_snapshot()
         self.assertEqual(file_hash(self.file),before)

@@ -1,5 +1,8 @@
 # World: add, draft, save
 
+The [layered World foundation](WORLD_LAYERS.md) adds animation-safe placement
+controls and a static stage-specific viewer without changing this save contract.
+
 The normal World path is Browse / View 3D → Add to scene → Save changes.
 Source selection, single-collection inspection and native import are coordinated
 by the existing bounded APIs. A selected reference is still not an imported

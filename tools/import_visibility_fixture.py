@@ -89,6 +89,18 @@ try:
         check(widget_name not in names,'checkpoint GLB excludes render-hidden rig helper')
         check({'SyntheticBody','Icosphere'}<=names,'checkpoint GLB retains character and unrelated same-name geometry')
         check(file_hash(source)==original and file_hash(seed)==seed_hash and file_hash(checkpoint)==checkpoint_hash and file_hash(legacy)==legacy_hash,'sources and old checkpoints are byte-identical')
+        world_folder, world_data = run('import',seed,{'file':asset.local_files[0]['path'],'placement':'world-v1'},asset.id)
+        bpy.ops.wm.open_mainfile(filepath=str(world_folder/'result.blend'),load_ui=False,use_scripts=False)
+        from asset_director.world_placement import ancestor_control, INSTANCE
+        control = ancestor_control(bpy.data.objects['SyntheticRig'])
+        check(control is not None and bool(control.get(INSTANCE)) and ancestor_control(bpy.data.objects['SyntheticBody']) == control,
+              'World import creates one verified placement instance above rig and skin')
+        check(len(world_data['world_placement']['prepared']) == 1 and not world_data['world_placement']['unsupported'],
+              'World import receipt exposes prepared instance and membership')
+        check(bpy.data.objects['Icosphere'].parent is None and ops.flatten(bpy.data.objects['Icosphere'].matrix_world)==prop_matrix,
+              'World import preparation is limited to the new import job')
+        check(file_hash(source)==original and file_hash(seed)==seed_hash and file_hash(checkpoint)==checkpoint_hash,
+              'opt-in placement preserves source and earlier unprepared import')
     report={'status':'PASS' if all(c['status']=='PASS' for c in checks) else 'FAIL','checks':checks,'blender_version':bpy.app.version_string,'human_approval':'NOT_GRANTED'}
     atomic_json(out/'import_visibility_report.json',report);print(json.dumps(report));assert report['status']=='PASS'
 except BaseException as error:

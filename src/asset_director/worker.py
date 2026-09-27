@@ -175,6 +175,9 @@ def execute(job_path, *, live=False):
                             collection.objects.link(obj)
                         obj["bad_asset"] = asset.id; obj["bad_job"] = job["id"]
                     data = {"objects": [o.name for o in created], "source": asset.id}
+                    if options.get('placement') == 'world-v1':
+                        from asset_director.world_placement import prepare as prepare_placement
+                        data['world_placement'] = prepare_placement(bpy.context.scene, only_job=job['id'])
                 # The launcher adopts a byte-identical candidate into project Scenes.
                 # Preserve external references across that move, without touching sources.
                 bpy.ops.file.make_paths_absolute()

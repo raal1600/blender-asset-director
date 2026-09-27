@@ -99,6 +99,9 @@ def scene_audit():
         # Observed provenance is distinct from the launcher's selected sources.
         item['asset_id'] = obj.get('bad_asset') if isinstance(obj.get('bad_asset'), str) else None
         item['import_job'] = obj.get('bad_job') if isinstance(obj.get('bad_job'), str) else None
+        if isinstance(obj.get('bad_placement_instance'), str):
+            item['placement_instance'] = obj['bad_placement_instance']
+            item['placement_control'] = obj.get('bad_placement_control') == 1
         animation = obj.animation_data
         if animation and animation.action:
             action = animation.action

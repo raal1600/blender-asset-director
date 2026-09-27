@@ -123,7 +123,7 @@ export const withCatalog=Base=>class extends Base {
     // checkpoint byte checks without launching that same native verification twice.
     const baseId=s.candidate||s.current;
     const cp=baseId?await timed('verify-checkpoint',()=>super.verify(p,s,baseId)):null;
-    const options=operation==='import'?{file,collection:sceneId,...(selection?{selection}: {})}:{file,request_scope:id+':'+sceneId};
+    const options=operation==='import'?{file,collection:sceneId,placement:'world-v1',...(selection?{selection}: {})}:{file,request_scope:id+':'+sceneId};
     const runId='run_'+randomUUID(),record=Object.assign(diagnostic,{schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',assetId:aid,sourceVersion:a.version,checkpointId:cp?.id||null,startedAt:now(),authorization:confirmed?'explicit-launcher-user-action':'read-only',options});
     await this.lock(p,runId);
     const receipt=await safe(p.directory,`Runs/${runId}.json`);

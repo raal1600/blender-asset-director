@@ -44,6 +44,14 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(job['specification']['inputs'],[]);self.assertNotIn('asset-contents',jobs.MUTATIONS)
         self.assertFalse((self.lib.root/'jobs'/job['id']/'result.blend').exists())
         with self.assertRaises(DirectorError):jobs.prepare(self.lib,'asset-contents',str(self.source),self.asset.id,{'file':'incoming/model.blend'})
+    def test_world_placement_is_opt_in_and_versioned(self):
+        plain=jobs.prepare(self.lib,'import',asset_id=self.asset.id)
+        self.assertNotIn('placement',plain['specification']['options'])
+        placed=jobs.prepare(self.lib,'import',asset_id=self.asset.id,options={'placement':'world-v1'})
+        self.assertNotEqual(plain['id'],placed['id'])
+        for invalid in [True, None, [], 'world-v2', '']:
+            with self.subTest(value=invalid),self.assertRaises(DirectorError):
+                jobs.prepare(self.lib,'import',asset_id=self.asset.id,options={'placement':invalid})
     def test_catalog_metadata_is_not_import_authorization(self):
         self.asset.evidence='unverified';self.lib.put(self.asset)
         item=catalog(self.lib,asset_id=self.asset.id,verify=True)

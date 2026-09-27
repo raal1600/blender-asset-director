@@ -45,7 +45,7 @@ export function worldView({project,scene,stages,locked,sourceUse,runs,taskStatus
     rights:['Review source use','Confirm permission for the exact sources selected for this production.','Review source use','source-review'],
     review:['Build your scene','Add more assets to this draft. Save changes when you are happy with the result.'],
     ready:['Keep building, or continue','Add assets to this same world, or arrange them in Blender. Continue when your World is ready.','Continue to Action','approve'],
-    editing:['Arrange in Blender','Your saved scene stays here while you edit a separate working copy.'],
+    editing:['Arrange in Blender','Place whole assets with the World placement panel or G / R / S. Save and close to return; animation stays in Action.'],
     working:[v.run?.action==='source-prepare'?'Preparing your library asset':v.run?.action==='asset-contents'?'Inspecting source collections':'Building your scene',progressLabel(v.run)],
     locked:['Another operation is active','Wait for the project writer to finish. Your saved work is preserved.']
   };

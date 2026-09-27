@@ -6,9 +6,10 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawn} from 'node:child_process';
 import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
 import {createApp} from '../launcher/server.mjs';
 import {json,writeJson,fileHash,exists} from '../launcher/lib/storage.mjs';
-const [out,blender]=process.argv.slice(2);
+const [out,blender,worldFixture]=process.argv.slice(2);
 assert(out&&path.isAbsolute(out)&&blender&&path.isAbsolute(blender),'Explicit new output and Blender paths required');
 assert(!await exists(out),'Output must be new');await fs.mkdir(out,{recursive:true});
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url))),children=new Map(),results=[];
@@ -24,8 +25,16 @@ const runtime={harness:async()=>({task_workspace:true,explicit_save_handoff:true
 const app=await createApp({root:out,config:{library:path.join(out,'Database/AssetDirector')},port:0,runtime});
 const api=async(route,body)=>{const r=await fetch(app.origin+'/api/'+route,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+app.token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});const v=await r.json();assert(r.ok,JSON.stringify(v));return v;};
 try {
-  for(mode of ['no-save','save','saved-then-unsaved','repeat-save','recovery-copy']) {
+  if(worldFixture)assert.equal((await json(path.join(worldFixture,'world_layers_report.json'))).status,'PASS','Use only generated World regression input');
+  for(mode of ['no-save','save','saved-then-unsaved','repeat-save','recovery-copy',...(worldFixture?['world-no-save','world-save']:[])]) {
     let p=await app.store.create('Synthetic Save Return '+mode),c=await app.workbench.create(p.id,p.revision,'Test scene');p=c.project;
+    let baseline=null;
+    if(mode.startsWith('world-')){
+      const cpId='cp_'+randomUUID(),relative='Scenes/'+cpId+'.blend';
+      await fs.copyFile(path.join(worldFixture,'baseline-failure.blend'),path.join(p.directory,relative));
+      baseline={id:cpId,path:relative,...await fileHash(path.join(p.directory,relative)),stage:'world',source:'synthetic-keyed-rig-test',parent:null};
+      p.workbench.scenes[0].checkpoints.push(baseline);p.workbench.scenes[0].current=cpId;p=await app.store.save(p,p.revision);
+    }
     const opened=await api('workbench/task-open',{projectId:p.id,sceneId:c.sceneId,revision:p.revision});
     assert.equal(await children.get(opened.task.processId).done,0,'Native worker failed');
     p=await app.store.get(p.id);
@@ -34,12 +43,14 @@ try {
     const result=await api('workbench/task-sync',{projectId:p.id,sceneId:c.sceneId,revision:p.revision});
     p=await app.store.get(p.id);const scene=p.workbench.scenes[0];
     assert.equal(scene.task,null);assert.equal(scene.candidate,null);assert.deepEqual(scene.completed,{});assert.equal(scene.stage,'world');
-    const saved=['save','saved-then-unsaved','repeat-save'].includes(mode);
+    const saved=['save','saved-then-unsaved','repeat-save','world-save'].includes(mode);
     assert.equal(result.outcome,saved?'saved':'no-save');
-    if(saved){const cp=scene.checkpoints[0];assert.equal((await fileHash(path.join(p.directory,cp.path))).sha256,cp.sha256);
-      const subject=cp.audit.objects.find(x=>x.name==='ExplicitSaveSubject');assert(subject);
+    if(saved){const cp=scene.checkpoints.find(x=>x.id===scene.current);assert.equal((await fileHash(path.join(p.directory,cp.path))).sha256,cp.sha256);
+      const subject=cp.audit.objects.find(x=>x.name===(baseline?'SyntheticRig0':'ExplicitSaveSubject'));assert(subject);
       assert.equal(subject.matrix_world[3],mode==='repeat-save'?9:1);
-    }else assert.equal(scene.current,null);
+      if(baseline)assert(subject.placement_instance);
+    }else assert.equal(scene.current,baseline?.id||null);
+    if(baseline)assert.equal((await fileHash(path.join(p.directory,baseline.path))).sha256,baseline.sha256);
     results.push({mode,status:'PASS',outcome:result.outcome,checkpoint:scene.current,native:await json(path.join(p.directory,'Docs/native-save-result.json'))});
   }
   await writeJson(path.join(out,'RESULTS.json'),{status:'PASS',scope:'REAL_HEADLESS_SAVE_AND_HTTP',native_dialogs:'NOT_TESTED',results});

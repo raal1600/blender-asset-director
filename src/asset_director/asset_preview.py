@@ -12,9 +12,12 @@ MAX_FILES = 4096
 def snapshot(request_file, *, embedded=False):
     request_file = Path(request_file).resolve()
     request = load_json(request_file, 2 * 1024 * 1024)
-    fields(request, {'schema', 'id', 'title', 'version', 'source_kind', 'root', 'files', 'file', 'motion'},
+    fields(request, {'schema', 'id', 'title', 'version', 'source_kind', 'root', 'files', 'file', 'motion', 'preview_profile'},
            {'schema', 'id', 'title', 'version', 'source_kind', 'root', 'files', 'file'})
     require(request['schema'] == 'asset-director.asset-preview/1', 'INVALID_PREVIEW', 'Unknown preview request')
+    require(isinstance(request.get('preview_profile', 'inspection-v1'), str)
+            and request.get('preview_profile', 'inspection-v1') in {'inspection-v1', 'world-static-v1'},
+            'INVALID_PREVIEW', 'Unknown preview profile')
     records = request['files']
     require(isinstance(records, list) and 0 < len(records) <= MAX_FILES, 'RESOURCE_LIMIT', 'Preview supports at most 4096 package files')
     names = set()
@@ -66,6 +69,7 @@ def snapshot(request_file, *, embedded=False):
     # Inspection-only transient record in a separate SQLite library. It is not
     # intake into the user's catalog and carries no manufactured rights grant.
     meta = {'preview_only': True}
+    meta['preview_profile'] = request.get('preview_profile', 'inspection-v1')
     if embedded:
         # Exact recorded files only. Allows absolute checkpoint texture paths to
         # be rebound to their verified copies in this disposable worker.

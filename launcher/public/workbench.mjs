@@ -24,7 +24,7 @@ let addPrompt=null;
 const worldPanels=new Map();
 function clearAssetViewer(){assetViewer?.dispose();assetViewer=null;}
 function clearSceneViewer(){sceneViewer?.dispose();sceneViewer=null;sceneViewerKey=null;}
-const sceneViewKey=()=>cp()?projectId+':'+sceneId+':'+cp().id+':'+cp().sha256:null;
+const sceneViewKey=()=>cp()?projectId+':'+sceneId+':'+s().stage+':'+cp().id+':'+cp().sha256:null;
 function showSceneViewer(host){clearSceneViewer();sceneViewer=startViewer(host,{kind:'checkpoint',id:cp().id});sceneViewerKey=sceneViewKey();}
 function startViewer(host,request){const context={projectId,sceneId,revision:p().revision};return openViewer({host,
  inspectInBlender:request.kind==='checkpoint'?undefined:()=>perform(async()=>{if(projectId!==context.projectId||sceneId!==context.sceneId||$(request.kind==='catalog'?'catalog-file':'source-file')?.value!==request.file)throw Error('Preview context changed; reopen the asset first.');await dispatch('asset-preview-open',request);}),
