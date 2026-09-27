@@ -1,6 +1,6 @@
 # Only for disposable acceptance desktops. Never run over a user's working session.
 param([Parameter(Mandatory=$true)][int]$ProcessIdentifier,
- [Parameter(Mandatory=$true)][ValidateSet('observe','close','button','move','checkpoint','capture')][string]$Action,
+ [Parameter(Mandatory=$true)][ValidateSet('observe','close','button','move','checkpoint','save-return','capture')][string]$Action,
  [string]$Text='', [string]$OutputPath='', [int]$X=0, [int]$Y=0)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -68,7 +68,8 @@ if($Action -eq 'move') {
  [Windows.Forms.SendKeys]::SendWait('x');[Windows.Forms.SendKeys]::SendWait('1');[Windows.Forms.SendKeys]::SendWait('{ENTER}')
 }else{
  [Windows.Forms.SendKeys]::SendWait('{F3}');Start-Sleep -Milliseconds 400
- [Windows.Forms.SendKeys]::SendWait('Save checkpoint and return to launcher');Start-Sleep -Milliseconds 700
+ $search=if($Action -eq 'save-return'){'Save and return to Director'}else{'Save checkpoint and return to launcher'}
+ [Windows.Forms.SendKeys]::SendWait($search);Start-Sleep -Milliseconds 700
  # Capture the actual search result. A keystroke or screenshot alone is not a pass.
  if($OutputPath -ne '') {
   $shot=New-Object NativeWindow+Rect;[NativeWindow]::GetWindowRect($handle,[ref]$shot)|Out-Null

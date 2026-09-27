@@ -51,6 +51,9 @@ jobs:
       - name: Add checksum-pinned software OpenGL only to disposable CI Blender
         shell: powershell
         run: python tools/ci/native_mesa.py "$env:BLENDER"
+      - name: Real Blender explicit Save and no-save return contracts
+        shell: powershell
+        run: node tools/task_save_native.mjs "$env:RUNNER_TEMP/save-handoff-evidence" "$env:BLENDER"
       - name: Exercise actual EXE, Blender GUI edit and checkpoint return
         shell: powershell
         run: python tools/native_desktop_fixture.py --blender "$env:BLENDER" --evidence native-desktop-evidence
@@ -60,5 +63,13 @@ jobs:
         with:
           name: native-desktop-${{ github.sha }}
           path: native-desktop-evidence/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain explicit-save evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: save-handoff-${{ github.sha }}
+          path: ${{ runner.temp }}/save-handoff-evidence/
           if-no-files-found: error
           retention-days: 14

@@ -126,6 +126,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='discard')return workbench.discard(id,sid,rev);
             if(command==='task-open')return workbench.openTask(id,sid,rev,body.context);
             if(command==='task-focus')return workbench.focusTask(id,sid,rev);
+            if(command==='task-sync')return workbench.syncTask(id,sid,rev);
             if(command==='task-collect')return workbench.collectTask(id,sid,rev);
             if(command==='resolve')return workbench.resolve(id,sid,rev,body.runId,body.confirmStopped);
             if(command==='run')return workbench.startJob(id,sid,rev,body.operation,body.options,body.confirmed);

@@ -18,6 +18,10 @@ def observation(task, configured):
     scene = window.scene if window else bpy.context.scene
     active = (window.view_layer if window else bpy.context.view_layer).objects.active
     returned = within(root, task['returnFile']).is_file()
+    save_session = None
+    if task.get('handoff') == 'explicit-save-v1':
+        from .task_save import session_file
+        save_session = load_json(session_file(task))
     return dict(taskId=task['id'], projectId=task['projectId'], sceneId=task['sceneId'],
                 state='CHECKPOINT_SAVED' if returned else 'READY' if matches else 'CONTEXT_CHANGED',
                 observed_at=time.time(), processId=os.getpid(), expected_file=matches,
@@ -26,6 +30,7 @@ def observation(task, configured):
                 active_object=active.name if matches and active else None,
                 frame=scene.frame_current if matches else None,
                 checkpoint_available=returned,
+                handoff=task.get('handoff'), save_state=save_session.get('state') if save_session else None,
                 areas=[dict(type=a.type, x=a.x, y=a.y, width=a.width, height=a.height)
                        for a in window.screen.areas] if window and matches else [])
 
@@ -33,17 +38,17 @@ def observation(task, configured):
 CHECKPOINT_LABEL = 'Save checkpoint and return to launcher'
 
 
-def register_checkpoint_menus(types):
+def register_checkpoint_menus(types, explicit_save=False):
     """Give F3 a canonical menu entry without changing user preferences.
 
     F3 searches menu entries. The abbreviated direct header button alone is not
     the canonical operator search label; retain both access paths.
     """
     def menu_entry(self, context):
-        self.layout.operator('asset_director.save_checkpoint', text=CHECKPOINT_LABEL)
+        self.layout.operator('asset_director.save_checkpoint', text='Save and return to Director' if explicit_save else CHECKPOINT_LABEL)
 
     def quick_button(self, context):
-        self.layout.operator('asset_director.save_checkpoint', text='Save checkpoint & return')
+        self.layout.operator('asset_director.save_checkpoint', text='Save & return to Director' if explicit_save else 'Save checkpoint & return')
 
     types.TOPBAR_MT_file.append(menu_entry)
     types.TOPBAR_MT_editor_menus.append(quick_button)
@@ -58,7 +63,7 @@ def install(filename):
     print('Feedback: status read', flush=True)
 
     print('Feedback: registering File menu and topbar', flush=True)
-    register_checkpoint_menus(bpy.types)
+    register_checkpoint_menus(bpy.types, task.get('handoff') == 'explicit-save-v1')
     print('Feedback: topbar registered', flush=True)
     from .task_window import task_window
     window = task_window()

@@ -114,3 +114,4 @@ dialog h2{overflow-wrap:anywhere}
  .ingredient-list{display:grid;grid-template-columns:1fr 1fr;padding-right:0}.ingredient{max-width:none}
  .ingredients>.small{position:static;margin-top:6px;padding-left:0}
 }
+#notice[data-kind="success"]{background:#1a3026;color:var(--good);border-color:#456c55}

@@ -11,11 +11,12 @@ import sys
 from .core import Library, atomic_json, fields, file_hash, load_json, require, within
 
 STAGES = {"world": "Layout", "action": "Animation", "shots": "Layout", "light": "Shading", "render": "Rendering"}
-TASK_FIELDS = {"schema", "id", "projectId", "sceneId", "stage", "projectDirectory", "library", "input", "workingScene", "checkpointScene", "returnFile", "targets", "camera", "frame", "action", "state", "startedAt", "processId", "selectedSources", "frameRange"}
+TASK_FIELDS = {"schema", "id", "projectId", "sceneId", "stage", "projectDirectory", "library", "input", "workingScene", "checkpointScene", "returnFile", "targets", "camera", "frame", "action", "state", "startedAt", "processId", "selectedSources", "frameRange", "handoff"}
 
 
 def validate(task):
-    fields(task, TASK_FIELDS, TASK_FIELDS - {"processId", "frameRange"})
+    fields(task, TASK_FIELDS, TASK_FIELDS - {"processId", "frameRange", "handoff"})
+    require(task.get("handoff") in (None, "explicit-save-v1"), "INVALID_TASK", "Unknown editing handoff")
     require(task["schema"] == 1 and task["stage"] in STAGES, "INVALID_TASK", "Unknown task schema or stage")
     for key, prefix in (("id", "task_"), ("projectId", "prj_"), ("sceneId", "sc_")):
         require(isinstance(task[key], str) and re.fullmatch(prefix + r"[0-9a-f-]{36}", task[key]),
@@ -202,6 +203,9 @@ def main(filename):
     status_file = within(project, "Docs/Workbench/" + task["id"] + "-status.json")
     try:
         state = initialize(task)
+        if task.get("handoff") == "explicit-save-v1":
+            from .task_save import install
+            install(task, state)
     except BaseException as exc:
         atomic_json(status_file, {"taskId": task["id"], "projectId": task["projectId"],
                                   "sceneId": task["sceneId"], "state": "FAILED", "message": str(exc)[:2000]})
@@ -209,8 +213,8 @@ def main(filename):
 
     class AD_OT_checkpoint(bpy.types.Operator):
         bl_idname = "asset_director.save_checkpoint"
-        bl_label = "Save checkpoint and return to launcher"
-        bl_description = "Save a new review candidate; your working copy stays open and the original is preserved"
+        bl_label = "Save and return to Director" if task.get("handoff") else "Save checkpoint and return to launcher"
+        bl_description = "Save this editing copy and return; saving is not approval"
 
         @classmethod
         def poll(cls, context):
@@ -218,7 +222,11 @@ def main(filename):
 
         def execute(self, context):
             try:
-                checkpoint(task, state)
+                if task.get("handoff") == "explicit-save-v1":
+                    from .task_save import save_and_return
+                    save_and_return(task)
+                else:
+                    checkpoint(task, state)
             except Exception as exc:
                 self.report({"ERROR"}, str(exc))
                 return {"CANCELLED"}
@@ -236,7 +244,7 @@ def main(filename):
             layout = self.layout
             layout.label(text="Activity: " + task["stage"].title())
             layout.label(text="Task: " + task["id"][5:13])
-            layout.label(text="Your original checkpoint is preserved.")
+            layout.label(text="Save to keep changes. Unsaved edits stay out of Director." if task.get("handoff") else "Your original checkpoint is preserved.")
             layout.operator(AD_OT_checkpoint.bl_idname)
             if task["selectedSources"]:
                 layout.separator()

@@ -171,15 +171,22 @@ class Journey:
             point=dict(X=area['x']+int(area['width']*.4),Y=area['y']+int(area['height']*.5))
             self.ui(task['processId'],'move',**point)
             wait(lambda:read(status_file).get('dirty'),'native edit dirty state')
-            self.ui(task['processId'],'checkpoint',OutputPath=e.directory/'native-checkpoint-search.png',**point)
-            returned=wait(lambda:read(directory/task['returnFile']),'native checkpoint receipt')
+            assert task['handoff']=='explicit-save-v1'
+            self.ui(task['processId'],'save-return',OutputPath=e.directory/'native-checkpoint-search.png',**point)
+            returned=wait(lambda:read(directory/('Docs/Workbench/'+task['id']+'-explicit-save.json')),'native explicit Save receipt')
             obj=next(o for o in returned['audit']['objects'] if o['name']=='NativeSubject')
             assert abs(obj['matrix_world'][3]-1)<1e-5,obj['matrix_world']
             assert digest(seed)==original and digest(directory/frozen['path'])==frozen['sha256']
             assert returned['human_acceptance']=='PENDING'
-            self.post('task-collect');after=self.state()['project']['workbench']['scenes'][0]
-            assert after['current']==frozen['id'] and after['candidate'] and not self.state()['locked']
-            write(e.directory/'native-checkpoint.json',returned);check.update(native_transform_x=1,candidate_only=True)
+            wait(lambda:self.post('task-sync').get('changed'),'confirmed exit and saved return')
+            self.task_pids.remove(task['processId']) # Stopped process must not be targeted again.
+            after=self.state()['project']['workbench']['scenes'][0]
+            assert after['current']!=frozen['id'] and after['candidate'] is None and not self.state()['locked']
+            assert not after['completed'] and after['stage']=='world'
+            saved=next(c for c in after['checkpoints'] if c['id']==after['current'])
+            assert saved['sha256']==returned['sha256']==digest(directory/saved['path'])
+            write(e.directory/'native-checkpoint.json',dict(returned, frozen_checkpoint=saved))
+            check.update(native_transform_x=1,explicit_save_return=True,unapproved_draft=True,original_checkpoint_preserved=True)
         with e.checkpoint('unrelated_unsaved_preserved'):
             latest=wait(lambda:(v if (v:=read(sentinel_file))['observed_at']>before['observed_at'] else None),'fresh sentinel observation')
             assert {k:v for k,v in latest.items() if k!='observed_at'}=={k:v for k,v in before.items() if k!='observed_at'}

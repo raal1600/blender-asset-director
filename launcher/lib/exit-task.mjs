@@ -16,7 +16,9 @@ export async function taskForExit(work,projectId,runId) {
   const process=work.runtime.inspectWorkbenchTask
     ?await work.runtime.inspectWorkbenchTask(project,run).catch(()=>({state:'unknown'})):{state:'unknown'};
   // Never recover over a checkpoint that might be collected, even if its receipt is damaged.
-  const saved=await exists(await safe(project.directory,run.returnFile))||await exists(await safe(project.directory,run.checkpointScene));
+  const explicit=run.handoff==='explicit-save-v1';
+  const saved=await exists(await safe(project.directory,run.returnFile))||await exists(await safe(project.directory,run.checkpointScene))||
+    (explicit&&await exists(await safe(project.directory,`Docs/Workbench/${run.id}-explicit-save.json`)));
   const canClose=process.state==='verified'&&process.hasWindow===true;
   const canRecover=process.state==='stopped'&&!saved&&!work.running.has(runId);
   const canCollect=await exists(await safe(project.directory,run.returnFile))&&status?.state!=='FAILED';
@@ -26,7 +28,7 @@ export async function taskForExit(work,projectId,runId) {
     process.state==='stopped'?'Its Blender process has stopped. Waiting will not complete this task.':
       process.state==='verified'?'Its Blender process is still open. Closing it may show Blender’s Save Changes prompt.':
       'The task process could not be safely identified. No process will be closed or task recovered.',
-    saved?'Saved checkpoint evidence exists. Collect it for review; recovery will not discard it.':
+    saved?(explicit?'Explicit saved changes exist. Return to the scene in Director to finish the automatic handoff; recovery will not discard them.':'Saved checkpoint evidence exists. Collect it for review; recovery will not discard it.'):
       'Recovery retains all working files and failure evidence. It does not approve any scene.',
     'You may also exit only Director and leave the backend and other applications running.'
   ].join('\n\n');
