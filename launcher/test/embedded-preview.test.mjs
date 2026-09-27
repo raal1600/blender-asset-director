@@ -38,7 +38,10 @@ test('World has a static profile; motion controls stay in other activities',()=>
   const clip={name:'native motion',duration:2,tracks:[{}]};
   assert.equal(previewProfile('world'),'world-static-v1');
   assert.deepEqual(animationEntries([clip],previewProfile('world')),[]);
-  for(const stage of ['action','shots','light','render']){
+  assert.equal(previewProfile('action'),'action-playback-v1');
+  assert.equal(previewProfile('action','catalog'),'inspection-v1');
+  assert.throws(()=>animationEntries([clip,clip],'action-playback-v1'),/combined/);
+  for(const stage of ['shots','light','render']){
     assert.equal(previewProfile(stage),'inspection-v1');
     assert.equal(animationEntries([clip],previewProfile(stage)).length,1);
   }

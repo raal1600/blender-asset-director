@@ -16,8 +16,10 @@ def snapshot(request_file, *, embedded=False):
            {'schema', 'id', 'title', 'version', 'source_kind', 'root', 'files', 'file'})
     require(request['schema'] == 'asset-director.asset-preview/1', 'INVALID_PREVIEW', 'Unknown preview request')
     require(isinstance(request.get('preview_profile', 'inspection-v1'), str)
-            and request.get('preview_profile', 'inspection-v1') in {'inspection-v1', 'world-static-v1'},
+            and request.get('preview_profile', 'inspection-v1') in {'inspection-v1', 'world-static-v1', 'action-playback-v1'},
             'INVALID_PREVIEW', 'Unknown preview profile')
+    require(request.get('preview_profile') != 'action-playback-v1' or request['source_kind'] == 'checkpoint',
+            'INVALID_PREVIEW', 'Combined Action playback requires a saved scene')
     records = request['files']
     require(isinstance(records, list) and 0 < len(records) <= MAX_FILES, 'RESOURCE_LIMIT', 'Preview supports at most 4096 package files')
     names = set()

@@ -9,7 +9,7 @@ import {MAX_VIEWER_BYTES,packageGLTF,validateGLB,verifiedPackage} from './viewer
 import {bindWorldPreview} from './world-preview-bindings.mjs';
 
 export const MAX_PREVIEW_STORAGE_BYTES=100*1024**3;
-export const previewProfile = stage => stage==='world'?'world-static-v1':'inspection-v1';
+export const previewProfile = (stage,kind='checkpoint') => stage==='world'?'world-static-v1':stage==='action'&&kind==='checkpoint'?'action-playback-v1':'inspection-v1';
 export function assertPreviewStorageBudget(disk,sourceBytes) {
   assert(disk+sourceBytes*2+MAX_VIEWER_BYTES<MAX_PREVIEW_STORAGE_BYTES,'Private 3D preview storage would exceed 100 GiB. Review ViewerPreviews before preparing more; nothing was deleted.');
 }
@@ -39,7 +39,7 @@ export class EmbeddedPreviews {
   async prepare(id,sceneId,revision,request) {
     assert(request&&typeof request==='object'&&!Array.isArray(request),'Expected a preview source.');
     const w=this.work,source=request.kind==='checkpoint'?await checkpointSource(w,id,sceneId,revision,request):await assetPreviewSource(w,id,sceneId,revision,request);
-    const project=await w.project(id,revision),profile=previewProfile(w.scene(project,sceneId).stage);
+    const project=await w.project(id,revision),profile=previewProfile(w.scene(project,sceneId).stage,source.source_kind);
     source.preview_profile=profile;
     await verifiedPackage(source);
     const implementation=await this.identity,key=digest({project:id,scene:sceneId,source,implementation});
@@ -55,7 +55,7 @@ export class EmbeddedPreviews {
     const previewId='view_'+randomUUID(),directory=await safe(base,previewId);await fs.mkdir(directory);
     const requestFile=path.join(directory,'request.json');await writeJson(requestFile,source);
     try {
-      let model,adapter,nativeJob=null,nativeImplementation=null,texturePreview=null,referenceFrame=null,placement=null;
+      let model,adapter,nativeJob=null,nativeImplementation=null,texturePreview=null,referenceFrame=null,placement=null,playback=null;
       if(/\.(gltf|glb)$/i.test(source.file)&&!Object.keys(source.motion||{}).length) {
         model=await packageGLTF(source);adapter='verified-gltf';
       } else {
@@ -70,14 +70,19 @@ export class EmbeddedPreviews {
         const textures=receipt.data?.embedded_viewer?.textures;
         assert(receipt.data?.embedded_viewer?.preview_profile===profile,'Preview profile differs from this activity.',409);
         referenceFrame=receipt.data.embedded_viewer.reference_frame;
+        if(profile==='action-playback-v1'){
+          playback=receipt.data.embedded_viewer.playback;
+          assert(playback?.version==='scene-playback-v1'&&playback.scope==='SAVED_SCENE'&&Number.isInteger(playback.start)&&Number.isInteger(playback.end)&&playback.end>=playback.start&&playback.end-playback.start<=3600&&Number.isFinite(playback.fps)&&playback.fps>0&&Number.isFinite(playback.duration),'Missing saved-scene playback timing.');
+        }
         if(source.source_kind==='checkpoint'&&profile==='world-static-v1')placement=bindWorldPreview(model,receipt.data.embedded_viewer);
         assert(textures?.scope==='PREVIEW_ONLY'&&textures.originals_changed===false&&Number.isInteger(textures.reduced_images)&&textures.reduced_images>=0&&textures.reduced_images<=128,'Missing preview texture preservation evidence.');
         texturePreview={reducedImages:textures.reduced_images,sourcePixels:textures.source_pixels,previewPixels:textures.preview_pixels,originalsChanged:false};
       }
       const observed=validateGLB(model);await verifiedPackage(source);
+      if(profile==='action-playback-v1')assert(observed.animations.length===1,'Action preview must contain one combined scene animation.');
       const filename=path.join(directory,'model.glb');await fs.writeFile(filename,model,{flag:'wx'});
       const record={previewId,projectId:id,sceneId,sourceId:source.id,version:source.version,title:source.title,kind:source.source_kind,
-        ...await fileHash(filename),profile,referenceFrame,placement,adapter,implementation,nativeJob,nativeImplementation,texturePreview,observed,cached:false,inspectionOnly:true,selectionChanged:false,approved:false};
+        ...await fileHash(filename),profile,referenceFrame,placement,playback,adapter,implementation,nativeJob,nativeImplementation,texturePreview,observed,cached:false,inspectionOnly:true,selectionChanged:false,approved:false};
       await writeJson(path.join(directory,'viewer.json'),record);
       this.owned.set(previewId,{record,filename,source});this.cache.set(key,record);return record;
     }catch(error){await writeJson(path.join(directory,'viewer-failure.json'),{previewId,state:'FAILED',error:error.message});throw Object.assign(new Error(error.message+' 3D attempt retained: '+previewId),{status:error.status});}

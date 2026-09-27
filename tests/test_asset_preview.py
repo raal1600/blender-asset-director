@@ -45,6 +45,11 @@ class PreviewTests(unittest.TestCase):
             self.assertEqual(job['specification']['license_grants'],[])
         with self.assertRaisesRegex(DirectorError,'immutable'):self.run_snapshot()
 
+    def test_combined_action_profile_cannot_be_requested_for_an_asset(self):
+        with self.assertRaisesRegex(DirectorError, 'saved scene'):
+            self.run_snapshot({**self.data, 'preview_profile': 'action-playback-v1'})
+        self.assertFalse((self.preview/'library').exists())
+
     def test_changed_member_refused_before_snapshot_allocation(self):
         self.file.write_bytes(b'changed')
         with self.assertRaisesRegex(DirectorError,'Source changed'):self.run_snapshot()

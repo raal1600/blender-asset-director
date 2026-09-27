@@ -61,8 +61,10 @@ def export(destination, observed):
     require(not bpy.app.autoexec_fail, 'VIEWER_UNSUPPORTED', 'This scene needs disabled script/driver execution; inspect in Blender')
     takes = observed['takes']
     profile = observed.get('preview_profile', 'inspection-v1')
-    require(isinstance(profile, str) and profile in {'inspection-v1', 'world-static-v1'}, 'INVALID_PREVIEW', 'Unknown preview profile')
+    require(isinstance(profile, str) and profile in {'inspection-v1', 'world-static-v1', 'action-playback-v1'}, 'INVALID_PREVIEW', 'Unknown preview profile')
     static = profile == 'world-static-v1'
+    combined = profile == 'action-playback-v1'
+    require(not combined or observed.get('checkpoint'), 'INVALID_PREVIEW', 'Action playback requires a saved scene')
     reference_frame = bpy.context.scene.frame_current
     if observed.get('checkpoint'):
         require(0 <= bpy.context.scene.frame_end - bpy.context.scene.frame_start <= 3600,
@@ -88,12 +90,19 @@ def export(destination, observed):
         args['export_unused_animations'] = False
     if 'export_frame_range' in supported:
         args['export_frame_range'] = bool(observed.get('checkpoint'))
+    if combined:
+        settings = {'export_animation_mode': 'SCENE', 'export_anim_scene_split_object': False,
+                    'export_force_sampling': True, 'export_frame_step': 1, 'export_anim_slide_to_zero': True,
+                    'export_bake_animation': True, 'export_frame_range': True}
+        require(all(k in supported for k in settings), 'VIEWER_UNSUPPORTED', 'Exporter lacks combined saved-scene playback')
+        args.update(settings)
     from .world_preview import frozen_meshes
     placement = None
     if static and observed.get('checkpoint'):
         from .world_transform import audit as placement_audit
         placement = placement_audit()
-    with frozen_meshes(static) as static_objects, preview_textures() as textures:
+    from .action_preview import hide_helpers, playback
+    with frozen_meshes(static) as static_objects, preview_textures() as textures, hide_helpers(combined):
         result = bpy.ops.export_scene.gltf(**args)
     require('FINISHED' in result and destination.is_file() and destination.stat().st_size <= 128 * 1024**2,
             'VIEWER_EXPORT_FAILED', 'GLB export failed or exceeds 128 MiB')
@@ -101,5 +110,6 @@ def export(destination, observed):
             'preview_profile': profile, 'reference_frame': reference_frame,
             'static_objects': static_objects,
             'placement': placement,
+            'playback': playback(destination, bpy.context.scene) if combined else None,
             'material_fidelity': 'GLTF_APPROXIMATION', 'human_acceptance': 'NOT_EVALUATED', 'textures': textures,
             'notice': 'Saved data, not a live Blender link or rendered evidence. No approval, import or scene edit.'}

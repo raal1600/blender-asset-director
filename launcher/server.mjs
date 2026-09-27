@@ -42,6 +42,8 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assets['/workbench-world.mjs']='workbench-world.mjs';
         assets['/world-add-flow.mjs']='world-add-flow.mjs';
         assets['/workbench-world.css']='workbench-world.css';
+        assets['/workbench-action.mjs']='workbench-action.mjs';
+        assets['/workbench-action.css']='workbench-action.css';
         assets['/viewer-3d.mjs']='viewer-3d.mjs';
         for(const name of ['world-draft.mjs','world-editor.mjs'])assets['/'+name]=name;
         assets['/icon.svg']='icon.svg';

@@ -56,7 +56,7 @@ try{
   await Promise.all(pending);assert.equal(records[0].profile,'world-static-v1');assert.equal((models[0].animations||[]).length,0);
   report.checks.push('Static evaluated World GLB, no motion controls, real orbit pixels');
   await click('[data-action="picker"]');await click('[data-action="project"][data-id="'+session.actionProjectId+'"]');
-  await click('[data-action="scene-viewer"]');const action=await ready(),moving=action.locator('canvas');
+  const action=await ready(),moving=action.locator('canvas');
   assert.equal(await action.locator('.viewer-animation').isVisible(),true);
   const slider=action.locator('[data-view="time"]'),duration=Number(await slider.getAttribute('max'));assert(duration>0);
   await slider.fill('0');await slider.dispatchEvent('input');await page.waitForTimeout(100);const first=await moving.screenshot();
@@ -64,7 +64,7 @@ try{
   assert.notDeepEqual(await moving.screenshot(),first,'Actual skin playback must move geometry');
   await action.getByRole('button',{name:'Play',exact:true}).click();await page.waitForTimeout(200);assert.notEqual(Number(await slider.inputValue()),midpoint);
   await action.getByRole('button',{name:'Pause',exact:true}).click();await shot('02-action-playback');
-  await Promise.all(pending);assert.equal(records.at(-1).profile,'inspection-v1');assert(models.at(-1).animations.length>0);
+  await Promise.all(pending);assert.equal(records.at(-1).profile,'action-playback-v1');assert.equal(models.at(-1).animations.length,1);
   report.checks.push('Action scrubbing/play/pause changes real pixels and retains native animation');
   await click('[data-action="picker"]');await click('[data-action="project"][data-id="'+session.projectId+'"]');
   const cached=await ready();await Promise.all(pending);

@@ -1,0 +1,12 @@
+.layered-action{max-width:1440px;margin:auto;padding:20px 28px}
+.action-heading,.action-savebar,.action-savebar>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.action-heading{margin:18px 0 12px}.action-heading h1{margin:0 0 6px;font-size:28px}.action-heading p{margin:0;color:var(--muted)}
+.action-savebar{padding:10px 0;font-size:12px;flex-wrap:wrap}.action-savebar button{padding:8px 12px}
+.action-workspace .viewer-canvas{height:clamp(300px,47vh,590px)}
+.action-preview-scope{font-size:12px;color:var(--muted);margin:10px 0}
+.action-controls{display:grid;grid-template-columns:minmax(140px,1fr) minmax(210px,1.5fr) minmax(90px,.45fr) minmax(80px,.4fr);gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.action-controls label{margin:0;min-width:0}.action-controls input,.action-controls select{width:100%;min-width:0;box-sizing:border-box}
+.action-details{margin:14px 0;font-size:12px}.action-details>p{max-width:900px;line-height:1.6}
+.scene-playback-label{font-size:12px;white-space:nowrap}.action-workspace .viewer-animation output{white-space:nowrap;min-width:120px}
+.action-workspace .viewer-animation label[hidden]{display:none}
+@media(max-width:760px){.layered-action{padding:12px}.action-heading{align-items:flex-start;flex-direction:column}.action-heading h1{font-size:24px}.action-controls{grid-template-columns:1fr 1fr;padding:12px}.action-controls label:first-child,.action-controls label:nth-child(2){grid-column:1/-1}.action-savebar>div{gap:5px;flex-wrap:wrap}.action-workspace .viewer-animation{flex-wrap:wrap}.action-workspace .viewer-animation input{min-width:120px;flex:1}.action-workspace .viewer-canvas{height:350px}.action-workspace .world-next{flex-wrap:wrap}}

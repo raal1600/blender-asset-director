@@ -112,7 +112,7 @@ def main():
             report['checks'].append('Responsive 390px layout and Escape releases the asset canvas')
             page.keyboard.press('Escape');click('[data-action="tab"][data-tab="film"]');expect(page.locator('[data-scene-viewer] canvas')).to_have_count(0)
             click('[data-action="picker"]');click('[data-action="project"][data-id="'+session['actionProjectId']+'"]')
-            click('[data-action="scene-viewer"]');host=ready('[data-scene-viewer]');canvas=host.locator('canvas')
+            host=ready('[data-scene-viewer]');canvas=host.locator('canvas')
             expect(host.locator('[data-view="take"] option')).to_have_count(1)
             host.locator('[data-view="time"]').fill('0');host.locator('[data-view="time"]').dispatch_event('input');page.wait_for_timeout(100)
             at_start=canvas.screenshot(path=str(output/'05-action-start.png'))

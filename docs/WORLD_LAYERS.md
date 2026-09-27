@@ -39,7 +39,8 @@ editor or a universal rig adapter.
 ## Static World preview
 
 The authenticated server chooses `world-static-v1` from the actual scene stage;
-the client cannot override it. Other stages retain `inspection-v1` in this slice.
+the client cannot override it. Action checkpoints use the separate combined
+`action-playback-v1`; single-asset inspection and other stages keep `inspection-v1`.
 The profile enters source/cache identity and scene-view reuse identity. Cached
 bytes and originals are still verified before serving. Derivatives do not import,
 save scene changes, assign motion or approve work.
@@ -98,8 +99,8 @@ of launcher plus harness. Do not patch an installed runtime under its old identi
 
 The [direct-edit implementation](WORLD_DIRECT_EDIT.md) adds in-app picking,
 whole-instance/group gizmos, draft undo/discard and explicit Save through a bounded
-native worker. The [Action backend](ACTION_LAYER.md) adds native performer inspection,
-timing and hold-pose transactions; its performer-first UI is still in progress.
+native worker. The [Action layer](ACTION_LAYER.md) adds native performer inspection,
+timing and hold-pose drafts, explicit Save and combined saved-scene playback.
 New shot/light controls and automatic recovery of earlier lost placement are not
 implemented yet. Live unsaved Blender streaming remains outside this plan.
 Earlier checkpoints are not repaired merely by switching to a static viewer.

@@ -3,6 +3,7 @@ import {worldView,addWorldAsset} from './workbench-world.mjs';
 import {worldAddQueue,addCatalogFlow} from './world-add-flow.mjs';
 import {openViewer} from './viewer-3d.mjs';
 import {worldActionNeedsSave} from './world-draft.mjs';
+import {actionView,actionDraft,actionInspection} from './workbench-action.mjs';
 import {evidenceView} from './workbench-evidence.mjs';
 import {imageLoader} from './workbench-images.mjs';
 import {taskBanner,observationKey} from './workbench-task.mjs';
@@ -21,7 +22,8 @@ if(token){sessionStorage.setItem('ad-token',token);history.replaceState(null,'',
 let overview=null,state=null,cap=null,projectId=sessionStorage.getItem('wb-project'),sceneId=sessionStorage.getItem('wb-scene'),tab='scenes',target=null,busy=false,blobs=[];
 let returnToFilm=false,filmTime=0;
 let assetViewer=null,sceneViewer=null,sceneViewerKey=null;
-let draftDestination=null,worldSave=null;
+let draftDestination=null,worldSave=null,actionSave=null;
+const actionDrafts=new Map();
 let addPrompt=null;
 const worldPanels=new Map();
 function clearAssetViewer(){assetViewer?.dispose();assetViewer=null;}
@@ -40,13 +42,53 @@ const p=()=>state?.project,s=()=>p()?.workbench.scenes.find(x=>x.id===sceneId),c
 const b=(text,action,data={},cls='',disabled=false)=>`<button class="${cls}" data-action="${action}" ${Object.entries(data).map(([k,v])=>`data-${k}="${esc(v)}"`).join(' ')} ${disabled?'disabled':''}>${esc(text)}</button>`;
 const next=(name,args={})=>api('workbench/'+name,{projectId,sceneId,revision:p().revision,...args});
 function notice(message,kind='error'){$('notice').hidden=!message;$('notice').textContent=message||'';$('notice').dataset.kind=kind;$('notice').setAttribute('role',kind==='success'?'status':'alert');const local=$('browser-notice');if(local){local.hidden=!message;local.textContent=message||'';}}
-async function perform(fn){if(busy)return;busy=true;syncWorldDraftUI();document.body.classList.add('working');$('app').classList.add('busy');notice('');try{await fn();}catch(e){try{if(projectId)await load();}catch{}notice(e.message);}finally{busy=false;document.body.classList.remove('working');$('app').classList.remove('busy');syncConsentButtons();syncWorldDraftUI();}}
-function acceptSnapshot(value){if(sceneViewer?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='world')throw Error('This scene or activity changed elsewhere. Your local placement draft remains open. Discard it before reloading the changed activity.');state=value;reconcileWorldSave();}
+async function perform(fn){if(busy)return;busy=true;syncWorldDraftUI();document.body.classList.add('working');$('app').classList.add('busy');notice('');try{await fn();}catch(e){try{if(projectId)await load();}catch{}notice(e.message);}finally{busy=false;document.body.classList.remove('working');$('app').classList.remove('busy');syncConsentButtons();syncWorldDraftUI();scheduleActionInspection();}}
+function acceptSnapshot(value){if(currentActionDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='action')throw Error('Activity changed elsewhere. Your Action draft is retained; discard it before reloading.');if(sceneViewer?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='world')throw Error('This scene or activity changed elsewhere. Your local placement draft remains open. Discard it before reloading the changed activity.');state=value;reconcileWorldSave();if(actionSave){const run=state.runs.find(r=>r.id===actionSave.body.request.requestId);if(run?.state==='SUCCEEDED'){if(!s().checkpoints.some(c=>c.id===run.resultCheckpointId))throw Error('Action Save receipt has no matching checkpoint.');actionSave.draft.discard();actionDrafts.delete(projectId+':'+sceneId);actionSave=null;}else if(run&&['FAILED','INTERRUPTED'].includes(run.state)){actionSave=null;notice(run.error||'Action Save failed. Your draft is preserved.');}}}
 async function load(){overview=await api('state?compact=true');if(projectId&&!overview.projects.some(x=>x.id===projectId)){if(sceneViewer?.dirty)throw Error('This production is no longer available. Your placement draft remains open; restore the production before saving.');projectId=null;}if(projectId){acceptSnapshot(await api('workbench/state?'+new URLSearchParams({projectId,compact:true})));if(!p().workbench.scenes.some(x=>x.id===sceneId))sceneId=p().workbench.scenes[0]?.id;sessionStorage.setItem('wb-project',projectId);sessionStorage.setItem('wb-scene',sceneId||'');}else state=null;render();if(browser.isOpen)await browser.refresh();}
 function reconcileWorldSave(){
  if(!worldSave)return;const run=state?.runs.find(r=>r.id===worldSave.body.request.requestId);
  if(run?.state==='SUCCEEDED'){if(!s()?.checkpoints.some(c=>c.id===run.resultCheckpointId))throw Error('Saved receipt has no matching checkpoint. Inspect the retained run.');worldSave.viewer.discard();worldSave=null;}
  else if(run&&['FAILED','INTERRUPTED'].includes(run.state)){worldSave=null;notice('Save failed; your placement draft and previous scene are preserved. '+(run.error||'Inspect the retained attempt.'));}
+}
+function currentActionDraft(){
+ if(!state||!projectId||!sceneId)return null;
+ const key=projectId+':'+sceneId,old=actionDrafts.get(key),checkpoint=cp();
+ if(old&&(old.dirty||old.checkpointId===checkpoint?.id&&old.sha256===checkpoint?.sha256))return old;
+ if(s()?.stage!=='action'||!checkpoint)return null;
+ const run=actionInspection(state.runs,s(),checkpoint);if(!run)return null;
+ const draft=actionDraft(checkpoint,run);actionDrafts.set(key,draft);return draft;
+}
+function scheduleActionInspection(){
+ setTimeout(()=>{
+  if(busy||tab!=='scenes'||s()?.stage!=='action'||!cp()||state.locked||cap?.action_layer!=='action-layer-v1'||currentActionDraft())return;
+  const attempted=state.runs.some(r=>r.action==='action-audit'&&r.sceneId===sceneId&&r.checkpointId===cp().id);
+  if(!attempted)perform(()=>dispatch('action-inspect',{}));
+ },0);
+}
+async function saveActionDraft(){
+ const draft=currentActionDraft();if(!draft?.dirty)return;
+ if((draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256))throw Error('Action draft is stale. Discard it and reload the saved scene.');
+ if(!actionSave)actionSave={draft,body:{projectId,sceneId,revision:p().revision,request:draft.request('run_'+crypto.randomUUID())}};
+ const attempt=actionSave;
+ try{await api('workbench/action-save',attempt.body);}catch(error){await load();if(!state.runs.some(r=>r.id===attempt.body.request.requestId)){actionSave=null;throw error;}}
+ const deadline=Date.now()+205000;
+ while(Date.now()<deadline){await load();const run=state.runs.find(r=>r.id===attempt.body.request.requestId);
+  if(run?.state==='SUCCEEDED'){notice('Performance saved. Review playback before marking Action ready.','success');return;}
+  if(run&&['FAILED','INTERRUPTED'].includes(run.state))throw Error(run.error||'Save failed; prior scene and draft retained.');
+  await new Promise(r=>setTimeout(r,500));
+ }
+ throw Error('Action Save is awaiting its receipt. Refresh status; do not start a second Save.');
+}
+function editActionField(field,value){
+ if(busy||state.locked)return;const draft=currentActionDraft();
+ if(!draft||(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256))throw Error('Refresh the current performers before editing.');
+ if(field==='performer'){draft.select(value);render();return;}
+ const name=draft.selected,old=draft.value(name);
+ if(field==='mode'){
+  const pose=Math.max(draft.audit.frame_range[0],Math.min(draft.audit.frame_range[1],sceneViewer?.currentFrame??draft.audit.reference_frame));
+  draft.change(name,value==='keep'?{mode:'keep'}:value==='hold'?{mode:'hold',frame:pose}:{mode:'clip',take_id:value,start:draft.audit.frame_range[0],speed:1});
+ }else draft.change(name,{...old,[field]:Number(value)});
+ render();
 }
 function syncWorldDraftUI(){
  const draft=sceneViewer?.draft,stale=!!draft&&sceneViewerKey!==sceneViewKey(),blocked=busy||!!worldSave||state?.locked||!!s()?.task||!!s()?.run||!!additions.state().count;
@@ -92,7 +134,7 @@ window.addEventListener('pagehide',()=>{clearAssetViewer();clearSceneViewer();})
 const browser=assetBrowser({dialog:$('library-dialog'),context:()=>({project:p(),scene:s(),locked:state.locked,queueCount:additions.state().count}),api,esc,b,loadImages:root=>{root.querySelectorAll('[data-source-image]').forEach(loadSourceImage);root.querySelectorAll('[data-catalog-image]').forEach(loadCatalogImage);},releaseImages:root=>{for(const img of root.querySelectorAll('img[src^="blob:"]')){const url=img.src;URL.revokeObjectURL(url);blobs=blobs.filter(x=>x!==url);}},onError:notice});
 const additions=worldAddQueue({context:()=>({projectId,sceneId}),run:processWorldAdd,
  changed:()=>{if(state)render();if(browser.isOpen)void browser.refresh().catch(e=>notice(e.message));},failed:e=>notice(e.message)});
-window.addEventListener('beforeunload',e=>{if(additions.state().count||sceneViewer?.dirty||worldSave){e.preventDefault();e.returnValue='';}});
+window.addEventListener('beforeunload',e=>{if(additions.state().count||sceneViewer?.dirty||worldSave||currentActionDraft()?.dirty||actionSave){e.preventDefault();e.returnValue='';}});
 function askAdd(title,body,buttons,kind,extra={}){browser.close();modal(title,body,buttons,'Cancel addition');if(kind==='prepare'||kind==='use')$('dialog').classList.add('preparation-dialog');return new Promise(resolve=>{addPrompt={resolve,kind,...extra};});}
 async function askSourcePermission(snapshot){
  const use=snapshot.sourceUse;
@@ -135,16 +177,16 @@ function objects(){return cp()?.audit?.objects||[];}
 function activityName(id){return state.stages.find(x=>x.id===id)?.label||id;}
 function block(message){return `<div class="note warn">${esc(message)}</div>`;}
 function sourceUseBanner(){return state.sourceUse&&!state.sourceUse.ready?`<div class="note warn"><strong>Source use needs your review</strong><p>Confirm the exact pinned sources once for this production. This is your attestation, not a license grant; normal native evidence gates still apply.</p>${b('Review source use','source-review',{},'',state.locked)}</div>`:'';}
-function render(){const priorWorld=document.querySelector('.world-workspace');if(priorWorld?.dataset.contextKey)worldPanels.set(priorWorld.dataset.contextKey,Object.fromEntries(['world-inspection','rendered-evidence','world-ingredient-list'].map(name=>[name,!!priorWorld.querySelector('.'+name)?.open])));const keptHost=tab==='scenes'&&s()?.stage==='world'&&(sceneViewer?.dirty||sceneViewerKey===sceneViewKey())?document.querySelector('[data-scene-viewer]'):null;if(!keptHost)clearSceneViewer();for(const url of blobs)URL.revokeObjectURL(url);blobs=[];
+function render(){const priorWorld=document.querySelector('.world-workspace');if(priorWorld?.dataset.contextKey)worldPanels.set(priorWorld.dataset.contextKey,Object.fromEntries(['world-inspection','rendered-evidence','world-ingredient-list'].map(name=>[name,!!priorWorld.querySelector('.'+name)?.open])));const keptHost=tab==='scenes'&&['world','action'].includes(s()?.stage)&&(sceneViewer?.dirty||currentActionDraft()?.dirty||sceneViewerKey===sceneViewKey())?document.querySelector('[data-scene-viewer]'):null;if(!keptHost)clearSceneViewer();for(const url of blobs)URL.revokeObjectURL(url);blobs=[];
  const root=$('app');if(!overview)return;
  if(!projectId){root.innerHTML=`<section class="picker"><div class="eyebrow">Your local studio</div><h1>Productions</h1><p>Choose a production. Each scene keeps its own creative workflow and checkpoints. Archive removes a production from this list without deleting its files; restore it from Archived productions.</p>${b('New production','new-production',{},'primary')}${b('Archived productions','archived-productions',{},'ghost')}${overview.errors.map(e=>block(e.folder+': '+e.message)).join('')}${overview.projects.map(project=>productionRow({project,esc,b})).join('')}${!overview.projects.length?'<p class="empty">No productions yet. Create one to begin.</p>':''}</section>`;return;}
  root.innerHTML=`<header class="projectbar">${b(p().name+' ▾','picker',{},'production ghost')}<nav aria-label="Production">${b('Scenes','tab',{tab:'scenes'},tab==='scenes'?'active':'')}${b('Final film','tab',{tab:'film'},tab==='film'?'active':'')}</nav><span class="grow"></span><span class="status">${state.locked?'Adding / preparing':s()?.candidate?'Unsaved scene changes':'Saved · revision '+p().revision}</span>${b('Refresh','refresh',{},'ghost')}${b('Studio','settings',{},'ghost')}</header>${returnToFilm&&tab==='scenes'?'<div class="note">Editing a source scene. The film arrangement is preserved. '+b('Return to Final film','return-film')+'</div>':''}${tab==='film'?film():scenePage()}`;
  root.querySelectorAll('[data-media]').forEach(loadMedia);root.querySelectorAll('[data-source-image]').forEach(loadSourceImage);root.querySelectorAll('[data-catalog-image]').forEach(loadCatalogImage);
  const world=root.querySelector('.world-workspace');if(world){const key=projectId+':'+sceneId;world.dataset.contextKey=key;for(const [name,open] of Object.entries(worldPanels.get(key)||{})){const panel=world.querySelector('.'+name);if(panel)panel.open=open;}}
- const worldHost=root.querySelector('.world-workspace [data-scene-viewer]');if(worldHost){if(keptHost)worldHost.replaceWith(keptHost);else if(cp()&&!state.locked&&!s().task&&!s().run)showSceneViewer(worldHost);}
+ const worldHost=root.querySelector('.world-workspace [data-scene-viewer],.action-workspace [data-scene-viewer]');if(worldHost){if(keptHost)worldHost.replaceWith(keptHost);else if(cp()&&!state.locked&&!s().task&&!s().run)showSceneViewer(worldHost);}
  syncWorldDraftUI();
 }
-function scenePage(){const scene=s();if(scene?.stage==='world')return `<section class="workspace world-workspace">${worldView({project:p(),scene,stages:state.stages,locked:state.locked,sourceUse:state.sourceUse,runs:state.runs,taskStatus:state.taskStatuses?.[scene.id],cap,inventory:state.inventory,queueCount:additions.state().count,esc,b})}</section>`;return `<div class="shell"><aside class="scenes"><h2>Scenes</h2>${p().workbench.scenes.map((x,i)=>b(`${String(i+1).padStart(2,'0')}  ${x.name} · ${activityName(x.stage)}`,'scene',{id:x.id},'scene-link'+(x.id===sceneId?' active':''))).join('')}${b('+ Add scene','new-scene',{},'ghost')}</aside><section class="workspace">${!scene?`<div class="empty"><h1>Build your first scene</h1><p>Start with your library. Assemble a world, stage the action, then decide how to film it.</p>${b('Create scene','new-scene',{},'primary')}</div>`:sceneBody(scene)}</section></div>`;}
+function scenePage(){const scene=s();if(scene?.stage==='action')return `<section class="workspace layered-action">${actionView({project:p(),scene,stages:state.stages,checkpoint:cp(),runs:state.runs,locked:state.locked,taskStatus:state.taskStatuses?.[scene.id],cap,draft:currentActionDraft(),saving:actionSave,esc,b})}${sourceUseBanner()}${runList(scene)}</section>`;if(scene?.stage==='world')return `<section class="workspace world-workspace">${worldView({project:p(),scene,stages:state.stages,locked:state.locked,sourceUse:state.sourceUse,runs:state.runs,taskStatus:state.taskStatuses?.[scene.id],cap,inventory:state.inventory,queueCount:additions.state().count,esc,b})}</section>`;return `<div class="shell"><aside class="scenes"><h2>Scenes</h2>${p().workbench.scenes.map((x,i)=>b(`${String(i+1).padStart(2,'0')}  ${x.name} · ${activityName(x.stage)}`,'scene',{id:x.id},'scene-link'+(x.id===sceneId?' active':''))).join('')}${b('+ Add scene','new-scene',{},'ghost')}</aside><section class="workspace">${!scene?`<div class="empty"><h1>Build your first scene</h1><p>Start with your library. Assemble a world, stage the action, then decide how to film it.</p>${b('Create scene','new-scene',{},'primary')}</div>`:sceneBody(scene)}</section></div>`;}
 function sceneBody(scene){const checkpoint=cp(),current=scene.checkpoints.find(c=>c.id===scene.current),candidate=!!scene.candidate;
  const activeRun=state.runs.find(r=>r.id===(scene.task||scene.run));
  return `<select class="mobile-scenes" aria-label="Selected scene" id="scene-picker">${p().workbench.scenes.map(x=>`<option value="${x.id}" ${x.id===sceneId?'selected':''}>${esc(x.name)}</option>`).join('')}</select><div class="scene-head"><div class="grow"><div class="eyebrow">Scene · ${esc(scene.id.slice(3,11))}</div><h1>${esc(scene.name)}</h1><p>${esc(p().brief||'Add your scene intent in Studio.')}</p></div>${b('History','history',{},'ghost')}${b('+ Scene','new-scene',{},'ghost')}</div><div class="steps" aria-label="Activities in this scene">${state.stages.map((st,i)=>b((scene.completed[st.id]?'✓ ':String(i+1)+' ')+st.short,'stage',{stage:st.id},`${scene.stage===st.id?'active ':''}${scene.completed[st.id]?'done':''}`,!!scene.task||!!scene.candidate||!!scene.run||state.stages.slice(0,i).some(x=>!scene.completed[x.id]))).join('')}</div>${sourceUseBanner()}${!cap?.task_workspace?block(cap?.message||'The configured harness does not expose this development workbench. No installed runtime has been changed.'):''}${scene.task?taskBanner(scene,state.taskStatuses?.[scene.id],esc,b):''}${scene.run?`<div class="note"><strong>${esc(activeRun?.action||'Harness operation')} · ${esc(activeRun?.state||'Checking receipt')}</strong><p>${esc(progressLabel(activeRun))}. Progress is not estimated. You can refresh or inspect the preserved run.</p>${b('Refresh status','refresh')}${b('Inspect operation','recover',{run:scene.run})}</div>`:''}${candidate?`<div class="note good"><strong>New checkpoint saved · review before continuing</strong><p>${esc(checkpoint.path)}. Saving did not approve the result or replace the previous checkpoint.</p></div>`:''}<div class="activity-head"><h2>${esc(activityName(scene.stage))}</h2><p>${esc({world:'Choose your ingredients, then assemble and edit the real scene in Blender.',action:'Work with the performers and actions in this saved scene—not a new scene.',shots:'Choose an existing camera or create one in Blender to capture the staged action.',light:'Refine the scene’s real lights and look. Preserve what already works.',render:'Render an explicit shot range, inspect its movie, and approve the actual output.'}[scene.stage])}</p></div>${['world','action','light'].includes(scene.stage)?library():''}<div class="workbench ${scene.stage} ${checkpoint?'has-checkpoint':''}">${scene.stage==='world'?'':scene.stage==='render'?'<div class="library-stack">'+shotPanel({scene,checkpoint,locked:state.locked,esc,b})+readiness()+'</div>':scene.stage==='action'?'<div class="library-stack">'+objectPanel()+'</div>':'<div class="library-stack">'+shotPanel({scene,checkpoint,locked:state.locked,esc,b})+objectPanel()+'</div>'}<section class="evidence">${evidence(scene,checkpoint)}<div class="summary"><h3>${candidate?'Candidate checkpoint':checkpoint?'Saved checkpoint':'No scene checkpoint yet'}</h3><p>${esc(checkpoint?.path||'Choose assets and prepare a Blender task. Nothing has been instantiated yet.')}</p>${scene.stage==='world'?'<p class="muted">Scene contents come from the saved Blender checkpoint audit, not your selection.</p>':''}${checkpoint?`<details><summary>Checkpoint provenance and observed contents</summary><pre>${esc(JSON.stringify({sha256:checkpoint.sha256,parent:checkpoint.parent,source:checkpoint.source,audit:checkpoint.audit||'Not audited; imported saved file'},null,2))}</pre></details>`:''}</div>${scene.stage==='render'?renderList(scene):''}</section><aside class="decision"><div class="role">${esc(state.stages.find(x=>x.id===scene.stage).role)} · this scene</div>${decision(scene,checkpoint,current)}</aside></div>${runList(scene)}`;
@@ -175,6 +217,28 @@ async function loadPackageImage(node,kind){try{const id=kind==='source'?node.dat
 const loadSourceImage=node=>loadPackageImage(node,'source');
 const loadCatalogImage=node=>loadPackageImage(node,'catalog');
 async function dispatch(a,d){
+ if(a==='action-draft-save'||a==='action-draft-discard'){
+  const destination=draftDestination;if(!destination)return;
+  if(a==='action-draft-save')await saveActionDraft();else{currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);}
+  draftDestination=null;close();await dispatch(destination.action,destination.data);return;
+ }
+ if(a==='action-discard'){if(actionSave)throw Error('Wait for the Save receipt.');currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);clearSceneViewer();await load();return;}
+ if(a==='action-undo'){currentActionDraft()?.undo();render();return;}
+ if(a==='action-save'){await saveActionDraft();return;}
+ if(a==='action-hold-all'){const draft=currentActionDraft();draft.holdAll(sceneViewer?.currentFrame??draft.audit.reference_frame);render();return;}
+ if(actionSave&&worldActionNeedsSave(a))throw Error('Action Save is still running. Refresh status or inspect its receipt.');
+ if(currentActionDraft()?.dirty&&worldActionNeedsSave(a)){
+  draftDestination={action:a,data:{...d}};modal('Keep your Action changes?','<p>Save the local motion choices before continuing, or discard only this draft. Your saved scene stays intact.</p>',b('Discard & continue','action-draft-discard',{},'ghost')+b('Save & continue','action-draft-save',{},'primary',currentActionDraft().checkpointId!==cp()?.id||currentActionDraft().sha256!==cp()?.sha256),'Stay here');return;
+ }
+ if(a==='action-inspect'){
+  if(!cp())throw Error('Save a World first.');
+  actionDrafts.delete(projectId+':'+sceneId);
+  await next('action-inspect',{request:{version:'action-layer-v1',requestId:'run_'+crypto.randomUUID(),checkpointId:cp().id,sha256:cp().sha256}});await load();return;
+ }
+ if(a==='action-ready'){
+  if(!confirm('Have you reviewed this exact saved performance over time, or chosen a static scene? Mark Action ready and continue to Shots?'))return;
+  await next('approve',{stage:'action',checkpointId:cp().id});target=null;await load();return;
+ }
  if(a==='world-draft-stay'){draftDestination=null;close();render();return;}
  if(a==='world-draft-save'||a==='world-draft-discard'){
    const destination=draftDestination;if(!destination)return;
@@ -247,7 +311,7 @@ if(a==='source-detail'){const source=await api('workbench/source-detail?'+new UR
  if(a==='keep-building'){if(s().stage!=='world'&&!confirm('Keep this reviewed checkpoint and stay in the same activity?'))return;await next('keep-building');await load();return;}
 if(a==='scan'){if(!confirm('Rescan the original database packages? This updates the source registry; existing pins and originals are preserved.'))return;await api('library/scan',{});thumbnails.clear();await load();return;}
  if(a==='source'){await next('source',{sourceId:d.id,selected:!s().sources.includes(d.id)});if($('dialog').open)close();await load();return;}
- if(a==='task'){const shot=shotFor(s()),context={targets:s().stage==='world'?sceneViewer?.targets()||[]:target?[target]:[],camera:shot&&['shots','light','render'].includes(s().stage)?shot.camera:s().stage==='shots'?target:null};await next('task-open',{context});await load();return;}
+ if(a==='task'){const shot=shotFor(s()),context={targets:s().stage==='world'?sceneViewer?.targets()||[]:s().stage==='action'?currentActionDraft()?.selected?[currentActionDraft().selected]:[]:target?[target]:[],...(s().stage==='action'&&sceneViewer?.currentFrame!==null?{frame:sceneViewer?.currentFrame}:{}),camera:shot&&['shots','light','render'].includes(s().stage)?shot.camera:s().stage==='shots'?target:null};await next('task-open',{context});await load();return;}
  if(a==='focus-task'){const r=await next('task-focus');notice(r.focused?'Blender task focused.':r.message||'Task window requested; select it on the taskbar.');return;}
  if(a==='collect'){await next('task-collect');await load();return;}
  if(a==='approve'){if(!confirm('Have you inspected this saved checkpoint in Blender? Keep it for '+activityName(s().stage)+'?'))return;await next('approve',{stage:s().stage,checkpointId:cp().id});target=null;await load();return;}
@@ -277,7 +341,7 @@ if(a==='scan'){if(!confirm('Rescan the original database packages? This updates 
  if(a==='resolve'){if(!confirm('Confirm you stopped the external Blender task or encoder. The launcher does not terminate it for you.'))return;await next('resolve',{sceneId:d.scene||null,runId:d.run,confirmStopped:true});close();await load();return;}
 }
 document.addEventListener('click',e=>{const button=e.target.closest('button[data-action]');if(button&&!button.disabled)perform(()=>dispatch(button.dataset.action,button.dataset));});
-document.addEventListener('change',e=>{if(e.target.id==='world-use-confirm'){const button=$('dialog').querySelector('[data-action="world-use-confirm"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='prepare-confirm'){const button=$('dialog').querySelector('[data-action="source-prepare"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='scene-picker')perform(()=>dispatch('scene',{id:e.target.value}));if(['browser-kind','browser-scope','browser-activity','browser-subcategory'].includes(e.target.id))perform(()=>dispatch(e.target.id,{value:e.target.value}));});
+document.addEventListener('change',e=>{if(e.target.dataset.actionField){try{editActionField(e.target.dataset.actionField,e.target.value);}catch(error){notice(error.message);}return;}if(e.target.id==='world-use-confirm'){const button=$('dialog').querySelector('[data-action="world-use-confirm"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='prepare-confirm'){const button=$('dialog').querySelector('[data-action="source-prepare"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='scene-picker')perform(()=>dispatch('scene',{id:e.target.value}));if(['browser-kind','browser-scope','browser-activity','browser-subcategory'].includes(e.target.id))perform(()=>dispatch(e.target.id,{value:e.target.value}));});
 document.addEventListener('submit',e=>{if(e.target.id==='browser-search'){e.preventDefault();perform(()=>dispatch('browser-search',{}));}});
 let lastObservationAt=Date.now();
 const pollStatus=statusPoller();
@@ -298,7 +362,7 @@ setInterval(async()=>{
   const changed=v.project.revision!==p().revision||v.locked!==state.locked||progressKey(v.runs)!==progressKey(state.runs)||
     observationKey(v.taskStatuses?.[sceneId],s()?.task,at)!==observationKey(state.taskStatuses?.[sceneId],s()?.task,lastObservationAt);
   acceptSnapshot(v);lastObservationAt=at;
-  if(changed)render();
+  if(changed){render();scheduleActionInspection();}
  }catch(e){notice(e.message);}
 },500);
 if(!token){notice('Open the desktop launcher or its Start shortcut to establish a local session.');$('app').innerHTML='<div class="empty"><h1>Local session required</h1><p>The workbench does not accept a public or unauthenticated studio connection.</p></div>';}else perform(async()=>{cap=await api('workbench/capabilities');await load();});

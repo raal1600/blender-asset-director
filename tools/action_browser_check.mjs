@@ -1,0 +1,69 @@
+/** Generated Action user journey: browser -> API -> native save -> combined GLB. */
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import {randomUUID,createHash} from 'node:crypto';
+import {createApp} from '../launcher/server.mjs';
+import {exists,fileHash,json,writeJson} from '../launcher/lib/storage.mjs';
+const [out,generated,previewFixture,python,blender,playwright,chrome]=process.argv.slice(2);
+assert([out,generated,previewFixture,python,blender,playwright].every(x=>x&&path.isAbsolute(x)));
+assert(!await exists(out),'New private evidence folder required');
+assert.equal((await json(path.join(generated,'RESULTS.json'))).scope,'REAL_GENERATED_NATIVE_ACTION');
+const expected=await json(path.join(previewFixture,'RESULTS.json'));assert.equal(expected.scope,'GENERATED_COMBINED_ACTION_PREVIEW');assert.equal(expected.status,'PASS');
+await fs.mkdir(out,{recursive:true});
+const repo=fileURLToPath(new URL('../',import.meta.url)),source=path.join(generated,'source.blend'),original=await fileHash(source);
+const report={kind:'synthetic-action-browser',checks:[],errors:[],requests:[],not_tested:['Native window/rig controls','Human temporal approval','Private asset compatibility','Live installation']};
+let app,browser,page;
+try{
+ app=await createApp({root:path.join(out,'Studio'),port:0,config:{python,blender,skill:path.join(repo,'skills/blender-asset-director'),library:path.join(out,'Studio/Database/AssetDirector')}});
+ const inspect=await app.runtime.harness(['job-prepare','scene-audit','--input',source]);const audit=await app.workbench.result(await app.runtime.harness(['job-run',inspect.id,'--blender',blender]));
+ let project=await app.store.create('Synthetic Action browser','Generated multi-performer scene; no human creative acceptance');
+ await app.workbench.create(project.id,project.revision,'Combined performance');project=await app.store.get(project.id);
+ const scene=project.workbench.scenes[0],cpId='cp_'+randomUUID(),relative='Scenes/'+cpId+'.blend';await fs.copyFile(source,path.join(project.directory,relative),fs.constants.COPYFILE_EXCL);
+ scene.checkpoints.push({id:cpId,path:relative,...original,parent:null,stage:'world',audit});scene.current=cpId;scene.stage='action';scene.completed={world:cpId};await app.store.save(project,project.revision);
+ const {chromium}=await import(pathToFileURL(playwright).href);browser=await chromium.launch(chrome?{executablePath:chrome}:{channel:'chrome'});
+ page=await browser.newPage({viewport:{width:1440,height:1000},serviceWorkers:'block'});page.setDefaultTimeout(30000);
+ const safe=value=>String(value).replaceAll(app.token,'[REDACTED]');
+ page.on('pageerror',e=>report.errors.push(safe(e.message)));page.on('console',m=>{if(m.type()==='error')report.errors.push(safe(m.text()));});page.on('dialog',d=>d.dismiss());
+ const records=[],models=[],pending=[];
+ page.on('request',r=>{if(r.url().startsWith(app.origin+'/'))report.requests.push({path:new URL(r.url()).pathname,method:r.method()});else if(/^https?:/.test(r.url()))report.errors.push('Unexpected external request');});
+ page.on('response',r=>{const url=new URL(r.url());if(url.pathname==='/api/workbench/viewer-prepare'&&r.ok())pending.push(r.json().then(v=>records.push(v)));if(url.pathname==='/api/workbench/viewer-model'&&r.ok())pending.push(r.body().then(b=>models.push(b)));});
+ const idle=()=>page.waitForFunction(()=>!document.body.classList.contains('working'));
+ const click=async selector=>{await page.locator('body').ariaSnapshot();await page.locator(selector).click();await idle();};
+ const ready=async()=>{await page.waitForFunction(()=>document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready'&&!!document.querySelector('[data-action-field="performer"]')&&!document.querySelector('[data-action-field="performer"]').disabled,null,{timeout:205000});await idle();};
+ await page.goto(app.origin+'/workbench#'+app.token);await idle();await click('[data-action="project"][data-id="'+project.id+'"]');await ready();await Promise.all(pending);
+ assert.equal(await page.locator('.action-workspace').count(),1);assert.equal(await page.getByLabel('Animation take').isVisible(),false);assert.match(await page.locator('.scene-playback-label').innerText(),/Whole scene.*24 fps/);
+ await page.screenshot({path:path.join(out,'01-action-ready.png'),fullPage:true});await fs.writeFile(path.join(out,'01-action-ready.txt'),safe(await page.locator('body').ariaSnapshot()),{flag:'wx'});
+ assert.deepEqual(report.errors,[]);report.checks.push('Action opens with automatic real performer inspection and whole-scene playback, no arbitrary global take selector');
+ // Independent evaluation of the actual app GLB, not a hidden UI test shortcut.
+ const THREE=await import(pathToFileURL(path.join(repo,'launcher/public/vendor/three/build/three.module.js')).href);
+ const {GLTFLoader}=await import(pathToFileURL(path.join(repo,'launcher/public/vendor/three/examples/jsm/loaders/GLTFLoader.js')).href);
+ const raw=models[0],gltf=await new GLTFLoader().parseAsync(raw.buffer.slice(raw.byteOffset,raw.byteOffset+raw.byteLength),'');assert.equal(gltf.animations.length,1);
+ const mixer=new THREE.AnimationMixer(gltf.scene),clip=mixer.clipAction(gltf.animations[0]);clip.setLoop(THREE.LoopOnce,1);clip.clampWhenFinished=true;clip.play();
+ const distances=[];
+ for(const sample of expected.samples){clip.time=(sample.frame-expected.playback.start)/expected.playback.fps;mixer.update(0);gltf.scene.updateMatrixWorld(true);gltf.scene.traverse(o=>o.skeleton?.update());
+  for(const [name,point] of Object.entries(sample.positions)){const object=gltf.scene.getObjectByName(name);assert(object?.isMesh,'Observed skin/prop exists');const centroid=new THREE.Vector3(),v=new THREE.Vector3();for(let i=0;i<object.geometry.attributes.position.count;i++){object.getVertexPosition(i,v);centroid.add(v.applyMatrix4(object.matrixWorld));}centroid.divideScalar(object.geometry.attributes.position.count);const error=centroid.distanceTo(new THREE.Vector3(...point));assert(error<1e-4,name+' GLB differs from native frame '+sample.frame+': '+error);distances.push({name,frame:sample.frame,error});}
+ }
+ report.evaluatedComparisons=distances;report.checks.push('Both skinned performers and moving prop agree with actual Blender samples at start/middle/end');
+ const canvas=page.locator('[data-scene-viewer] canvas'),first=await canvas.screenshot();await page.locator('[data-view="play"]').click();await page.waitForTimeout(150);await page.locator('[data-view="play"]').click();
+ await page.locator('[data-view="time"]').fill((4/24).toFixed(3));await page.locator('[data-view="time"]').dispatchEvent('input');await page.waitForTimeout(100);assert.notEqual(createHash('sha256').update(await canvas.screenshot()).digest('hex'),createHash('sha256').update(first).digest('hex'));assert.match(await page.locator('[data-view="clock"]').innerText(),/Frame 5/);report.checks.push('Actual scene playback and frame-labelled scrubbing change rendered geometry');
+ await page.getByRole('combobox',{name:'Performer',exact:true}).selectOption('SyntheticRig0');
+ const nativeChoice=await page.locator('[data-action-field="mode"] option').filter({hasText:'Synthetic Alternate'}).getAttribute('value');await page.getByRole('combobox',{name:'Performance',exact:true}).selectOption(nativeChoice);
+ await page.getByLabel('Start frame',{exact:true}).fill('20');await page.getByLabel('Start frame',{exact:true}).press('Tab');await page.getByLabel('Speed',{exact:true}).fill('2');await page.getByLabel('Speed',{exact:true}).press('Tab');
+ await click('[data-action="action-undo"]');assert.equal(await page.getByLabel('Speed',{exact:true}).inputValue(),'1');await page.getByLabel('Speed',{exact:true}).fill('2');await page.getByLabel('Speed',{exact:true}).press('Tab');
+ await page.getByRole('combobox',{name:'Performer',exact:true}).selectOption('StaticProp');await page.getByRole('combobox',{name:'Performance',exact:true}).selectOption('hold');await page.getByLabel('Hold frame',{exact:true}).fill('5');await page.getByLabel('Hold frame',{exact:true}).press('Tab');
+ assert.match(await page.locator('.action-savebar').innerText(),/2 performers/);assert.equal(report.requests.filter(r=>r.path.endsWith('/action-save')).length,0);assert.equal((await app.store.get(project.id)).workbench.scenes[0].current,cpId);
+ await click('[data-action="tab"][data-tab="film"]');assert.match(await page.locator('#dialog').innerText(),/Keep your Action changes/);await click('#dialog [data-action="close"]');report.checks.push('Two-performer local draft, Undo and unsaved-navigation guard with no job per field change');
+ await page.screenshot({path:path.join(out,'02-action-draft.png'),fullPage:true});await click('[data-action="action-save"]');await ready();
+ project=await app.store.get(project.id);const saved=project.workbench.scenes[0],cp=saved.checkpoints.find(c=>c.id===saved.current);assert.notEqual(cp.id,cpId);assert.deepEqual(saved.completed,{world:cpId});assert.equal(saved.stage,'action');assert.equal(report.requests.filter(r=>r.path.endsWith('/action-save')).length,1);
+ const nativeState=(await app.store.runs(project.id)).find(r=>r.action==='action-audit'&&r.checkpointId===cp.id&&r.state==='SUCCEEDED').inspection;
+ const rig=nativeState.performers.find(p=>p.name==='SyntheticRig0'),prop=nativeState.performers.find(p=>p.name==='StaticProp');assert.equal(rig.tracks.find(t=>!t.mute).strips[0].scale,.5);assert.equal(rig.tracks.find(t=>!t.mute).strips[0].start,20);assert(prop.tracks.every(t=>t.mute));assert.deepEqual(nativeState.frame_range,[1,24]);
+ report.checks.push('One UI Save reaches real Blender; refreshed independent inspection proves exact timing and hold without approving Action');
+ await page.screenshot({path:path.join(out,'03-action-saved.png'),fullPage:true});
+ await page.getByRole('combobox',{name:'Performer',exact:true}).selectOption('SyntheticRig1');await page.getByRole('combobox',{name:'Performance',exact:true}).selectOption('hold');await click('[data-action="action-discard"]');await ready();assert.equal((await app.store.get(project.id)).workbench.scenes[0].current,cp.id);report.checks.push('Discard removes only the local Action draft');
+ await click('[data-action="stage"][data-stage="world"]');await page.waitForFunction(()=>document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready',null,{timeout:205000});assert.equal(await page.locator('.viewer-animation').isVisible(),false);assert.match(await page.locator('.viewer-disclaimer:not(.viewer-texture-note)').innerText(),/Static World/);report.checks.push('Returning to World freezes saved Action at its recorded frame without changing native motion');
+ await click('[data-action="stage"][data-stage="action"]');await ready();await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'04-action-mobile.png'),fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ assert.deepEqual(await fileHash(source),original);assert.deepEqual(await fileHash(path.join(project.directory,relative)),original);assert.deepEqual(report.errors,[]);report.checks.push('Originals preserved, responsive 390px view, no browser errors or external requests');report.status='PASS';
+}catch(error){report.status='FAIL';report.error=String(error).replaceAll(app?.token||'never-match-token','[REDACTED]');process.exitCode=1;if(page){await page.screenshot({path:path.join(out,'failure.png'),fullPage:true}).catch(()=>{});await fs.writeFile(path.join(out,'failure.txt'),await page.locator('body').innerText()).catch(()=>{});}}
+finally{await browser?.close();if(app){app.server.closeAllConnections();await new Promise(resolve=>app.server.close(resolve));}await writeJson(path.join(out,'RESULTS.json'),report);console.log(JSON.stringify({status:report.status,checks:report.checks.length,error:report.error}));}
