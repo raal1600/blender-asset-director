@@ -29,6 +29,15 @@ def main():
         subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
                         '--python-exit-code','11','--python',str(ROOT/'tools/world_layers_fixture.py'),'--',str(output/'world-layers')],
                        cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=180,check=True)
+    with (output/'world-transform.log').open('wb') as log:
+        subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
+                        '--python-exit-code','11','--python',str(ROOT/'tools/world_transform_fixture.py'),'--',
+                        str(output/'world-layers/placed.blend'),str(output/'world-transform')],
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
+    with (output/'world-append.log').open('wb') as log:
+        subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
+                        '--python-exit-code','11','--python',str(ROOT/'tools/world_append_fixture.py'),'--',str(output/'world-append')],
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
     with (output/'world-save-return.log').open('wb') as log:
         subprocess.run([args.node,str(ROOT/'tools/task_save_native.mjs'),str(output/'world-save-return'),
                         args.blender,str(output/'world-layers')],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,

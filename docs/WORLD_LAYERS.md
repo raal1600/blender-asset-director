@@ -96,7 +96,9 @@ Those remain separately recorded gates. Deployment requires exact-commit CI,
 private-input checks, packaged staging, backups and reversible coherent replacement
 of launcher plus harness. Do not patch an installed runtime under its old identity.
 
-Not implemented in this slice: in-app picking/transform gizmos, transform-draft
-undo/Save batching, performer-first motion assignment, new shot/light controls,
+The [direct-edit Save foundation](WORLD_DIRECT_EDIT.md) adds a bounded native
+batch worker and authenticated save endpoint. Its frontend integration remains
+in progress. Not implemented yet: in-app picking/transform gizmos, transform-draft
+undo/Save controls, performer-first motion assignment, new shot/light controls,
 live unsaved Blender streaming, or automatic recovery of earlier lost placement.
 Earlier checkpoints are not repaired merely by switching to a static viewer.

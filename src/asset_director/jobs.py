@@ -14,8 +14,11 @@ from . import transfer_contract
 from . import bone_display_contract
 from . import sequence_contract
 from . import render_sequence
+from . import world_transform_contract
 
 OPS = {
+    "world-transform": world_transform_contract.FIELDS,
+    "world-placement-audit": set(),
     "render-readiness": set(),
     "render-frames": render_sequence.FIELDS,
     **sequence_contract.OPS,
@@ -44,9 +47,9 @@ OPS = {
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage", "camera"},
 }
-MUTATIONS = {"asset-preview", "sequence-execute", "bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
+MUTATIONS = {"world-transform", "asset-preview", "sequence-execute", "bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
              "light-adjust", "world-adjust", "look-adjust", "light-rig"}
-TARGET_REQUIRED = {"render-readiness", "render-frames", "sequence-plan", "sequence-execute", "sequence-check", "bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
+TARGET_REQUIRED = {"world-transform", "world-placement-audit", "render-readiness", "render-frames", "sequence-plan", "sequence-execute", "sequence-check", "bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
                    "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 
 OPS.update(motion_contract.OPS)
@@ -62,6 +65,11 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
     options = copy.deepcopy(options or {})
     fields(options, OPS[operation])
+    if operation in {'world-transform', 'world-placement-audit'}:
+        if operation == 'world-transform':
+            world_transform_contract.validate(options)
+        require(input_file is not None and asset_id is None and Path(input_file).suffix.lower() == '.blend',
+                'TARGET_REQUIRED', 'World placement requires a saved scene checkpoint, not an asset')
     if operation in sequence_contract.OPS:
         sequence_contract.validate(operation, options)
         require(input_file is not None and asset_id is None, "TARGET_REQUIRED",

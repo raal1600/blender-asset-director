@@ -185,6 +185,10 @@ def catalog_and_film(s, click, idle, check):
         while True:
             snapshot = state()
             result = snapshot['project']['workbench']['scenes'][0]
+            failures = [r for r in snapshot['runs'] if r.get('sceneId') == result['id']
+                        and r['state'] in ('FAILED', 'INTERRUPTED') and not r.get('recovery')]
+            assert not failures, 'World add failed; preserved receipts: ' + str(failures)
+            expect(page.locator('#notice')).to_be_hidden()
             if result['candidate'] and result['candidate'] != previous and not snapshot['locked']:
                 break
             if page.locator('#dialog[open] [name="world-collection"]').count():

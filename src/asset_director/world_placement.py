@@ -21,6 +21,10 @@ def widgets(scene):
 
 def prepare(scene, only_job=None):
     """Prepare supported groups in this working copy; preserve animated bases."""
+    # Collection append/link does not eagerly evaluate matrix_world. Establish
+    # the actual scene-frame baseline before comparing identity-parent results;
+    # otherwise the first update looks like an illegal placement mutation.
+    bpy.context.view_layer.update()
     helpers = widgets(scene)
     groups = {}
     for obj in scene.objects:
