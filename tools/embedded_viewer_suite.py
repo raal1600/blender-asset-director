@@ -138,6 +138,10 @@ def main():
                    str(output/'world-layers'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
         reported_browser(command, output, 'preview-cleanup-browser', 300)
+        command = [args.node, str(ROOT/'tools/preview_cancel_check.mjs'), str(output/'preview-cancel-browser'),
+                   str(output/'world-layers'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        reported_browser(command, output, 'preview-cancel-browser', 300)
         with (output/'studio-teardown.log').open('wb') as log:
             subprocess.run([sys.executable, str(ROOT/'tools/studio_e2e/teardown_check.py'),
                             '--evidence', str(output/'studio-teardown'), '--blender', args.blender],

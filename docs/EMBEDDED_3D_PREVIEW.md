@@ -58,6 +58,19 @@ Repeated concurrent preparation is serialized and reuses the verified result;
 failed promises do not poison the queue. Source and project scope is rechecked
 for every request. No session token or credential is persisted in this cache.
 
+Closing or replacing a view aborts its preparation/geometry HTTP requests. The
+existing authenticated preparation handler observes that disconnect and cancels
+queued or preflight work before allocating a conversion attempt. This signal is
+limited to read-only preview preparation; it never cancels an explicit scene Save,
+render, review or other writer just because a browser went away. There is no new
+unauthenticated cancellation endpoint or general Blender command channel.
+
+Once a conversion attempt has been allocated, its bounded native work completes
+normally. A departed view receives no active lease; verified successful bytes can
+be reused when reopened. Actual failures keep their original failure evidence.
+This cancels obsolete requests, not already-started Blender processes. No process
+is killed, source changed, checkpoint created or approval inferred by navigation.
+
 The implementation still refuses a source above 512 MiB / 4096 files,
 128 MiB GLB, 10000 nodes, 2 million displayed vertices,
 128 textures, 8192-pixel texture dimensions or 64 million decoded texture pixels.
@@ -169,6 +182,13 @@ coverage separately simulates a locked-file partial failure and protects drift,
 unknown files and hard links. Test decisions are not human production approvals.
 Representative large-source timing and broader resource measurements remain
 separate acceptance work; automatic cache eviction never deletes disk files.
+
+`preview_cancel_check.mjs` verifies browser navigation actually aborts the request,
+queued cancellation avoids a native conversion, an observed RUNNING native job
+finishes safely, and returning reuses its exact result without another conversion.
+Its deterministic queue gate holds the response of a real completed first native
+job; it does not simulate native success or claim a native process was interrupted.
+Original/checkpoint/manifest preservation and absent active-view leaks are checked.
 
 Synthetic/local test success is not exact-commit CI success, desktop WebView
 acceptance, a runtime update or production/creative acceptance. Installation

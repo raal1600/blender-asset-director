@@ -39,7 +39,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,r
   const dispose=()=>{if(disposed)return;disposed=true;relinquish();abort.abort();cancelAnimationFrame(frame);observer?.disconnect();for(const f of cleanups)f();editor?.dispose();controls?.dispose();mixer?.stopAllAction();if(model)mixer?.uncacheRoot(model);releaseTree([world,...loadedScenes]);renderer?.dispose();renderer?.forceContextLoss();host.replaceChildren();delete host.dataset.viewerState;delete host.dataset.previewId;};
   const ready=(async()=>{
     try {
-      const [record,THREE,{GLTFLoader},{OrbitControls}]=await Promise.all([Promise.resolve().then(prepare).then(value=>{preparedRecord=value;if(releaseWanted)relinquish();return value;}),import('./vendor/three/build/three.module.js'),import('./vendor/three/examples/jsm/loaders/GLTFLoader.js'),import('./vendor/three/examples/jsm/controls/OrbitControls.js')]);
+      const [record,THREE,{GLTFLoader},{OrbitControls}]=await Promise.all([Promise.resolve().then(()=>prepare(abort.signal)).then(value=>{preparedRecord=value;if(releaseWanted)relinquish();return value;}),import('./vendor/three/build/three.module.js'),import('./vendor/three/examples/jsm/loaders/GLTFLoader.js'),import('./vendor/three/examples/jsm/controls/OrbitControls.js')]);
       if(disposed)return;
       const bytes=await fetchModel(record,abort.signal);if(disposed)return;
       const manager=new THREE.LoadingManager();

@@ -12,6 +12,7 @@ import {PreviewCache} from './preview-cache.mjs';
 
 export const MAX_PREVIEW_STORAGE_BYTES=100*1024**3;
 export const MAX_PREVIEW_METADATA_BYTES=32*1024**2;
+const stillRequested=signal=>assert(!signal?.aborted,'Preview request cancelled. Existing files were retained.',499);
 export const previewProfile = (stage,kind='checkpoint',shot=null) => stage==='world'?'world-static-v1':kind==='checkpoint'&&shot&&['shots','light','render'].includes(stage)?stage==='light'?'look-inspection-v1':'shot-framing-v1':stage==='action'&&kind==='checkpoint'?'action-playback-v1':'inspection-v1';
 export function validateActionPlayback(playback,observed,geometryOnly=false){
   assert(playback?.version==='scene-playback-v1'&&playback.scope==='SAVED_SCENE'&&
@@ -71,24 +72,29 @@ export class EmbeddedPreviews {
     return {released:true};
   }
   exclusive(action){const pending=this.queue.then(action);this.queue=pending.catch(()=>{});return pending;}
-  prepare(id,sceneId,revision,request,viewerId){
+  prepare(id,sceneId,revision,request,viewerId,signal){
     return this.exclusive(async()=>{
+      stillRequested(signal);
       if(viewerId!==undefined){
         assert(typeof viewerId==='string'&&/^viewer_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(viewerId),'Invalid preview view identity.');
         this.views||=new Map();assert(!this.views.has(viewerId)&&this.views.size<256,'Close an existing 3D view before opening another.',409);
       }
-      const record=await this.prepareOne(id,sceneId,revision,request);
+      const record=await this.prepareOne(id,sceneId,revision,request,signal);
+      // An allocated native attempt finishes safely, but a departed view gets no lease.
+      stillRequested(signal);
       if(viewerId)this.views.set(viewerId,{previewId:record.previewId,projectId:id,sceneId});
       else {this.legacy||=new Set();this.legacy.add(record.previewId);while(this.legacy.size>64)this.legacy.delete(this.legacy.values().next().value);}
       return record;
     });
   }
-  async prepareOne(id,sceneId,revision,request) {
+  async prepareOne(id,sceneId,revision,request,signal) {
     assert(request&&typeof request==='object'&&!Array.isArray(request),'Expected a preview source.');
     const w=this.work,source=request.kind==='checkpoint'?await checkpointSource(w,id,sceneId,revision,request):await assetPreviewSource(w,id,sceneId,revision,request);
+    stillRequested(signal);
     const project=await w.project(id,revision),profile=previewProfile(w.scene(project,sceneId).stage,source.source_kind,source.shot_view);
     source.preview_profile=profile;
     await verifiedPackage(source);
+    stillRequested(signal);
     const base=await safe(w.store.root,'SystemRuntime/UserData/ViewerPreviews');await fs.mkdir(base,{recursive:true});
     const direct=/\.(gltf|glb)$/i.test(source.file)&&!Object.keys(source.motion||{}).length;
     let converter=null;
@@ -97,16 +103,19 @@ export class EmbeddedPreviews {
       assert(/^[a-f0-9]{64}$/.test(native.implementation),'Preview requires a verified native runtime identity.',409);
       converter={implementation:native.implementation,blender:await fileHash(w.config.blender)};
     }
+    stillRequested(signal);
     const implementation=await this.identity,key=digest({project:id,scene:sceneId,source,implementation,converter}),cache=new PreviewCache(base);
     const reused=await cache.load(key,{source,projectId:id,sceneId,implementation,converter});
+    stillRequested(signal);
     if(reused){
       const observed=validateGLB(await fs.readFile(reused.filename));
       assert(digest(observed)===digest(reused.record.observed),'Cached geometry description changed.',409);
       this.remember(reused);return {...reused.record,cached:true};
     }
     // Never delete user data or historical failure evidence to make room.
-    const names=await walk(base,50000);let disk=0;for(const name of names)disk+=(await fs.stat(await safe(base,name))).size;
+    const names=await walk(base,50000);let disk=0;for(const name of names){stillRequested(signal);disk+=(await fs.stat(await safe(base,name))).size;}
     assertPreviewStorageBudget(disk,source.files.reduce((n,f)=>n+f.size,0));
+    stillRequested(signal);
     const previewId='view_'+randomUUID(),directory=await safe(base,previewId);await fs.mkdir(directory);
     const requestFile=path.join(directory,'request.json');await writeJson(requestFile,source);
     try {

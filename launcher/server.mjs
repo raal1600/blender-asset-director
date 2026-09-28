@@ -28,7 +28,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
   const server = http.createServer(async(req,res) => {
     res.setHeader('Cache-Control','no-store'); res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy','no-referrer');
 res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
-    const send = (code,value) => {res.writeHead(code,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
+    const send = (code,value) => {if(res.destroyed||res.writableEnded)return;res.writeHead(code,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
     try {
       assert(req.headers.host === new URL(origin).host,'Invalid host.',403);
       assert(!req.headers.origin || req.headers.origin === origin,'Cross-origin request refused.',403);
@@ -69,6 +69,12 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assert(req.headers['content-type']?.startsWith('application/json'),'Expected JSON.',415);
         let data = ''; for await (const part of req) { data += part; assert(data.length <= 65536,'Request too large.',413); }
         body = data ? JSON.parse(data) : {};
+      }
+      let previewSignal;
+      if(req.method==='POST'&&url.pathname==='/api/workbench/viewer-prepare'){
+        const cancellation=new AbortController();previewSignal=cancellation.signal;
+        const departed=()=>{if(!res.writableEnded)cancellation.abort();};
+        res.once('close',departed);if(res.destroyed)departed();
       }
       const lifecycle = async () => {
         const {reasons,tasks,needsAttention} = await unfinishedState(store,config);
@@ -133,7 +139,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='source-prepare')return workbench.prepareSource(id,sid,rev,body.request);
             if(command==='catalog-label')return workbench.labelCatalog(id,sid,rev,body.request);
             if(command==='asset-preview')return workbench.previewAsset(id,sid,rev,body.request);
-            if(command==='viewer-prepare')return viewers.prepare(id,sid,rev,body.request,body.viewerId);
+            if(command==='viewer-prepare')return viewers.prepare(id,sid,rev,body.request,body.viewerId,previewSignal);
             if(command==='viewer-release')return viewers.release(id,sid,body.viewerId);
             if(command==='catalog-job')return workbench.catalogJob(id,sid,rev,body.request);
             if(command==='keep-building')return workbench.keepBuilding(id,sid,rev);

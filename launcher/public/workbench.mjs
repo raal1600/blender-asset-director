@@ -146,11 +146,11 @@ function showSceneViewer(host){clearSceneViewer();sceneViewer=startViewer(host,{
 function startViewer(host,request){const context={projectId,sceneId,revision:p().revision},viewerId='viewer_'+crypto.randomUUID();return openViewer({host,
  worldEdit:request.kind==='checkpoint'&&s().stage==='world'?{labels:Object.fromEntries((p().workbench.catalogPins||[]).map(a=>[a.id,a.title])),changed:()=>syncWorldDraftUI()}:undefined,
  inspectInBlender:request.kind==='checkpoint'?undefined:()=>perform(async()=>{if(projectId!==context.projectId||sceneId!==context.sceneId||$(request.kind==='catalog'?'catalog-file':'source-file')?.value!==request.file)throw Error('Preview context changed; reopen the asset first.');await dispatch('asset-preview-open',request);}),
- prepare:()=>api('workbench/viewer-prepare',{...context,request,viewerId}),
+ prepare:signal=>api('workbench/viewer-prepare',{...context,request,viewerId},signal),
  release:()=>fetch('/api/workbench/viewer-release',{method:'POST',headers:requestHeaders(),body:JSON.stringify({...context,viewerId}),keepalive:true}),
  fetchModel:async(record,signal)=>{const r=await fetch('/api/workbench/viewer-model?'+new URLSearchParams({projectId:context.projectId,sceneId:context.sceneId,previewId:record.previewId}),{headers:requestHeaders(),signal});if(!r.ok)throw Error((await r.json()).error);return r.arrayBuffer();}});}
 const requestHeaders=()=>({'Authorization':`Bearer ${token}`,'Content-Type':'application/json'});
-async function api(route,data){const r=await fetch('/api/'+route,{method:data===undefined?'GET':'POST',headers:requestHeaders(),...(data===undefined?{}:{body:JSON.stringify(data)})});const v=await r.json();if(!r.ok)throw Object.assign(new Error(v.error||'Request failed.'),{status:r.status});return v;}
+async function api(route,data,signal){const r=await fetch('/api/'+route,{method:data===undefined?'GET':'POST',headers:requestHeaders(),signal,...(data===undefined?{}:{body:JSON.stringify(data)})});const v=await r.json();if(!r.ok)throw Object.assign(new Error(v.error||'Request failed.'),{status:r.status});return v;}
 const thumbnails=imageLoader({fetchImage:async url=>{const r=await fetch(url,{headers:requestHeaders()});if(r.status===204)return null;if(!r.ok)throw new Error((await r.json()).error||'Package image request failed.');return r.blob();}});
 const p=()=>state?.project,s=()=>p()?.workbench.scenes.find(x=>x.id===sceneId),cp=()=>s()?.checkpoints.find(c=>c.id===(s().candidate||s().current));
 const b=(text,action,data={},cls='',disabled=false)=>`<button class="${cls}" data-action="${action}" ${Object.entries(data).map(([k,v])=>`data-${k}="${esc(v)}"`).join(' ')} ${disabled?'disabled':''}>${esc(text)}</button>`;

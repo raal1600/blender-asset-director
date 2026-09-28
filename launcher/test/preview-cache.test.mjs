@@ -152,3 +152,22 @@ test('storage review separates protected evidence, exact paths and explicit remo
  assert.match(result.body,/view_test\/model.glb/);assert.match(result.body,/Active preview/);assert.match(result.buttons,/preview-storage-apply/);
  assert.match(storageConfirmation(plan),/not open in Blender/);assert.match(storageConfirmation(plan),/Originals, saved checkpoints, databases, receipts and logs stay intact/);assert.match(storageConfirmation(plan),/cannot be undone/);
 });
+
+test('an abandoned queued preview never resolves sources or allocates a conversion attempt',async t=>{
+ const f=await fixture(t),controller=new AbortController();let resume,lookups=0;
+ const blocker=f.viewers.exclusive(()=>new Promise(resolve=>{resume=resolve;}));await new Promise(setImmediate);
+ const original=f.work.catalogDetail;f.work.catalogDetail=(...args)=>{lookups++;return original(...args);};
+ const preparing=f.viewers.prepare('project','scene',1,f.request(1),'viewer_00000000-0000-4000-8000-000000000001',controller.signal);
+ const refused=assert.rejects(preparing,e=>e.status===499&&/cancelled/.test(e.message));controller.abort();resume();await blocker;await refused;
+ assert.equal(lookups,0);assert.equal(f.viewers.owned.size,0);assert.equal(await fs.access(f.base).then(()=>true,()=>false),false);
+ assert.equal((await f.prepare()).profile,'world-static-v1','Cancellation must not poison subsequent queue work');
+});
+
+test('cancellation during source verification refuses before conversion allocation',async t=>{
+ const f=await fixture(t),controller=new AbortController(),original=f.work.catalogDetail;let entered,resume;
+ const started=new Promise(resolve=>{entered=resolve;}),gate=new Promise(resolve=>{resume=resolve;});
+ f.work.catalogDetail=async(...args)=>{entered();await gate;return original(...args);};
+ const preparing=f.viewers.prepare('project','scene',1,f.request(1),'viewer_00000000-0000-4000-8000-000000000001',controller.signal);
+ const refused=assert.rejects(preparing,e=>e.status===499);await started;controller.abort();resume();await refused;
+ assert.equal(f.viewers.owned.size,0);assert.equal(await fs.access(f.base).then(()=>true,()=>false),false);
+});
