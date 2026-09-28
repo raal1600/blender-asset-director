@@ -3,7 +3,7 @@ import bpy
 from mathutils import Matrix
 from .core import digest, require
 from .blender_ops import curves, flatten
-from .world_placement import INSTANCE, CONTROL, ancestor_control, widgets
+from .world_placement import INSTANCE, CONTROL, ancestor_control, widgets, skin_dependencies, require_owned_skin
 from . import world_transform_contract as contract
 
 
@@ -11,7 +11,7 @@ def close_matrix(actual, expected):
     return all(abs(a - b) <= max(1e-5, abs(b) * 1e-6) for a, b in zip(actual, expected))
 
 
-def observed(scene, identity):
+def observed(scene, identity, dependencies=None):
     """Resolve an identity only in this scene, including ownership postconditions."""
     members = [o for o in scene.objects if o.get(INSTANCE) == identity]
     controls = [o for o in members if o.get(CONTROL) == 1]
@@ -25,6 +25,7 @@ def observed(scene, identity):
             'WORLD_IDENTITY_CHANGED', 'Placement ownership changed')
     helpers = widgets(scene)
     owned = set(members)
+    require_owned_skin(owned, dependencies)
     require(owned == {o for o in scene.objects if o.get('bad_asset') == asset and o.get('bad_job') == job
                       and o not in helpers}, 'WORLD_IDENTITY_CHANGED', 'Asset membership changed')
     require(all(not o.library and not o.override_library and len(o.users_scene) == 1
@@ -45,9 +46,10 @@ def audit():
     require(len(scene.objects) <= 10000, 'RESOURCE_LIMIT', 'Too many objects to inspect placement')
     identities = sorted({o.get(INSTANCE) for o in scene.objects if isinstance(o.get(INSTANCE), str)})
     result = {'version': contract.VERSION, 'instances': [], 'unsupported': []}
+    dependencies = skin_dependencies()
     for identity in identities:
         try:
-            _, record = observed(scene, identity)
+            _, record = observed(scene, identity, dependencies)
             result['instances'].append(record)
         except Exception as exc:
             result['unsupported'].append({'instance': identity, 'reason': str(exc)})
@@ -91,9 +93,10 @@ def apply(options):
     require(bpy.app.background, 'BACKGROUND_REQUIRED', 'World saves run in an isolated worker')
     require(len(scene.objects) <= 10000, 'RESOURCE_LIMIT', 'Too many scene objects')
     pending = []
+    dependencies = skin_dependencies()
     # Do not prepare, move, or repair anything until EVERY requested target passed.
     for change in options['transforms']:
-        control, record = observed(scene, change['instance'])
+        control, record = observed(scene, change['instance'], dependencies)
         require(close_matrix(record['matrix'], change['expected_matrix']),
                 'WORLD_BASE_CHANGED', 'Placement changed since this draft; refresh before saving')
         pending.append((control, record, change['matrix']))
@@ -112,8 +115,9 @@ def apply(options):
 
 
 def verify(report):
+    dependencies = skin_dependencies()
     for change in report['transforms']:
-        control, record = observed(bpy.context.scene, change['instance'])
+        control, record = observed(bpy.context.scene, change['instance'], dependencies)
         require(control.name == change['control'] and close_matrix(record['matrix'], change['after']),
                 'WORLD_RESULT_CHANGED', 'Saved placement did not match the requested transform')
     require(preserved_state({x['control'] for x in report['transforms']}) == report['preserved'],

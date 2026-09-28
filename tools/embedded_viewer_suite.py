@@ -47,6 +47,11 @@ def main():
         subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
                         '--python-exit-code','11','--python',str(ROOT/'tools/world_layers_fixture.py'),'--',str(output/'world-layers')],
                        cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=180,check=True)
+    with (output/'world-skin-ownership.log').open('wb') as log:
+        subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
+                        '--python-exit-code','11','--python',str(ROOT/'tools/world_skin_ownership_fixture.py'),'--',
+                        str(output/'world-layers'),str(output/'world-skin-ownership')],
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=180,check=True)
     with (output/'world-transform.log').open('wb') as log:
         subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
                         '--python-exit-code','11','--python',str(ROOT/'tools/world_transform_fixture.py'),'--',

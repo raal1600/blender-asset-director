@@ -22,6 +22,15 @@ Linked/overridden/shared-scene objects, constraints/drivers, cross-owned hierarc
 missing controls and inconsistent instance bindings are not guessed into support.
 They remain unchanged and appear in the preparation report/manual task panel.
 
+Skin ownership is checked in both directions: a mesh cannot use an armature from
+another import group, and a group's rig cannot drive geometry outside that group.
+This includes saved objects in other scenes. Independent World placement cannot
+preserve such cross-group deformation; it refuses before mutation instead of
+rewiring skin or grouping assets by guesswork. Normal same-group armature modifiers
+remain supported. Ownership inspection is bounded to 10,000 saved objects and
+50,000 modifiers. `world_skin_ownership_fixture.py` retains the generated failure
+and covers preparation, native selection, and atomic batch-save refusal.
+
 Existing imports can be prepared in a dedicated World task working copy, or via
 the explicit in-app compatibility review described below. Opening a project or
 requesting a preview never migrates its checkpoints. Task initialization is not

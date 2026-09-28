@@ -31,7 +31,23 @@ def import_groups(scene, only_job=None, only_group=None):
     return groups, helpers
 
 
-def inspect_group(members, helpers):
+def skin_dependencies():
+    """Include incoming users, even saved objects outside the active scene."""
+    require(len(bpy.data.objects) <= 10000 and sum(len(o.modifiers) for o in bpy.data.objects) <= 50000,
+            'RESOURCE_LIMIT', 'Too many saved objects or modifiers to verify independent skin ownership')
+    return [(obj, modifier.object) for obj in bpy.data.objects for modifier in obj.modifiers
+            if modifier.type == 'ARMATURE' and modifier.object is not None]
+
+
+def require_owned_skin(members, dependencies=None):
+    owned = set(members)
+    dependencies = skin_dependencies() if dependencies is None else dependencies
+    require(all((obj in owned) == (rig in owned) for obj, rig in dependencies),
+            'WORLD_PLACEMENT_UNSUPPORTED',
+            'Skin uses an armature outside this asset, or this armature drives another asset; use Blender for reviewed preparation')
+
+
+def inspect_group(members, helpers, dependencies=None):
     """Shared read-only eligibility check for task copies and reviewed candidates."""
     require(all(not o.library and not o.override_library and len(o.users_scene) == 1 for o in members),
             'WORLD_PLACEMENT_UNSUPPORTED', 'Linked, shared-scene or overridden asset needs manual preparation')
@@ -39,6 +55,7 @@ def inspect_group(members, helpers):
                 and not (o.type == 'ARMATURE' and any(p.constraints for p in o.pose.bones)) for o in members),
             'WORLD_PLACEMENT_UNSUPPORTED', 'Constrained or driven hierarchy needs reviewed preparation')
     owned = set(members)
+    require_owned_skin(owned, dependencies)
     require(all(o.parent is None or o.parent in owned for o in members)
             and all(c in owned or c in helpers for o in members for c in o.children),
             'WORLD_PLACEMENT_UNSUPPORTED', 'Asset shares a hierarchy with unowned objects')
@@ -67,10 +84,11 @@ def prepare(scene, only_job=None, only_group=None):
     # otherwise the first update looks like an illegal placement mutation.
     bpy.context.view_layer.update()
     groups, helpers = import_groups(scene, only_job, only_group)
+    dependencies = skin_dependencies()
     result = {'prepared': [], 'unsupported': []}
     for (asset, job), members in sorted(groups.items()):
         try:
-            control, roots = inspect_group(members, helpers)
+            control, roots = inspect_group(members, helpers, dependencies)
             if control:
                 instance = control[INSTANCE]
             else:
@@ -119,9 +137,12 @@ def select_instances(objects):
     controls = {ancestor_control(o) for o in objects}
     require(controls and None not in controls, 'WORLD_SELECTION_REQUIRED',
             'Choose a prepared asset; use detailed Blender tools for unsupported objects')
+    from .world_transform import observed
+    dependencies = skin_dependencies()
     for control in controls:
         require(control.name in bpy.context.view_layer.objects and not control.hide_get(),
                 'WORLD_SELECTION_REQUIRED', 'Placement control is not visible in this view layer')
+        observed(bpy.context.scene, control.get(INSTANCE), dependencies)
     for obj in list(bpy.context.selected_objects):
         obj.select_set(False)
     for control in controls:
@@ -167,10 +188,12 @@ def install_tools(task, report):
             obj = context.scene.objects.get(self.control)
             if not obj or obj.get(CONTROL) != 1:
                 return {'CANCELLED'}
-            for selected in list(context.selected_objects):
-                selected.select_set(False)
-            select_instances([obj])
-            return {'FINISHED'}
+            try:
+                select_instances([obj])
+                return {'FINISHED'}
+            except Exception as exc:
+                self.report({'ERROR'}, str(exc))
+                return {'CANCELLED'}
 
     class AD_OT_world_transform(bpy.types.Operator):
         bl_idname = 'asset_director.world_transform'

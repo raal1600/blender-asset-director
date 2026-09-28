@@ -30,11 +30,12 @@ def audit():
     require(len(scene.objects) <= 10000, 'RESOURCE_LIMIT', 'Too many objects for World preparation')
     bpy.context.view_layer.update()
     groups, helpers = world_placement.import_groups(scene)
+    dependencies = world_placement.skin_dependencies()
     rows = []
     for (asset, job), members in sorted(groups.items()):
         row = {'asset_id': asset, 'import_job': job, 'members': sorted(o.name for o in members)}
         try:
-            control, roots = world_placement.inspect_group(members, helpers)
+            control, roots = world_placement.inspect_group(members, helpers, dependencies)
             row.update(status='ALREADY_PREPARED' if control else 'PREPARABLE', roots=sorted(o.name for o in roots))
             if control:row['control'] = control.name
         except Exception as exc:
