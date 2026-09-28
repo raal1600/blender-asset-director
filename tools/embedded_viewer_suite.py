@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -17,6 +18,8 @@ def main():
     parser.add_argument('--blender', required=True)
     parser.add_argument('--node', default='node')
     parser.add_argument('--chrome')
+    parser.add_argument('--ffmpeg', help='Existing encoder executable; PATH lookup only when omitted')
+    parser.add_argument('--ffprobe', help='Existing probe executable; PATH lookup only when omitted')
     parser.add_argument('--native-fixture', help='Optional previously generated PASS fixture, never a user scene')
     parser.add_argument('--guided-world', action='store_true', help='Exercise real World import/review UI with scripted synthetic decisions')
     args = parser.parse_args()
@@ -100,6 +103,15 @@ def main():
         if args.chrome: command.append(args.chrome)
         with (output/'lighting-evidence-browser.log').open('wb') as log:
             subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=600, check=True)
+        ffmpeg = args.ffmpeg or shutil.which('ffmpeg')
+        ffprobe = args.ffprobe or shutil.which('ffprobe')
+        if not ffmpeg or not ffprobe:
+            raise RuntimeError('The progressive output check needs existing FFmpeg and FFprobe paths; nothing is installed automatically')
+        command = [args.node, str(ROOT/'tools/output_browser_check.mjs'), str(output/'progressive-output-browser'),
+                   str(output/'scene-layers-native'), sys.executable, args.blender, str(module),
+                   args.chrome or '', str(Path(ffmpeg).resolve()), str(Path(ffprobe).resolve())]
+        with (output/'progressive-output-browser.log').open('wb') as log:
+            subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=900, check=True)
         command = [args.node, str(ROOT/'tools/shot_view_check.mjs'), str(output/'shot-view-browser'),
                    str(output/'shot-view-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)

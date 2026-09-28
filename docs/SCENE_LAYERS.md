@@ -78,8 +78,10 @@ required gates in the layered-workflow enhancement.
 Shots and Light share the large saved-scene viewer, scene picker, activity strip,
 compact shot selector and explicit Save/Ready separation. The former general
 asset shelf and three-column controls are not shown in these layers. History and
-specialist/import tools remain under More. Imported candidates retain explicit
-inspect, keep-working and reject controls; normal native Save/return does not gain
+specialist/import tools remain under More. Light's More menu includes **Find
+materials / HDRIs**, preserving the reviewed library route without restoring a
+permanent asset shelf. Imported candidates retain explicit inspect, keep-working
+and reject controls; normal native Save/return does not gain
 an extra Collect/Keep step.
 
 Shots can create a separate fitted camera from explicitly selected observed

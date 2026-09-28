@@ -300,11 +300,11 @@ def catalog_and_film(s, click, idle, check):
     shot = scene['renders'][-1]
     assert shot['shotId'] == definition['id'] and shot['shotRevision'] == definition['revision']
     assert shot['video']['frames'] == 4 and shot['video']['state'] == 'SUCCEEDED' and not shot['approved']
-    click('[data-action="play-render"][data-id="' + shot['id'] + '"]')
-    wait_for_media(page, '#review-video')
-    page.locator('#review-video').evaluate('(v) => v.play()')
-    wait_for_media(page, '#review-video', started=True)
-    click('#dialog [data-action="close"]')
+    movie_selector = 'video[aria-label="Rendered shot movie"]'
+    expect(page.locator(movie_selector)).to_have_attribute('data-id', shot['id'])
+    wait_for_media(page, movie_selector)
+    page.locator(movie_selector).evaluate('(v) => v.play()')
+    wait_for_media(page, movie_selector, started=True)
     click('[data-action="approve-render"][data-id="' + shot['id'] + '"]')
     click('[data-action="tab"][data-tab="film"]')
     click('[data-action="add-clip"][data-id="' + shot['id'] + '"]')
@@ -326,7 +326,7 @@ def catalog_and_film(s, click, idle, check):
     with s.evidence.checkpoint('workbench_shot_roundtrip') as shot_check:
         # Revise timing without changing scene bytes: the old render must become
         # historical. Old green scene hashes cannot validate a changed shot.
-        click('[data-action="edit-source"][data-id="' + scene['id'] + '"]')
+        click('.film-strip [data-action="edit-source"][data-id="' + scene['id'] + '"]')
         click('[data-action="stage"][data-stage="shots"]')
         click('[data-action="edit-shot"][data-id="' + definition['id'] + '"]')
         page.locator('#shot-end').fill('3')
