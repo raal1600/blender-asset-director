@@ -9,8 +9,27 @@ import {createApp} from '../server.mjs';
 import {fileHash} from '../lib/storage.mjs';
 import {packageGLTF,validateGLB} from '../lib/viewer-gltf.mjs';
 import {animationEntries,previewFailure} from '../public/viewer-3d.mjs';
-import {MAX_PREVIEW_STORAGE_BYTES,assertPreviewStorageBudget,previewProfile} from '../lib/embedded-preview.mjs';
+import {MAX_PREVIEW_STORAGE_BYTES,assertPreviewStorageBudget,previewProfile,validateActionPlayback} from '../lib/embedded-preview.mjs';
 import {MAX_VIEWER_BYTES} from '../lib/viewer-gltf.mjs';
+
+test('Action permits zero clips only for explicitly verified static scenes',()=>{
+  assert.throws(()=>animationEntries([],'action-playback-v1'),/combined/);
+  assert.deepEqual(animationEntries([],'action-playback-v1',true),[]);
+  assert.throws(()=>animationEntries([{duration:0,tracks:[{}]}],'action-playback-v1',true),/combined/);
+});
+
+test('Action receipt binds actual timebase and cannot label missing animation as static without evidence',()=>{
+  const playback={version:'scene-playback-v1',scope:'SAVED_SCENE',start:11,end:19,fps:24,duration:8/24};
+  assert.doesNotThrow(()=>validateActionPlayback(playback,{animations:['Scene']}));
+  const still={...playback,static:true,clip:null,static_evidence:'NO_EVALUATED_MOTION_SOURCES'};
+  assert.doesNotThrow(()=>validateActionPlayback(still,{animations:[]}));
+  for(const patch of [{duration:0},{duration:NaN},{fps:0},{end:4000},{start:1.5},{scope:'ASSET'}])
+    assert.throws(()=>validateActionPlayback({...still,...patch},{animations:[]}),/timebase/);
+  for(const patch of [{static_evidence:null},{static:false},{clip:'missing take'}])
+    assert.throws(()=>validateActionPlayback({...still,...patch},{animations:[]}),/verified static/);
+  assert.throws(()=>validateActionPlayback(still,{animations:['Scene']}),/verified static/);
+  assert.throws(()=>validateActionPlayback(playback,{animations:[]}),/verified static/);
+});
 
 test('preview storage permits more than 2 GiB but reserves copies and output below 100 GiB',()=>{
   const gib=1024**3,sourceBytes=160*1024**2;

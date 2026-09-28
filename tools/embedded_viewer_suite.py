@@ -48,6 +48,11 @@ def main():
         subprocess.run([args.node,str(ROOT/'tools/action_layer_check.mjs'),str(output/'action-http'),
                         str(output/'action-layer'),sys.executable,args.blender],
                        cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
+    with (output/'action-static.log').open('wb') as log:
+        subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
+                        '--python-exit-code','11','--python',str(ROOT/'tools/action_static_preview_fixture.py'),'--',
+                        str(output/'action-layer/source.blend'),str(output/'action-static')],
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=180,check=True)
     with (output/'action-task.log').open('wb') as log:
         subprocess.run([args.node,str(ROOT/'tools/action_task_check.mjs'),str(output/'action-task'),
                         str(output/'action-layer'),sys.executable,args.blender],
@@ -81,6 +86,11 @@ def main():
                    str(output/'action-layer'), str(output/'action-preview'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
         with (output/'action-browser.log').open('wb') as log:
+            subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300, check=True)
+        command = [args.node, str(ROOT/'tools/action_static_browser_check.mjs'), str(output/'action-static-browser'),
+                   str(output/'action-static'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        with (output/'action-static-browser.log').open('wb') as log:
             subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300, check=True)
     generated = Path(args.native_fixture).resolve() if args.native_fixture else output / 'native'
     if not args.native_fixture:

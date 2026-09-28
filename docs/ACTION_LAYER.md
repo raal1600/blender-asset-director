@@ -24,6 +24,20 @@ skin, native keys, original helper visibility and source files remain intact.
 Returning to World produces its separate frozen-frame profile without removing
 motion from the scene. Materials and viewer lighting remain approximations.
 
+A genuinely unanimated scene may export no clip. This is accepted only after a
+conservative native check finds no active actions/NLA, drivers, constraints or
+unverified procedural modifiers affecting the static fallback. The derivative
+records static evidence and the actual scene timebase; the server verifies both.
+The viewer labels **Static scene**, disables play/scrub and still permits orbit,
+inspection and an explicit user completion decision. A missing clip from an
+animated source remains a failure, not a reason to call the scene static.
+Held performers can also retain one constant, sampled scene clip without losing
+their muted native takes. A static option never certifies motion quality.
+
+The secondary **Find motion in library** route is under **More**. The existing
+activity-filtered catalog remains available without adding a permanent asset
+shelf to the performer-first Action canvas.
+
 Manual handoff uses the selected saved performer and current playback frame,
 bound to the exact checkpoint and successful native inspection. The separate
 Action task rechecks the native fingerprint before setup. Ordinary performance
@@ -95,6 +109,8 @@ node tools/action_layer_check.mjs <new-http-output> <action-output> <python> <bl
 blender --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/action_preview_fixture.py -- <action-output>/source.blend <new-preview-output>
 node tools/action_browser_check.mjs <new-browser-output> <action-output> <preview-output> <python> <blender> <installed-playwright-module> [installed-chrome]
 node tools/action_task_check.mjs <new-task-output> <action-output> <python> <blender>
+blender --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/action_static_preview_fixture.py -- <action-output>/source.blend <new-static-output>
+node tools/action_static_browser_check.mjs <new-browser-output> <static-output> <python> <blender> <installed-playwright-module> [installed-chrome]
 ```
 
 The existing embedded-viewer CI journey runs these fixtures without changing its
@@ -108,6 +124,9 @@ Browser tests compare both generated skins and a moving prop against evaluated
 Blender samples, then exercise timing/hold, Undo, Save, Discard and return to World.
 Legacy preview-only tests precompute performer inspection before their unchanged-
 manifest baseline; they still forbid scene mutations and approvals.
+Static tests cover held performers, never-animated geometry and a single-frame
+scene, comparing actual app GLB geometry with Blender's evaluated samples. They
+also refuse an omitted animated clip and procedural motion in the static fallback.
 
 Generated Action task tests cover real selection/frame, deliberate rig show/hide,
 preserved motion/render flags, exact-context refusals and explicit Save/no-save/

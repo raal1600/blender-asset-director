@@ -3,9 +3,9 @@ export function viewerPlaceholder() {
   return '<section class="viewer-3d" data-viewer-host aria-label="Interactive 3D preview"><div class="viewer-message"><strong>Explore in 3D</strong><p>Orbit, zoom and pan the actual saved geometry. World focuses on arrangement; Action exposes motion.</p><p class="muted">Read-only inspection, not a final render or a live link to Blender.</p></div></section>';
 }
 
-export function animationEntries(animations,profile='inspection-v1') {
+export function animationEntries(animations,profile='inspection-v1',staticScene=false) {
   if(profile==='world-static-v1')return [];
-  if(profile==='action-playback-v1'&&animations.length!==1)throw Error('Expected one combined saved-scene animation.');
+  if(profile==='action-playback-v1'&&animations.length!==(staticScene?0:1))throw Error('Expected one combined saved-scene animation or verified static scene.');
   return animations.filter(a=>a.tracks.length).map(clip=>{
     if(!Number.isFinite(clip.duration)||clip.duration<0)throw Error('Invalid animation duration.');
     return {clip,staticPose:clip.duration===0};
@@ -80,7 +80,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit})
       listen(node('reset'),'click',reset);listen(canvas,'keydown',e=>{if(e.key.toLowerCase()==='f'){e.preventDefault();reset();}});
       listen(node('grid'),'click',()=>{grid.visible=!grid.visible;node('grid').setAttribute('aria-pressed',String(grid.visible));dirty=true;});
       listen(node('wire'),'click',()=>{const on=node('wire').getAttribute('aria-pressed')!=='true';node('wire').setAttribute('aria-pressed',String(on));model.traverse(o=>{for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[])if('wireframe' in m)m.wireframe=on;});dirty=true;});
-      const entries=animationEntries(gltf.animations,record.profile),takes=entries.map(e=>e.clip);
+      const entries=animationEntries(gltf.animations,record.profile,record.playback?.static===true),takes=entries.map(e=>e.clip);
       playback=record.playback;
       mixer=new THREE.AnimationMixer(model);
       for(const [i,clip] of takes.entries()){const option=document.createElement('option');option.value=String(i);option.textContent=(clip.name||'Take '+(i+1))+' · '+(clip.duration===0?'Static pose':clip.duration.toFixed(2)+' s');node('take').append(option);}
@@ -88,9 +88,10 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit})
       const select=()=>{mixer.stopAllAction();playing=false;node('play').textContent='Play';const clip=takes[Number(node('take').value)],staticPose=clip.duration===0;action=mixer.clipAction(clip);action.reset().setLoop(staticPose?THREE.LoopOnce:THREE.LoopRepeat,Infinity);action.clampWhenFinished=staticPose;action.play();mixer.update(0);node('time').max=String(clip.duration);node('play').disabled=staticPose;node('time').disabled=staticPose;clock();reset();dirty=true;};
       if(takes.length)select();else{host.querySelector('.viewer-animation').hidden=true;}
       if(record.profile==='action-playback-v1'){
+        if(playback.static===true){host.querySelector('.viewer-animation').hidden=false;node('play').disabled=true;node('time').disabled=true;clock();}
         node('take').closest('label').hidden=true;
-        const label=document.createElement('strong');label.className='scene-playback-label';label.textContent='Whole scene · '+playback.fps+' fps';host.querySelector('.viewer-animation').prepend(label);
-        host.querySelector('.viewer-disclaimer:not(.viewer-texture-note)').textContent='Combined saved performance · frames '+playback.start+'–'+playback.end+'. No rig editing or motion-quality approval. Materials and lighting remain inspection approximations.';
+        const label=document.createElement('strong');label.className='scene-playback-label';label.textContent=(playback.static?'Static scene':'Whole scene')+' · '+playback.fps+' fps';host.querySelector('.viewer-animation').prepend(label);
+        host.querySelector('.viewer-disclaimer:not(.viewer-texture-note)').textContent=(playback.static?'Static saved scene':'Combined saved performance')+' · frames '+playback.start+'–'+playback.end+'. No rig editing or motion-quality approval. Materials and lighting remain inspection approximations.';
       }
       if(record.profile==='world-static-v1')host.querySelector('.viewer-disclaimer:not(.viewer-texture-note)').textContent='Static World preview'+(Number.isInteger(record.referenceFrame)?' at frame '+record.referenceFrame:'')+'. Animation and rig editing belong in Action. Original materials and motion are preserved.';
       listen(node('take'),'change',select);
@@ -99,7 +100,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit})
       listen(document,'visibilitychange',()=>{last=performance.now();});
       listen(canvas,'webglcontextlost',e=>{e.preventDefault();playing=false;cancelAnimationFrame(frame);host.dataset.viewerState='failed';status().textContent='The 3D graphics context was lost. Close and reopen this preview, or inspect in Blender.';});
       const poseCount=entries.filter(e=>e.staticPose).length,playable=takes.length-poseCount;
-      const motionStatus=record.profile==='world-static-v1'?'static World':record.profile==='action-playback-v1'?'combined saved scene':`${playable} playable take${playable===1?'':'s'}${poseCount?' · '+poseCount+' static pose'+(poseCount===1?'':'s'):''}`;
+      const motionStatus=record.profile==='world-static-v1'?'static World':record.profile==='action-playback-v1'?(playback.static?'static saved scene':'combined saved scene'):`${playable} playable take${playable===1?'':'s'}${poseCount?' · '+poseCount+' static pose'+(poseCount===1?'':'s'):''}`;
       status().textContent=`${record.observed.vertices.toLocaleString()} vertices · ${motionStatus} · source ${record.version.slice(0,12)} · ${record.cached?'verified cached copy':'verified preview copy'}`;
       if(worldEdit&&record.kind==='checkpoint'&&record.profile==='world-static-v1'&&record.placement?.instances.length){
         const {attachWorldEditor}=await import('./world-editor.mjs');if(disposed)return;

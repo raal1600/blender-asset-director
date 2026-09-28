@@ -10,6 +10,16 @@ import {bindWorldPreview} from './world-preview-bindings.mjs';
 
 export const MAX_PREVIEW_STORAGE_BYTES=100*1024**3;
 export const previewProfile = (stage,kind='checkpoint') => stage==='world'?'world-static-v1':stage==='action'&&kind==='checkpoint'?'action-playback-v1':'inspection-v1';
+export function validateActionPlayback(playback,observed){
+  assert(playback?.version==='scene-playback-v1'&&playback.scope==='SAVED_SCENE'&&
+    Number.isInteger(playback.start)&&Number.isInteger(playback.end)&&playback.end>=playback.start&&playback.end-playback.start<=3600&&
+    Number.isFinite(playback.fps)&&playback.fps>0&&Number.isFinite(playback.duration)&&playback.duration>=0&&
+    Math.abs(playback.duration-(playback.end-playback.start)/playback.fps)<1e-4,
+    'Action preview differs from its saved-scene timebase.');
+  assert(observed.animations.length===(playback.static===true?0:1)&&
+    (playback.static!==true||playback.clip===null&&playback.static_evidence==='NO_EVALUATED_MOTION_SOURCES'),
+    'Action preview needs one combined animation or verified static scene evidence.');
+}
 export function assertPreviewStorageBudget(disk,sourceBytes) {
   assert(disk+sourceBytes*2+MAX_VIEWER_BYTES<MAX_PREVIEW_STORAGE_BYTES,'Private 3D preview storage would exceed 100 GiB. Review ViewerPreviews before preparing more; nothing was deleted.');
 }
@@ -79,7 +89,7 @@ export class EmbeddedPreviews {
         texturePreview={reducedImages:textures.reduced_images,sourcePixels:textures.source_pixels,previewPixels:textures.preview_pixels,originalsChanged:false};
       }
       const observed=validateGLB(model);await verifiedPackage(source);
-      if(profile==='action-playback-v1')assert(observed.animations.length===1,'Action preview must contain one combined scene animation.');
+      if(profile==='action-playback-v1')validateActionPlayback(playback,observed);
       const filename=path.join(directory,'model.glb');await fs.writeFile(filename,model,{flag:'wx'});
       const record={previewId,projectId:id,sceneId,sourceId:source.id,version:source.version,title:source.title,kind:source.source_kind,
         ...await fileHash(filename),profile,referenceFrame,placement,playback,adapter,implementation,nativeJob,nativeImplementation,texturePreview,observed,cached:false,inspectionOnly:true,selectionChanged:false,approved:false};
