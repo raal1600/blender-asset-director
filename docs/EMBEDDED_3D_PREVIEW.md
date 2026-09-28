@@ -72,6 +72,20 @@ This cancels obsolete requests, not already-started Blender processes. No proces
 is killed, source changed, checkpoint created or approval inferred by navigation.
 
 The implementation still refuses a source above 512 MiB / 4096 files,
+with one compatible optimization for saved checkpoints: new native audits may
+record `preview-dependencies-v1`, bound to the exact saved file SHA-256. For clean
+snapshots with simple absolute file references, the copy includes that checkpoint
+and only its observed, already-pinned dependencies. Both the Blender path inventory
+and supported data-block references must agree. This does not import a missing
+dependency, grant rights, or skip production-wide pinned-source verification.
+
+Older audits, wrong-byte observations, relative paths, linked libraries,
+time-varying resources and unknown path types retain conservative all-pinned
+copying. Existing projects are not rewritten to obtain the optimization. Actual
+native conversion still rejects unrecorded references and verifies copied bytes.
+The source-copy limit is unchanged; it applies after the safe selection.
+
+Other limits remain:
 128 MiB GLB, 10000 nodes, 2 million displayed vertices,
 128 textures, 8192-pixel texture dimensions or 64 million decoded texture pixels.
 Conversion supports up to 3600 frames per take / saved scene and 20000 total take
@@ -189,6 +203,13 @@ finishes safely, and returning reuses its exact result without another conversio
 Its deterministic queue gate holds the response of a real completed first native
 job; it does not simulate native success or claim a native process was interrupted.
 Original/checkpoint/manifest preservation and absent active-view leaks are checked.
+
+`preview_dependencies_fixture.py` observes real saved texture, packed-image,
+relative-path, sequence, modifier-cache and linked-library cases.
+`preview_dependencies_check.mjs` verifies the authenticated native conversion and
+browser canvas copy only the needed recorded inputs and reuse the same result.
+Semantic camera/light fingerprints exclude this copy-only metadata; the native
+Save/reopen and existing source/checkpoint byte checks remain independent gates.
 
 Synthetic/local test success is not exact-commit CI success, desktop WebView
 acceptance, a runtime update or production/creative acceptance. Installation

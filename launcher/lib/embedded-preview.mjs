@@ -9,6 +9,7 @@ import {MAX_VIEWER_BYTES,packageGLTF,validateGLB,verifiedPackage} from './viewer
 import {bindWorldPreview} from './world-preview-bindings.mjs';
 import {selectedShotPreview,shotProfiles,validateShotCamera} from './shot-preview.mjs';
 import {PreviewCache} from './preview-cache.mjs';
+import {checkpointFiles} from './checkpoint-dependencies.mjs';
 
 export const MAX_PREVIEW_STORAGE_BYTES=100*1024**3;
 export const MAX_PREVIEW_METADATA_BYTES=32*1024**2;
@@ -40,7 +41,7 @@ async function checkpointSource(work,id,sceneId,revision,request) {
     const base=await safe(work.store.database,version.relative),folder=(await fs.stat(base)).isDirectory()?base:path.dirname(base);
     for(const f of version.files)records.push({...f,filename:await safe(folder,f.path)});
   }
-  const unique=[...new Map(records.map(f=>[f.filename.toLowerCase(),f])).values()];
+  const unique=checkpointFiles(cp,records);
   assert(unique.length<=4096&&unique.reduce((n,f)=>n+f.size,0)<=512*1024*1024,'Checkpoint and pinned dependencies exceed the 512 MiB interactive-copy limit; inspect in Blender.');
   let root=path.dirname(records[0].filename);
   while(!unique.every(f=>inside(root,f.filename))){const parent=path.dirname(root);assert(parent!==root,'Cross-drive checkpoint dependencies need Blender inspection.');root=parent;}
@@ -50,7 +51,7 @@ async function checkpointSource(work,id,sceneId,revision,request) {
 }
 
 export class EmbeddedPreviews {
-  constructor(work){this.work=work;this.owned=new Map();this.queue=Promise.resolve();this.identity=Promise.all(['./embedded-preview.mjs','./preview-cache.mjs','./viewer-gltf.mjs','./asset-preview.mjs','./world-preview-bindings.mjs','./shot-preview.mjs','../public/world-draft.mjs','../public/world-editor.mjs','../public/viewer-3d.mjs','../public/shot-view.mjs','../public/vendor/three/VENDOR.json'].map(async name=>({name,...await fileHash(fileURLToPath(new URL(name,import.meta.url)))}))).then(digest);}
+  constructor(work){this.work=work;this.owned=new Map();this.queue=Promise.resolve();this.identity=Promise.all(['./embedded-preview.mjs','./preview-cache.mjs','./checkpoint-dependencies.mjs','./viewer-gltf.mjs','./asset-preview.mjs','./world-preview-bindings.mjs','./shot-preview.mjs','../public/world-draft.mjs','../public/world-editor.mjs','../public/viewer-3d.mjs','../public/shot-view.mjs','../public/vendor/three/VENDOR.json'].map(async name=>({name,...await fileHash(fileURLToPath(new URL(name,import.meta.url)))}))).then(digest);}
   remember(item){
     const weight=Buffer.byteLength(JSON.stringify({record:item.record,source:item.source}));
     assert(weight<=MAX_PREVIEW_METADATA_BYTES,'Preview metadata exceeds the active-memory bound.',409);

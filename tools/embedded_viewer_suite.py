@@ -118,6 +118,15 @@ def main():
         # Reuse Playwright's installed Node driver package; no npm/CDN download.
         import playwright
         module = Path(playwright.__file__).parent / 'driver/package/index.mjs'
+        with (output/'preview-dependencies-native.log').open('wb') as log:
+            subprocess.run([args.blender, '--background', '--factory-startup', '--disable-autoexec', '--threads', '2',
+                            '--python-exit-code', '11', '--python', str(ROOT/'tools/preview_dependencies_fixture.py'),
+                            '--', str(output/'preview-dependencies-native')],
+                           cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=180, check=True)
+        command = [args.node, str(ROOT/'tools/preview_dependencies_check.mjs'), str(output/'preview-dependencies-browser'),
+                   str(output/'preview-dependencies-native'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        reported_browser(command, output, 'preview-dependencies-browser', 300)
         command = [args.node, str(ROOT/'tools/scene_layer_browser_check.mjs'), str(output/'scene-layers-browser'),
                    str(output/'scene-layers-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)

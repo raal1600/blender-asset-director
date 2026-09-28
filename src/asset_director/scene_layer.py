@@ -1,6 +1,6 @@
 """Blender-only Shots/Light transactions. No new arbitrary-code executor."""
 import bpy
-from .core import digest, require
+from .core import require
 from . import scene_layer_contract as contract, scene_ops, action_layer
 
 
@@ -41,7 +41,7 @@ def audit(layer):
     state = {'version': contract.VERSION, 'layer': layer, 'scene': scene_ops.scene_audit(),
              'cameras': cameras, 'look': look, 'preserved': action_layer.preserved(set()),
              'visual_acceptance': 'NOT_EVALUATED'}
-    state['sha256'] = digest(state)
+    state['sha256'] = contract.fingerprint(state)
     return state
 
 

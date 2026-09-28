@@ -1,12 +1,19 @@
 """Portable, bounded Shots/Light transactions over existing native operations."""
 import re
-from .core import fields, require
+from .core import digest, fields, require
 from . import camera_plan, look_contract
 
 VERSION = 'scene-layer-v1'
 FIELDS = {'version', 'layer', 'audit_sha256', 'operations'}
 ALLOWED = {'shots': {'camera-fit', 'camera-plan'},
            'light': {'light-adjust', 'world-adjust', 'look-adjust', 'light-rig'}}
+
+
+def fingerprint(state):
+    # A saved-file copy inventory changes when bytes are saved, not scene meaning.
+    # Checkpoint/file identities are enforced separately by the job and launcher.
+    scene = {k: v for k, v in state['scene'].items() if k != 'preview_dependencies'}
+    return digest(state | {'scene': scene})
 
 
 def name(value, limit=255):

@@ -7,6 +7,19 @@ from asset_director.core import DirectorError, Library
 
 
 class SceneLayerContracts(unittest.TestCase):
+    def test_copy_inventory_does_not_change_semantic_layer_fingerprint(self):
+        state = {'scene': {'camera': 'Wide', 'preview_dependencies': {'mode': 'ALL_PINNED'}},
+                 'cameras': [{'lens': 50}], 'look': {'energy': 100}, 'preserved': 'original'}
+        expected = contract.fingerprint(state)
+        changed = copy.deepcopy(state)
+        changed['scene']['preview_dependencies'] = {'mode': 'EXACT_ABSOLUTE_FILES', 'source_sha256': 'a'*64, 'paths': []}
+        self.assertEqual(contract.fingerprint(changed), expected)
+        del changed['scene']['preview_dependencies']
+        self.assertEqual(contract.fingerprint(changed), expected)
+        for key, value in [('cameras', [{'lens': 35}]), ('look', {'energy': 150}), ('preserved', 'changed'),
+                           ('scene', {'camera': 'Close'})]:
+            self.assertNotEqual(contract.fingerprint(changed | {key: value}), expected)
+
     def request(self):
         return {'version': contract.VERSION, 'layer': 'shots', 'audit_sha256': 'a'*64,
                 'operations': [{'operation': 'camera-fit', 'name': 'Wide', 'options':

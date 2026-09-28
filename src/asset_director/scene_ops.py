@@ -88,6 +88,8 @@ def bounding_box(points):
 
 
 def scene_audit():
+    from .preview_dependencies import inventory
+    preview_dependencies = inventory()
     scene=bpy.context.scene
     require(len(scene.objects)<=10000,'RESOURCE_LIMIT','Scene exceeds bounded audit size')
     objects=[]
@@ -135,7 +137,8 @@ def scene_audit():
                                    'colorspace':node.image.colorspace_settings.name})
         materials.append({'name':mat.name,'uses_nodes':mat.use_nodes,'images':images,
                           'node_types':sorted(n.bl_idname for n in mat.node_tree.nodes) if mat.use_nodes else []})
-    return {'objects':objects,'materials':materials,'fps':scene.render.fps/scene.render.fps_base,
+    return {'objects':objects,'materials':materials,'preview_dependencies':preview_dependencies,
+            'fps':scene.render.fps/scene.render.fps_base,
             'frame_range':[scene.frame_start,scene.frame_end], 'frame_current':scene.frame_current,
             'resolution':[scene.render.resolution_x,scene.render.resolution_y],
             'pixel_aspect':[scene.render.pixel_aspect_x,scene.render.pixel_aspect_y],
