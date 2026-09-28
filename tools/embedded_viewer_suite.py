@@ -134,6 +134,10 @@ def main():
                    str(output/'world-layers'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
         reported_browser(command, output, 'preview-cache-browser', 300)
+        command = [args.node, str(ROOT/'tools/preview_cleanup_check.mjs'), str(output/'preview-cleanup-browser'),
+                   str(output/'world-layers'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        reported_browser(command, output, 'preview-cleanup-browser', 300)
         command = [args.node, str(ROOT/'tools/lighting_evidence_check.mjs'), str(output/'lighting-evidence-browser'),
                    str(output/'scene-layers-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
@@ -161,8 +165,7 @@ def main():
         command = [args.node, str(ROOT/'tools/action_browser_check.mjs'), str(output/'action-browser'),
                    str(output/'action-layer'), str(output/'action-preview'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
-        with (output/'action-browser.log').open('wb') as log:
-            subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300, check=True)
+        reported_browser(command, output, 'action-browser', 300)
         command = [args.node, str(ROOT/'tools/action_static_browser_check.mjs'), str(output/'action-static-browser'),
                    str(output/'action-static'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)

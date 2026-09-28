@@ -1,4 +1,5 @@
 import {diagnosticsView,trashView,productionRow,archiveTarget,archiveConfirmation} from './workbench-studio.mjs';
+import {previewStorageView,storageConfirmation} from './workbench-preview-storage.mjs';
 import {worldView,addWorldAsset} from './workbench-world.mjs';
 import {preparationInspection,preparationDialog as worldPreparationDialog,preparationSelection} from './workbench-world-prepare.mjs';
 import {worldAddQueue,addCatalogFlow} from './world-add-flow.mjs';
@@ -137,14 +138,16 @@ function syncLayerDraftUI(){
 }
 let addPrompt=null;
 const worldPanels=new Map();
+let previewStoragePlan=null;
 function clearAssetViewer(){assetViewer?.dispose();assetViewer=null;}
 function clearSceneViewer(){sceneViewer?.dispose();sceneViewer=null;sceneViewerKey=null;}
 const sceneViewKey=()=>cp()?projectId+':'+sceneId+':'+s().stage+':'+cp().id+':'+cp().sha256+':'+JSON.stringify(shotFor(s())):null;
 function showSceneViewer(host){clearSceneViewer();sceneViewer=startViewer(host,{kind:'checkpoint',id:cp().id});sceneViewerKey=sceneViewKey();}
-function startViewer(host,request){const context={projectId,sceneId,revision:p().revision};return openViewer({host,
+function startViewer(host,request){const context={projectId,sceneId,revision:p().revision},viewerId='viewer_'+crypto.randomUUID();return openViewer({host,
  worldEdit:request.kind==='checkpoint'&&s().stage==='world'?{labels:Object.fromEntries((p().workbench.catalogPins||[]).map(a=>[a.id,a.title])),changed:()=>syncWorldDraftUI()}:undefined,
  inspectInBlender:request.kind==='checkpoint'?undefined:()=>perform(async()=>{if(projectId!==context.projectId||sceneId!==context.sceneId||$(request.kind==='catalog'?'catalog-file':'source-file')?.value!==request.file)throw Error('Preview context changed; reopen the asset first.');await dispatch('asset-preview-open',request);}),
- prepare:()=>api('workbench/viewer-prepare',{...context,request}),
+ prepare:()=>api('workbench/viewer-prepare',{...context,request,viewerId}),
+ release:()=>fetch('/api/workbench/viewer-release',{method:'POST',headers:requestHeaders(),body:JSON.stringify({...context,viewerId}),keepalive:true}),
  fetchModel:async(record,signal)=>{const r=await fetch('/api/workbench/viewer-model?'+new URLSearchParams({projectId:context.projectId,sceneId:context.sceneId,previewId:record.previewId}),{headers:requestHeaders(),signal});if(!r.ok)throw Error((await r.json()).error);return r.arrayBuffer();}});}
 const requestHeaders=()=>({'Authorization':`Bearer ${token}`,'Content-Type':'application/json'});
 async function api(route,data){const r=await fetch('/api/'+route,{method:data===undefined?'GET':'POST',headers:requestHeaders(),...(data===undefined?{}:{body:JSON.stringify(data)})});const v=await r.json();if(!r.ok)throw Object.assign(new Error(v.error||'Request failed.'),{status:r.status});return v;}
@@ -493,7 +496,17 @@ if(a==='scan'){if(!confirm('Rescan the original database packages? This updates 
  if(a==='history'){modal('Scene checkpoints',s().checkpoints.map(c=>`<div class="checkpoint-row"><div><h3>${esc(c.path)}</h3><p>${esc(activityName(c.stage))} · ${c.id===s().current?'Current':c.id===s().candidate?'Candidate':'Historical'}</p><small>${esc(c.sha256)}</small></div></div>`).join('')||'<p>No saved checkpoints yet.</p>');return;}
  if(a==='source-review'){const use=state.sourceUse;modal('Review production source use',`<pre>${esc(use.message)}</pre><p>${esc(use.notice)}</p><p>Confirm only when you have rights to use and adapt all sources below for this production. This excludes future files, raw redistribution and model training. Folder names alone do not establish origin or rights.</p>${use.scope.sources.map(a=>`<div class="section"><h3>${esc(a.relative)}</h3><pre>${esc(a.version)}</pre></div>`).join('')}<p>Cancel or uncertainty leaves rendering blocked. The application does not supply a default answer.</p>`,b('I confirm this exact project use','source-confirm',{},'primary'));return;}
  if(a==='source-confirm'){await next('attest-sources',{confirmed:true});close();await load();return;}
- if(a==='settings'){modal('Local studio',`<p>This is the Asset Director workbench. No Vercel server, private asset upload, remote-control port or model service is required.</p><p>Executable paths remain in <code>SystemRuntime/UserData/Launcher/config.json</code>. Add absolute <code>ffmpeg</code> and <code>ffprobe</code> paths for silent movie encoding. Runtime updates use verified staging and reversible replacement; project data stays separate.</p>${p()?'<label>Production intent<textarea id="production-intent" rows="3" maxlength="10000">'+esc(p().brief)+'</textarea></label>':''}${p()?b('Production diagnostics','diagnostics',{},'',state.locked)+b('Archive production','archive-production',{},'ghost',state.locked):''}<details><summary>Capability response</summary><pre>${esc(JSON.stringify(cap,null,2))}</pre></details>`,p()?b('Save intent','save-intent',{},'',state.locked):'');return;}
+ if(a==='preview-storage'){
+  previewStoragePlan=null;modal('Preview storage','<p role="status">Checking disposable copies and their originals. Nothing is being removed…</p>');
+  const plan=await api('viewer-cache/plan',{});previewStoragePlan=plan;const view=previewStorageView(plan,esc,b);modal('Preview storage',view.body,view.buttons,'Keep everything');return;
+ }
+ if(a==='preview-storage-apply'){
+  if(!previewStoragePlan)throw Error('Review preview storage first.');
+  if(!confirm(storageConfirmation(previewStoragePlan)))return;
+  const result=await api('viewer-cache/apply',{id:previewStoragePlan.id,digest:previewStoragePlan.digest,confirmed:true,closedNativePreviews:true});previewStoragePlan=null;
+  modal('Preview storage',`<p role="status">${esc(result.message)}</p>${result.error?'<p class="warn">'+esc(result.error)+'</p>':''}<p>Removal journal: <code>${esc(result.journal)}</code> inside ViewerPreviews.</p>`,'','Done');return;
+ }
+ if(a==='settings'){modal('Local studio',`<p>This is the Asset Director workbench. No Vercel server, private asset upload, remote-control port or model service is required.</p><p>Executable paths remain in <code>SystemRuntime/UserData/Launcher/config.json</code>. Add absolute <code>ffmpeg</code> and <code>ffprobe</code> paths for silent movie encoding. Runtime updates use verified staging and reversible replacement; project data stays separate.</p>${p()?'<label>Production intent<textarea id="production-intent" rows="3" maxlength="10000">'+esc(p().brief)+'</textarea></label>':''}${b('Preview storage','preview-storage',{},'ghost')}${p()?b('Production diagnostics','diagnostics',{},'',state.locked)+b('Archive production','archive-production',{},'ghost',state.locked):''}<details><summary>Capability response</summary><pre>${esc(JSON.stringify(cap,null,2))}</pre></details>`,p()?b('Save intent','save-intent',{},'',state.locked):'');return;}
  if(a==='save-intent'){await api('projects/update',{projectId,revision:p().revision,brief:$('production-intent').value});close();await load();return;}
  if(a==='recover'){const run=state.runs.find(r=>r.id===d.run);modal('Task evidence and recovery',`<pre>${esc(JSON.stringify(run||{id:d.run,message:'Refresh or inspect the Runs folder for this record.'},null,2))}</pre><p>Do not resolve a task while Blender or the native worker is still using it. Recovery records your confirmation and retains every file; it does not kill a process or repair native job evidence.</p>`,`${run?.jobId&&['FAILED','INTERRUPTED'].includes(run.state)?b('Reset failed native job for retry','retry',{job:run.jobId}):''}${b('I stopped it · resolve task','resolve',{run:d.run,scene:run?.sceneId||''},'',run?.state==='SUCCEEDED')}`);return;}
  if(a==='retry'){if(!confirm('Archive the failed native attempt using job-retry? Starting it again is a separate action.'))return;await next('retry',{jobId:d.job,confirmed:true});close();await load();return;}

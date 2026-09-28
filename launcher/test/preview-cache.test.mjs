@@ -7,6 +7,8 @@ import path from 'node:path';
 import {EmbeddedPreviews,MAX_PREVIEW_METADATA_BYTES} from '../lib/embedded-preview.mjs';
 import {fileHash,json,writeJson} from '../lib/storage.mjs';
 import {PreviewCache} from '../lib/preview-cache.mjs';
+import {PreviewCleanup} from '../lib/preview-cleanup.mjs';
+import {previewStorageView,storageConfirmation} from '../public/workbench-preview-storage.mjs';
 async function fixture(t){
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'ad-preview-cache-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
  const library=path.join(root,'Sources');await fs.mkdir(library);
@@ -80,4 +82,55 @@ test('synthetic native receipt contract rejects failed status, changed converter
   await writeJson(path.join(directory,`library/jobs/${jobId}/job.json`),changed);await cache.publish(key,source,record);
   await assert.rejects(cache.load(key,expected),/Native (preview evidence|model evidence)/);
  }
+});
+test('shared view lifetimes protect active copies; explicit cleanup retains evidence and supports rebuilding',async t=>{
+ const f=await fixture(t),one='viewer_00000000-0000-4000-8000-000000000001',two=one.replace(/1$/,'2');
+ const prepare=id=>f.viewers.prepare('project','scene',1,f.request(1),id);
+ const record=await prepare(one);assert.equal((await prepare(two)).previewId,record.previewId);
+ const cleanup=new PreviewCleanup(f.viewers),directory=path.join(f.base,record.previewId),source=path.join(f.work.config.library,'model.gltf'),sourceBefore=await fileHash(source);
+ assert.equal((await cleanup.plan()).eligible.length,0);f.viewers.release('project','scene',one);assert.equal((await cleanup.plan()).eligible.length,0);
+ assert.throws(()=>f.viewers.release('project','wrong',two),/another scene/);f.viewers.release('project','scene',two);
+ assert.equal(f.viewers.release('project','scene',two).released,false);
+ const plan=await cleanup.plan();assert.equal(plan.eligible.length,1);assert.deepEqual(plan.eligible[0].files,['model.glb']);
+ const preserved=await Promise.all(['request.json','viewer.json'].map(n=>fileHash(path.join(directory,n))));
+ await assert.rejects(cleanup.apply({...plan,confirmed:false,closedNativePreviews:true}),/explicitly confirm/);
+ await assert.rejects(cleanup.apply({...plan,confirmed:true,closedNativePreviews:false}),/explicitly confirm/);
+ assert.equal((await fileHash(path.join(directory,'model.glb'))).sha256,record.sha256);
+ const result=await cleanup.apply({...plan,confirmed:true,closedNativePreviews:true});assert.equal(result.state,'SUCCEEDED');assert.equal(result.removedBytes,record.size);
+ await assert.rejects(fs.access(path.join(directory,'model.glb')));
+ assert.deepEqual(await Promise.all(['request.json','viewer.json'].map(n=>fileHash(path.join(directory,n)))),preserved);assert.deepEqual(await fileHash(source),sourceBefore);
+ const rebuilt=await prepare(one);assert.notEqual(rebuilt.previewId,record.previewId);assert.equal(rebuilt.sha256,record.sha256);
+ const journal=await json(path.join(f.base,result.journal));assert.equal(journal.state,'SUCCEEDED');assert.equal(journal.removed.length,2);assert.equal(journal.review.eligible[0].indexRecord.previewId,record.previewId);
+});
+test('unknown files, active views and source drift protect copies and invalidate an older review',async t=>{
+ const f=await fixture(t),id='viewer_00000000-0000-4000-8000-000000000001',record=await f.viewers.prepare('project','scene',1,f.request(1),id);f.viewers.release('project','scene',id);
+ const cleanup=new PreviewCleanup(f.viewers),directory=path.join(f.base,record.previewId),model=path.join(directory,'model.glb');
+ let plan=await cleanup.plan();await fs.writeFile(path.join(directory,'user-note.txt'),'user-owned test note');
+ await assert.rejects(cleanup.apply({...plan,confirmed:true,closedNativePreviews:true}),/protected/);assert.equal((await cleanup.plan()).eligible.length,0);await fs.unlink(path.join(directory,'user-note.txt'));
+ plan=await cleanup.plan();await f.viewers.prepare('project','scene',1,f.request(1),id);
+ await assert.rejects(cleanup.apply({...plan,confirmed:true,closedNativePreviews:true}),/Active/);f.viewers.release('project','scene',id);
+ plan=await cleanup.plan();await fs.appendFile(path.join(f.work.config.library,'mesh.bin'),'changed');
+ await assert.rejects(cleanup.apply({...plan,confirmed:true,closedNativePreviews:true}),/source changed/);assert.equal((await fileHash(model)).sha256,record.sha256);assert.equal((await cleanup.plan()).eligible.length,0);
+});
+test('changed payload and shared file identities cannot be removed from an old cleanup review',async t=>{
+ const f=await fixture(t),id='viewer_00000000-0000-4000-8000-000000000001',record=await f.viewers.prepare('project','scene',1,f.request(1),id);f.viewers.release('project','scene',id);
+ const cleanup=new PreviewCleanup(f.viewers),model=path.join(f.base,record.previewId,'model.glb'),bytes=await fs.readFile(model),plan=await cleanup.plan();
+ await fs.appendFile(model,'changed');await assert.rejects(cleanup.apply({...plan,confirmed:true,closedNativePreviews:true}),/changed/);assert.equal((await fs.readFile(model)).length,bytes.length+7);
+ await fs.writeFile(model,bytes);await fs.link(model,path.join(f.work.store.root,'retained-hardlink.glb'));assert.equal((await cleanup.plan()).eligible.length,0);assert.equal((await fileHash(model)).sha256,record.sha256);
+});
+test('a simulated file-removal failure stops cleanup with a retained partial journal and remaining bytes',async t=>{
+ const f=await fixture(t),id='viewer_00000000-0000-4000-8000-000000000001',record=await f.viewers.prepare('project','scene',1,f.request(1),id);f.viewers.release('project','scene',id);
+ const cleanup=new PreviewCleanup(f.viewers),plan=await cleanup.plan(),originalUnlink=fs.unlink,model=path.join(f.base,record.previewId,'model.glb');
+ const hook=t.mock.method(fs,'unlink',async filename=>{if(filename===model)throw Object.assign(Error('Synthetic locked payload'),{code:'EACCES'});return originalUnlink(filename);});
+ const result=await cleanup.apply({...plan,confirmed:true,closedNativePreviews:true});hook.mock.restore();
+ assert.equal(result.state,'PARTIAL');assert.equal(result.removedBytes,0);assert.match(result.error,/Synthetic locked/);
+ assert.equal((await json(path.join(f.base,result.journal))).pending.path,record.previewId+'/model.glb');
+ assert.equal((await fileHash(model)).sha256,record.sha256);const journal=await json(path.join(f.base,result.journal));assert.equal(journal.state,'PARTIAL');assert.equal(journal.removed.length,1);assert.equal(journal.removed[0].kind,'cache-index');
+ await assert.rejects(cleanup.apply({...plan,confirmed:true,closedNativePreviews:true}),/Review/);assert.equal((await cleanup.plan()).eligible.length,0);
+});
+test('storage review separates protected evidence, exact paths and explicit removal confirmation',()=>{
+ const plan={usedBytes:1024**3,removableBytes:1024**2,eligible:[{previewId:'view_test',title:'Synthetic',bytes:1024**2,files:['model.glb']}],protected:[{previewId:'view_active',reason:'Active preview is protected.'}],preserved:'Originals and logs retained'};
+ const result=previewStorageView(plan,String,(text,action)=>`<button data-action="${action}">${text}</button>`);
+ assert.match(result.body,/view_test\/model.glb/);assert.match(result.body,/Active preview/);assert.match(result.buttons,/preview-storage-apply/);
+ assert.match(storageConfirmation(plan),/not open in Blender/);assert.match(storageConfirmation(plan),/Originals, saved checkpoints, databases, receipts and logs stay intact/);assert.match(storageConfirmation(plan),/cannot be undone/);
 });

@@ -4,6 +4,7 @@ const safeActions=new Set(['save-world','world-undo','refresh','close','dismiss'
 // Retry only archives a stopped failure; resolve only releases its receipt.
 // Neither executes work nor changes the scene, so keep the failed-save draft.
 safeActions.add('retry');safeActions.add('resolve');
+safeActions.add('preview-storage');safeActions.add('preview-storage-apply');
 export const worldActionNeedsSave=action=>!safeActions.has(action);
 export function instanceObjects(associations,index){
  const objects=[...associations].filter(([object,ref])=>object.isObject3D&&ref?.nodes===index).map(([object])=>object);

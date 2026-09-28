@@ -68,6 +68,45 @@ source, conversion and GLB limits above remain unchanged.
 No automatic deletion of old copies or failed evidence is performed. Very large
 packages, procedural/simulation/volume content and rig-only files use Blender.
 
+## Reviewed preview cleanup
+
+Studio -> Preview storage scans private derivatives and presents removable payload
+bytes, protected copies and exact relative targets. It does not clean the asset
+library or project history. Nothing is removed until the user confirms the exact
+current review, including that these cached copies are not open manually in Blender.
+Viewing another scene or Final film releases the prior in-app view; another open
+window still protects its copy. Each UI view has a separate scope-bound grant.
+Lost/crashed view grants remain protected until session restart rather than being
+expired on a timer. Older API clients without view IDs receive conservative
+session protection for their 64 most recent preparations.
+
+Only indexed, successful, byte-verified derivatives whose original sources still
+verify are eligible. For native previews this includes the copied source payload,
+model GLBs and derived BLEND files, not request/viewer metadata, catalog databases,
+job/result/receipt records or worker logs. Failed, interrupted, unindexed, unknown,
+linked, multiply-linked, drifted or actively viewed copies remain protected.
+Scanning is bounded to 50,000 files, review metadata to 16 MiB and each removal
+batch to 128 copies. These are conservative refusals, not recursive deletion.
+
+Apply rechecks the complete review and native process command lines, then each
+target immediately before unlinking. Missing native process information refuses
+removal. Command-line checks cannot discover a file opened later through Blender's
+File menu, so the user's explicit closed-copy confirmation is still required.
+Normal scene-editing Blender windows must not be closed just to clean previews.
+Preparation and removal are serialized; one closed browser view cannot revoke
+another view's protection. Abandoned asynchronous views release their grant if
+preparation finishes later, without pretending that the native job was cancelled.
+
+The cache-index pointer is removed first so a partial attempt cannot be reused.
+Its original record, reviewed hashes, write-ahead target and actual removals remain
+in a synced JSON journal under ViewerPreviews/Cleanup. Any failure stops further
+removal and reports PARTIAL with the journal path; remaining evidence is protected,
+not retried or erased automatically. This is not an atomic multi-file transaction.
+Removed payloads have no undo but can be regenerated from verified originals.
+Net recovered space differs from payload bytes because the journal is retained.
+
+## Preview fidelity and failure presentation
+
 Native Blender conversion now reduces static textures only in temporary image
 datablocks: at most 2048 pixels per edge and 16 Mi pixels total (smaller when
 necessary). Original files and the saved Blender inspection copy retain their
@@ -118,8 +157,14 @@ actual native cold/warm/restart conversion and transfer, verifies fresh-session
 authentication, original/manifest preservation and real workbench WebGL/selection
 before and after restart. Timings are measured evidence, not universal promises.
 Its RSS measurement covers the launcher only, not Blender or browser peak memory.
-User-controlled cleanup, representative large-source timing and broader resource
-measurements are separate operations work; this cache never deletes old files.
+`preview_cleanup_check.mjs` drives two real browser views, actual native conversion,
+an owned short-lived Blender process, authenticated removal refusal, scripted
+decline/confirmation, exact allowlisted cleanup and actual native rebuilding. It
+verifies retained database/log/receipt/source/checkpoint/manifest hashes. Unit
+coverage separately simulates a locked-file partial failure and protects drift,
+unknown files and hard links. Test decisions are not human production approvals.
+Representative large-source timing and broader resource measurements remain
+separate acceptance work; automatic cache eviction never deletes disk files.
 
 Synthetic/local test success is not exact-commit CI success, desktop WebView
 acceptance, a runtime update or production/creative acceptance. Installation

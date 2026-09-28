@@ -1,5 +1,6 @@
 import {unfinishedState} from './lib/lifecycle.mjs';
 import {EmbeddedPreviews} from './lib/embedded-preview.mjs';
+import {PreviewCleanup} from './lib/preview-cleanup.mjs';
 import {taskForExit,actOnExitTask} from './lib/exit-task.mjs';
 import {Console} from 'node:console';
 import {createWriteStream} from 'node:fs';
@@ -23,6 +24,7 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
   const serialize = action => { const p = queue.then(action); queue = p.catch(()=>{}); return p; };
   const workbench=new Workbench(store,runtime,config,serialize);
   const viewers=new EmbeddedPreviews(workbench);
+  const previewCleanup=new PreviewCleanup(viewers);
   const server = http.createServer(async(req,res) => {
     res.setHeader('Cache-Control','no-store'); res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy','no-referrer');
 res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
@@ -51,6 +53,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assets['/workbench-render.mjs']='workbench-render.mjs';
         assets['/workbench-film.mjs']='workbench-film.mjs';
         assets['/viewer-3d.mjs']='viewer-3d.mjs';
+        assets['/workbench-preview-storage.mjs']='workbench-preview-storage.mjs';
         for(const name of ['world-draft.mjs','world-editor.mjs','shot-view.mjs'])assets['/'+name]=name;
         assets['/icon.svg']='icon.svg';
         for(const name of ['build/three.module.js','build/three.core.js','examples/jsm/loaders/GLTFLoader.js','examples/jsm/controls/OrbitControls.js','examples/jsm/controls/TransformControls.js','examples/jsm/utils/BufferGeometryUtils.js','examples/jsm/utils/SkeletonUtils.js'])assets['/vendor/three/'+name]='vendor/three/'+name;
@@ -114,6 +117,8 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
           if (p === '/api/blender') return runtime.blender();
           if (p === '/api/session') return {app:'asset-director-launcher',version:'0.1.0',root};
         } else {
+          if(p==='/api/viewer-cache/plan')return viewers.exclusive(()=>previewCleanup.plan());
+          if(p==='/api/viewer-cache/apply')return viewers.exclusive(()=>previewCleanup.apply(body));
           if(p==='/api/lifecycle/task-close')return actOnExitTask(workbench,body,'close');
           if(p==='/api/lifecycle/task-recover')return actOnExitTask(workbench,body,'recover');
           if(p.startsWith('/api/workbench/')) {
@@ -128,7 +133,8 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='source-prepare')return workbench.prepareSource(id,sid,rev,body.request);
             if(command==='catalog-label')return workbench.labelCatalog(id,sid,rev,body.request);
             if(command==='asset-preview')return workbench.previewAsset(id,sid,rev,body.request);
-            if(command==='viewer-prepare')return viewers.prepare(id,sid,rev,body.request);
+            if(command==='viewer-prepare')return viewers.prepare(id,sid,rev,body.request,body.viewerId);
+            if(command==='viewer-release')return viewers.release(id,sid,body.viewerId);
             if(command==='catalog-job')return workbench.catalogJob(id,sid,rev,body.request);
             if(command==='keep-building')return workbench.keepBuilding(id,sid,rev);
             if(command==='world-undo')return workbench.undoWorld(id,sid,rev);

@@ -60,8 +60,26 @@ export class EmbeddedPreviews {
       const id=this.owned.keys().next().value;this.ownedBytes-=this.owned.get(id).weight;this.owned.delete(id);
     }
   }
-  prepare(...args){
-    const pending=this.queue.then(()=>this.prepareOne(...args));this.queue=pending.catch(()=>{});return pending;
+  protectedPreview(previewId){return [...(this.views?.values()||[])].some(v=>v.previewId===previewId)||!!this.legacy?.has(previewId);}
+  forget(previewId){const item=this.owned.get(previewId);if(item){this.ownedBytes-=item.weight;this.owned.delete(previewId);}}
+  release(projectId,sceneId,viewerId){
+    const view=this.views?.get(viewerId);if(!view)return {released:false};
+    assert(view.projectId===projectId&&view.sceneId===sceneId,'Preview view belongs to another scene.',404);
+    this.views.delete(viewerId);if(!this.protectedPreview(view.previewId))this.forget(view.previewId);
+    return {released:true};
+  }
+  exclusive(action){const pending=this.queue.then(action);this.queue=pending.catch(()=>{});return pending;}
+  prepare(id,sceneId,revision,request,viewerId){
+    return this.exclusive(async()=>{
+      if(viewerId!==undefined){
+        assert(typeof viewerId==='string'&&/^viewer_[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(viewerId),'Invalid preview view identity.');
+        this.views||=new Map();assert(!this.views.has(viewerId)&&this.views.size<256,'Close an existing 3D view before opening another.',409);
+      }
+      const record=await this.prepareOne(id,sceneId,revision,request);
+      if(viewerId)this.views.set(viewerId,{previewId:record.previewId,projectId:id,sceneId});
+      else {this.legacy||=new Set();this.legacy.add(record.previewId);while(this.legacy.size>64)this.legacy.delete(this.legacy.values().next().value);}
+      return record;
+    });
   }
   async prepareOne(id,sceneId,revision,request) {
     assert(request&&typeof request==='object'&&!Array.isArray(request),'Expected a preview source.');

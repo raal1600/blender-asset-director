@@ -26,18 +26,20 @@ export function previewFailure(error) {
   return {title:'3D preview unavailable',message:textures?'This asset exceeds the in-app texture conversion limits. You can inspect the full-resolution asset in Blender.':'Director could not prepare this in-app preview. You can inspect the asset separately in Blender.',detail};
 }
 
-export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit}) {
+export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,release}) {
   let disposed=false,renderer,controls,world,mixer,editor,frame=0,observer,model,action,playing=false,last=0,dirty=true,resize,loadedScenes=[],playback=null;
   let shotView=null,shotTime=0,shotFixed=true;
   const abort=new AbortController(),cleanups=[];
+  let preparedRecord,releaseWanted=false,released=false;
+  const relinquish=()=>{releaseWanted=true;if(preparedRecord&&!released){released=true;Promise.resolve().then(()=>release?.(preparedRecord)).catch(()=>{});}};
   host.dataset.viewerState='loading';delete host.dataset.previewId;
   host.innerHTML='<div class="viewer-message" role="status" aria-live="polite">Verifying this exact source and preparing 3D geometry… Native files may need up to three minutes. No scene changes or render.</div>';
   const status=()=>host.querySelector('[data-viewer-status]');
   const listen=(node,type,fn,options)=>{node.addEventListener(type,fn,options);cleanups.push(()=>node.removeEventListener(type,fn,options));};
-  const dispose=()=>{if(disposed)return;disposed=true;abort.abort();cancelAnimationFrame(frame);observer?.disconnect();for(const f of cleanups)f();editor?.dispose();controls?.dispose();mixer?.stopAllAction();if(model)mixer?.uncacheRoot(model);releaseTree([world,...loadedScenes]);renderer?.dispose();renderer?.forceContextLoss();host.replaceChildren();delete host.dataset.viewerState;delete host.dataset.previewId;};
+  const dispose=()=>{if(disposed)return;disposed=true;relinquish();abort.abort();cancelAnimationFrame(frame);observer?.disconnect();for(const f of cleanups)f();editor?.dispose();controls?.dispose();mixer?.stopAllAction();if(model)mixer?.uncacheRoot(model);releaseTree([world,...loadedScenes]);renderer?.dispose();renderer?.forceContextLoss();host.replaceChildren();delete host.dataset.viewerState;delete host.dataset.previewId;};
   const ready=(async()=>{
     try {
-      const [record,THREE,{GLTFLoader},{OrbitControls}]=await Promise.all([prepare(),import('./vendor/three/build/three.module.js'),import('./vendor/three/examples/jsm/loaders/GLTFLoader.js'),import('./vendor/three/examples/jsm/controls/OrbitControls.js')]);
+      const [record,THREE,{GLTFLoader},{OrbitControls}]=await Promise.all([Promise.resolve().then(prepare).then(value=>{preparedRecord=value;if(releaseWanted)relinquish();return value;}),import('./vendor/three/build/three.module.js'),import('./vendor/three/examples/jsm/loaders/GLTFLoader.js'),import('./vendor/three/examples/jsm/controls/OrbitControls.js')]);
       if(disposed)return;
       const bytes=await fetchModel(record,abort.signal);if(disposed)return;
       const manager=new THREE.LoadingManager();
@@ -137,6 +139,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit})
       frame=requestAnimationFrame(animate);
       return record;
     }catch(error){
+      relinquish();
       if(disposed)return;cancelAnimationFrame(frame);observer?.disconnect();editor?.dispose();editor=null;controls?.dispose();releaseTree([world,...loadedScenes]);renderer?.dispose();world=null;loadedScenes=[];model=null;renderer=null;controls=null;host.replaceChildren();
       const failure=previewFailure(error),box=document.createElement('div');box.className='viewer-message warn';box.setAttribute('role','alert');
       const title=document.createElement('strong');title.textContent=failure.title;box.append(title);
