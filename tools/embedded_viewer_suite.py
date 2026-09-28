@@ -90,6 +90,11 @@ def main():
         # Reuse Playwright's installed Node driver package; no npm/CDN download.
         import playwright
         module = Path(playwright.__file__).parent / 'driver/package/index.mjs'
+        command = [args.node, str(ROOT/'tools/scene_layer_browser_check.mjs'), str(output/'scene-layers-browser'),
+                   str(output/'scene-layers-native'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        with (output/'scene-layers-browser.log').open('wb') as log:
+            subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300, check=True)
         command = [args.node, str(ROOT/'tools/shot_view_check.mjs'), str(output/'shot-view-browser'),
                    str(output/'shot-view-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)

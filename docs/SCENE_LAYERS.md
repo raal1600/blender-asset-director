@@ -1,9 +1,9 @@
 # Bounded camera and shared-light transactions
 
-Development contract: `scene-layer-v1`. This slice adds native operations and
-authenticated launcher transactions. Selected-shot viewing is described below;
-the contextual camera/light authoring controls and native desktop acceptance
-remain separate unfinished work.
+Development contract: `scene-layer-v1`. Native operations, authenticated launcher
+transactions and progressive camera/shared-light controls are implemented.
+Selected-shot viewing is described below. Complete rendered lighting comparison,
+native desktop acceptance and local deployment remain separate required work.
 It builds on [World placement](WORLD_LAYERS.md) and [Action](ACTION_LAYER.md).
 
 ## Inspect, propose, explicitly save
@@ -69,10 +69,47 @@ two named shots, idempotency, refusal, checkpoint publication and shared-shot
 context. Both run in the existing embedded-viewer acceptance journey.
 
 Their generated test decisions are explicitly scripted, not human approvals.
-They do not substitute for browser camera/light authoring,
-rendered before/after comparison, Windows manual handoff, licensed
+They do not substitute for rendered before/after comparison, Windows manual handoff, licensed
 inputs, exact-commit CI or local deployment acceptance. Those remain separate
 required gates in the layered-workflow enhancement.
+
+## Progressive authoring controls
+
+Shots and Light share the large saved-scene viewer, scene picker, activity strip,
+compact shot selector and explicit Save/Ready separation. The former general
+asset shelf and three-column controls are not shown in these layers. History and
+specialist/import tools remain under More. Imported candidates retain explicit
+inspect, keep-working and reject controls; normal native Save/return does not gain
+an extra Collect/Keep step.
+
+Shots can create a separate fitted camera from explicitly selected observed
+geometry, a named new camera, frame, direction and lens. Starting values are
+visible and editable, not an automatic artistic prescription. Naming a shot then
+binds its real saved camera and range. Detailed camera refinement/motion remains
+available through Blender; orbiting never edits a camera.
+
+Light exposes the selected observed light's supported energy, size/radius/angle,
+linear color and position, plus supported world strength and scene exposure.
+Unrelated properties are omitted from the bounded batch. Local values have Undo,
+Discard and one explicit Save; a typed field is one Undo gesture. Typing does not
+remount the controls or steal the Save click. The selected light survives Save.
+No approximate WebGL lighting is presented as these unsaved values or as a render.
+All named affected shots are listed; Preview lighting explicitly authorizes the
+existing bounded real still. Saving or previewing does not approve Light.
+
+Inspection scheduling reuses exact layer/checkpoint receipts, refreshes a stale
+read revision once and never automatically retries a failed mutation. Stale local
+drafts remain visible and cannot save. Navigation resolves a dirty draft before
+changing context. Separately verified native results publish new checkpoints.
+
+`tools/scene_layer_browser_check.mjs` drives real browser camera creation, named
+shot viewing, light editing, undo/navigation, invalid-input refusal, one-click
+Save, a competing native Save/stale draft and explicit discard. Independent
+native inspections check saved values, unchanged cameras, affected-shot identities
+and preserved original/checkpoint hashes. Its scripted Shots-ready decision is
+synthetic test setup, never human approval. It runs in the existing embedded-viewer
+browser partition; native Windows handoff and artistic lighting review are not
+inferred from this browser result.
 
 ## Saved-shot viewing
 

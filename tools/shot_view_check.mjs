@@ -40,7 +40,7 @@ try{
  await page.goto(app.origin+'/workbench#'+app.token);await idle();await page.locator('[data-action="project"][data-id="'+p.id+'"]').click();await idle();await ready();
  const THREE=await import(pathToFileURL(path.join(repo,'launcher/public/vendor/three/build/three.module.js')).href),{GLTFLoader}=await import(pathToFileURL(path.join(repo,'launcher/public/vendor/three/examples/jsm/loaders/GLTFLoader.js')).href);
  for(const entry of entries){
-  await page.locator('[data-action="scene"][data-id="'+entry.sceneId+'"]').click();await idle();await ready();
+  await page.locator('#scene-picker').selectOption(entry.sceneId);await idle();await ready();
   await page.locator('[data-action="select-shot"][data-id="'+entry.shot.id+'"]').click();await idle();await ready();
   const host=page.locator('[data-scene-viewer]'),id=await host.getAttribute('data-preview-id'),record=await json(path.join(out,'Studio/SystemRuntime/UserData/ViewerPreviews',id,'viewer.json'));
   assert.equal(record.shotView.shot.id,entry.shot.id);assert.equal(record.shotView.shot.revision,entry.shot.revision);assert.equal(record.profile,'shot-framing-v1');
@@ -73,7 +73,7 @@ try{
   assert.deepEqual(await fileHash(entry.source),entry.original);assert.deepEqual(await fileHash(path.join(p.directory,entry.cp.path)),entry.original);
   report.checks.push(entry.item.label+': actual GLB motion/projected framing matches Blender, bounded playback and orbit round-trip, no project or source writes');
  }
- const first=entries[0];await page.locator('[data-action="scene"][data-id="'+first.sceneId+'"]').click();await idle();await ready();
+ const first=entries[0];await page.locator('#scene-picker').selectOption(first.sceneId);await idle();await ready();
  await page.locator('[data-action="select-shot"][data-id="'+first.shot.id+'"]').click();await idle();await ready();
  assert.equal(await page.locator('[data-scene-viewer]').getAttribute('data-preview-id'),report.previews[0].id,'Exact shot reuses verified preview');
  await page.locator('[data-action="edit-shot"][data-id="'+first.shot.id+'"]').click();await idle();await page.locator('#shot-start').fill(String(first.shot.start+1));await page.locator('[data-action="save-shot"]').click();await idle();await ready();
