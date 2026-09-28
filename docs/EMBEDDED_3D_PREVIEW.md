@@ -27,7 +27,8 @@ Both endpoints require the existing loopback Bearer session, same-origin checks,
 project/scene identities and an exact recorded version/member or checkpoint hash.
 Every original is verified before preparation, after conversion and before a
 cached derivative is served. Source files, catalog and project manifests are not
-modified. Returned preview IDs belong to the current server session and scene.
+modified. Serving a preview requires a current session grant for its scene;
+verified successful IDs may be reused after explicit preparation in a new session.
 
 The direct glTF/GLB path needs no Blender process. It packages only recorded
 relative buffers and PNG/JPEG textures into an embedded GLB. External/data URLs,
@@ -40,9 +41,25 @@ Embedded BLEND copies use short, source-mapped paths for both catalog assets and
 checkpoints, avoiding nested Windows path failures without altering source paths.
 
 Private outputs and failures live in `SystemRuntime/UserData/ViewerPreviews`.
-Successful previews are reused within the running server session, bound to exact
-sources. The implementation refuses more than 64 session copies, a 512 MiB /
-4096-file source package, 128 MiB GLB, 10000 nodes, 2 million displayed vertices,
+Successful previews are reused across sessions only after validating an indexed
+provenance record, exact source/profile/shot identity, current launcher/native
+implementation and Blender executable hash, metadata/output hashes, successful
+native evidence (where applicable), and the GLB description. Altered evidence
+refuses visibly and remains on disk; an old/unindexed attempt is never promoted
+into a trusted cache entry automatically. Native identity checking is deliberate
+work on a warm request, not a zero-cost cache lookup.
+
+At most 64 recently accessed preview descriptors, and at most 32 MiB of their
+serialized metadata, remain in memory (not a promise about total process RSS). Older
+descriptors may be evicted without deleting files; reopening them re-verifies the
+persisted cache. Preparing a 65th preview does not require restarting Director.
+An old media grant that was evicted must be prepared again before serving bytes.
+Repeated concurrent preparation is serialized and reuses the verified result;
+failed promises do not poison the queue. Source and project scope is rechecked
+for every request. No session token or credential is persisted in this cache.
+
+The implementation still refuses a source above 512 MiB / 4096 files,
+128 MiB GLB, 10000 nodes, 2 million displayed vertices,
 128 textures, 8192-pixel texture dimensions or 64 million decoded texture pixels.
 Conversion supports up to 3600 frames per take / saved scene and 20000 total take
 frames. Before another copy it reserves space under a 100 GiB preview-folder budget.
@@ -93,6 +110,16 @@ uses actual catalog intake, real native conversion and real Chrome WebGL, checks
 rendered-pixel changes for navigation/animation, and verifies originals/catalog/
 manifest preservation. Screenshots and logs remain in the explicit evidence
 directory and are not automatically published.
+
+`preview-cache.test.mjs` covers fresh-session reuse, 66 distinct previews with a
+64-entry memory bound, profile isolation, concurrent repeated requests and
+corrupt/escaped/oversized metadata refusal. `preview_cache_check.mjs` measures
+actual native cold/warm/restart conversion and transfer, verifies fresh-session
+authentication, original/manifest preservation and real workbench WebGL/selection
+before and after restart. Timings are measured evidence, not universal promises.
+Its RSS measurement covers the launcher only, not Blender or browser peak memory.
+User-controlled cleanup, representative large-source timing and broader resource
+measurements are separate operations work; this cache never deletes old files.
 
 Synthetic/local test success is not exact-commit CI success, desktop WebView
 acceptance, a runtime update or production/creative acceptance. Installation
