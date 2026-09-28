@@ -1,6 +1,9 @@
 /** Local, unsaved instance transforms. No storage, network, approval or Blender calls. */
 // Read-only inspection is safe. New mutations/navigation resolve the draft first.
 const safeActions=new Set(['save-world','world-undo','refresh','close','dismiss','history','world-details','world-ingredients','browse-assets','catalog-detail','source-detail','viewer-open','catalog-preview-detail','source-preview-detail','library-scene','asset-preview-open','inspect-candidate','settings','diagnostics','verify-sources','recover','focus-task','browser-search','browser-kind','browser-scope','browser-activity','browser-subcategory','browser-view','browser-page','browser-close']);
+// Retry only archives a stopped failure; resolve only releases its receipt.
+// Neither executes work nor changes the scene, so keep the failed-save draft.
+safeActions.add('retry');safeActions.add('resolve');
 export const worldActionNeedsSave=action=>!safeActions.has(action);
 export function instanceObjects(associations,index){
  const objects=[...associations].filter(([object,ref])=>object.isObject3D&&ref?.nodes===index).map(([object])=>object);

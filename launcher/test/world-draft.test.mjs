@@ -27,5 +27,5 @@ test('draft refuses unsupported transforms and limits a save to 64 instances',()
 });
 test('navigation and unknown mutations require resolving a dirty draft, inspections do not',()=>{
  for(const name of ['task','approve','library-add','stage','scene','picker','tab','scene-viewer','save-production','save-scene','unknown-future-mutation'])assert.equal(worldActionNeedsSave(name),true,name);
- for(const name of ['save-world','world-undo','refresh','catalog-detail','viewer-open','history','close'])assert.equal(worldActionNeedsSave(name),false,name);
+ for(const name of ['save-world','world-undo','refresh','catalog-detail','viewer-open','history','close','retry','resolve'])assert.equal(worldActionNeedsSave(name),false,name);
 });

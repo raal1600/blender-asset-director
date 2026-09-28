@@ -64,8 +64,31 @@ historical evidence are unchanged. Synthetic confirmations are not human review.
 undo/discard, unsaved-navigation protection, one Save through actual Blender,
 rotation/scale persistence, original preservation, transport failure and stale
 draft handling. It reuses the installed Playwright driver and Chrome, not a CDN.
-Native desktop gestures, interruption/recovery, private licensed inputs and
-packaged/live deployment remain separate acceptance gates.
+Native desktop gestures, private licensed inputs and packaged/live deployment
+remain separate acceptance gates.
+
+## Explicit interrupted-save recovery
+
+A failed native Save leaves the local placement draft and previous checkpoint
+intact. Inspect / recover attempt exposes the retained failure. Declining reset
+changes nothing. An explicitly confirmed reset archives the native attempt and
+returns that bounded, project-owned job to PLANNED; it never launches a worker.
+The retry allowlist includes World, Action and scene-layer audit/edit operations
+alongside existing preview/render jobs. Running/successful jobs, unrelated native
+operations, foreign ownership, stale revisions and active writers still refuse.
+
+Reset and stopped-task resolution change recovery metadata only, so they do not
+require discarding or resaving the failed local draft first. Execution is a new
+explicit Save, rechecking all ordinary source/checkpoint/writer guards. Resolve
+does not terminate processes, adopt unsaved work or approve a stage.
+
+`world_recovery_check.mjs` exercises the real browser and native harness after
+deliberately stopping its exact owned background Blender child during startup.
+The test-only helper uses the captured Popen handle, never process-name/PID scans
+or manual receipt edits. It verifies actual failure, a scripted decline, archived
+failure hashes, preserved draft, explicit resolve, a new native Save/reopen and
+viewer agreement. This startup interruption is not proof of a native close dialog,
+mid-render recovery or genuine human approval; those remain distinct gates.
 
 ## Windows path compatibility
 

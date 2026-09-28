@@ -331,7 +331,8 @@ export class Workbench {
     const p=await this.project(id,revision);await this.unlocked(p);
     assert(confirmed===true&&p.jobs.some(j=>j.id===jobId),'Confirm retry of a project-owned job.');
     const job=await this.runtime.job(jobId);
-    assert(['render-readiness','preview','render-frames'].includes(job.specification.operation)&&['FAILED','INTERRUPTED'].includes(job.state),
+    assert(['render-readiness','preview','render-frames','world-transform','world-prepare-audit','world-prepare',
+      'action-audit','action-edit','scene-layer-audit','scene-layer-edit'].includes(job.specification.operation)&&['FAILED','INTERRUPTED'].includes(job.state),
       'Only failed workbench jobs can be reset for explicit retry.',409);
     // Native job-retry archives the failed attempt; the next Run is separate.
     return this.runtime.harness(['job-retry',jobId]);

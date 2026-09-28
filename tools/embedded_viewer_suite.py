@@ -126,6 +126,10 @@ def main():
                    str(output/'world-layers'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
         reported_browser(command, output, 'world-preparation-browser', 300)
+        command = [args.node, str(ROOT/'tools/world_recovery_check.mjs'), str(output/'world-recovery-browser'),
+                   str(output/'world-layers'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        reported_browser(command, output, 'world-recovery-browser', 300)
         command = [args.node, str(ROOT/'tools/lighting_evidence_check.mjs'), str(output/'lighting-evidence-browser'),
                    str(output/'scene-layers-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
