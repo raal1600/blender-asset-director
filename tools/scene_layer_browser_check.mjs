@@ -27,7 +27,21 @@ try{
  page.on('pageerror',e=>report.errors.push(e.message.replaceAll(app.token,'[REDACTED]')));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text().replaceAll(app.token,'[REDACTED]'));});
  page.on('dialog',async dialog=>{assert.match(dialog.message(),/reviewed every named shot/);await dialog.accept();});
  const idle=()=>page.waitForFunction(()=>!document.body.classList.contains('working'));
- const ready=async()=>{await idle();await page.waitForFunction(()=>document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready',null,{timeout:205000});await page.waitForFunction(()=>!document.querySelector('[data-action="layer-ready"]')?.disabled,null,{timeout:205000});await idle();};
+ const ready=async()=>{
+  await idle();
+  try{
+   await page.waitForFunction(()=>['ready','failed'].includes(document.querySelector('[data-scene-viewer]')?.dataset.viewerState),null,{timeout:205000});
+   assert.equal(await page.locator('[data-scene-viewer]').getAttribute('data-viewer-state'),'ready',await page.locator('[data-scene-viewer]').innerText());
+   await page.waitForFunction(()=>!document.querySelector('[data-action="layer-ready"]')?.disabled,null,{timeout:205000});await idle();
+  }catch(error){
+   const ui=await page.evaluate(()=>({viewer:document.querySelector('[data-scene-viewer]')?.dataset.viewerState,
+    viewerText:document.querySelector('[data-scene-viewer]')?.innerText?.slice(0,5000),notice:document.querySelector('#notice')?.innerText,
+    busy:document.body.classList.contains('working'),readyDisabled:document.querySelector('[data-action="layer-ready"]')?.disabled}));
+   const v=await state(),scene=v.project.workbench.scenes[0];
+   const native={locked:v.locked,current:scene.current,run:scene.run,runs:v.runs.map(r=>({id:r.id,action:r.action,state:r.state,checkpointId:r.checkpointId,resultCheckpointId:r.resultCheckpointId,error:r.error}))};
+   throw new Error(String(error.stack||error)+'\nSynthetic failing boundary: '+JSON.stringify({ui,native}));
+  }
+ };
  const click=async action=>{await page.locator('[data-action="'+action+'"]').click();await idle();};
  const input=async(selector,value)=>{await page.locator(selector).fill(String(value));await page.locator(selector).press('Tab');};
  await page.goto(app.origin+'/workbench#'+app.token);await idle();await page.locator('[data-action="project"][data-id="'+p.id+'"]').click();await idle();await page.waitForFunction(()=>document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready',null,{timeout:205000});
