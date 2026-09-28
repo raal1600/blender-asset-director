@@ -27,7 +27,8 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
   const savedBase=scene.current,draftBase=scene.candidate;
   const record={schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',
     requestIdentity:identity,checkpointId:cp.id,checkpointSha256:cp.sha256,requestedRevision:revision,
-    startedAt:now(),authorization:readOnly?'explicit-launcher-inspection':'explicit-launcher-save',options};
+    startedAt:now(),authorization:readOnly?'explicit-launcher-inspection':'explicit-launcher-save',options,
+    ...(policy.context?{context:policy.context}:{})};
   await work.lock(p,runId);
   try {
     await writeJson(receipt,record);

@@ -4,6 +4,7 @@ import {syncTask} from './task-save.mjs';
 import {saveWorld} from './world-transform.mjs';
 import {inspectAction,saveAction} from './action-layer.mjs';
 import {resolveActionContext} from './action-context.mjs';
+import {inspectSceneLayer,saveSceneLayer} from './scene-layer.mjs';
 /** Scene workbench facade: native file/catalog adapters over the shared job lifecycle. */
 import fs from 'node:fs/promises';
 import {constants} from 'node:fs';
@@ -16,6 +17,8 @@ import {withCatalog} from './workbench-catalog.mjs';
 import {assertBlendEnvelope} from './workbench-files.mjs';
 
 export class Workbench extends withCatalog(WorkbenchCore) {
+  inspectSceneLayer(...args){return inspectSceneLayer(this,...args);}
+  saveSceneLayer(...args){return saveSceneLayer(this,...args);}
   saveWorld(...args){return saveWorld(this,...args);}
   inspectAction(...args){return inspectAction(this,...args);}
   saveAction(...args){return saveAction(this,...args);}

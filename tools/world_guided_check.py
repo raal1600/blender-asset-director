@@ -210,7 +210,10 @@ def main():
             for saved in (cp,second_cp):assert digest(Path(session['projectManifest']).parent/saved['path'])==saved['sha256']
             report['checks'].append('Explicit second-copy import; Undo retains previous world and both immutable checkpoint files')
             click('[data-action="approve"]');assert scene()['stage']=='action'
-            expect(page.get_by_role('heading',name='Performers & action',exact=True)).to_be_visible()
+            expect(page.get_by_role('heading',name='Bring your world to life',exact=True)).to_be_visible()
+            expect(page.locator('#scene-picker')).to_have_value(session['sceneId'])
+            ready('[data-scene-viewer]')
+            expect(page.locator('[data-action="action-ready"]')).to_be_enabled(timeout=30000)
             capture('08-continue-action')
             click('[data-action="stage"][data-stage="world"]');page.reload();idle()
             expect(page.locator('[data-world-state]')).to_have_attribute('data-world-state','ready')

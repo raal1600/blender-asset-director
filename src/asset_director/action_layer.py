@@ -122,7 +122,7 @@ def ancestors(obj):
         yield obj
 
 
-def preserved(excluded):
+def preserved(excluded, *, omit_objects=(), omit_actions=()):
     """Keys, rest/skin identity, placement and every unselected performer remain."""
     require(sum(len(o.data.vertices) for o in bpy.context.scene.objects if o.type == 'MESH') <= 2000000,
             'RESOURCE_LIMIT', 'Simple Action editing supports at most two million scene mesh vertices; use Blender for this scene')
@@ -130,6 +130,7 @@ def preserved(excluded):
             'RESOURCE_LIMIT', 'Simple Action editing exceeds the bounded keyframe inspection budget')
     rows = []
     for obj in sorted(bpy.context.scene.objects, key=lambda o: o.name):
+        if obj.name in omit_objects:continue
         ad = obj.animation_data
         row = {'name': obj.name, 'type': obj.type, 'parent': obj.parent.name if obj.parent else None,
                'parent_inverse': ops.flatten(obj.matrix_parent_inverse), 'data': obj.data.name if obj.data else None,
@@ -148,7 +149,7 @@ def preserved(excluded):
                                       'groups': [g.name for g in obj.vertex_groups],
                                       'weights': [[(g.group, g.weight) for g in v.groups] for v in obj.data.vertices]})
         rows.append(row)
-    return digest({'objects': rows, 'actions': {a.name: channels(a) for a in bpy.data.actions},
+    return digest({'objects': rows, 'actions': {a.name: channels(a) for a in bpy.data.actions if a.name not in omit_actions},
                    'fps': [bpy.context.scene.render.fps, bpy.context.scene.render.fps_base]})
 
 

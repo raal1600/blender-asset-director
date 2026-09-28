@@ -69,6 +69,7 @@ def main(argv=None):
                 result={"schema":1,"render_frames":True,"gpu_render":True,"film_assemble":True,"task_workspace":True,"explicit_save_handoff":True,"preview_camera":True,"catalog":True,"asset_preview":True,"asset_contents":True,"runtime":__version__,"implementation":jobs.implementation_hash(),"limits":{"frames_per_shot":360,"frames_per_film":3600,"render_seconds":900},"audio":False}
                 result['action_layer'] = 'action-layer-v1'
                 result['action_task'] = 'action-task-v1'
+                result['scene_layer'] = 'scene-layer-v1'
             elif command == "workbench-verify":
                 from .workbench_catalog import verify_project
                 result=verify_project(lib,args.project)

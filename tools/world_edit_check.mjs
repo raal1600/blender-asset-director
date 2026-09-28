@@ -34,7 +34,7 @@ try{
  page.on('pageerror',e=>report.errors.push(String(e).replaceAll(app.token,'[REDACTED]')));
  page.on('request',r=>{if(r.url().startsWith(app.origin+'/'))report.requests.push({path:new URL(r.url()).pathname,method:r.method()});else if(!r.url().startsWith('blob:'))report.errors.push('Unexpected external request');});
  page.on('response',r=>{if(r.status()>=400)report.errors.push(r.status()+' '+new URL(r.url()).pathname);});
- page.on('dialog',d=>d.dismiss());
+ let approveSyntheticWorld=false;page.on('dialog',d=>approveSyntheticWorld?d.accept():d.dismiss());
  const idle=()=>page.waitForFunction(()=>!document.body.classList.contains('working'));
  const click=async selector=>{await page.locator(selector).click();await idle();};
  const ready=async()=>{await page.waitForFunction(()=>['ready','failed'].includes(document.querySelector('[data-scene-viewer]')?.dataset.viewerState),null,{timeout:205000});assert.equal(await page.locator('[data-scene-viewer]').getAttribute('data-viewer-state'),'ready',await page.locator('[data-scene-viewer]').innerText());};
@@ -44,7 +44,13 @@ try{
  assert.equal(await host.locator('.viewer-animation').isVisible(),false);
  await page.screenshot({path:path.join(out,'01-ready.png'),fullPage:true});
  report.checks.push('Real static GLB + three native instance bindings + usable editor');
- const ids=await picker.locator('option').evaluateAll(rows=>rows.map(x=>x.value).filter(Boolean));
+ const observedInstances=await picker.locator('option').evaluateAll(rows=>rows.map(x=>({id:x.value,label:x.textContent})).filter(x=>x.id));
+ // Instance UUID order is deliberately unstable. The multi-root prop has a
+ // genuine empty gap at its bounds centre, so bind the pointer target to the
+ // observed generated skin rather than assuming option 2 is a character.
+ const ids=['SyntheticRig0','SyntheticRig1','StaticProp'].map(name=>{
+   const row=observedInstances.find(x=>x.label==='World placement - '+name);assert(row,'Observed generated instance '+name);return row.id;
+ });
  // Real ray picking and handle drag. Focusing a known visible instance gives a
  // stable user-visible target without exposing an internal editor test channel.
  await picker.selectOption(ids[1]);await host.locator('[data-world-focus]').click();await picker.selectOption('');
@@ -127,6 +133,15 @@ try{
  report.checks.push('Concurrent checkpoint change retains stale local draft; Save refuses until deliberate discard/reload');
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'04-mobile.png'),fullPage:true});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'No horizontal overflow at 390px');
+ approveSyntheticWorld=true;await click('[data-action="approve"]');approveSyntheticWorld=false;
+ await page.waitForFunction(()=>document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready'&&document.querySelector('[data-action="action-ready"]')?.disabled===false,null,{timeout:205000});
+ assert.equal(await page.getByRole('heading',{name:'Bring your world to life',exact:true}).isVisible(),true);
+ assert.equal(await page.locator('#scene-picker').inputValue(),scene.id);
+ const transitioned=(await app.store.get(project.id)).workbench.scenes[0];assert.equal(transitioned.stage,'action');assert.equal(transitioned.current,replacement.id);assert.equal(transitioned.completed.action,undefined);
+ await page.screenshot({path:path.join(out,'05-world-to-action.png'),fullPage:true});
+ await click('[data-action="stage"][data-stage="world"]');await page.reload();await ready();
+ assert.equal((await app.store.get(project.id)).workbench.scenes[0].current,replacement.id);
+ report.checks.push('SCRIPTED SYNTHETIC World completion enters real inspected Action with the same checkpoint; return/reload preserves it without Action approval');
  assert.deepEqual(report.errors,[]);report.status='PASS';
 }catch(error){report.status='FAIL';report.failure=error.stack;if(page){report.page=await page.locator('body').textContent().catch(()=>null);await page.screenshot({path:path.join(out,'failure.png'),fullPage:true}).catch(()=>{});}process.exitCode=1;}
 finally{await browser?.close();if(app){app.server.closeAllConnections();await new Promise(resolve=>app.server.close(resolve));}await writeJson(path.join(out,'RESULTS.json'),report);console.log(JSON.stringify({status:report.status,checks:report.checks.length,failure:report.failure,output:out}));}
