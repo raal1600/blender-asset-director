@@ -151,8 +151,13 @@ def configure(task, project):
     if task.get("frameRange"):
         start, end = task["frameRange"]
         require(scene.frame_start <= start <= end <= scene.frame_end, "TARGET_CHANGED", "Shot range leaves the saved scene")
-        scene.frame_preview_start, scene.frame_preview_end = start, end
+        # Enabling initializes a previously unused preview range from the scene.
+        # Blender also clamps each endpoint against the other. Widen the start
+        # first so an earlier, disjoint shot can move the end backwards safely.
         scene.use_preview_range = True
+        scene.frame_preview_start = min(scene.frame_preview_start, start)
+        scene.frame_preview_end = end
+        scene.frame_preview_start = start
         require([scene.frame_preview_start, scene.frame_preview_end] == [start, end],
                 "INVALID_TASK", "Blender did not retain the requested playback range")
     for name in task["targets"]:

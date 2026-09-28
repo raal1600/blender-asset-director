@@ -168,6 +168,13 @@ view. Neither mode, playback nor navigation changes a camera or creates approval
 Manual handoff includes the viewed frame; the existing server shot contract still
 enforces the exact named camera and range. Native window acceptance is separate.
 
+Native task setup enables Blender's preview range before assigning its bounds.
+It widens the lower endpoint before moving the upper one, then verifies both
+requested endpoints. This handles an unused preview range, a shot earlier than a
+previously saved preview, and a one-frame shot without changing the scene's Action
+range or FPS. The real `workbench_film_fixture.py` covers these three cases as
+part of the existing film journey; headless success is not a native-window pass.
+
 Light uses these same camera samples, but WebGL lighting/materials remain
 explicit inspection approximations. Depth of field is not simulated. Actual
 Blender-rendered stills remain the authority for shared-light review.
