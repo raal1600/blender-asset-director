@@ -85,6 +85,17 @@ The profile enters source/cache identity and scene-view reuse identity. Cached
 bytes and originals are still verified before serving. Derivatives do not import,
 save scene changes, assign motion or approve work.
 
+Workbench CLI metadata paths load only their required modules; provider/network
+and job-dispatch imports are deferred to commands that use them. Capability
+discovery does not open or initialize a catalog. This is runtime metadata, not a
+database-health check: project/catalog verification still opens the selected
+library and checks every retained source pin. Capability and job implementation
+identities use the same full-content hash of every runtime Python module on each
+call, never a timestamp-only cache. Preview provenance and served-byte checks
+are unchanged. Measure real cold and cached browser loads separately; portable
+tests verify strict parsing, identity invalidation and catalog preservation, not
+a universal latency guarantee.
+
 For Blender-converted World sources, the worker makes temporary evaluated mesh
 copies at the saved/observed reference frame. This preserves current deformation:
 turning off animation export alone can incorrectly export the bind pose. The

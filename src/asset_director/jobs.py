@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 import threading
 import time
-from .core import Asset, DirectorError, Library, SCHEMA, atomic_json, canonical, digest, fields, file_hash, load_json, require, rights, tokens, within
+from .core import Asset, DirectorError, Library, SCHEMA, atomic_json, canonical, digest, fields, file_hash, implementation_hash, load_json, require, rights, tokens, within
 from . import camera_plan
 from . import look_contract
 from . import motion_contract
@@ -68,10 +68,6 @@ MUTATIONS.add('scene-layer-edit')
 MUTATIONS.add('world-prepare')
 TARGET_REQUIRED.update({'world-prepare-audit', 'world-prepare'})
 TARGET_REQUIRED.update({'scene-layer-audit', 'scene-layer-edit'})
-
-
-def implementation_hash():
-    return digest({p.name: file_hash(p) for p in sorted(Path(__file__).parent.glob("*.py"))})
 
 
 def prepare(lib: Library, operation: str, input_file: str | None = None, asset_id: str | None = None, options=None) -> dict:
