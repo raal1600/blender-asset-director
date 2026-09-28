@@ -151,9 +151,21 @@ export class Store {
   }
   async runs(id) {
     const p = await this.get(id), records = [];
-    for (const name of (await fs.readdir(await safe(p.directory,'Runs'))).filter(n=>n.endsWith('.json')).sort().reverse().slice(0,30)) {
+    const active=new Set((p.workbench?.scenes||[]).flatMap(s=>[s.run,s.task]).filter(Boolean).map(id=>id+'.json'));
+    const names=[...new Set([...(await fs.readdir(await safe(p.directory,'Runs'))).filter(n=>n.endsWith('.json')),...active])];
+    assert(names.length<=10000,'Too many retained task receipts to inspect safely; review the project history without deleting evidence.');
+    const entries=[];
+    // UUID filenames have no chronological meaning. Read bounded metadata in
+    // small batches, always retaining a referenced active or missing task.
+    for(let offset=0;offset<names.length;offset+=32)entries.push(...await Promise.all(names.slice(offset,offset+32).map(async name=>{
+      try{const stat=await fs.stat(await safe(p.directory,`Runs/${name}`));assert(stat.isFile(),'Task receipt is not a file.');return {name,active:active.has(name),updated:stat.mtimeMs};}
+      catch(e){return {name,active:active.has(name),updated:Infinity,error:e.message};}
+    })));
+    entries.sort((a,b)=>Number(b.active)-Number(a.active)||b.updated-a.updated||b.name.localeCompare(a.name));
+    for (const {name,error} of entries.slice(0,Math.max(30,active.size))) {
+      if(error){records.push({id:name.slice(0,-5),state:'UNAVAILABLE',action:name,error});continue;}
       try { const r=await json(await safe(p.directory,`Runs/${name}`)); assert(r.projectId===id,'Operation belongs to a different project.'); records.push(r); }
-      catch(e) {records.push({state:'UNAVAILABLE',action:name,error:e.message});}
+      catch(e) {records.push({id:name.slice(0,-5),state:'UNAVAILABLE',action:name,error:e.message});}
     }
     return records;
   }

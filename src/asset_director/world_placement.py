@@ -19,46 +19,61 @@ def widgets(scene):
             for p in rig.pose.bones if p.custom_shape and p.custom_shape.name in scene.objects}
 
 
-def prepare(scene, only_job=None):
+def import_groups(scene, only_job=None, only_group=None):
+    """Read explicit ownership only; helper geometry is never a guessed member."""
+    helpers, groups = widgets(scene), {}
+    for obj in scene.objects:
+        asset, job = obj.get('bad_asset'), obj.get('bad_job')
+        if (isinstance(asset, str) and isinstance(job, str) and obj not in helpers
+                and (only_job is None or job == only_job)
+                and (only_group is None or (asset, job) == only_group)):
+            groups.setdefault((asset, job), []).append(obj)
+    return groups, helpers
+
+
+def inspect_group(members, helpers):
+    """Shared read-only eligibility check for task copies and reviewed candidates."""
+    require(all(not o.library and not o.override_library and len(o.users_scene) == 1 for o in members),
+            'WORLD_PLACEMENT_UNSUPPORTED', 'Linked, shared-scene or overridden asset needs manual preparation')
+    require(all(not o.constraints and not (o.animation_data and o.animation_data.drivers)
+                and not (o.type == 'ARMATURE' and any(p.constraints for p in o.pose.bones)) for o in members),
+            'WORLD_PLACEMENT_UNSUPPORTED', 'Constrained or driven hierarchy needs reviewed preparation')
+    owned = set(members)
+    require(all(o.parent is None or o.parent in owned for o in members)
+            and all(c in owned or c in helpers for o in members for c in o.children),
+            'WORLD_PLACEMENT_UNSUPPORTED', 'Asset shares a hierarchy with unowned objects')
+    existing = [o for o in members if o.get(CONTROL) == 1]
+    if existing:
+        require(len(existing) == 1, 'WORLD_PLACEMENT_UNSUPPORTED', 'Duplicated placement identity needs review')
+        control = existing[0]
+        instance = control.get(INSTANCE)
+        require(control.type == 'EMPTY' and control.parent is None and not control.animation_data
+                and isinstance(instance, str) and all(o.get(INSTANCE) == instance for o in members)
+                and all(o == control or ancestor_control(o) == control for o in members),
+                'WORLD_PLACEMENT_UNSUPPORTED', 'Placement hierarchy changed; inspect before arranging')
+        return control, []
+    require(not any(o.get(INSTANCE) for o in members), 'WORLD_PLACEMENT_UNSUPPORTED',
+            'Placement control is missing; do not infer a replacement')
+    roots = [o for o in members if o.parent is None]
+    require(roots and any(o.type == 'MESH' for o in members),
+            'WORLD_PLACEMENT_UNSUPPORTED', 'No independent mesh asset roots')
+    return None, roots
+
+
+def prepare(scene, only_job=None, only_group=None):
     """Prepare supported groups in this working copy; preserve animated bases."""
     # Collection append/link does not eagerly evaluate matrix_world. Establish
     # the actual scene-frame baseline before comparing identity-parent results;
     # otherwise the first update looks like an illegal placement mutation.
     bpy.context.view_layer.update()
-    helpers = widgets(scene)
-    groups = {}
-    for obj in scene.objects:
-        asset, job = obj.get('bad_asset'), obj.get('bad_job')
-        if (isinstance(asset, str) and isinstance(job, str) and obj not in helpers
-                and (only_job is None or job == only_job)):
-            groups.setdefault((asset, job), []).append(obj)
+    groups, helpers = import_groups(scene, only_job, only_group)
     result = {'prepared': [], 'unsupported': []}
     for (asset, job), members in sorted(groups.items()):
-        existing = [o for o in members if o.get(CONTROL) == 1]
         try:
-            require(all(not o.library and not o.override_library and len(o.users_scene) == 1 for o in members),
-                    'WORLD_PLACEMENT_UNSUPPORTED', 'Linked, shared-scene or overridden asset needs manual preparation')
-            require(all(not o.constraints and not (o.animation_data and o.animation_data.drivers)
-                        and not (o.type == 'ARMATURE' and any(p.constraints for p in o.pose.bones)) for o in members),
-                    'WORLD_PLACEMENT_UNSUPPORTED', 'Constrained or driven hierarchy needs reviewed preparation')
-            owned = set(members)
-            require(all(o.parent is None or o.parent in owned for o in members)
-                    and all(c in owned or c in helpers for o in members for c in o.children),
-                    'WORLD_PLACEMENT_UNSUPPORTED', 'Asset shares a hierarchy with unowned objects')
-            if existing:
-                require(len(existing) == 1, 'WORLD_PLACEMENT_UNSUPPORTED', 'Duplicated placement identity needs review')
-                control = existing[0]
-                instance = control.get(INSTANCE)
-                require(control.type == 'EMPTY' and control.parent is None and not control.animation_data
-                        and isinstance(instance, str) and all(o.get(INSTANCE) == instance for o in members)
-                        and all(o == control or ancestor_control(o) == control for o in members),
-                        'WORLD_PLACEMENT_UNSUPPORTED', 'Placement hierarchy changed; inspect before arranging')
+            control, roots = inspect_group(members, helpers)
+            if control:
+                instance = control[INSTANCE]
             else:
-                require(not any(o.get(INSTANCE) for o in members), 'WORLD_PLACEMENT_UNSUPPORTED',
-                        'Placement control is missing; do not infer a replacement')
-                roots = [o for o in members if o.parent is None]
-                require(roots and any(o.type == 'MESH' for o in members),
-                        'WORLD_PLACEMENT_UNSUPPORTED', 'No independent mesh asset roots')
                 before = {o: o.matrix_world.copy() for o in members}
                 control = bpy.data.objects.new('World placement - ' + roots[0].name, None)
                 scene.collection.objects.link(control)

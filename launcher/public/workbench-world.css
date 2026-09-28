@@ -89,4 +89,7 @@ dialog.world-asset-dialog{width:min(1050px,calc(100vw - 36px));max-width:1050px;
 .world-transform-details{padding:6px 14px;border-top:1px solid var(--line)}.world-transform-details summary{cursor:pointer;font-size:13px;padding:6px 0}
 .world-transform-fields{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin:8px 0}.world-transform-fields label{flex:1;min-width:70px;margin:0;font-size:12px}
 .world-transform-fields input{width:100%;min-width:0}.world-transform-details p,.world-editor-error{font-size:12px;margin:8px 0}.world-editor-error{color:#ffd7a1;padding:0 14px}
+.world-compatibility{display:flex;align-items:center;gap:14px;flex-wrap:wrap}.world-compatibility span{flex:1;min-width:180px}
+.world-preparation-dialog{max-width:680px}.world-preparation-group{padding:12px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.world-preparation-group label{display:flex;align-items:center;gap:8px}.world-preparation-group input{width:auto}.world-preparation-group p,.world-preparation-group details{font-size:13px}.world-preparation-group ul{max-height:180px;overflow:auto}
 @media(max-width:640px){.world-instance-picker{flex-basis:100%;max-width:none}.world-editor-toolbar [data-world-selection]{flex-basis:100%}.world-transform-fields label{flex-basis:25%}.world-transform-fields button{width:100%}}

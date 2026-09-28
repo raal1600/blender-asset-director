@@ -15,6 +15,7 @@ from . import bone_display_contract
 from . import sequence_contract
 from . import render_sequence
 from . import world_transform_contract
+from . import world_prepare_contract
 from . import action_layer_contract
 from . import scene_layer_contract
 
@@ -25,6 +26,8 @@ OPS = {
     "action-edit": action_layer_contract.FIELDS,
     "world-transform": world_transform_contract.FIELDS,
     "world-placement-audit": set(),
+    "world-prepare-audit": set(),
+    "world-prepare": world_prepare_contract.FIELDS,
     "render-readiness": set(),
     "render-frames": render_sequence.FIELDS,
     **sequence_contract.OPS,
@@ -62,6 +65,8 @@ OPS.update(motion_contract.OPS)
 MUTATIONS.update(motion_contract.MUTATIONS)
 TARGET_REQUIRED.update(motion_contract.TARGETS)
 MUTATIONS.add('scene-layer-edit')
+MUTATIONS.add('world-prepare')
+TARGET_REQUIRED.update({'world-prepare-audit', 'world-prepare'})
 TARGET_REQUIRED.update({'scene-layer-audit', 'scene-layer-edit'})
 
 
@@ -73,6 +78,10 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
     options = copy.deepcopy(options or {})
     fields(options, OPS[operation])
+    if operation in {'world-prepare-audit', 'world-prepare'}:
+        if operation == 'world-prepare':world_prepare_contract.validate(options)
+        require(input_file is not None and asset_id is None and Path(input_file).suffix.lower() == '.blend',
+                'TARGET_REQUIRED', 'Compatibility preparation requires an exact saved scene, not a source asset')
     if operation in {'scene-layer-audit', 'scene-layer-edit'}:
         scene_layer_contract.validate(options, inspect=operation == 'scene-layer-audit')
         require(input_file is not None and asset_id is None and Path(input_file).suffix.lower() == '.blend',

@@ -40,6 +40,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assets['/library-usage.mjs']='library-usage.mjs';
         assets['/library-preparation.mjs']='library-preparation.mjs';
         assets['/workbench-world.mjs']='workbench-world.mjs';
+        assets['/workbench-world-prepare.mjs']='workbench-world-prepare.mjs';
         assets['/world-add-flow.mjs']='world-add-flow.mjs';
         assets['/workbench-world.css']='workbench-world.css';
         assets['/workbench-action.mjs']='workbench-action.mjs';
@@ -132,6 +133,8 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='keep-building')return workbench.keepBuilding(id,sid,rev);
             if(command==='world-undo')return workbench.undoWorld(id,sid,rev);
             if(command==='world-save')return workbench.saveWorld(id,sid,rev,body.request);
+            if(command==='world-prepare-inspect')return workbench.inspectWorldPreparation(id,sid,rev,body.request);
+            if(command==='world-prepare')return workbench.prepareWorld(id,sid,rev,body.request);
             if(command==='action-inspect')return workbench.inspectAction(id,sid,rev,body.request);
             if(command==='action-save')return workbench.saveAction(id,sid,rev,body.request);
             if(command==='scene-layer-inspect')return workbench.inspectSceneLayer(id,sid,rev,body.request);

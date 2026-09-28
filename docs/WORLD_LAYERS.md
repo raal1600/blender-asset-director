@@ -22,10 +22,11 @@ Linked/overridden/shared-scene objects, constraints/drivers, cross-owned hierarc
 missing controls and inconsistent instance bindings are not guessed into support.
 They remain unchanged and appear in the preparation report/manual task panel.
 
-Existing imports are prepared only in the dedicated World task working copy.
-Opening a project or requesting a preview never migrates its checkpoints. Task
-initialization is not an explicit Save. Don't Save keeps the input; Save publishes
-the separate result through the existing unapproved Save/return protocol.
+Existing imports can be prepared in a dedicated World task working copy, or via
+the explicit in-app compatibility review described below. Opening a project or
+requesting a preview never migrates its checkpoints. Task initialization is not
+an explicit Save. Don't Save keeps the input; Save publishes the separate result
+through the existing unapproved Save/return protocol.
 
 The dedicated World workspace has a whole-asset selector and Move/Rotate/Scale
 commands. G/R/S route selected imported members to their placement control only
@@ -35,6 +36,36 @@ scale is the verified rig path; nonuniform/negative scale and arbitrary detailed
 editing remain manual, unverified operations. Native toolbar/property edits are
 not reinterpreted as whole-instance operations. This is not a restricted Blender
 editor or a universal rig adapter.
+
+## Older-scene compatibility review
+
+Check asset placement starts read-only `world-prepare-audit` against the exact
+saved checkpoint. The compact review lists observed import groups and separates
+independently preparable, already prepared and unsupported groups. No group is
+preselected and Cancel runs no preparation. Untagged objects are not guessed
+into an asset. Linked/shared/constrained hierarchies retain a Blender route.
+
+Prepare a separate copy requires explicit groups, the exact inspection run and
+native audit hash, unchanged checkpoint bytes, current source-use review and the
+single-writer lease. The server verifies the retained native inspection receipt;
+the worker rechecks every group before mutating any. It creates identity placement
+containers, preserves local channels/animation/skin/ownership/settings, compares
+evaluated world matrices at the saved frame and start/middle/end, saves separately
+and reopens for verification. This is bounded sampled preservation, not a claim
+about arbitrary simulations or universal rig compatibility.
+
+The result is a candidate only: current checkpoint and completion remain intact.
+Review its 3D geometry, then Save changes to adopt it without approving World, or
+Undo to return to the original. Candidates and failure receipts remain retained.
+Preparation preserves the arrangement evaluated from the saved file; it cannot
+infer or restore previously lost unsaved intent. That needs separate evidence and
+human review. No catalog/schema migration or startup scene rewrite is performed.
+
+The generated `world_prepare_fixture.py` and `world_prepare_check.mjs` cover real
+native preservation, stale/all-or-nothing refusal, browser Cancel/Undo/Save and a
+subsequent native placement edit. Run them with fresh evidence folders; their
+scripted decisions are not human acceptance. Both are included in the existing
+embedded-viewer acceptance journey.
 
 ## Static World preview
 
@@ -101,6 +132,7 @@ The [direct-edit implementation](WORLD_DIRECT_EDIT.md) adds in-app picking,
 whole-instance/group gizmos, draft undo/discard and explicit Save through a bounded
 native worker. The [Action layer](ACTION_LAYER.md) adds native performer inspection,
 timing and hold-pose drafts, explicit Save and combined saved-scene playback.
-New shot/light controls and automatic recovery of earlier lost placement are not
-implemented yet. Live unsaved Blender streaming remains outside this plan.
+The [Shots and Light layer](SCENE_LAYERS.md) adds bounded camera/light controls.
+Automatic recovery of earlier lost placement is not implemented. Live unsaved
+Blender streaming remains outside this plan.
 Earlier checkpoints are not repaired merely by switching to a static viewer.

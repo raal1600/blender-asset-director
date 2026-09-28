@@ -6,7 +6,8 @@ import {assert,digest,exists,fileHash,json,now,safe,writeJson} from './storage.m
 import {approveCheckpoint} from './workbench-model.mjs';
 
 export async function checkpointJob(work,id,sceneId,revision,request,policy) {
-  const {stage,operation,options,readOnly=false}=policy;
+  const {stage,operation,options,readOnly=false,candidateOnly=false}=policy;
+  assert(!(readOnly&&candidateOnly),'Read-only inspection cannot publish a candidate.');
   const p=await work.project(id),scene=work.scene(p,sceneId),runId=request.requestId;
   const identity=digest({projectId:id,sceneId,revision,request});
   const receipt=await safe(p.directory,`Runs/${runId}.json`);
@@ -27,7 +28,8 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
   const savedBase=scene.current,draftBase=scene.candidate;
   const record={schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',
     requestIdentity:identity,checkpointId:cp.id,checkpointSha256:cp.sha256,requestedRevision:revision,
-    startedAt:now(),authorization:readOnly?'explicit-launcher-inspection':'explicit-launcher-save',options,
+    startedAt:now(),authorization:readOnly?'explicit-launcher-inspection':candidateOnly?'explicit-launcher-preparation':'explicit-launcher-save',options,
+    ...(candidateOnly?{publication:'SEPARATE_CANDIDATE_ONLY'}:{}),
     ...(policy.context?{context:policy.context}:{})};
   await work.lock(p,runId);
   try {
@@ -64,7 +66,9 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
           const checkpoint={id:cpId,path:relative,...copied,parent:cp.id,stage,createdAt:now(),
             source:operation+'-job',jobId:job.id,audit:data.scene_audit};
           await writeJson(await safe(q.directory,`Docs/Workbench/${cpId}.json`),checkpoint);
-          s.checkpoints.push(checkpoint);approveCheckpoint(s,stage,cpId,false);s.run=null;
+          s.checkpoints.push(checkpoint);
+          if(candidateOnly)s.candidate=cpId;else approveCheckpoint(s,stage,cpId,false);
+          s.run=null;
           await work.store.save(q,q.revision);record.resultCheckpointId=cpId;
         });
         record.state='SUCCEEDED';

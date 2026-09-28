@@ -1,5 +1,6 @@
 import {diagnosticsView,trashView,productionRow,archiveTarget,archiveConfirmation} from './workbench-studio.mjs';
 import {worldView,addWorldAsset} from './workbench-world.mjs';
+import {preparationInspection,preparationDialog as worldPreparationDialog,preparationSelection} from './workbench-world-prepare.mjs';
 import {worldAddQueue,addCatalogFlow} from './world-add-flow.mjs';
 import {openViewer} from './viewer-3d.mjs';
 import {worldActionNeedsSave} from './world-draft.mjs';
@@ -33,6 +34,23 @@ const actionDrafts=new Map();
 const actionInspectionAttempts=new Set();
 const layerDrafts=new Map(),layerInspectionAttempts=new Set(),layerSelections=new Map();
 let layerSave=null;
+let pendingPreparation=null;
+function showWorldPreparation(run){
+ if(s()?.stage!=='world'||s().candidate||run!==preparationInspection(state.runs,s(),cp()))throw Error('Placement check changed. Refresh and inspect the saved scene again.');
+ const view=worldPreparationDialog({project:p(),run,esc,b});
+ modal('Enable asset placement',view.body,view.buttons,'Back to World');$('dialog').classList.add('world-preparation-dialog');
+}
+function scheduleWorldPreparation(){
+ setTimeout(()=>{
+  const pending=pendingPreparation;if(!pending||busy||$('dialog').open||browser.isOpen)return;
+  if(projectId!==pending.projectId||sceneId!==pending.sceneId||tab!=='scenes'||s()?.stage!=='world'||cp()?.id!==pending.checkpointId||cp()?.sha256!==pending.sha256){pendingPreparation=null;return;}
+  const run=state.runs.find(r=>r.id===pending.requestId);
+  if(state.locked||!run||['PREPARING','RUNNING'].includes(run.state))return;
+  pendingPreparation=null;
+  if(run.state==='SUCCEEDED'){try{showWorldPreparation(run);}catch(error){notice(error.message);}}
+  else notice(run.error||'Placement check did not finish. Inspect its retained attempt; your scene is unchanged.');
+ },0);
+}
 const outputDrafts=outputPreferences();
 function currentOutputDraft(){return s()?.stage==='render'?outputDrafts.get(projectId,sceneId,s().selectedShot):null;}
 function syncOutputUI(){const draft=currentOutputDraft(),button=document.querySelector('.output-workspace [data-action="render"]');if(!draft||!button)return;const context=outputContext(s(),state.runs,state.locked);button.disabled=busy||context.active||!!s().candidate||!cap?.encoder||!context.ready||!!context.ready.blockers.length||!outputValuesValid(draft,context.shot,context.ready,cap);}
@@ -135,7 +153,7 @@ const p=()=>state?.project,s=()=>p()?.workbench.scenes.find(x=>x.id===sceneId),c
 const b=(text,action,data={},cls='',disabled=false)=>`<button class="${cls}" data-action="${action}" ${Object.entries(data).map(([k,v])=>`data-${k}="${esc(v)}"`).join(' ')} ${disabled?'disabled':''}>${esc(text)}</button>`;
 const next=(name,args={})=>api('workbench/'+name,{projectId,sceneId,revision:p().revision,...args});
 function notice(message,kind='error'){$('notice').hidden=!message;$('notice').textContent=message||'';$('notice').dataset.kind=kind;$('notice').setAttribute('role',kind==='success'?'status':'alert');const local=$('browser-notice');if(local){local.hidden=!message;local.textContent=message||'';}}
-async function perform(fn){if(busy)return;busy=true;syncWorldDraftUI();document.body.classList.add('working');$('app').classList.add('busy');notice('');try{await fn();}catch(e){try{if(projectId)await load();}catch{}notice(e.message);}finally{busy=false;document.body.classList.remove('working');$('app').classList.remove('busy');syncConsentButtons();syncWorldDraftUI();syncLayerDraftUI();syncOutputUI();scheduleActionInspection();scheduleLayerInspection();}}
+async function perform(fn){if(busy)return;busy=true;syncWorldDraftUI();document.body.classList.add('working');$('app').classList.add('busy');notice('');try{await fn();}catch(e){try{if(projectId)await load();}catch{}notice(e.message);}finally{busy=false;document.body.classList.remove('working');$('app').classList.remove('busy');syncConsentButtons();syncWorldDraftUI();syncLayerDraftUI();syncOutputUI();scheduleActionInspection();scheduleLayerInspection();scheduleWorldPreparation();}}
 function acceptSnapshot(value){if(currentLayerDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!==currentLayerDraft().layer)throw Error('Activity changed elsewhere. Your camera/light draft is retained; discard it before reloading.');if(currentActionDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='action')throw Error('Activity changed elsewhere. Your Action draft is retained; discard it before reloading.');if(sceneViewer?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='world')throw Error('This scene or activity changed elsewhere. Your local placement draft remains open. Discard it before reloading the changed activity.');state=value;reconcileWorldSave();reconcileLayerSave();if(actionSave){const run=state.runs.find(r=>r.id===actionSave.body.request.requestId);if(run?.state==='SUCCEEDED'){if(!s().checkpoints.some(c=>c.id===run.resultCheckpointId))throw Error('Action Save receipt has no matching checkpoint.');actionSave.draft.discard();actionDrafts.delete(projectId+':'+sceneId);actionSave=null;}else if(run&&['FAILED','INTERRUPTED'].includes(run.state)){actionSave=null;notice(run.error||'Action Save failed. Your draft is preserved.');}}}
 async function load(){overview=await api('state?compact=true');if(projectId&&!overview.projects.some(x=>x.id===projectId)){if(sceneViewer?.dirty||currentActionDraft()?.dirty||actionSave||currentLayerDraft()?.dirty||layerSave)throw Error('This production is no longer available. Your local draft remains open; restore the production before saving.');projectId=null;}if(projectId){acceptSnapshot(await api('workbench/state?'+new URLSearchParams({projectId,compact:true})));if(!p().workbench.scenes.some(x=>x.id===sceneId))sceneId=p().workbench.scenes[0]?.id;sessionStorage.setItem('wb-project',projectId);sessionStorage.setItem('wb-scene',sceneId||'');}else state=null;render();if(browser.isOpen)await browser.refresh();}
 function reconcileWorldSave(){
@@ -373,6 +391,21 @@ async function dispatch(a,d){
    modal('Keep your placement changes?', '<p>You have an unsaved visual draft. Save it before continuing, or discard only these placement edits. The previous scene file stays intact.</p>',b('Discard & continue','world-draft-discard',{},'ghost')+b('Save & continue','world-draft-save',{},'primary',sceneViewerKey!==sceneViewKey()),'Stay here');
    return;
  }
+ if(a==='world-prepare-inspect'){
+  if(s()?.stage!=='world'||!cp()||s().candidate)throw Error('Save or undo the current World draft before checking placement.');
+  const inspected=preparationInspection(state.runs,s(),cp());if(inspected){showWorldPreparation(inspected);return;}
+  const request={version:'world-prepare-v1',requestId:'run_'+crypto.randomUUID(),checkpointId:cp().id,sha256:cp().sha256};
+  pendingPreparation={projectId,sceneId,...request};
+  try{await next('world-prepare-inspect',{request});}catch(error){pendingPreparation=null;throw error;}
+  await load();return;
+ }
+ if(a==='world-prepare-confirm'){
+  const run=preparationInspection(state.runs,s(),cp());
+  if(!run||run.id!==d.run||s().candidate)throw Error('Placement inspection is stale. Close this review and inspect again.');
+  const groups=preparationSelection(run,Array.from($('dialog').querySelectorAll('[name="world-prepare-group"]:checked'),n=>n.value));
+  await next('world-prepare',{request:{version:'world-prepare-v1',requestId:'run_'+crypto.randomUUID(),checkpointId:cp().id,sha256:cp().sha256,inspectionId:run.id,audit_sha256:run.inspection.sha256,groups}});
+  close();await load();return;
+ }
  if(a==='library-add'){await enqueueWorldAsset({...d,kind:'catalog'});return;}
  if(a==='library-prepare'){await enqueueWorldAsset({...d,kind:'source'});return;}
  if(a==='world-add'){await enqueueWorldAsset({...d,file:d.file||($('dialog').open?$(d.kind==='source'?'source-file':'catalog-file')?.value:undefined)});return;}
@@ -470,6 +503,7 @@ document.addEventListener('click',e=>{const button=e.target.closest('button[data
 document.addEventListener('input',e=>{if(e.target.dataset.renderSetting){editOutputSetting(e.target);return;}if(!e.target.dataset.layerField||e.target.dataset.layerField==='selected')return;e.target.setCustomValidity('');try{editLayerField(e.target);}catch(error){e.target.setCustomValidity(error.message);}syncLayerDraftUI();});
 document.addEventListener('change',e=>{if(e.target.id==='film-cut'){perform(()=>dispatch('film-cut',{id:e.target.value}));return;}if(e.target.dataset.renderSetting){editOutputSetting(e.target);return;}if(e.target.id==='lighting-evidence-shot'||e.target.id==='lighting-evidence-before'){perform(()=>dispatch('lighting-evidence',{shot:$('lighting-evidence-shot').value,before:e.target.id==='lighting-evidence-before'?e.target.value:undefined,page:e.target.id==='lighting-evidence-before'?$('dialog').dataset.evidencePage:0}));return;}if(e.target.dataset.layerField){e.target.setCustomValidity('');try{editLayerField(e.target);notice('');}catch(error){e.target.setCustomValidity(error.message);notice(error.message);}currentLayerDraft()?.finishEdit();syncLayerDraftUI();return;}if(e.target.dataset.actionField){try{editActionField(e.target.dataset.actionField,e.target.value);}catch(error){notice(error.message);}return;}if(e.target.id==='world-use-confirm'){const button=$('dialog').querySelector('[data-action="world-use-confirm"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='prepare-confirm'){const button=$('dialog').querySelector('[data-action="source-prepare"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='scene-picker')perform(()=>dispatch('scene',{id:e.target.value}));if(['browser-kind','browser-scope','browser-activity','browser-subcategory'].includes(e.target.id))perform(()=>dispatch(e.target.id,{value:e.target.value}));});
 document.addEventListener('submit',e=>{if(e.target.id==='browser-search'){e.preventDefault();perform(()=>dispatch('browser-search',{}));}});
+document.addEventListener('change',e=>{if(e.target.name==='world-prepare-group'){const button=$('dialog').querySelector('[data-action="world-prepare-confirm"]');if(button){const count=$('dialog').querySelectorAll('[name="world-prepare-group"]:checked').length;button.disabled=busy||count<1||count>64;}}});
 let lastObservationAt=Date.now();
 const pollStatus=statusPoller();
 setInterval(async()=>{
@@ -489,7 +523,7 @@ setInterval(async()=>{
   const changed=v.project.revision!==p().revision||v.locked!==state.locked||progressKey(v.runs)!==progressKey(state.runs)||
     observationKey(v.taskStatuses?.[sceneId],s()?.task,at)!==observationKey(state.taskStatuses?.[sceneId],s()?.task,lastObservationAt);
   acceptSnapshot(v);lastObservationAt=at;
-  if(changed){render();scheduleActionInspection();scheduleLayerInspection();}
+  if(changed){render();scheduleActionInspection();scheduleLayerInspection();scheduleWorldPreparation();}
  }catch(e){notice(e.message);}
 },500);
 if(!token){notice('Open the desktop launcher or its Start shortcut to establish a local session.');$('app').innerHTML='<div class="empty"><h1>Local session required</h1><p>The workbench does not accept a public or unauthenticated studio connection.</p></div>';}else perform(async()=>{cap=await api('workbench/capabilities');await load();});

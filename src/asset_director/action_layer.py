@@ -122,8 +122,10 @@ def ancestors(obj):
         yield obj
 
 
-def preserved(excluded, *, omit_objects=(), omit_actions=()):
+def preserved(excluded, *, omit_objects=(), omit_actions=(), omit_parent=()):
     """Keys, rest/skin identity, placement and every unselected performer remain."""
+    # Preparation alone uses omit_parent for inspected independent roots; its
+    # verifier separately requires their exact new identity-container binding.
     require(sum(len(o.data.vertices) for o in bpy.context.scene.objects if o.type == 'MESH') <= 2000000,
             'RESOURCE_LIMIT', 'Simple Action editing supports at most two million scene mesh vertices; use Blender for this scene')
     require(sum(len(c.keyframe_points) for a in bpy.data.actions for c in ops.curves(a)) <= 500000,
@@ -132,8 +134,8 @@ def preserved(excluded, *, omit_objects=(), omit_actions=()):
     for obj in sorted(bpy.context.scene.objects, key=lambda o: o.name):
         if obj.name in omit_objects:continue
         ad = obj.animation_data
-        row = {'name': obj.name, 'type': obj.type, 'parent': obj.parent.name if obj.parent else None,
-               'parent_inverse': ops.flatten(obj.matrix_parent_inverse), 'data': obj.data.name if obj.data else None,
+        row = {'name': obj.name, 'type': obj.type, 'parent': None if obj.name in omit_parent else obj.parent.name if obj.parent else None,
+               'parent_inverse': None if obj.name in omit_parent else ops.flatten(obj.matrix_parent_inverse), 'data': obj.data.name if obj.data else None,
                'local': None if obj.name in excluded else ops.flatten(obj.matrix_basis),
                'materials': [s.material.name if s.material else None for s in obj.material_slots],
                'visibility': [obj.hide_render, obj.hide_viewport],

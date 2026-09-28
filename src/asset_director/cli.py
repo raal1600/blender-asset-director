@@ -70,6 +70,7 @@ def main(argv=None):
                 result['action_layer'] = 'action-layer-v1'
                 result['action_task'] = 'action-task-v1'
                 result['scene_layer'] = 'scene-layer-v1'
+                result['world_prepare'] = 'world-prepare-v1'
                 result['shot_preview'] = 'shot-camera-samples-v1'
             elif command == "workbench-verify":
                 from .workbench_catalog import verify_project

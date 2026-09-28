@@ -12,6 +12,21 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def reported_browser(command, output, name, timeout):
+    """Retain full local evidence; surface the existing redacted synthetic verdict on failure."""
+    with (output / (name + '.log')).open('wb') as log:
+        result = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=timeout)
+    if result.returncode:
+        report = output / name / 'RESULTS.json'
+        try:
+            data = json.loads(report.read_text(encoding='utf-8'))
+            summary = {key: data[key] for key in ('status', 'checks', 'error', 'errors') if key in data}
+            print(json.dumps({'journey': name, 'result': summary}), file=sys.stderr)
+        except (OSError, ValueError):
+            print(f'{name}: failed before a readable result was written; local log retained', file=sys.stderr)
+        result.check_returncode()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--evidence', required=True)
@@ -36,6 +51,11 @@ def main():
         subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
                         '--python-exit-code','11','--python',str(ROOT/'tools/world_transform_fixture.py'),'--',
                         str(output/'world-layers/placed.blend'),str(output/'world-transform')],
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
+    with (output/'world-prepare.log').open('wb') as log:
+        subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
+                        '--python-exit-code','11','--python',str(ROOT/'tools/world_prepare_fixture.py'),'--',
+                        str(output/'world-layers'),str(output/'world-prepare')],
                        cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
     with (output/'action-layer.log').open('wb') as log:
         subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
@@ -96,8 +116,11 @@ def main():
         command = [args.node, str(ROOT/'tools/scene_layer_browser_check.mjs'), str(output/'scene-layers-browser'),
                    str(output/'scene-layers-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
-        with (output/'scene-layers-browser.log').open('wb') as log:
-            subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300, check=True)
+        reported_browser(command, output, 'scene-layers-browser', 300)
+        command = [args.node, str(ROOT/'tools/world_prepare_check.mjs'), str(output/'world-preparation-browser'),
+                   str(output/'world-layers'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        reported_browser(command, output, 'world-preparation-browser', 300)
         command = [args.node, str(ROOT/'tools/lighting_evidence_check.mjs'), str(output/'lighting-evidence-browser'),
                    str(output/'scene-layers-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)

@@ -2,6 +2,7 @@ import {openAssetPreview} from './asset-preview.mjs';
 import {focusTask} from './workbench-task.mjs';
 import {syncTask} from './task-save.mjs';
 import {saveWorld} from './world-transform.mjs';
+import {inspectWorldPreparation,prepareWorld} from './world-prepare.mjs';
 import {inspectAction,saveAction} from './action-layer.mjs';
 import {resolveActionContext} from './action-context.mjs';
 import {inspectSceneLayer,saveSceneLayer} from './scene-layer.mjs';
@@ -29,6 +30,8 @@ export class Workbench extends withCatalog(WorkbenchCore) {
   inspectSceneLayer(...args){return inspectSceneLayer(this,...args);}
   saveSceneLayer(...args){return saveSceneLayer(this,...args);}
   saveWorld(...args){return saveWorld(this,...args);}
+  inspectWorldPreparation(...args){return inspectWorldPreparation(this,...args);}
+  prepareWorld(...args){return prepareWorld(this,...args);}
   inspectAction(...args){return inspectAction(this,...args);}
   saveAction(...args){return saveAction(this,...args);}
   previewAsset(...args){return openAssetPreview(this,...args);}

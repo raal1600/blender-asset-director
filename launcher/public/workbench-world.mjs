@@ -3,6 +3,7 @@ import {taskBanner} from './workbench-task.mjs';
 import {progressLabel} from './workbench-progress.mjs';
 import {previewIsCurrent} from './workbench-lineage.mjs';
 import {ingredientStatus} from './workbench-browser.mjs';
+import {preparationHint} from './workbench-world-prepare.mjs';
 
 /** Presence comes only from the displayed checkpoint, never from a selected pin. */
 export function worldIngredients({project,scene,inventory={sources:[]}}) {
@@ -62,6 +63,7 @@ export function worldView({project,scene,stages,locked,sourceUse,runs,taskStatus
       ${cp?`<section class="viewer-3d" data-scene-viewer aria-label="Saved scene in 3D"><div class="viewer-message"><strong>Explore your saved scene</strong><p>${blocked?'Your current task is separate from this saved checkpoint.':'Loading saved geometry for inspection…'}</p>${b('View saved scene in 3D','scene-viewer',{},'ghost',blocked)}</div></section>`:`<div class="world-empty"><h2>${v.pending.length?'Your asset is chosen':'Every world starts with an ingredient'}</h2><p>${v.pending.length?'It is not in your scene yet. Add it below to create real scene objects.':'Find something to place in your scene, then make it your own.'}</p>${v.pending.length?b('Preview selected asset in 3D','catalog-preview-detail',{id:v.pending[0].id,preview:'true'},'ghost'):''}</div>`}
     </section>
     <section class="world-next" aria-label="Next step" data-world-state="${v.kind}"><div class="grow"><h2>${esc(title)}</h2><p>${esc(hint)}</p></div><div class="world-next-actions">${action?button(label,action,data||{},'primary',!!queueCount):''}${v.kind==='review'?button('Inspect in Blender','inspect-candidate',{},'ghost',!!queueCount):['ready','empty'].includes(v.kind)?button('Arrange in Blender','task',{},'',!!queueCount):v.kind==='working'?b('Inspect operation','recover',{run:scene.run},'ghost'):v.kind==='locked'?b('Refresh status','refresh',{},'ghost'):''}</div></section>
+    ${preparationHint({scene,checkpoint:cp,runs,cap,blocked:blocked||unsupported,esc,b})}
     ${ingredientStrip({project,scene,inventory,esc,b,disabled:blocked||unsupported})}
     ${scene.task?taskBanner(scene,taskStatus,esc,b):''}
     ${cp?`<details class="world-inspection"><summary>Inspection tools</summary><div class="row">${b('Reload saved scene in 3D','scene-viewer',{},'',blocked)}${button('Inspect saved file in Blender','inspect-candidate')}</div><p>Saved geometry only; unsaved Blender edits are not shown. Preview lighting and materials may differ from Blender.</p><details class="rendered-evidence"><summary>Rendered still${preview?' · available':''}</summary>${preview?'<img data-media="preview" alt="Rendered still of the current saved checkpoint">':''}<p>${camera?'A camera-rendered still is separate from this interactive view.':'A saved camera is needed for a rendered still.'}</p>${button('Render preview still','preview',{},'',!cap?.render_frames||!camera)}</details></details>`:''}
