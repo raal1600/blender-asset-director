@@ -2,6 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sceneLayerDraft,layerInspection,ensureLayerInspection,sceneLayerView,cameraForm} from '../public/workbench-scene-layer.mjs';
 const cp={id:'cp_saved',sha256:'saved-hash'};
+test('failed or interrupted inspection is visible in the viewer with retained-operation recovery',()=>{
+ for(const state of ['FAILED','INTERRUPTED']){
+  const scene={id:'scene',stage:'shots',current:cp.id,completed:{},checkpoints:[cp]},attempt={id:'run_failed',action:'scene-layer-audit',sceneId:'scene',checkpointId:cp.id,options:{layer:'shots'},state,error:'Native input unavailable'};
+  const html=sceneLayerView({project:{workbench:{scenes:[scene]}},scene,checkpoint:cp,stages:[],runs:[attempt],locked:false,cap:{scene_layer:'scene-layer-v1'},draft:null,esc:v=>String(v??''),b:(t,a,d,c,disabled)=>`<button data-action="${a}" ${disabled?'disabled':''}>${t}</button>`});
+  assert.match(html,/<section[^>]*data-scene-viewer[^>]*><div[^>]*role="alert"/);
+  assert.match(html,/Your saved scene is preserved/);assert.match(html,/Native input unavailable/);
+  assert.match(html,/data-action="recover"/);assert.doesNotMatch(html,/Inspecting the saved cameras|Retry layer inspection/);
+  assert.match(html,/data-action="layer-ready" disabled/);
+ }
+});
 test('older scenes without optional shot metadata display Shots and Light without rewriting the scene',()=>{
  for(const stage of ['shots','light']){
   const scene={id:'scene',name:'Older scene',stage,current:cp.id,checkpoints:[cp],completed:{},renders:[]},original=structuredClone(scene);

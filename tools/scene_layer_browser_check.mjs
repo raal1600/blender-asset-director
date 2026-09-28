@@ -30,7 +30,7 @@ try{
  const ready=async()=>{
   await idle();
   try{
-   await page.waitForFunction(()=>['ready','failed'].includes(document.querySelector('[data-scene-viewer]')?.dataset.viewerState),null,{timeout:205000});
+   await page.waitForFunction(()=>['ready','failed'].includes(document.querySelector('[data-scene-viewer]')?.dataset.viewerState)||!!document.querySelector('[data-scene-viewer] [role="alert"]'),null,{timeout:205000});
    assert.equal(await page.locator('[data-scene-viewer]').getAttribute('data-viewer-state'),'ready',await page.locator('[data-scene-viewer]').innerText());
    await page.waitForFunction(()=>!document.querySelector('[data-action="layer-ready"]')?.disabled,null,{timeout:205000});await idle();
   }catch(error){
@@ -53,6 +53,7 @@ try{
  await click('layer-camera');await page.locator('[name="layer-subject"][value="SyntheticSkin0"]').check();await page.locator('#layer-camera-name').fill('SyntheticBrowserCamera');await page.locator('#layer-lens').fill('55');assert.deepEqual(await fileHash(path.join(p.directory,'project.json')),base);
  await click('layer-camera-save');await ready();let v=await state(),scene=v.project.workbench.scenes[0],cameraCP=scene.checkpoints.find(c=>c.id===scene.current);
  assert.notEqual(cameraCP.id,cpId);assert.equal(scene.completed.shots,undefined);const cameraRun=v.runs.find(r=>r.action==='scene-layer-audit'&&r.state==='SUCCEEDED'&&r.checkpointId===cameraCP.id);
+ if(process.platform==='win32')assert(path.join(p.directory,cameraCP.path).length<=250,'Native checkpoint must remain accessible inside Blender');
  assert.equal(cameraRun.inspection.cameras.find(c=>c.name==='SyntheticBrowserCamera').lens_mm,55);assert.equal(cameraRun.inspection.cameras.length,3);report.saved.push(cameraCP);
  report.checks.push('Observed subject selection -> explicit new camera Save -> real independently audited camera; old cameras and unapproved state retained');
  await click('new-shot');await page.locator('#shot-name').fill('Detail');await page.locator('#shot-camera').selectOption('SyntheticBrowserCamera');await click('save-shot');await ready();

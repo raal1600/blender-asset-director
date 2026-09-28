@@ -4,6 +4,7 @@ import {constants} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {assert,digest,exists,fileHash,json,now,safe,writeJson} from './storage.mjs';
 import {approveCheckpoint} from './workbench-model.mjs';
+import {checkpointScenePath} from './checkpoint-paths.mjs';
 
 export async function checkpointJob(work,id,sceneId,revision,request,policy) {
   const {stage,operation,options,readOnly=false,candidateOnly=false}=policy;
@@ -23,6 +24,10 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
   assert(request.checkpointId===(scene.candidate||scene.current),'This draft belongs to an older checkpoint. Refresh before saving.',409);
   const cp=await work.verify(p,scene,request.checkpointId);
   assert(cp.sha256===request.sha256,'The draft checkpoint changed.',409);
+  // Blender's embedded Python can reject paths that Node/standalone Python can
+  // read. Check the new immutable destination before taking a lease or running.
+  const cpId=readOnly?null:'cp_'+randomUUID();
+  const relative=readOnly?null:checkpointScenePath(p.directory,sceneId,cpId);
   if(!readOnly)assert((await work.interactions(id).sourceStatus()).ready,'Review the exact production source use before saving.',409);
   await policy.check?.({p,scene,cp});
   const savedBase=scene.current,draftBase=scene.candidate;
@@ -59,7 +64,7 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
           await work.verify(q,s,cp.id);
           if(readOnly){record.inspection=data;return;}
           assert((await work.interactions(id).sourceStatus()).ready,'Source-use scope changed during Save.',409);
-          const cpId='cp_'+randomUUID(),relative=`Scenes/${sceneId}--${cpId}.blend`,destination=await safe(q.directory,relative);
+          const destination=await safe(q.directory,relative);
           await fs.copyFile(source,destination,constants.COPYFILE_EXCL);
           const copied=await fileHash(destination);
           assert(copied.sha256===actual.sha256&&copied.size===actual.size,'New saved checkpoint differs from the verified output.',409);

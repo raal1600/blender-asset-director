@@ -190,3 +190,16 @@ compares GLB geometry and projected coordinates against those native samples,
 checks real pixels/playback/orbit return, revises a shot and verifies cache
 invalidation plus preserved old bytes, and enters Light under its distinct
 profile. Its generated stage decisions are scripted, not human acceptance.
+
+### Windows checkpoint paths and inspection failures
+
+New native layer/World/Action checkpoints retain the full checkpoint UUID but
+omit the redundant scene UUID from the filename when the longer Windows path
+would exceed 250 characters. Node and standalone Python can read some paths that
+Blender's embedded Python cannot. If even the compact path exceeds that bound,
+Save refuses before taking the writer lease or starting a native job. Existing
+files, manifests and checkpoint identities are never renamed or truncated.
+
+Failed/interrupted layer inspection appears in the viewer with the retained
+operation and technical details. Native retry remains an explicit evidence-
+preserving reset; it neither reruns a job nor approves a saved scene.
