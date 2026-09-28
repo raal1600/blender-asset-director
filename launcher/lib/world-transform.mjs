@@ -26,6 +26,12 @@ export async function saveWorld(work,id,sceneId,revision,request) {
   return checkpointJob(work,id,sceneId,revision,request,{
     stage:'world',operation:'world-transform',options,
     check:({cp})=>{
+      // Saved-file imports intentionally have no cached scene audit. Their
+      // preview can still expose native-verified instances. The bounded worker
+      // resolves every identity/owner/expected matrix again before ANY mutation;
+      // absence of this optional cache must not make those controls unsaveable.
+      // A present audit still supplies the early unknown-target refusal below.
+      if(cp.audit===null||cp.audit===undefined)return;
       const observed=cp.audit?.objects||[];
       for(const change of request.transforms){
         const control=observed.filter(o=>o.placement_control&&o.placement_instance===change.instance);

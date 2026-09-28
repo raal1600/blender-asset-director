@@ -84,6 +84,35 @@ test('stale revision, checkpoint, unknown instance and wrong activity never laun
   assert.equal(f.calls.length,0);
 });
 
+test('missing optional imported audit delegates validation to native Save without rewriting baseline',async t=>{
+  for(const fail of [false,true]){
+    const f=await fixture(t),p=await f.store.get(f.p.id);
+    p.workbench.scenes[0].checkpoints[0].audit=null;
+    const imported=await f.store.save(p,p.revision);f.control.fail=fail;
+    const before=await fileHash(f.source);
+    const started=await f.work.saveWorld(p.id,f.sceneId,imported.revision,f.request);
+    const saved=await f.wait(),scene=saved.workbench.scenes[0];
+    assert.equal(scene.checkpoints[0].audit,null,'Do not fabricate or backfill imported audit');
+    assert.deepEqual(await fileHash(f.source),before);
+    const receipt=await json(path.join(p.directory,`Runs/${started.run.id}.json`));
+    assert.equal(receipt.state,fail?'FAILED':'SUCCEEDED');
+    assert.equal(scene.current===f.cp.id,fail);
+    assert.equal(scene.checkpoints.length,fail?1:2);
+    assert.equal(f.calls.filter(x=>x[0]==='job-run').length,1);
+    if(!fail)assert.deepEqual(scene.completed,{});
+  }
+});
+
+test('present empty or malformed audit is not treated as missing metadata',async t=>{
+  for(const audit of [{objects:[]},{}]){
+    const f=await fixture(t),p=await f.store.get(f.p.id);
+    p.workbench.scenes[0].checkpoints[0].audit=audit;
+    const saved=await f.store.save(p,p.revision);
+    await assert.rejects(f.work.saveWorld(p.id,f.sceneId,saved.revision,f.request),/no verified placement/);
+    assert.equal(f.calls.length,0);
+  }
+});
+
 test('source-use refusal and a manual writer prevent dependent native execution',async t=>{
   const f=await fixture(t);const original=f.work.interactions.bind(f.work);
   f.work.interactions=()=>({sourceStatus:async()=>({ready:false})});

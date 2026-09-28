@@ -36,6 +36,14 @@ with Save. Sources and baseline are rechecked before publishing the verified
 output as a new current **unapproved** checkpoint. Saving is not World completion,
 render approval or a replacement for source rights. Previous files are retained.
 
+Saved-file imports may have no cached checkpoint audit. They remain editable when
+the native preview observes valid placement instances: Save delegates validation
+to the same isolated worker, which resolves exact ownership and expected matrices
+for the whole batch before any mutation. It never invents an audit or repairs the
+baseline on display. A present audit retains the early unknown-instance refusal;
+missing, stale or unsupported native identities still fail without publishing a
+checkpoint. The imported original remains byte-identical.
+
 ## Regression coverage
 
 Portable contract tests and launcher synthetic persistence tests cover schema,

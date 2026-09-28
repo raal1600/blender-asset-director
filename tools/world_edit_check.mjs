@@ -18,15 +18,26 @@ const report={kind:'synthetic-world-direct-edit',checks:[],errors:[],requests:[]
 let app,browser,page;
 try{
  app=await createApp({root:path.join(out,'Studio'),port:0,config:{python,blender,skill:path.join(repo,'skills/blender-asset-director'),library:path.join(out,'Studio/Database/AssetDirector')}});
- const prepared=await app.runtime.harness(['job-prepare','scene-audit','--input',source]);
- const result=await app.runtime.harness(['job-run',prepared.id,'--blender',blender]);
- const audit=await app.workbench.result(result);
  let project=await app.store.create('Synthetic World direct editing','Generated rigs and props; no human creative acceptance.');
  await app.workbench.create(project.id,project.revision,'Two performers and props');project=await app.store.get(project.id);
- const scene=project.workbench.scenes[0],cpId='cp_'+randomUUID(),relative='Scenes/'+cpId+'.blend';
+ const scene=project.workbench.scenes[0],relative='Scenes/generated-import.blend';
  await fs.copyFile(source,path.join(project.directory,relative),fs.constants.COPYFILE_EXCL);
- scene.checkpoints.push({id:cpId,path:relative,...sourceBefore,parent:null,stage:'world',createdAt:new Date().toISOString(),source:'synthetic-native-world-fixture',audit});scene.current=cpId;
- project=await app.store.save(project,project.revision);
+ project=await app.workbench.importCheckpoint(project.id,scene.id,project.revision,relative);
+ const cpId=project.workbench.scenes[0].candidate;
+ project=await app.workbench.keepBuilding(project.id,scene.id,project.revision);
+ assert.equal(project.workbench.scenes[0].checkpoints.find(c=>c.id===cpId).audit,null);
+ // The public saved-file route has no cached audit. Unknown native identities
+ // must still fail before mutation, leaving a retained attempt and no new scene.
+ const unknown={version:'world-transform-v1',requestId:'run_'+randomUUID(),checkpointId:cpId,sha256:sourceBefore.sha256,
+   transforms:[{instance:'instance_'+randomUUID(),expected_matrix:[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],matrix:[1,0,0,2,0,1,0,0,0,0,1,0,0,0,0,1]}]};
+ const rejected=await app.workbench.saveWorld(project.id,scene.id,project.revision,unknown);
+ const deadline=Date.now()+205000;while(app.workbench.running.size&&Date.now()<deadline)await new Promise(r=>setTimeout(r,150));
+ assert.equal(app.workbench.running.size,0,'Rejected native Save must finish');
+ const refusal=await json(path.join(project.directory,'Runs',rejected.run.id+'.json'));assert.equal(refusal.state,'FAILED');
+ assert.equal(await exists(path.join(app.workbench.config.library,'jobs',refusal.jobId,'result.blend')),false);
+ project=await app.store.get(project.id);assert.equal(project.workbench.scenes[0].current,cpId);assert.equal(project.workbench.scenes[0].checkpoints.length,1);
+ assert.deepEqual(await fileHash(source),sourceBefore);assert.deepEqual(await fileHash(path.join(project.directory,relative)),sourceBefore);
+ report.checks.push('Public saved-file import with no cached audit: native unknown target refused without publishing or changing baseline');
  const before=await fileHash(path.join(project.directory,'project.json'));
  const {chromium}=await import(pathToFileURL(playwright).href);
  browser=await chromium.launch(chrome?{executablePath:chrome}:{channel:'chrome'});
@@ -131,7 +142,10 @@ try{
  await page.screenshot({path:path.join(out,'04-stale-draft.png'),fullPage:true});await click('[data-action="world-discard-draft"]');await ready();
  assert.equal((await app.store.get(project.id)).workbench.scenes[0].current,replacement.id);
  report.checks.push('Concurrent checkpoint change retains stale local draft; Save refuses until deliberate discard/reload');
- await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'04-mobile.png'),fullPage:true});
+ await page.setViewportSize({width:390,height:844});
+ assert.equal(await page.locator('.world-failure').isVisible(),true,'Retained native refusal remains visible');
+ assert.match(await page.locator('.world-failure').innerText(),/WORLD_IDENTITY_CHANGED/);
+ await page.screenshot({path:path.join(out,'04-mobile.png'),fullPage:true});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'No horizontal overflow at 390px');
  approveSyntheticWorld=true;await click('[data-action="approve"]');approveSyntheticWorld=false;
  await page.waitForFunction(()=>document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready'&&document.querySelector('[data-action="action-ready"]')?.disabled===false,null,{timeout:205000});

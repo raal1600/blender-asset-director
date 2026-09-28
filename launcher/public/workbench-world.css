@@ -62,7 +62,7 @@
 .preparation-dialog .primary:hover,.preparation-dialog .primary:focus-visible,.browser-asset .primary:hover{background:#c5d4ff;color:#162137}
 @media(max-width:640px){.browser-locations{margin-bottom:6px}.browser-locations button{padding:8px}}
 .world-inspection .row{margin:16px 0}.world-inspection .rendered-evidence img{max-width:100%;max-height:500px}
-.world-failure{margin-bottom:18px}.world-workspace .note button{margin-top:8px}
+.world-failure{margin-bottom:18px;overflow-wrap:anywhere}.world-workspace .note button{margin-top:8px}
 dialog.world-asset-dialog{width:min(1050px,calc(100vw - 36px));max-width:1050px;padding:24px;max-height:94vh}
 .world-asset-dialog .detail-head{margin-bottom:12px}.world-asset-dialog .asset-facts{margin-bottom:12px}
 .world-asset-dialog .viewer-canvas{height:clamp(230px,40vh,450px)}
