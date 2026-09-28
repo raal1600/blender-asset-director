@@ -109,6 +109,7 @@ export class PreviewCleanup {
     for(const candidate of review.eligible){
       assert(!this.viewers.protectedPreview(candidate.previewId),'Preview became active; remaining files retained.',409);
       await exactFile(base,candidate.index.path,candidate.index);
+      this.viewers.forget(candidate.previewId);
       // Drop the reuse pointer first; retain its original content in the journal.
       await remove(await safe(base,candidate.index.path),{...candidate.index,kind:'cache-index'});
       const directory=await safe(base,candidate.previewId);
@@ -116,7 +117,6 @@ export class PreviewCleanup {
         await exactFile(directory,member.path,member);
         await remove(await safe(directory,member.path),{...member,path:candidate.previewId+'/'+member.path,kind:'disposable-payload'});
       }
-      this.viewers.forget(candidate.previewId);
     }
     journal.state='SUCCEEDED';
   }catch(error){journal.state='PARTIAL';journal.error=error.message;}

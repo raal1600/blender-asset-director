@@ -76,6 +76,10 @@ library or project history. Nothing is removed until the user confirms the exact
 current review, including that these cached copies are not open manually in Blender.
 Viewing another scene or Final film releases the prior in-app view; another open
 window still protects its copy. Each UI view has a separate scope-bound grant.
+Closing a view releases its cleanup protection, not the existing bounded session
+media descriptor. Previously prepared historical bytes remain readable until LRU
+eviction or explicit cleanup. Media reads share the cleanup queue, so removal
+waits for an in-flight read and revokes its descriptor before removing payloads.
 Lost/crashed view grants remain protected until session restart rather than being
 expired on a timer. Older API clients without view IDs receive conservative
 session protection for their 64 most recent preparations.

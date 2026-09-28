@@ -65,7 +65,9 @@ export class EmbeddedPreviews {
   release(projectId,sceneId,viewerId){
     const view=this.views?.get(viewerId);if(!view)return {released:false};
     assert(view.projectId===projectId&&view.sceneId===sceneId,'Preview view belongs to another scene.',404);
-    this.views.delete(viewerId);if(!this.protectedPreview(view.previewId))this.forget(view.previewId);
+    // Release cleanup protection, not the bounded historical media descriptor.
+    // Explicit cleanup or LRU eviction revokes that separate session grant.
+    this.views.delete(viewerId);
     return {released:true};
   }
   exclusive(action){const pending=this.queue.then(action);this.queue=pending.catch(()=>{});return pending;}
@@ -144,7 +146,8 @@ export class EmbeddedPreviews {
       await cache.publish(key,source,record);this.remember({record,filename,source});return record;
     }catch(error){await writeJson(path.join(directory,'viewer-failure.json'),{previewId,state:'FAILED',error:error.message});throw Object.assign(new Error(error.message+' 3D attempt retained: '+previewId),{status:error.status});}
   }
-  async bytes(projectId,sceneId,previewId) {
+  bytes(projectId,sceneId,previewId) {return this.exclusive(()=>this.readBytes(projectId,sceneId,previewId));}
+  async readBytes(projectId,sceneId,previewId) {
     const item=this.owned.get(previewId);
     assert(item&&item.record.projectId===projectId&&item.record.sceneId===sceneId,'3D preview is not active in this session/scene. Reopen its preview; no restart is needed.',404);
     this.remember(item);

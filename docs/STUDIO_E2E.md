@@ -73,3 +73,19 @@ python tools/studio_e2e/run.py --blender /absolute/path/to/blender \
 
 The runner always creates a fresh studio and never accepts an existing studio
 path. Focused scenarios still run real installation/onboarding prerequisites.
+
+Fixture teardown closes its synthetic browser/MCP clients, polls authenticated
+lifecycle state, then requests normal backend shutdown after pending work drains.
+It does not force-terminate a backend with unknown/unfinished work or delete a
+temporary studio underneath its native children. Successful owned temporary roots
+are removed only after shutdown; failures retain their generated directory and
+record its path for diagnosis. This is test cleanup, not a live-studio updater.
+
+`tools/studio_e2e/teardown_check.py --blender <existing-executable> --evidence <new-folder>`
+adds a focused actual installed-backend check: generate/import an unapproved
+synthetic checkpoint, observe its native preview job RUNNING, request fixture
+shutdown, and verify native success precedes normal backend exit with source,
+manifest, checkpoint and failure evidence preserved. It installs only into its
+new test directory, downloads nothing, renders no movie and claims no native GUI
+or human acceptance. The existing embedded-viewer suite invokes it without adding
+a workflow identity or uploading the generated whole studio.

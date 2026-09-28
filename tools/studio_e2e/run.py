@@ -2,13 +2,12 @@
 import argparse
 from pathlib import Path
 import sys
-import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT/'tools/ci'))
 from contracts import SCENARIOS, checkpoints
 from evidence import Evidence
-from support import Studio
+from support import Studio, disposable_studio
 import journeys
 
 NOT_TESTED = [
@@ -32,7 +31,7 @@ def main():
         if not __debug__:
             raise RuntimeError('Optimized Python disables test assertions; refuse to run')
         from playwright.sync_api import sync_playwright
-        with tempfile.TemporaryDirectory(prefix='synthetic-studio-e2e-') as temporary:
+        with disposable_studio(evidence) as temporary:
             s = Studio(temporary, args.blender, evidence)
             try:
                 s.install()

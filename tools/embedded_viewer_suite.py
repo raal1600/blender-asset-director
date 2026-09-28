@@ -138,6 +138,10 @@ def main():
                    str(output/'world-layers'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
         reported_browser(command, output, 'preview-cleanup-browser', 300)
+        with (output/'studio-teardown.log').open('wb') as log:
+            subprocess.run([sys.executable, str(ROOT/'tools/studio_e2e/teardown_check.py'),
+                            '--evidence', str(output/'studio-teardown'), '--blender', args.blender],
+                           cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300, check=True)
         command = [args.node, str(ROOT/'tools/lighting_evidence_check.mjs'), str(output/'lighting-evidence-browser'),
                    str(output/'scene-layers-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
@@ -155,8 +159,7 @@ def main():
         command = [args.node, str(ROOT/'tools/shot_view_check.mjs'), str(output/'shot-view-browser'),
                    str(output/'shot-view-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
-        with (output/'shot-view-browser.log').open('wb') as log:
-            subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300, check=True)
+        reported_browser(command, output, 'shot-view-browser', 300)
         command = [args.node, str(ROOT/'tools/world_edit_check.mjs'), str(output/'world-direct-edit'),
                    str(output/'world-layers'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)

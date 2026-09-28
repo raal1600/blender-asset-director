@@ -91,6 +91,8 @@ test('shared view lifetimes protect active copies; explicit cleanup retains evid
  assert.equal((await cleanup.plan()).eligible.length,0);f.viewers.release('project','scene',one);assert.equal((await cleanup.plan()).eligible.length,0);
  assert.throws(()=>f.viewers.release('project','wrong',two),/another scene/);f.viewers.release('project','scene',two);
  assert.equal(f.viewers.release('project','scene',two).released,false);
+ assert.equal(f.viewers.protectedPreview(record.previewId),false);
+ assert.equal((await f.viewers.bytes('project','scene',record.previewId)).length,record.size,'Closing the last view releases cleanup protection, not the bounded session media grant');
  const plan=await cleanup.plan();assert.equal(plan.eligible.length,1);assert.deepEqual(plan.eligible[0].files,['model.glb']);
  const preserved=await Promise.all(['request.json','viewer.json'].map(n=>fileHash(path.join(directory,n))));
  await assert.rejects(cleanup.apply({...plan,confirmed:false,closedNativePreviews:true}),/explicitly confirm/);
@@ -98,6 +100,7 @@ test('shared view lifetimes protect active copies; explicit cleanup retains evid
  assert.equal((await fileHash(path.join(directory,'model.glb'))).sha256,record.sha256);
  const result=await cleanup.apply({...plan,confirmed:true,closedNativePreviews:true});assert.equal(result.state,'SUCCEEDED');assert.equal(result.removedBytes,record.size);
  await assert.rejects(fs.access(path.join(directory,'model.glb')));
+ await assert.rejects(f.viewers.bytes('project','scene',record.previewId),e=>e.status===404);
  assert.deepEqual(await Promise.all(['request.json','viewer.json'].map(n=>fileHash(path.join(directory,n)))),preserved);assert.deepEqual(await fileHash(source),sourceBefore);
  const rebuilt=await prepare(one);assert.notEqual(rebuilt.previewId,record.previewId);assert.equal(rebuilt.sha256,record.sha256);
  const journal=await json(path.join(f.base,result.journal));assert.equal(journal.state,'SUCCEEDED');assert.equal(journal.removed.length,2);assert.equal(journal.review.eligible[0].indexRecord.previewId,record.previewId);
@@ -112,6 +115,19 @@ test('unknown files, active views and source drift protect copies and invalidate
  plan=await cleanup.plan();await fs.appendFile(path.join(f.work.config.library,'mesh.bin'),'changed');
  await assert.rejects(cleanup.apply({...plan,confirmed:true,closedNativePreviews:true}),/source changed/);assert.equal((await fileHash(model)).sha256,record.sha256);assert.equal((await cleanup.plan()).eligible.length,0);
 });
+
+test('reviewed cleanup waits for an existing media read, then revokes the descriptor before removal',async t=>{
+ const f=await fixture(t),id='viewer_00000000-0000-4000-8000-000000000001',record=await f.viewers.prepare('project','scene',1,f.request(1),id);f.viewers.release('project','scene',id);
+ const cleanup=new PreviewCleanup(f.viewers),plan=await cleanup.plan(),original=f.work.project;
+ let entered,resume,applying=false;
+ const started=new Promise(resolve=>{entered=resolve;}),gate=new Promise(resolve=>{resume=resolve;});
+ f.work.project=async(...args)=>{entered();await gate;return original(...args);};
+ const reading=f.viewers.bytes('project','scene',record.previewId);await started;
+ const removing=f.viewers.exclusive(()=>{applying=true;return cleanup.apply({...plan,confirmed:true,closedNativePreviews:true});});
+ await new Promise(setImmediate);assert.equal(applying,false);assert.equal((await fileHash(path.join(f.base,record.previewId,'model.glb'))).sha256,record.sha256);
+ resume();assert.equal((await reading).length,record.size);assert.equal((await removing).state,'SUCCEEDED');
+ await assert.rejects(f.viewers.bytes('project','scene',record.previewId),e=>e.status===404);
+});
 test('changed payload and shared file identities cannot be removed from an old cleanup review',async t=>{
  const f=await fixture(t),id='viewer_00000000-0000-4000-8000-000000000001',record=await f.viewers.prepare('project','scene',1,f.request(1),id);f.viewers.release('project','scene',id);
  const cleanup=new PreviewCleanup(f.viewers),model=path.join(f.base,record.previewId,'model.glb'),bytes=await fs.readFile(model),plan=await cleanup.plan();
@@ -120,10 +136,12 @@ test('changed payload and shared file identities cannot be removed from an old c
 });
 test('a simulated file-removal failure stops cleanup with a retained partial journal and remaining bytes',async t=>{
  const f=await fixture(t),id='viewer_00000000-0000-4000-8000-000000000001',record=await f.viewers.prepare('project','scene',1,f.request(1),id);f.viewers.release('project','scene',id);
- const cleanup=new PreviewCleanup(f.viewers),plan=await cleanup.plan(),originalUnlink=fs.unlink,model=path.join(f.base,record.previewId,'model.glb');
- const hook=t.mock.method(fs,'unlink',async filename=>{if(filename===model)throw Object.assign(Error('Synthetic locked payload'),{code:'EACCES'});return originalUnlink(filename);});
+ const cleanup=new PreviewCleanup(f.viewers),plan=await cleanup.plan(),originalUnlink=fs.unlink;
+ const rawModel=path.join(f.base,record.previewId,'model.glb'),model=process.platform==='win32'?rawModel.toLowerCase():rawModel;
+ const canonicalModel=await fs.realpath(model);let injected=0;
+ const hook=t.mock.method(fs,'unlink',async filename=>{if(path.relative(canonicalModel,await fs.realpath(filename))===''){injected++;throw Object.assign(Error('Synthetic locked payload'),{code:'EACCES'});}return originalUnlink(filename);});
  const result=await cleanup.apply({...plan,confirmed:true,closedNativePreviews:true});hook.mock.restore();
- assert.equal(result.state,'PARTIAL');assert.equal(result.removedBytes,0);assert.match(result.error,/Synthetic locked/);
+ assert.equal(injected,1);assert.equal(result.state,'PARTIAL');assert.equal(result.removedBytes,0);assert.match(result.error,/Synthetic locked/);
  assert.equal((await json(path.join(f.base,result.journal))).pending.path,record.previewId+'/model.glb');
  assert.equal((await fileHash(model)).sha256,record.sha256);const journal=await json(path.join(f.base,result.journal));assert.equal(journal.state,'PARTIAL');assert.equal(journal.removed.length,1);assert.equal(journal.removed[0].kind,'cache-index');
  await assert.rejects(cleanup.apply({...plan,confirmed:true,closedNativePreviews:true}),/Review/);assert.equal((await cleanup.plan()).eligible.length,0);
