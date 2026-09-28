@@ -1,11 +1,12 @@
 /** Local WebGL inspection. No project writes and no connection to live Blender. */
+import {shotFrame,shotViewport,sampledCamera} from './shot-view.mjs';
 export function viewerPlaceholder() {
   return '<section class="viewer-3d" data-viewer-host aria-label="Interactive 3D preview"><div class="viewer-message"><strong>Explore in 3D</strong><p>Orbit, zoom and pan the actual saved geometry. World focuses on arrangement; Action exposes motion.</p><p class="muted">Read-only inspection, not a final render or a live link to Blender.</p></div></section>';
 }
 
 export function animationEntries(animations,profile='inspection-v1',staticScene=false) {
   if(profile==='world-static-v1')return [];
-  if(profile==='action-playback-v1'&&animations.length!==(staticScene?0:1))throw Error('Expected one combined saved-scene animation or verified static scene.');
+  if(['action-playback-v1','shot-framing-v1','look-inspection-v1'].includes(profile)&&animations.length!==(staticScene?0:1))throw Error('Expected one combined saved-scene animation or verified static scene.');
   return animations.filter(a=>a.tracks.length).map(clip=>{
     if(!Number.isFinite(clip.duration)||clip.duration<0)throw Error('Invalid animation duration.');
     return {clip,staticPose:clip.duration===0};
@@ -27,6 +28,7 @@ export function previewFailure(error) {
 
 export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit}) {
   let disposed=false,renderer,controls,world,mixer,editor,frame=0,observer,model,action,playing=false,last=0,dirty=true,resize,loadedScenes=[],playback=null;
+  let shotView=null,shotTime=0,shotFixed=true;
   const abort=new AbortController(),cleanups=[];
   host.dataset.viewerState='loading';delete host.dataset.previewId;
   host.innerHTML='<div class="viewer-message" role="status" aria-live="polite">Verifying this exact source and preparing 3D geometry… Native files may need up to three minutes. No scene changes or render.</div>';
@@ -60,9 +62,19 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit})
       const box=new THREE.Box3().setFromObject(model,true),center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
       let radius=Math.max(size.length()/2,0.01);if(!Number.isFinite(radius)||radius>1e9)throw Error('Invalid model dimensions.');
       const camera=new THREE.PerspectiveCamera(40,1,Math.max(radius/10000,.00001),radius*1000);
+      shotView=record.shotView;const shotRig=shotView?sampledCamera(THREE,shotView):null;
       controls=new OrbitControls(camera,canvas);controls.enableDamping=true;controls.dampingFactor=.12;controls.target.copy(center);controls.minDistance=radius*.02;controls.maxDistance=radius*100;
       controls.listenToKeyEvents(canvas);controls.addEventListener('change',()=>{dirty=true;});
       const grid=new THREE.GridHelper(radius*4,20,0x748195,0x394455);grid.position.set(center.x,box.min.y-.002*radius,center.z);world.add(grid);
+      const shotMode=fixed=>{shotFixed=fixed;controls.enabled=!fixed;host.dataset.cameraMode=fixed?'saved-shot':'orbit-inspection';const button=node('orbit');if(button)button.setAttribute('aria-pressed',String(!fixed));dirty=true;};
+      if(shotRig){
+        controls.enabled=false;grid.visible=false;node('grid').setAttribute('aria-pressed','false');
+        node('reset').textContent='Return to shot camera';
+        const orbit=document.createElement('button');orbit.type='button';orbit.dataset.view='orbit';orbit.textContent='Orbit inspection';orbit.setAttribute('aria-pressed','false');node('reset').before(orbit);
+        listen(orbit,'click',()=>{shotMode(!shotFixed);if(!shotFixed)reset();});shotMode(true);
+        canvas.setAttribute('aria-label','Saved shot camera. Use Orbit inspection to look around without changing the camera.');
+        host.querySelector('.viewer-help').textContent='Saved Blender camera · scrub or play this shot. Orbit inspection never changes the camera. F returns to the shot camera.';
+      }
       const gridRadius=radius;
       const reset=()=>{
         // Fit the evaluated pose, not the bind pose cached before animation.
@@ -77,15 +89,18 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit})
       };
       reset();resize=()=>{if(disposed)return;const width=surface.clientWidth,height=surface.clientHeight;if(width>0&&height>0){renderer.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();dirty=true;}};
       observer=new ResizeObserver(resize);observer.observe(surface);resize();
-      listen(node('reset'),'click',reset);listen(canvas,'keydown',e=>{if(e.key.toLowerCase()==='f'){e.preventDefault();reset();}});
+      const resetView=()=>{if(shotRig)shotMode(true);else reset();};
+      listen(node('reset'),'click',resetView);listen(canvas,'keydown',e=>{if(e.key.toLowerCase()==='f'){e.preventDefault();resetView();}});
       listen(node('grid'),'click',()=>{grid.visible=!grid.visible;node('grid').setAttribute('aria-pressed',String(grid.visible));dirty=true;});
       listen(node('wire'),'click',()=>{const on=node('wire').getAttribute('aria-pressed')!=='true';node('wire').setAttribute('aria-pressed',String(on));model.traverse(o=>{for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[])if('wireframe' in m)m.wireframe=on;});dirty=true;});
       const entries=animationEntries(gltf.animations,record.profile,record.playback?.static===true),takes=entries.map(e=>e.clip);
       playback=record.playback;
       mixer=new THREE.AnimationMixer(model);
       for(const [i,clip] of takes.entries()){const option=document.createElement('option');option.value=String(i);option.textContent=(clip.name||'Take '+(i+1))+' · '+(clip.duration===0?'Static pose':clip.duration.toFixed(2)+' s');node('take').append(option);}
-      const clock=()=>{const time=action?.time||0;node('clock').textContent=playback?'Frame '+Math.min(playback.end,Math.round(playback.start+time*playback.fps))+' · '+time.toFixed(2)+' s':time.toFixed(2)+' s';node('time').value=String(time);};
-      const select=()=>{mixer.stopAllAction();playing=false;node('play').textContent='Play';const clip=takes[Number(node('take').value)],staticPose=clip.duration===0;action=mixer.clipAction(clip);action.reset().setLoop(staticPose?THREE.LoopOnce:THREE.LoopRepeat,Infinity);action.clampWhenFinished=staticPose;action.play();mixer.update(0);node('time').max=String(clip.duration);node('play').disabled=staticPose;node('time').disabled=staticPose;clock();reset();dirty=true;};
+      const clock=()=>{const time=shotView?shotTime:action?.time||0,current=shotView?shotFrame(shotView,time):playback?Math.min(playback.end,Math.round(playback.start+time*playback.fps)):null;
+        if(shotRig){shotRig.frame(current);if(action){action.paused=false;action.time=(current-playback.start)/playback.fps;mixer.update(0);}host.dataset.shotFrame=String(current);}
+        node('clock').textContent=playback?'Frame '+current+' · '+time.toFixed(2)+' s':time.toFixed(2)+' s';node('time').value=String(shotView?current:time);};
+      const select=()=>{mixer.stopAllAction();playing=false;node('play').textContent='Play';const clip=takes[Number(node('take').value)],staticPose=clip.duration===0;action=mixer.clipAction(clip);action.reset().setLoop(staticPose||shotRig?THREE.LoopOnce:THREE.LoopRepeat,Infinity);action.clampWhenFinished=staticPose||!!shotRig;action.play();mixer.update(0);node('time').max=String(clip.duration);node('play').disabled=staticPose;node('time').disabled=staticPose;clock();reset();dirty=true;};
       if(takes.length)select();else{host.querySelector('.viewer-animation').hidden=true;}
       if(record.profile==='action-playback-v1'){
         if(playback.static===true){host.querySelector('.viewer-animation').hidden=false;node('play').disabled=true;node('time').disabled=true;clock();}
@@ -93,14 +108,22 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit})
         const label=document.createElement('strong');label.className='scene-playback-label';label.textContent=(playback.static?'Static scene':'Whole scene')+' · '+playback.fps+' fps';host.querySelector('.viewer-animation').prepend(label);
         host.querySelector('.viewer-disclaimer:not(.viewer-texture-note)').textContent=(playback.static?'Static saved scene':'Combined saved performance')+' · frames '+playback.start+'–'+playback.end+'. No rig editing or motion-quality approval. Materials and lighting remain inspection approximations.';
       }
+      if(shotView){
+        host.querySelector('.viewer-animation').hidden=false;node('take').closest('label').hidden=true;
+        node('time').min=String(shotView.shot.start);node('time').max=String(shotView.shot.end);node('time').step='1';node('time').setAttribute('aria-label','Shot frame');
+        node('play').disabled=node('time').disabled=shotView.shot.start===shotView.shot.end;
+        const label=document.createElement('strong');label.className='scene-playback-label';label.textContent=shotView.shot.name+' · '+shotView.shot.camera+' · '+Number(shotView.fps.toFixed(3))+' fps';host.querySelector('.viewer-animation').prepend(label);
+        host.querySelector('.viewer-disclaimer:not(.viewer-texture-note)').textContent='Saved shot · frames '+shotView.shot.start+'–'+shotView.shot.end+'. Exact sampled Blender camera; materials and lighting are inspection approximations. Depth of field is not simulated. Use rendered previews to review lighting.';
+        clock();
+      }
       if(record.profile==='world-static-v1')host.querySelector('.viewer-disclaimer:not(.viewer-texture-note)').textContent='Static World preview'+(Number.isInteger(record.referenceFrame)?' at frame '+record.referenceFrame:'')+'. Animation and rig editing belong in Action. Original materials and motion are preserved.';
       listen(node('take'),'change',select);
       listen(node('play'),'click',()=>{playing=!playing;node('play').textContent=playing?'Pause':'Play';last=performance.now();});
-      listen(node('time'),'input',()=>{playing=false;node('play').textContent='Play';action.time=Number(node('time').value);mixer.update(0);clock();dirty=true;});
+      listen(node('time'),'input',()=>{playing=false;node('play').textContent='Play';if(shotView)shotTime=(Number(node('time').value)-shotView.shot.start)/shotView.fps;else if(action){action.time=Number(node('time').value);mixer.update(0);}clock();dirty=true;});
       listen(document,'visibilitychange',()=>{last=performance.now();});
       listen(canvas,'webglcontextlost',e=>{e.preventDefault();playing=false;cancelAnimationFrame(frame);host.dataset.viewerState='failed';status().textContent='The 3D graphics context was lost. Close and reopen this preview, or inspect in Blender.';});
       const poseCount=entries.filter(e=>e.staticPose).length,playable=takes.length-poseCount;
-      const motionStatus=record.profile==='world-static-v1'?'static World':record.profile==='action-playback-v1'?(playback.static?'static saved scene':'combined saved scene'):`${playable} playable take${playable===1?'':'s'}${poseCount?' · '+poseCount+' static pose'+(poseCount===1?'':'s'):''}`;
+      const motionStatus=shotView?'saved shot camera and range':record.profile==='world-static-v1'?'static World':record.profile==='action-playback-v1'?(playback.static?'static saved scene':'combined saved scene'):`${playable} playable take${playable===1?'':'s'}${poseCount?' · '+poseCount+' static pose'+(poseCount===1?'':'s'):''}`;
       status().textContent=`${record.observed.vertices.toLocaleString()} vertices · ${motionStatus} · source ${record.version.slice(0,12)} · ${record.cached?'verified cached copy':'verified preview copy'}`;
       if(worldEdit&&record.kind==='checkpoint'&&record.profile==='world-static-v1'&&record.placement?.instances.length){
         const {attachWorldEditor}=await import('./world-editor.mjs');if(disposed)return;
@@ -108,7 +131,9 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit})
         worldEdit.changed?.(editor.state);
       }
       host.dataset.viewerState='ready';host.dataset.previewId=record.previewId;
-      function animate(now){if(disposed)return;frame=requestAnimationFrame(animate);if(document.hidden||(!host.closest('dialog')&&document.querySelector('dialog[open]'))){last=now;return;}const dt=Math.min((now-(last||now))/1000,.1);last=now;if(playing){mixer.update(dt);clock();dirty=true;}controls.update();if(dirty){renderer.render(world,camera);dirty=false;}}
+      function animate(now){if(disposed)return;frame=requestAnimationFrame(animate);if(document.hidden||(!host.closest('dialog')&&document.querySelector('dialog[open]'))){last=now;return;}const dt=Math.min((now-(last||now))/1000,.1);last=now;if(playing){if(shotView){const duration=(shotView.shot.end-shotView.shot.start+1)/shotView.fps;shotTime=(shotTime+dt)%duration;}else mixer.update(dt);clock();dirty=true;}if(controls.enabled)controls.update();if(dirty){
+        if(shotRig&&shotFixed){const width=surface.clientWidth,height=surface.clientHeight,v=shotViewport(width,height,shotView.aspect);renderer.setScissorTest(false);renderer.setViewport(0,0,width,height);renderer.setClearColor(0x080b10);renderer.clear();renderer.setViewport(v.x,v.y,v.width,v.height);renderer.setScissor(v.x,v.y,v.width,v.height);renderer.setScissorTest(true);renderer.setClearColor(0x161c25);renderer.render(world,shotRig.camera);renderer.setScissorTest(false);}
+        else{renderer.setViewport(0,0,surface.clientWidth,surface.clientHeight);renderer.render(world,camera);}dirty=false;}}
       frame=requestAnimationFrame(animate);
       return record;
     }catch(error){
@@ -121,7 +146,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit})
     }
   })();
   return {dispose,ready,get dirty(){return !!editor?.dirty;},get draft(){return editor?.state;},
-    get currentFrame(){return playback?Math.min(playback.end,Math.round(playback.start+(action?.time||0)*playback.fps)):null;},
+    get currentFrame(){return shotView?shotFrame(shotView,shotTime):playback?Math.min(playback.end,Math.round(playback.start+(action?.time||0)*playback.fps)):null;},
     request:id=>{if(!editor)throw Error('This saved scene needs placement preparation in Blender.');return editor.request(id);},
     targets:()=>editor?.targets()||[],undo:()=>editor?.undo(),discard:()=>editor?.discard(),setEnabled:value=>editor?.setEnabled(value)};
 }

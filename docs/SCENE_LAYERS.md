@@ -1,8 +1,9 @@
 # Bounded camera and shared-light transactions
 
 Development contract: `scene-layer-v1`. This slice adds native operations and
-authenticated launcher transactions. It does not yet deliver the contextual
-Shots/Light controls, shot-framing viewer profile or native desktop acceptance.
+authenticated launcher transactions. Selected-shot viewing is described below;
+the contextual camera/light authoring controls and native desktop acceptance
+remain separate unfinished work.
 It builds on [World placement](WORLD_LAYERS.md) and [Action](ACTION_LAYER.md).
 
 ## Inspect, propose, explicitly save
@@ -68,7 +69,53 @@ two named shots, idempotency, refusal, checkpoint publication and shared-shot
 context. Both run in the existing embedded-viewer acceptance journey.
 
 Their generated test decisions are explicitly scripted, not human approvals.
-They do not substitute for browser camera/light authoring, actual shot-profile
-playback, rendered before/after comparison, Windows manual handoff, licensed
+They do not substitute for browser camera/light authoring,
+rendered before/after comparison, Windows manual handoff, licensed
 inputs, exact-commit CI or local deployment acceptance. Those remain separate
 required gates in the layered-workflow enhancement.
+
+## Saved-shot viewing
+
+For a selected checkpoint shot, the server derives `shot-framing-v1` (Shots or
+Render) or `look-inspection-v1` (Light) from the actual activity. The source and
+cache identity include the selected shot ID, revision, name, camera and range.
+Client-supplied profile or camera overrides are refused. Native copies validate
+the identity, observed camera and 1..360-frame range before sampling.
+
+The native worker records the evaluated camera world matrix and Blender's real
+projection matrix for every integer shot frame, including animated lens/shift,
+orthographic projection and pixel aspect. Unsupported panorama, render-border
+and multiview cases refuse rather than approximate. Sampling restores the
+original frame/subframe and active camera. Original scene files stay unchanged.
+
+The browser uses the same combined saved-scene motion as Action, restricted to
+the named shot's range. Camera and geometry advance together at integer frames;
+the scrubber uses integer frame values, avoiding floating-point endpoint errors.
+The fixed view is letterboxed to the saved pixel aspect. **Orbit inspection** is
+a separate local mode; **Return to shot camera** or F restores the exact sampled
+view. Neither mode, playback nor navigation changes a camera or creates approval.
+Manual handoff includes the viewed frame; the existing server shot contract still
+enforces the exact named camera and range. Native window acceptance is separate.
+
+Light uses these same camera samples, but WebGL lighting/materials remain
+explicit inspection approximations. Depth of field is not simulated. Actual
+Blender-rendered stills remain the authority for shared-light review.
+
+### Fractional frame rates
+
+Installed exporters can use `fps * fps_base` or `fps` for GLB timestamps instead
+of Blender's actual `fps / fps_base`. Preview conversion validates the full
+integer-frame sample interval against those known rates before correcting only
+the derivative's timestamp accessors. Unknown/partial timing refuses; native
+animation values, source keys, FPS and scene properties are never retimed.
+The receipt retains the correction evidence. The exporter also loses subframes
+when restoring its frame; the wrapper restores both values even on failure.
+
+`tools/shot_view_fixture.py` generates moving perspective/lens, orthographic,
+single-frame and static-geometry/moving-camera cases at fractional FPS. It checks
+projection against independent Blender camera-space calculations and preserves
+source hashes. `tools/shot_view_check.mjs` drives actual scene/shot controls,
+compares GLB geometry and projected coordinates against those native samples,
+checks real pixels/playback/orbit return, revises a shot and verifies cache
+invalidation plus preserved old bytes, and enters Light under its distinct
+profile. Its generated stage decisions are scripted, not human acceptance.

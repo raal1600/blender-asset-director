@@ -7,17 +7,18 @@ import {assetPreviewSource} from './asset-preview.mjs';
 import {assert,digest,fileHash,inside,json,safe,slash,walk,writeJson} from './storage.mjs';
 import {MAX_VIEWER_BYTES,packageGLTF,validateGLB,verifiedPackage} from './viewer-gltf.mjs';
 import {bindWorldPreview} from './world-preview-bindings.mjs';
+import {selectedShotPreview,shotProfiles,validateShotCamera} from './shot-preview.mjs';
 
 export const MAX_PREVIEW_STORAGE_BYTES=100*1024**3;
-export const previewProfile = (stage,kind='checkpoint') => stage==='world'?'world-static-v1':stage==='action'&&kind==='checkpoint'?'action-playback-v1':'inspection-v1';
-export function validateActionPlayback(playback,observed){
+export const previewProfile = (stage,kind='checkpoint',shot=null) => stage==='world'?'world-static-v1':kind==='checkpoint'&&shot&&['shots','light','render'].includes(stage)?stage==='light'?'look-inspection-v1':'shot-framing-v1':stage==='action'&&kind==='checkpoint'?'action-playback-v1':'inspection-v1';
+export function validateActionPlayback(playback,observed,geometryOnly=false){
   assert(playback?.version==='scene-playback-v1'&&playback.scope==='SAVED_SCENE'&&
     Number.isInteger(playback.start)&&Number.isInteger(playback.end)&&playback.end>=playback.start&&playback.end-playback.start<=3600&&
     Number.isFinite(playback.fps)&&playback.fps>0&&Number.isFinite(playback.duration)&&playback.duration>=0&&
     Math.abs(playback.duration-(playback.end-playback.start)/playback.fps)<1e-4,
     'Action preview differs from its saved-scene timebase.');
   assert(observed.animations.length===(playback.static===true?0:1)&&
-    (playback.static!==true||playback.clip===null&&playback.static_evidence==='NO_EVALUATED_MOTION_SOURCES'),
+    (playback.static!==true||playback.clip===null&&playback.static_evidence===(geometryOnly?'NO_EVALUATED_GEOMETRY_MOTION_SOURCES':'NO_EVALUATED_MOTION_SOURCES')),
     'Action preview needs one combined animation or verified static scene evidence.');
 }
 export function assertPreviewStorageBudget(disk,sourceBytes) {
@@ -40,16 +41,17 @@ async function checkpointSource(work,id,sceneId,revision,request) {
   assert(unique.length<=4096&&unique.reduce((n,f)=>n+f.size,0)<=512*1024*1024,'Checkpoint and pinned dependencies exceed the 512 MiB interactive-copy limit; inspect in Blender.');
   let root=path.dirname(records[0].filename);
   while(!unique.every(f=>inside(root,f.filename))){const parent=path.dirname(root);assert(parent!==root,'Cross-drive checkpoint dependencies need Blender inspection.');root=parent;}
-  return {schema:'asset-director.asset-preview/1',id:cp.id,title:scene.name+' / saved checkpoint',version:cp.sha256,source_kind:'checkpoint',root,
+  const shot=selectedShotPreview(scene,cp);
+  return {schema:'asset-director.asset-preview/1',id:cp.id,title:scene.name+(shot?' / '+shot.name:' / saved checkpoint'),version:cp.sha256,source_kind:'checkpoint',root,...(shot?{shot_view:shot}:{}),
     files:unique.map(f=>({path:slash(path.relative(root,f.filename)),sha256:f.sha256,size:f.size})),file:slash(path.relative(root,records[0].filename)),motion:{}};
 }
 
 export class EmbeddedPreviews {
-  constructor(work){this.work=work;this.cache=new Map();this.owned=new Map();this.identity=Promise.all(['./embedded-preview.mjs','./viewer-gltf.mjs','./asset-preview.mjs','./world-preview-bindings.mjs','../public/world-draft.mjs','../public/world-editor.mjs','../public/viewer-3d.mjs','../public/vendor/three/VENDOR.json'].map(async name=>({name,...await fileHash(fileURLToPath(new URL(name,import.meta.url)))}))).then(digest);}
+  constructor(work){this.work=work;this.cache=new Map();this.owned=new Map();this.identity=Promise.all(['./embedded-preview.mjs','./viewer-gltf.mjs','./asset-preview.mjs','./world-preview-bindings.mjs','./shot-preview.mjs','../public/world-draft.mjs','../public/world-editor.mjs','../public/viewer-3d.mjs','../public/shot-view.mjs','../public/vendor/three/VENDOR.json'].map(async name=>({name,...await fileHash(fileURLToPath(new URL(name,import.meta.url)))}))).then(digest);}
   async prepare(id,sceneId,revision,request) {
     assert(request&&typeof request==='object'&&!Array.isArray(request),'Expected a preview source.');
     const w=this.work,source=request.kind==='checkpoint'?await checkpointSource(w,id,sceneId,revision,request):await assetPreviewSource(w,id,sceneId,revision,request);
-    const project=await w.project(id,revision),profile=previewProfile(w.scene(project,sceneId).stage,source.source_kind);
+    const project=await w.project(id,revision),profile=previewProfile(w.scene(project,sceneId).stage,source.source_kind,source.shot_view);
     source.preview_profile=profile;
     await verifiedPackage(source);
     const implementation=await this.identity,key=digest({project:id,scene:sceneId,source,implementation});
@@ -65,7 +67,7 @@ export class EmbeddedPreviews {
     const previewId='view_'+randomUUID(),directory=await safe(base,previewId);await fs.mkdir(directory);
     const requestFile=path.join(directory,'request.json');await writeJson(requestFile,source);
     try {
-      let model,adapter,nativeJob=null,nativeImplementation=null,texturePreview=null,referenceFrame=null,placement=null,playback=null;
+      let model,adapter,nativeJob=null,nativeImplementation=null,texturePreview=null,referenceFrame=null,placement=null,playback=null,shotView=null;
       if(/\.(gltf|glb)$/i.test(source.file)&&!Object.keys(source.motion||{}).length) {
         model=await packageGLTF(source);adapter='verified-gltf';
       } else {
@@ -80,19 +82,22 @@ export class EmbeddedPreviews {
         const textures=receipt.data?.embedded_viewer?.textures;
         assert(receipt.data?.embedded_viewer?.preview_profile===profile,'Preview profile differs from this activity.',409);
         referenceFrame=receipt.data.embedded_viewer.reference_frame;
-        if(profile==='action-playback-v1'){
+        if(profile==='action-playback-v1'||shotProfiles.includes(profile)){
           playback=receipt.data.embedded_viewer.playback;
           assert(playback?.version==='scene-playback-v1'&&playback.scope==='SAVED_SCENE'&&Number.isInteger(playback.start)&&Number.isInteger(playback.end)&&playback.end>=playback.start&&playback.end-playback.start<=3600&&Number.isFinite(playback.fps)&&playback.fps>0&&Number.isFinite(playback.duration),'Missing saved-scene playback timing.');
+        }
+        if(shotProfiles.includes(profile)){
+          shotView=receipt.data.embedded_viewer.shot_view;validateShotCamera(shotView,source.shot_view,playback);
         }
         if(source.source_kind==='checkpoint'&&profile==='world-static-v1')placement=bindWorldPreview(model,receipt.data.embedded_viewer);
         assert(textures?.scope==='PREVIEW_ONLY'&&textures.originals_changed===false&&Number.isInteger(textures.reduced_images)&&textures.reduced_images>=0&&textures.reduced_images<=128,'Missing preview texture preservation evidence.');
         texturePreview={reducedImages:textures.reduced_images,sourcePixels:textures.source_pixels,previewPixels:textures.preview_pixels,originalsChanged:false};
       }
       const observed=validateGLB(model);await verifiedPackage(source);
-      if(profile==='action-playback-v1')validateActionPlayback(playback,observed);
+      if(profile==='action-playback-v1'||shotProfiles.includes(profile))validateActionPlayback(playback,observed,shotProfiles.includes(profile));
       const filename=path.join(directory,'model.glb');await fs.writeFile(filename,model,{flag:'wx'});
       const record={previewId,projectId:id,sceneId,sourceId:source.id,version:source.version,title:source.title,kind:source.source_kind,
-        ...await fileHash(filename),profile,referenceFrame,placement,playback,adapter,implementation,nativeJob,nativeImplementation,texturePreview,observed,cached:false,inspectionOnly:true,selectionChanged:false,approved:false};
+        ...await fileHash(filename),profile,referenceFrame,placement,playback,shotView,adapter,implementation,nativeJob,nativeImplementation,texturePreview,observed,cached:false,inspectionOnly:true,selectionChanged:false,approved:false};
       await writeJson(path.join(directory,'viewer.json'),record);
       this.owned.set(previewId,{record,filename,source});this.cache.set(key,record);return record;
     }catch(error){await writeJson(path.join(directory,'viewer-failure.json'),{previewId,state:'FAILED',error:error.message});throw Object.assign(new Error(error.message+' 3D attempt retained: '+previewId),{status:error.status});}

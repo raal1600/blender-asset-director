@@ -27,7 +27,7 @@ def hide_helpers(enabled):
         bpy.context.view_layer.update()
 
 
-def assert_static_scene(scene):
+def assert_static_scene(scene, *, presentation_only=False):
     """A missing clip is valid only for a conservatively verified static scene.
 
     Do not mistake omitted animation, procedural motion or drivers for a still.
@@ -38,19 +38,24 @@ def assert_static_scene(scene):
                   'lattices', 'armatures', 'shape_keys', 'scenes', 'worlds',
                   'materials', 'node_groups', 'lights', 'cameras', 'textures'):
         for data in getattr(bpy.data, group, []):
+            # Shot cameras are sampled independently. They and non-parenting
+            # lights cannot move geometry; do not claim their motion is absent.
+            if presentation_only and (group in {'cameras', 'lights'} or
+                    group == 'objects' and data.type in {'CAMERA', 'LIGHT'} and not data.children):continue
             for owner in (data, getattr(data, 'node_tree', None)):
                 ad = getattr(owner, 'animation_data', None)
                 require(not ad or (not ad.action and not ad.drivers and
                         not any(not track.mute and track.strips for track in ad.nla_tracks)),
                         'VIEWER_EXPORT_FAILED', 'Missing animation for an animated scene; inspect in Blender')
     for obj in scene.objects:
+        if presentation_only and obj.type in {'CAMERA', 'LIGHT'} and not obj.children:continue
         require(not obj.constraints and not obj.particle_systems and
                 all(m.type == 'ARMATURE' for m in obj.modifiers) and
                 (not obj.pose or not any(b.constraints for b in obj.pose.bones)),
                 'VIEWER_EXPORT_FAILED', 'Unverified procedural or constrained static scene; inspect in Blender')
 
 
-def playback(destination, scene):
+def playback(destination, scene, *, presentation_only=False):
     raw = destination.read_bytes()
     length, kind = struct.unpack_from('<II', raw, 12)
     require(raw[:4] == b'glTF' and kind == 0x4e4f534a, 'VIEWER_EXPORT_FAILED', 'Missing scene animation envelope')
@@ -59,9 +64,9 @@ def playback(destination, scene):
     base = {'version': 'scene-playback-v1', 'start': scene.frame_start, 'end': scene.frame_end,
             'fps': fps, 'scope': 'SAVED_SCENE', 'performance_acceptance': 'NOT_EVALUATED'}
     if not animations:
-        assert_static_scene(scene)
+        assert_static_scene(scene, presentation_only=presentation_only)
         return base | {'duration': (scene.frame_end - scene.frame_start) / fps, 'clip': None,
-                       'static': True, 'static_evidence': 'NO_EVALUATED_MOTION_SOURCES'}
+                       'static': True, 'static_evidence': 'NO_EVALUATED_GEOMETRY_MOTION_SOURCES' if presentation_only else 'NO_EVALUATED_MOTION_SOURCES'}
     require(len(animations) == 1 and animations[0].get('channels'), 'VIEWER_EXPORT_FAILED', 'Action needs one combined scene animation')
     intervals = [data['accessors'][s['input']] for s in animations[0]['samplers']]
     first = min(a['min'][0] for a in intervals);last = max(a['max'][0] for a in intervals)

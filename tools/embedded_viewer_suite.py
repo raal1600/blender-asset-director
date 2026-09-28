@@ -66,6 +66,10 @@ def main():
         subprocess.run([args.node,str(ROOT/'tools/scene_layer_check.mjs'),str(output/'scene-layers-http'),
                         str(output/'scene-layers-native'),sys.executable,args.blender],
                        cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
+    with (output/'shot-view-native.log').open('wb') as log:
+        subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
+                        '--python-exit-code','11','--python',str(ROOT/'tools/shot_view_fixture.py'),'--',str(output/'shot-view-native')],
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=180,check=True)
     with (output/'world-append.log').open('wb') as log:
         subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
                         '--python-exit-code','11','--python',str(ROOT/'tools/world_append_fixture.py'),'--',str(output/'world-append')],
@@ -86,6 +90,11 @@ def main():
         # Reuse Playwright's installed Node driver package; no npm/CDN download.
         import playwright
         module = Path(playwright.__file__).parent / 'driver/package/index.mjs'
+        command = [args.node, str(ROOT/'tools/shot_view_check.mjs'), str(output/'shot-view-browser'),
+                   str(output/'shot-view-native'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        with (output/'shot-view-browser.log').open('wb') as log:
+            subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300, check=True)
         command = [args.node, str(ROOT/'tools/world_edit_check.mjs'), str(output/'world-direct-edit'),
                    str(output/'world-layers'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)

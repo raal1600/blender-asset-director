@@ -45,7 +45,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assets['/workbench-action.mjs']='workbench-action.mjs';
         assets['/workbench-action.css']='workbench-action.css';
         assets['/viewer-3d.mjs']='viewer-3d.mjs';
-        for(const name of ['world-draft.mjs','world-editor.mjs'])assets['/'+name]=name;
+        for(const name of ['world-draft.mjs','world-editor.mjs','shot-view.mjs'])assets['/'+name]=name;
         assets['/icon.svg']='icon.svg';
         for(const name of ['build/three.module.js','build/three.core.js','examples/jsm/loaders/GLTFLoader.js','examples/jsm/controls/OrbitControls.js','examples/jsm/controls/TransformControls.js','examples/jsm/utils/BufferGeometryUtils.js','examples/jsm/utils/SkeletonUtils.js'])assets['/vendor/three/'+name]='vendor/three/'+name;
         assert(Object.hasOwn(assets,url.pathname),'Not found.',404);

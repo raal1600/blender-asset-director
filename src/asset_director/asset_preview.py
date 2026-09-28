@@ -3,6 +3,7 @@ from pathlib import Path
 import copy
 import shutil
 from .core import Asset, Library, atomic_json, fields, file_hash, load_json, require, within
+from . import shot_view_contract
 
 FORMATS = {'.blend', '.gltf', '.glb', '.fbx', '.bvh'}
 MAX_BYTES = 512 * 1024 * 1024
@@ -12,14 +13,20 @@ MAX_FILES = 4096
 def snapshot(request_file, *, embedded=False):
     request_file = Path(request_file).resolve()
     request = load_json(request_file, 2 * 1024 * 1024)
-    fields(request, {'schema', 'id', 'title', 'version', 'source_kind', 'root', 'files', 'file', 'motion', 'preview_profile'},
+    fields(request, {'schema', 'id', 'title', 'version', 'source_kind', 'root', 'files', 'file', 'motion', 'preview_profile', 'shot_view'},
            {'schema', 'id', 'title', 'version', 'source_kind', 'root', 'files', 'file'})
     require(request['schema'] == 'asset-director.asset-preview/1', 'INVALID_PREVIEW', 'Unknown preview request')
     require(isinstance(request.get('preview_profile', 'inspection-v1'), str)
-            and request.get('preview_profile', 'inspection-v1') in {'inspection-v1', 'world-static-v1', 'action-playback-v1'},
+            and request.get('preview_profile', 'inspection-v1') in {'inspection-v1', 'world-static-v1', 'action-playback-v1'} | shot_view_contract.PROFILES,
             'INVALID_PREVIEW', 'Unknown preview profile')
     require(request.get('preview_profile') != 'action-playback-v1' or request['source_kind'] == 'checkpoint',
             'INVALID_PREVIEW', 'Combined Action playback requires a saved scene')
+    shot = request.get('preview_profile') in shot_view_contract.PROFILES
+    require(shot == ('shot_view' in request), 'INVALID_PREVIEW', 'Shot profile needs its exact saved shot')
+    if shot:
+        require(embedded and request['source_kind'] == 'checkpoint' and Path(request['file']).suffix.lower() == '.blend',
+                'INVALID_PREVIEW', 'Shot viewing requires an embedded saved Blender scene')
+        shot_view_contract.validate(request['shot_view'])
     records = request['files']
     require(isinstance(records, list) and 0 < len(records) <= MAX_FILES, 'RESOURCE_LIMIT', 'Preview supports at most 4096 package files')
     names = set()
@@ -72,6 +79,7 @@ def snapshot(request_file, *, embedded=False):
     # intake into the user's catalog and carries no manufactured rights grant.
     meta = {'preview_only': True}
     meta['preview_profile'] = request.get('preview_profile', 'inspection-v1')
+    if shot:meta['shot_view'] = copy.deepcopy(request['shot_view'])
     if embedded:
         # Exact recorded files only. Allows absolute checkpoint texture paths to
         # be rebound to their verified copies in this disposable worker.

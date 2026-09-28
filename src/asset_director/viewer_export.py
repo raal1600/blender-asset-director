@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from array import array
 from .core import require
 from .viewer_textures import plan
+from .shot_view_contract import PROFILES as SHOT_PROFILES
 
 
 @contextmanager
@@ -61,11 +62,17 @@ def export(destination, observed):
     require(not bpy.app.autoexec_fail, 'VIEWER_UNSUPPORTED', 'This scene needs disabled script/driver execution; inspect in Blender')
     takes = observed['takes']
     profile = observed.get('preview_profile', 'inspection-v1')
-    require(isinstance(profile, str) and profile in {'inspection-v1', 'world-static-v1', 'action-playback-v1'}, 'INVALID_PREVIEW', 'Unknown preview profile')
+    require(isinstance(profile, str) and profile in {'inspection-v1', 'world-static-v1', 'action-playback-v1'} | SHOT_PROFILES, 'INVALID_PREVIEW', 'Unknown preview profile')
     static = profile == 'world-static-v1'
-    combined = profile == 'action-playback-v1'
+    shot = profile in SHOT_PROFILES
+    combined = profile == 'action-playback-v1' or shot
     require(not combined or observed.get('checkpoint'), 'INVALID_PREVIEW', 'Action playback requires a saved scene')
     reference_frame = bpy.context.scene.frame_current
+    reference_subframe = bpy.context.scene.frame_subframe
+    shot_view = None
+    if shot:
+        from .shot_view import inspect
+        shot_view = inspect(observed.get('shot_view'))
     if observed.get('checkpoint'):
         require(0 <= bpy.context.scene.frame_end - bpy.context.scene.frame_start <= 3600,
                 'RESOURCE_LIMIT', 'Saved scene range exceeds 3600 frames; inspect in Blender')
@@ -102,14 +109,26 @@ def export(destination, observed):
         from .world_transform import audit as placement_audit
         placement = placement_audit()
     from .action_preview import hide_helpers, playback
-    with frozen_meshes(static) as static_objects, preview_textures() as textures, hide_helpers(combined):
-        result = bpy.ops.export_scene.gltf(**args)
+    try:
+        with frozen_meshes(static) as static_objects, preview_textures() as textures, hide_helpers(combined):
+            result = bpy.ops.export_scene.gltf(**args)
+    finally:
+        # The exporter restores only frame_current, dropping saved subframes.
+        bpy.context.scene.frame_set(reference_frame, subframe=reference_subframe)
     require('FINISHED' in result and destination.is_file() and destination.stat().st_size <= 128 * 1024**2,
             'VIEWER_EXPORT_FAILED', 'GLB export failed or exceeds 128 MiB')
+    timebase = None
+    if combined:
+        from .viewer_timebase import normalize
+        scene = bpy.context.scene
+        timebase = normalize(destination, scene.frame_start, scene.frame_end, scene.render.fps, scene.render.fps_base)
+        require(destination.stat().st_size <= 128 * 1024**2, 'VIEWER_EXPORT_FAILED', 'Corrected preview exceeds 128 MiB')
     return {'kind': 'READ_ONLY_3D_INSPECTION', 'vertices': vertices, 'source_objects': len(objects),
             'preview_profile': profile, 'reference_frame': reference_frame,
             'static_objects': static_objects,
             'placement': placement,
-            'playback': playback(destination, bpy.context.scene) if combined else None,
+            'playback': playback(destination, bpy.context.scene, presentation_only=shot) if combined else None,
+            'shot_view': shot_view,
+            'timebase': timebase,
             'material_fidelity': 'GLTF_APPROXIMATION', 'human_acceptance': 'NOT_EVALUATED', 'textures': textures,
             'notice': 'Saved data, not a live Blender link or rendered evidence. No approval, import or scene edit.'}

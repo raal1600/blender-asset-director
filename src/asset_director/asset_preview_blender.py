@@ -63,6 +63,7 @@ def create(lib, asset, member):
         if workspace.name == 'Layout': workspace.name = 'Asset Director - Preview'
     return {'preview_only': True, 'checkpoint': asset.metadata.get('preview_checkpoint', False),
             'preview_profile': asset.metadata.get('preview_profile', 'inspection-v1'),
+            'shot_view': asset.metadata.get('shot_view'),
             'reference_frame': scene.frame_current,
             'objects': [{'name': o.name, 'type': o.type} for o in bpy.data.objects],
             'takes': takes, 'unassigned_actions': unassigned, 'native_clip': native,
