@@ -65,7 +65,9 @@ try{
  for(const [name,identity] of Object.entries(identities))assert.deepEqual(await fileHash(path.join(directory,name)),identity);
  report.checks.push('Unauthenticated removal refuses; scripted decline sends no cleanup request and preserves every byte');
  // A known generated preview opened by a real, short-lived Blender process.
- const child=spawn(blender,['--background','--factory-startup','--disable-autoexec','--threads','2',path.join(directory,'PREVIEW_COPY.blend'),'--python-expr',"import time; print('CLEANUP_PROBE_READY', flush=True); time.sleep(8)"],{windowsHide:true});
+ const releaseFile=path.join(out,'native-probe-release');
+ const probe=['import time','from pathlib import Path','release=Path('+JSON.stringify(releaseFile)+')','deadline=time.monotonic()+60',"print('CLEANUP_PROBE_READY', flush=True)",'while not release.exists() and time.monotonic()<deadline: time.sleep(.05)',"assert release.exists(), 'Owned preview guard test timed out'"].join(String.fromCharCode(10));
+ const child=spawn(blender,['--background','--factory-startup','--disable-autoexec','--threads','2',path.join(directory,'PREVIEW_COPY.blend'),'--python-expr',probe],{windowsHide:true});
  const chunks=[];let mark;
  const started=new Promise((resolve,reject)=>{mark=resolve;child.once('error',reject);child.once('close',()=>reject(Error('Native preview probe closed before its marker')));});
  child.stdout.on('data',data=>{chunks.push(data);if(Buffer.concat(chunks).toString().includes('CLEANUP_PROBE_READY'))mark();});child.stderr.on('data',data=>chunks.push(data));
@@ -74,8 +76,9 @@ try{
  let refused;
  try{
   refused=await fetch(app.origin+'/api/viewer-cache/apply',{method:'POST',headers:{Authorization:'Bearer '+app.token,'Content-Type':'application/json'},body:JSON.stringify({id:review.id,digest:review.digest,confirmed:true,closedNativePreviews:true})});
-  assert.equal(refused.status,409);assert.match((await refused.json()).error,/still open in Blender/);
- }finally{assert.equal(await finished,0);await fs.writeFile(path.join(out,'native-preview-probe.log'),Buffer.concat(chunks),{flag:'wx'});}
+  const refusal=await refused.json();report.native_refusal={status:refused.status,...refusal};
+  assert.equal(refused.status,409,JSON.stringify(refusal));assert.match(refusal.error,/still open in Blender/);
+ }finally{await fs.writeFile(releaseFile,'owned synthetic probe finished',{flag:'wx'});assert.equal(await finished,0);await fs.writeFile(path.join(out,'native-preview-probe.log'),Buffer.concat(chunks),{flag:'wx'});}
  for(const [name,identity] of Object.entries(identities))assert.deepEqual(await fileHash(path.join(directory,name)),identity);
  report.checks.push('Actual Blender process owning the generated preview prevents removal, despite scripted confirmation; it exits itself without any process kill');
  const pending=page.waitForResponse(r=>r.url().endsWith('/api/viewer-cache/apply'));

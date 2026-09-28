@@ -101,6 +101,12 @@ Studio -> Preview storage scans private derivatives and presents removable paylo
 bytes, protected copies and exact relative targets. It does not clean the asset
 library or project history. Nothing is removed until the user confirms the exact
 current review, including that these cached copies are not open manually in Blender.
+Windows native ownership uses a filtered, bounded process query. Timeout,
+unreadable process details or malformed results refuse cleanup with a redacted
+reason and no removal; they are not interpreted as an idle Blender. Raw command
+lines are never included in the response. The native test holds its own generated
+preview open until the ownership check finishes, with a separate bounded deadline,
+rather than relying on an eight-second window on a loaded host.
 Viewing another scene or Final film releases the prior in-app view; another open
 window still protects its copy. Each UI view has a separate scope-bound grant.
 Closing a view releases its cleanup protection, not the existing bounded session
