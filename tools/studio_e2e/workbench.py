@@ -50,7 +50,7 @@ def review_scene(s):
             if page.locator('.world-inspection').count() and page.locator('.world-inspection').get_attribute('open') is None:
                 page.locator('.world-inspection > summary').click()
             panel = page.locator('.rendered-evidence')
-            if panel.get_attribute('open') is None:
+            if panel.count() and panel.get_attribute('open') is None:
                 panel.locator('summary').click()
         page.locator(selector).click()
         idle()
@@ -273,14 +273,18 @@ def catalog_and_film(s, click, idle, check):
     scene = state()['project']['workbench']['scenes'][0]
     definition = scene['shots'][0]
     assert scene['selectedShot'] == definition['id'] and definition['revision'] == 1
+    expect(page.locator('[data-action="layer-ready"]')).to_be_enabled(timeout=220000)
+    click('[data-action="layer-ready"]')
+    assert state()['project']['workbench']['scenes'][0]['stage'] == 'light'
+    expect(page.locator('[data-action="preview"]')).to_be_enabled(timeout=220000)
     click('[data-action="preview"]')
     click('[data-action="save-preview"]')
     scene = settle()
     assert scene['preview']['camera'] == definition['camera']
     assert scene['preview']['shotId'] == definition['id'] and scene['preview']['shotRevision'] == 1
-    for activity in ['shots', 'light']:
-        assert state()['project']['workbench']['scenes'][0]['stage'] == activity
-        click('[data-action="approve"]')
+    expect(page.locator('[data-action="layer-ready"]')).to_be_enabled(timeout=220000)
+    click('[data-action="layer-ready"]')
+    assert state()['project']['workbench']['scenes'][0]['stage'] == 'render'
     assert s.api('workbench/capabilities')['encoder'], 'Film journey needs real FFmpeg and FFprobe' 
     click('[data-action="readiness"]')
     scene = settle()

@@ -22,7 +22,7 @@ try{
  s.checkpoints.push({id:cpId,path:relative,...original,stage:'action',parent:null,audit});s.current=cpId;s.stage='shots';s.completed={world:cpId,action:cpId};p=await app.store.save(p,p.revision);
  const state=async()=>{const r=await fetch(app.origin+'/api/workbench/state?'+new URLSearchParams({projectId:p.id,compact:true}),{headers});assert.equal(r.status,200);return r.json();};
  const post=async(route,body)=>{const r=await fetch(app.origin+'/api/workbench/'+route,{method:'POST',headers,body:JSON.stringify(body)}),v=await r.json();assert.equal(r.status,200,JSON.stringify(v));return v;};
- for(const [name,camera] of [['Wide','SyntheticWide'],['Close','SyntheticClose']]){const v=await state();await post('shot-save',{projectId:p.id,sceneId:s.id,revision:v.project.revision,shot:{name,camera,start:1,end:9}});}
+
  const {chromium}=await import(pathToFileURL(playwright).href);browser=await chromium.launch(chrome?{executablePath:chrome}:{channel:'chrome'});page=await browser.newPage({viewport:{width:1440,height:1000},serviceWorkers:'block'});page.setDefaultTimeout(30000);
  page.on('pageerror',e=>report.errors.push(e.message.replaceAll(app.token,'[REDACTED]')));page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text().replaceAll(app.token,'[REDACTED]'));});
  page.on('dialog',async dialog=>{assert.match(dialog.message(),/reviewed every named shot/);await dialog.accept();});
@@ -30,7 +30,10 @@ try{
  const ready=async()=>{await idle();await page.waitForFunction(()=>document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready',null,{timeout:205000});await page.waitForFunction(()=>!document.querySelector('[data-action="layer-ready"]')?.disabled,null,{timeout:205000});await idle();};
  const click=async action=>{await page.locator('[data-action="'+action+'"]').click();await idle();};
  const input=async(selector,value)=>{await page.locator(selector).fill(String(value));await page.locator(selector).press('Tab');};
- await page.goto(app.origin+'/workbench#'+app.token);await idle();await page.locator('[data-action="project"][data-id="'+p.id+'"]').click();await ready();
+ await page.goto(app.origin+'/workbench#'+app.token);await idle();await page.locator('[data-action="project"][data-id="'+p.id+'"]').click();await idle();await page.waitForFunction(()=>document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready',null,{timeout:205000});
+ assert.equal(await page.locator('#notice').isVisible(),false);assert.equal(await page.locator('[data-action="layer-ready"]').isDisabled(),true);assert.equal(Object.hasOwn((await state()).project.workbench.scenes[0],'shots'),false);report.checks.push('Older scene with no optional shots metadata opens without a crash, migration or fabricated completion');
+ for(const [name,camera] of [['Wide','SyntheticWide'],['Close','SyntheticClose']]){const v=await state();await post('shot-save',{projectId:p.id,sceneId:s.id,revision:v.project.revision,shot:{name,camera,start:1,end:9}});}
+ await click('refresh');await ready();
  assert.equal(await page.locator('.layered-scene').count(),1);assert.equal(await page.locator('.scene-layout').count(),0);await page.screenshot({path:path.join(out,'shots-before.png'),fullPage:true});
  const base=await fileHash(path.join(p.directory,'project.json'));
  await click('layer-camera');await page.locator('[name="layer-subject"][value="SyntheticSkin0"]').check();await page.locator('#layer-camera-name').fill('SyntheticBrowserCamera');await page.locator('#layer-lens').fill('55');assert.deepEqual(await fileHash(path.join(p.directory,'project.json')),base);

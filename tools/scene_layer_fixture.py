@@ -41,6 +41,10 @@ def save(lib, source_file, layer, operations):
 
 try:
     bpy.ops.wm.open_mainfile(filepath=str(source), load_ui=False, use_scripts=False)
+    # This generated fixture tests source-scene lighting, not compositor/VSE
+    # delivery. Configure its NEW baseline explicitly; never alter the input.
+    bpy.context.scene.render.use_compositing = False
+    bpy.context.scene.render.use_sequencer = False
     for name, energy in [('SyntheticLayerKey', 100), ('SyntheticLayerFill', 25)]:
         assert name not in bpy.data.objects
         data = bpy.data.lights.new(name, 'AREA');data.energy = energy

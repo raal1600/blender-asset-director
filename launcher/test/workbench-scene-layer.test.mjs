@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sceneLayerDraft,layerInspection,ensureLayerInspection,sceneLayerView,cameraForm} from '../public/workbench-scene-layer.mjs';
 const cp={id:'cp_saved',sha256:'saved-hash'};
+test('older scenes without optional shot metadata display Shots and Light without rewriting the scene',()=>{
+ for(const stage of ['shots','light']){
+  const scene={id:'scene',name:'Older scene',stage,current:cp.id,checkpoints:[cp],completed:{},renders:[]},original=structuredClone(scene);
+  const html=sceneLayerView({project:{workbench:{scenes:[scene]}},scene,checkpoint:cp,stages:[],runs:[],locked:false,cap:{scene_layer:'scene-layer-v1'},draft:null,esc:v=>String(v??''),b:(t,a,d,c,disabled)=>'<button data-action="'+a+'" '+(disabled?'disabled':'')+'>'+t+'</button>'});
+  assert.match(html,stage==='shots'?/Frame your story/:/Light your scene/);assert.deepEqual(scene,original);assert.equal(Object.hasOwn(scene,'shots'),false);
+  assert.match(html,/data-action="layer-ready" disabled/);assert.doesNotMatch(html,/data-media="preview"/);
+ }
+});
 const run={id:'run_inspect',inspection:{layer:'light',sha256:'audit-hash',scene:{frame_range:[1,9],objects:[{name:'Body',type:'MESH'},{name:'Camera',type:'CAMERA'}]},cameras:[],look:{state:{lights:[{name:'Key',type:'AREA',energy:200,size:2,color:[1,.5,.2],location:[1,2,3]},{name:'Fill',type:'POINT',energy:25,shadow_soft_size:1,color:[1,1,1],location:[0,0,1]},{name:'Linked',type:'AREA',energy:10,unsupported:'Linked data'}],world:{background_strength:.2},color_management:{exposure:.5}},editable:{world:['strength'],color_management:['exposure']}}}};
 test('shared-light local draft batches only explicitly changed observed values, undo/discard and immutable request',()=>{
  const original=structuredClone(run),draft=sceneLayerDraft(cp,run);assert.equal(draft.selected,'Key');assert.equal(draft.dirty,false);

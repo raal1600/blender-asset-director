@@ -46,6 +46,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assets['/workbench-action.css']='workbench-action.css';
         assets['/workbench-scene-layer.mjs']='workbench-scene-layer.mjs';
         assets['/workbench-scene-layer.css']='workbench-scene-layer.css';
+        assets['/lighting-evidence.mjs']='lighting-evidence.mjs';
         assets['/viewer-3d.mjs']='viewer-3d.mjs';
         for(const name of ['world-draft.mjs','world-editor.mjs','shot-view.mjs'])assets['/'+name]=name;
         assets['/icon.svg']='icon.svg';
@@ -77,6 +78,10 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         return send(200,{message:'Launcher stopped. Blender and Codex remain open.'});
       }
       assert(!stopping,'Launcher is shutting down.',503);
+      if(req.method==='GET'&&url.pathname==='/api/workbench/preview-evidence'){
+        const {projectId,sceneId,...parameters}=Object.fromEntries(url.searchParams);
+        return send(200,await workbench.previewEvidence(projectId,sceneId,parameters));
+      }
       if(req.method==='GET'&&url.pathname==='/api/workbench/viewer-model') {
         const data=await viewers.bytes(url.searchParams.get('projectId'),url.searchParams.get('sceneId'),url.searchParams.get('previewId'));
         res.writeHead(200,{'Content-Type':'model/gltf-binary','Content-Length':data.length});return res.end(data);

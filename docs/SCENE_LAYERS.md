@@ -111,6 +111,38 @@ synthetic test setup, never human approval. It runs in the existing embedded-vie
 browser partition; native Windows handoff and artistic lighting review are not
 inferred from this browser result.
 
+## Rendered shared-light comparisons
+
+Light's **Compare rendered stills** opens a read-only, shot-scoped comparison of
+retained Blender PNGs. It does not render, save or approve anything. The current
+checkpoint and historical checkpoint are labelled separately; matching camera,
+frame, shot revision and preview settings do not prove that only lighting changed.
+Users review every affected shot before deliberately marking Light ready.
+
+The authenticated evidence endpoint verifies project/scene ownership, the retained
+successful run and native job, exact options, checkpoint bytes/path, saved shot
+definition, native result and exact PNG hash/size. Named-camera previews now retain
+the verified external dependency identities in their native result. Changed or
+missing dependencies make a still historical; older results with no dependency
+identity cannot establish current lighting. No historical receipt is rewritten.
+The browser additionally checks the PNG bytes against the returned SHA-256 before
+display. Unavailable evidence is reported, never silently replaced or approved.
+
+History reads the retained run directory rather than the small recent-run window.
+It is bounded to 10,000 receipt names, 64 KiB per scanned receipt, 32 MiB total
+receipt bytes and 20 previews per page. Larger non-preview receipts are not read.
+No asset/database schema migration, asset copy, deletion or new service is needed.
+Scenes without optional shot metadata remain readable without rewriting them.
+
+`tools/lighting_evidence_check.mjs` generates four real CPU previews: two named
+cameras before and after one explicit shared exposure Save. It verifies the
+actual browser images, old/current identities, ownership, mobile comparison and
+shot-revision invalidation. It runs in the existing embedded-viewer partition.
+`tools/lighting_retained_check.mjs` can continue the specific synthetic selector
+failure using the retained four renders without rendering them again; its report
+does not replace the original failure. Synthetic checks and image inspection are
+not native desktop or human artistic acceptance.
+
 ## Saved-shot viewing
 
 For a selected checkpoint shot, the server derives `shot-framing-v1` (Shots or

@@ -5,6 +5,7 @@ import {openViewer} from './viewer-3d.mjs';
 import {worldActionNeedsSave} from './world-draft.mjs';
 import {actionView,actionDraft,actionInspection,ensureActionInspection} from './workbench-action.mjs';
 import {sceneLayerView,sceneLayerDraft,layerInspection,ensureLayerInspection,cameraForm} from './workbench-scene-layer.mjs';
+import {lightingEvidenceView} from './lighting-evidence.mjs';
 import {evidenceView} from './workbench-evidence.mjs';
 import {imageLoader} from './workbench-images.mjs';
 import {taskBanner,observationKey} from './workbench-task.mjs';
@@ -28,6 +29,26 @@ const actionDrafts=new Map();
 const actionInspectionAttempts=new Set();
 const layerDrafts=new Map(),layerInspectionAttempts=new Set(),layerSelections=new Map();
 let layerSave=null;
+let lightingBlobs=[];
+function clearLightingMedia(){for(const url of lightingBlobs)URL.revokeObjectURL(url);lightingBlobs=[];}
+async function showLightingEvidence(d){
+ const context={projectId,sceneId},shotId=d.shot||s().selectedShot||s().shots?.[0]?.id;
+ if(!shotId)throw Error('Name a shot in Shots before reviewing its lighting.');
+ const data=await api('workbench/preview-evidence?'+new URLSearchParams({...context,shotId,page:d.page||0}));
+ if(projectId!==context.projectId||sceneId!==context.sceneId||data.revision!==p().revision)throw Error('Scene changed while inspecting stills. Refresh and open the comparison again.');
+ modal('Review shared lighting',lightingEvidenceView({data,scene:s(),shotId,beforeId:d.before,esc,b}),b('Open this shot in the scene','lighting-open-shot',{id:shotId},'primary'),'Back to Light');
+ $('dialog').classList.add('lighting-evidence-dialog');$('dialog').dataset.evidencePage=String(data.page);
+ for(const node of $('dialog').querySelectorAll('[data-lighting-run]')){
+  const entry=data.items.find(x=>x.runId===node.dataset.lightingRun);
+  void (async()=>{try{
+   const response=await fetch('/api/workbench/media?'+new URLSearchParams({...context,kind:'preview-evidence',runId:entry.runId}),{headers:requestHeaders()});
+   if(!response.ok)throw Error((await response.json()).error);const bytes=await response.arrayBuffer();
+   if(bytes.byteLength!==entry.image.size)throw Error('Rendered still size changed; not displayed.');
+   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');if(hash!==entry.image.sha256)throw Error('Rendered still hash changed; not displayed.');
+   if(!node.isConnected||!$('dialog').open)return;const url=URL.createObjectURL(new Blob([bytes],{type:'image/png'}));lightingBlobs.push(url);node.src=url;
+  }catch(error){if(node.isConnected){node.hidden=true;node.insertAdjacentHTML('afterend','<p class="note warn">'+esc(error.message)+'</p>');}}})();
+ }
+}
 const layerKey=()=>projectId+':'+sceneId;
 function currentLayerDraft(){
  if(!state||!projectId||!sceneId)return null;const old=layerDrafts.get(layerKey()),checkpoint=cp();
@@ -84,7 +105,7 @@ function syncLayerDraftUI(){
  if(discard)discard.disabled=active||(!draft?.dirty&&!invalid);
  if(undo)undo.disabled=active||stale||!draft?.canUndo;
  const disabled=active||stale||invalid||!draft||!!draft.dirty;
- for(const action of ['layer-ready','preview','layer-camera']){const button=workspace.querySelector('[data-action="'+action+'"]');if(button)button.disabled=disabled||(action==='preview'?(!cap?.render_frames||!shotFor(s())):action==='layer-ready'?!s().shots.length:cap?.scene_layer!=='scene-layer-v1');}
+ for(const action of ['layer-ready','preview','layer-camera']){const button=workspace.querySelector('[data-action="'+action+'"]');if(button)button.disabled=disabled||(action==='preview'?(!cap?.render_frames||!shotFor(s())):action==='layer-ready'?!(s().shots||[]).length:cap?.scene_layer!=='scene-layer-v1');}
  const status=workspace.querySelector('.action-savebar [role="status"]');if(status&&!active)status.textContent=invalid?'Correct the highlighted value · saved scene unchanged':stale?'Saved scene changed elsewhere · local draft retained':draft?.dirty?'Unsaved '+(s().stage==='light'?'lighting':'camera')+' changes':'All changes saved';
  const scope=workspace.querySelector('.layer-view-scope');if(scope&&draft?.dirty)scope.textContent='This is still the saved scene. Save changes to update its preview. Use a Blender-rendered still to judge actual lighting.';
 }
@@ -189,11 +210,12 @@ async function saveWorldDraft(){
  }
  throw Error('Save is still awaiting a final receipt. Refresh status; do not start another Save. Your previous scene is preserved.');
 }
-function modal(title,body,buttons,back='Cancel'){clearAssetViewer();$('dialog').className='';delete $('dialog').dataset.returnLibrary;delete $('dialog').dataset.catalogId;$('dialog').setAttribute('aria-labelledby','detail-title');$('dialog').innerHTML=`<header class="detail-head"><h2 id="detail-title">${esc(title)}</h2>${b('Close','dismiss',{},'ghost small')}</header>${body}<footer>${b(back,'close',{},'ghost')}${buttons||''}</footer>`;if(!$('dialog').open)$('dialog').showModal();$('dialog').querySelector('input,button')?.focus();}
+function modal(title,body,buttons,back='Cancel'){clearLightingMedia();clearAssetViewer();$('dialog').className='';delete $('dialog').dataset.returnLibrary;delete $('dialog').dataset.catalogId;$('dialog').setAttribute('aria-labelledby','detail-title');$('dialog').innerHTML=`<header class="detail-head"><h2 id="detail-title">${esc(title)}</h2>${b('Close','dismiss',{},'ghost small')}</header>${body}<footer>${b(back,'close',{},'ghost')}${buttons||''}</footer>`;if(!$('dialog').open)$('dialog').showModal();$('dialog').querySelector('input,button')?.focus();}
 function finishAddPrompt(value){const prompt=addPrompt;addPrompt=null;prompt?.resolve(value);}
 function syncConsentButtons(){for(const [input,action] of [['world-use-confirm','world-use-confirm'],['prepare-confirm','source-prepare']]){const checkbox=$(input),button=$('dialog').querySelector('[data-action="'+action+'"]');if(checkbox&&button)button.disabled=!checkbox.checked||busy;}}
-function close(){finishAddPrompt(false);clearAssetViewer();$('dialog').close();}
+function close(){clearLightingMedia();finishAddPrompt(false);clearAssetViewer();$('dialog').close();}
 $('dialog').addEventListener('close',clearAssetViewer);
+$('dialog').addEventListener('close',clearLightingMedia);
 $('dialog').addEventListener('close',()=>finishAddPrompt(false));
 $('dialog').addEventListener('cancel',e=>{if($('dialog').dataset.returnLibrary==='true'){e.preventDefault();perform(()=>dispatch('close',{}));}});
 $('dialog').addEventListener('change',e=>{if(e.target.id==='catalog-file'&&$('dialog').dataset.catalogId){const id=$('dialog').dataset.catalogId,file=e.target.value,back=$('dialog').dataset.returnLibrary;perform(()=>dispatch('catalog-detail',{id,file,back}));}});
@@ -285,6 +307,7 @@ async function loadPackageImage(node,kind){try{const id=kind==='source'?node.dat
 const loadSourceImage=node=>loadPackageImage(node,'source');
 const loadCatalogImage=node=>loadPackageImage(node,'catalog');
 async function dispatch(a,d){
+ if(a==='lighting-evidence'){await showLightingEvidence(d);return;}
  if(a==='layer-draft-save'||a==='layer-draft-discard'){
   const destination=draftDestination;if(!destination)return;
   if(a==='layer-draft-save')await saveLayerDraft();else{currentLayerDraft()?.discard();layerDrafts.delete(layerKey());}
@@ -304,7 +327,7 @@ async function dispatch(a,d){
  if(a==='layer-inspect'){if(!cp())throw Error('Save a World first.');layerDrafts.delete(layerKey());await next('scene-layer-inspect',{request:{version:'scene-layer-v1',layer:s().stage,requestId:'run_'+crypto.randomUUID(),checkpointId:cp().id,sha256:cp().sha256}});await load();return;}
  if(a==='layer-camera'){modal('Create a camera',cameraForm(currentLayerDraft(),esc),b('Save new camera','layer-camera-save',{},'primary'),'Cancel');return;}
  if(a==='layer-ready'){
-  const text=s().stage==='light'?'Have you reviewed real lighting for every affected shot ('+s().shots.map(x=>x.name).join(', ')+')? Lights are shared scene state.':'Have you reviewed every named shot’s camera, framing and timing?';
+  const text=s().stage==='light'?'Have you reviewed real lighting for every affected shot ('+(s().shots||[]).map(x=>x.name).join(', ')+')? Lights are shared scene state.':'Have you reviewed every named shot’s camera, framing and timing?';
   if(!confirm(text+' Mark this layer ready and continue?'))return;await next('approve',{stage:s().stage,checkpointId:cp().id});target=null;await load();return;
  }
  if(a==='action-draft-save'||a==='action-draft-discard'){
@@ -384,6 +407,7 @@ async function dispatch(a,d){
  if(a==='stage'){await next('enter',{stage:d.stage});target=null;await load();return;}
  if(a==='new-shot'||a==='edit-shot'){modal(a==='edit-shot'?'Revise shot':'Save camera as shot',shotEditor({scene:s(),checkpoint:cp(),id:d.id,esc}),b('Save shot','save-shot',{id:d.id||''},'primary'));return;}
  if(a==='save-shot'){const previous=shotFor(s(),d.id),shot={name:$('shot-name').value,camera:$('shot-camera').value,start:Number($('shot-start').value),end:Number($('shot-end').value),...(previous?{id:previous.id,revision:previous.revision}:{})};await next('shot-save',{shot});close();target=null;await load();return;}
+ if(a==='lighting-open-shot'){close();await dispatch('select-shot',{id:d.id});return;}
  if(a==='select-shot'||a==='scene-context'){await next('shot-select',{shotId:a==='scene-context'?null:d.id});target=null;await load();return;}
  if(a==='target'){target=d.name;render();return;}
  if(a==='refresh'){thumbnails.clear();await load();return;}
@@ -410,7 +434,7 @@ if(a==='scan'){if(!confirm('Rescan the original database packages? This updates 
  if(a==='import'){modal('Import a saved working scene',`<p>Copies the file to a new frozen checkpoint. Originals and their relative asset paths are preserved. This is not an approval.</p><label>Project Scenes folder<select id="import-file">${state.savedScenes.map(f=>`<option value="${esc(f)}">${esc(f.slice(7))}</option>`).join('')}</select></label>`,b('Copy as candidate','save-import',{},'primary',!state.savedScenes.length));return;}
  if(a==='save-import'){await next('import',{sourceScene:$('import-file').value});close();await load();return;}
  if(a==='codex'){await next('codex',{context:s().stage==='action'&&currentActionDraft()?.selected?{actionContext:currentActionDraft().handoff(sceneViewer?.currentFrame)}:{}});modal('Specialist session requested','<p>Your configured Codex terminal receives this exact scene task and selected sources. Respond to its normal trust, source-use and job-review prompts. Save results to this project’s Scenes folder, then import the working scene here. This does not attach to the dedicated manual Blender task.</p>');return;}
- if(a==='preview'){const shot=shotFor(s());modal('One CPU preview frame',`<p>Produces a 640 × 360, 4-sample still from the displayed ${s().candidate?'unapproved candidate':'kept checkpoint'}. This does not keep the candidate or approve any activity. ${shot?'Shot: '+esc(shot.name)+' · '+esc(shot.camera)+'.':'An existing saved camera is required.'}</p><label>Frame<input id="preview-frame" type="number" value="${shot?.start??cp()?.audit?.frame_range?.[0]??1}"></label>`,b('Authorize preview','save-preview',{},'primary'));return;}
+ if(a==='preview'){const shot=shotFor(s());modal('One CPU preview frame',`<p>Produces a 640 × 360, 4-sample still from the displayed ${s().candidate?'unapproved candidate':'kept checkpoint'}. This does not keep the candidate or approve any activity. ${shot?'Shot: '+esc(shot.name)+' · '+esc(shot.camera)+'.':'An existing saved camera is required.'}</p><label>Frame<input id="preview-frame" type="number" value="${sceneViewer?.currentFrame??shot?.start??cp()?.audit?.frame_range?.[0]??1}"></label>`,b('Authorize preview','save-preview',{},'primary'));return;}
  if(a==='save-preview'){await next('run',{operation:'preview',options:{frame:Number($('preview-frame').value)},confirmed:true});close();await load();return;}
  if(a==='readiness'){await next('run',{operation:'render-readiness'});await load();return;}
  if(a==='render'){const chosen=selectedDevice(s().readiness?.data,cap,$('render-device')?.value??0);const options={camera:$('render-camera').value,...(chosen.backend==='CPU'?{}:{render_device:chosen})};for(const k of ['start','end','width','height','samples'])options[k]=Number($('render-'+k).value);if(!confirm(`Authorize ${deviceLabel(chosen,s().readiness?.data,cap)} render: ${options.camera}, frames ${options.start}–${options.end}, ${options.width}×${options.height}, ${options.samples} samples? The 900-second deadline remains enforced.`))return;await next('run',{operation:'render-frames',options,confirmed:true});await load();return;}
@@ -432,7 +456,7 @@ if(a==='scan'){if(!confirm('Rescan the original database packages? This updates 
 }
 document.addEventListener('click',e=>{const button=e.target.closest('button[data-action]');if(button&&!button.disabled)perform(()=>dispatch(button.dataset.action,button.dataset));});
 document.addEventListener('input',e=>{if(!e.target.dataset.layerField||e.target.dataset.layerField==='selected')return;e.target.setCustomValidity('');try{editLayerField(e.target);}catch(error){e.target.setCustomValidity(error.message);}syncLayerDraftUI();});
-document.addEventListener('change',e=>{if(e.target.dataset.layerField){e.target.setCustomValidity('');try{editLayerField(e.target);notice('');}catch(error){e.target.setCustomValidity(error.message);notice(error.message);}currentLayerDraft()?.finishEdit();syncLayerDraftUI();return;}if(e.target.dataset.actionField){try{editActionField(e.target.dataset.actionField,e.target.value);}catch(error){notice(error.message);}return;}if(e.target.id==='world-use-confirm'){const button=$('dialog').querySelector('[data-action="world-use-confirm"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='prepare-confirm'){const button=$('dialog').querySelector('[data-action="source-prepare"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='scene-picker')perform(()=>dispatch('scene',{id:e.target.value}));if(['browser-kind','browser-scope','browser-activity','browser-subcategory'].includes(e.target.id))perform(()=>dispatch(e.target.id,{value:e.target.value}));});
+document.addEventListener('change',e=>{if(e.target.id==='lighting-evidence-shot'||e.target.id==='lighting-evidence-before'){perform(()=>dispatch('lighting-evidence',{shot:$('lighting-evidence-shot').value,before:e.target.id==='lighting-evidence-before'?e.target.value:undefined,page:e.target.id==='lighting-evidence-before'?$('dialog').dataset.evidencePage:0}));return;}if(e.target.dataset.layerField){e.target.setCustomValidity('');try{editLayerField(e.target);notice('');}catch(error){e.target.setCustomValidity(error.message);notice(error.message);}currentLayerDraft()?.finishEdit();syncLayerDraftUI();return;}if(e.target.dataset.actionField){try{editActionField(e.target.dataset.actionField,e.target.value);}catch(error){notice(error.message);}return;}if(e.target.id==='world-use-confirm'){const button=$('dialog').querySelector('[data-action="world-use-confirm"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='prepare-confirm'){const button=$('dialog').querySelector('[data-action="source-prepare"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='scene-picker')perform(()=>dispatch('scene',{id:e.target.value}));if(['browser-kind','browser-scope','browser-activity','browser-subcategory'].includes(e.target.id))perform(()=>dispatch(e.target.id,{value:e.target.value}));});
 document.addEventListener('submit',e=>{if(e.target.id==='browser-search'){e.preventDefault();perform(()=>dispatch('browser-search',{}));}});
 let lastObservationAt=Date.now();
 const pollStatus=statusPoller();

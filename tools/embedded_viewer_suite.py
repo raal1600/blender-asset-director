@@ -95,6 +95,11 @@ def main():
         if args.chrome: command.append(args.chrome)
         with (output/'scene-layers-browser.log').open('wb') as log:
             subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300, check=True)
+        command = [args.node, str(ROOT/'tools/lighting_evidence_check.mjs'), str(output/'lighting-evidence-browser'),
+                   str(output/'scene-layers-native'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        with (output/'lighting-evidence-browser.log').open('wb') as log:
+            subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=600, check=True)
         command = [args.node, str(ROOT/'tools/shot_view_check.mjs'), str(output/'shot-view-browser'),
                    str(output/'shot-view-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
