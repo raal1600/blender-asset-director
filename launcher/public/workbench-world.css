@@ -6,7 +6,8 @@
 .world-top{display:flex;align-items:center;gap:16px;margin-bottom:18px}
 .world-top label{display:flex;align-items:center;gap:12px;font-size:14px;margin:0;color:var(--sub)}
 .world-top select{width:auto;min-width:180px;max-width:50vw;margin:0;font-size:15px}
-.world-more{position:relative;border:0;padding:0;margin:0;z-index:4}
+/* Menus sit above the sticky Save bar (8), below blocking notices (10). */
+.world-more{position:relative;border:0;padding:0;margin:0;z-index:9}
 .world-more>summary{padding:12px;cursor:pointer;font-size:14px}
 .world-menu{position:absolute;right:0;top:100%;min-width:250px;padding:8px;display:grid;gap:4px;background:var(--raised);border:1px solid var(--line);border-radius:6px}
 .world-menu button{text-align:left;background:transparent;border-color:transparent}
@@ -74,7 +75,7 @@ dialog.world-asset-dialog{width:min(1050px,calc(100vw - 36px));max-width:1050px;
 .world-asset-dialog footer{background:#1b2533;padding:16px 0 4px;align-items:center;border-top:1px solid var(--line)}
 .world-asset-dialog .world-member{max-width:100%;margin-bottom:12px}.world-member select{max-width:100%}
 .world-member.single-member{display:none}
-.browser-toolbar .browser-filters{position:relative;margin:0;border:0;padding:0;align-self:end;z-index:4}
+.browser-toolbar .browser-filters{position:relative;margin:0;border:0;padding:0;align-self:end;z-index:9}
 .browser-filters>summary{font-size:13px;min-height:42px;padding:12px;cursor:pointer;border:1px solid #465260;border-radius:5px;background:var(--raised)}
 .browser-filter-fields{position:absolute;right:0;top:calc(100% + 6px);width:320px;max-width:calc(100vw - 64px);padding:16px;background:var(--raised);border:1px solid var(--line);border-radius:6px;display:grid;gap:14px}
 .browser-filter-fields label{min-width:0}.browser-filter-fields .view-switch{margin-top:4px}
