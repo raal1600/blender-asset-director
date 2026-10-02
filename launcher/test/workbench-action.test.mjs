@@ -38,3 +38,26 @@ test('Action presentation stays performer-first and labels unsaved playback hone
  const html=actionView({project:{workbench:{scenes:[scene]}},scene,stages:[{id:'world',short:'World'},{id:'action',short:'Action'}],checkpoint:cp,runs:[],locked:false,cap:{task_workspace:true,action_layer:'action-layer-v1'},draft:d,esc:v=>String(v??''),b:(t,a)=>'<button data-action="'+a+'">'+t+'</button>'});
  assert.match(html,/Performer<select/);assert.match(html,/Playback shows the saved scene/);assert.match(html,/Save changes to preview the new motion/);assert.match(html,/Hold a pose/);assert.doesNotMatch(html,/Inspect saved candidate|Keep checkpoint/);
 });
+test('Action timing rejects invalid direct changes before draft or history mutation',()=>{
+ const d=actionDraft(cp,run),valid={mode:'clip',take_id:'take_one',start:1,speed:1};
+ for(const patch of [{start:.1},{start:100001},{speed:0},{speed:4.1},{speed:Infinity},{speed:NaN},{speed:''},{speed:true}])assert.throws(()=>d.change('One',{...valid,...patch}),/Start frame|Speed/);
+ assert.equal(d.dirty,false);assert.equal(d.canUndo,false);
+ for(const frame of [0,10,1.5,NaN])assert.throws(()=>d.change('One',{mode:'hold',frame}),/Hold frame/);
+ assert.throws(()=>d.holdAll(1.5),/Hold frame/);assert.equal(d.dirty,false);
+});
+test('invalid Action field text survives selection but cannot enter a request or make an infinite range',()=>{
+ const d=actionDraft(cp,run);d.change('One',{mode:'clip',take_id:'take_one',start:1,speed:1});
+ d.editTiming('One','speed','');assert.equal(d.invalid,true);assert.equal(d.input('One','speed'),'');assert.equal(d.value('One').speed,1);assert.deepEqual(d.playbackRange,[1,9]);assert.throws(()=>d.request('run_save'),/Speed/);
+ d.select('Two');assert.equal(d.invalid,true);d.select('One');assert.equal(d.input('One','speed'),'');
+ for(const raw of ['0','5','Infinity','NaN']){d.editTiming('One','speed',raw);assert.equal(d.invalid,true);assert.equal(d.value('One').speed,1);}
+ d.editTiming('One','speed','1.25');assert.equal(d.invalid,false);assert.equal(d.request('run_save').changes[0].speed,1.25);
+ d.editTiming('One','start','0.1');assert.equal(d.invalid,true);assert.match(d.errors[0].message,/whole number/);assert.throws(()=>d.handoff(5),/Save or discard/);
+ d.discard();assert.equal(d.dirty,false);assert.equal(d.invalid,false);assert.equal(d.canUndo,false);
+});
+test('continuous timing input is one undo step including invalid intermediate text',()=>{
+ const d=actionDraft(cp,run);d.change('One',{mode:'clip',take_id:'take_one',start:1,speed:1});
+ d.editTiming('One','start','');d.editTiming('One','start','2');d.editTiming('One','start','20');d.finishEdit();
+ assert.equal(d.value('One').start,20);d.undo();assert.equal(d.value('One').start,1);assert.equal(d.invalid,false);
+ d.editTiming('One','speed','0');d.finishEdit();d.editTiming('One','speed','2');d.finishEdit();d.undo();assert.equal(d.input('One','speed'),'0');assert.equal(d.invalid,true);d.undo();assert.equal(d.value('One').speed,1);assert.equal(d.invalid,false);
+ d.change('One',{mode:'hold',frame:5});d.editTiming('One','frame','10');assert.equal(d.invalid,true);assert.match(d.errors[0].message,/Hold frame/);d.change('One',{mode:'keep'});assert.equal(d.invalid,false);
+});

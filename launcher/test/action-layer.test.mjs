@@ -51,6 +51,10 @@ test('Action contract refuses guessed transfers, duplicate performers and bad ti
   assert.throws(()=>validateActionRequest({...request,frame_range:[1,4000]}));
   assert.throws(()=>validateActionRequest({...request,script:'no'}));
   validateActionRequest({...request,changes:[{performer:'Performer',mode:'hold',frame:5}]});
+  for(const start of ['',null,true,.1,100001])assert.throws(()=>validateActionRequest({...request,changes:[{...request.changes[0],start}]}),/Start frame must be a whole number/);
+  for(const speed of ['',null,true,0,4.1,Infinity])assert.throws(()=>validateActionRequest({...request,changes:[{...request.changes[0],speed}]}),/Speed must be a number from 0.1 to 4/);
+  assert.throws(()=>validateActionRequest({...request,changes:[{...request.changes[0],take_id:'unknown'}]}),/Choose an observed take for this performer/);
+  validateActionRequest({...request,changes:[{...request.changes[0],start:0,speed:1.25}]});
 });
 test('inspection is read-only and Save keeps World completion but invalidates later layers',async t=>{
   const f=await fixture(t),before=await fileHash(f.source),p=await f.inspect();

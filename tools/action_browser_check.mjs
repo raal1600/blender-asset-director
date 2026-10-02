@@ -32,7 +32,7 @@ try{
  page.on('response',r=>{const url=new URL(r.url());if(url.pathname==='/api/workbench/viewer-prepare'&&r.ok())pending.push(r.json().then(v=>records.push(v)));if(url.pathname==='/api/workbench/viewer-model'&&r.ok())pending.push(r.body().then(b=>models.push(b)));});
  const idle=()=>page.waitForFunction(()=>!document.body.classList.contains('working'));
  const click=async selector=>{await page.locator('body').ariaSnapshot();await page.locator(selector).click();await idle();};
- const ready=async()=>{await page.waitForFunction(()=>document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready'&&!!document.querySelector('[data-action-field="performer"]')&&!document.querySelector('[data-action-field="performer"]').disabled,null,{timeout:205000});await idle();};
+ const ready=async()=>{await page.waitForFunction(()=>!document.body.classList.contains('working')&&document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready'&&!!document.querySelector('[data-action-field="performer"]')&&!document.querySelector('[data-action-field="performer"]').disabled,null,{timeout:205000});};
  await page.goto(app.origin+'/workbench#'+app.token);await idle();
  const inspectionStarted=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/workbench/action-inspect'&&r.ok());
  await click('[data-action="project"][data-id="'+project.id+'"]');await inspectionStarted;await page.reload();await ready();await Promise.all(pending);
@@ -55,12 +55,31 @@ try{
  await page.locator('[data-view="time"]').fill((4/24).toFixed(3));await page.locator('[data-view="time"]').dispatchEvent('input');await page.waitForTimeout(100);assert.notEqual(createHash('sha256').update(await canvas.screenshot()).digest('hex'),createHash('sha256').update(first).digest('hex'));assert.match(await page.locator('[data-view="clock"]').innerText(),/Frame 5/);report.checks.push('Actual scene playback and frame-labelled scrubbing change rendered geometry');
  await page.getByRole('combobox',{name:'Performer',exact:true}).selectOption('SyntheticRig0');
  const nativeChoice=await page.locator('[data-action-field="mode"] option').filter({hasText:'Synthetic Alternate'}).getAttribute('value');await page.getByRole('combobox',{name:'Performance',exact:true}).selectOption(nativeChoice);
+ const startField=page.getByLabel('Start frame',{exact:true}),speedField=page.getByLabel('Speed',{exact:true}),saveButton=page.locator('[data-action="action-save"]');
+ const stableStart=await startField.elementHandle(),stableSave=await saveButton.elementHandle(),stableViewer=await page.locator('[data-scene-viewer]').elementHandle();
+ await startField.fill('0.1');assert.equal(await saveButton.isDisabled(),true);assert.match(await page.locator('#action-start-error').innerText(),/whole number/);
+ await page.screenshot({path:path.join(out,'02a-invalid-start.png'),fullPage:true});
+ await startField.press('Tab');assert.equal(await stableStart.evaluate(n=>n.isConnected),true);assert.equal(await stableSave.evaluate(n=>n.isConnected),true);
+ await page.getByRole('combobox',{name:'Performer',exact:true}).selectOption('SyntheticRig1');assert.equal(await saveButton.isDisabled(),true);await page.getByRole('combobox',{name:'Performer',exact:true}).selectOption('SyntheticRig0');assert.equal(await startField.inputValue(),'0.1');
+ await startField.fill('1');await startField.press('Tab');
+ for(const invalid of ['', '0', '4.1']){await speedField.fill(invalid);assert.equal(await saveButton.isDisabled(),true);assert.match(await page.locator('#action-speed-error').innerText(),/Speed/);assert.doesNotMatch(await page.locator('.action-preview-scope').innerText(),/Infinity|NaN/);}
+ await page.screenshot({path:path.join(out,'02b-invalid-speed.png'),fullPage:true});
+ await speedField.fill('1.25');await speedField.press('Tab');assert.equal(await saveButton.isEnabled(),true);assert.equal(await stableViewer.evaluate(n=>n.isConnected),true);
+ await click('[data-action="action-undo"]');assert.equal(await speedField.inputValue(),'1');assert.equal(await saveButton.isEnabled(),true);
+ assert.equal(report.requests.filter(r=>r.path.endsWith('/action-save')).length,0);report.checks.push('Action timing validates per field, preserves invalid text across performer selection, coalesces Undo and never rebuilds focused controls or the viewer');
  await page.getByLabel('Start frame',{exact:true}).fill('20');await page.getByLabel('Start frame',{exact:true}).press('Tab');await page.getByLabel('Speed',{exact:true}).fill('2');await page.getByLabel('Speed',{exact:true}).press('Tab');
  await click('[data-action="action-undo"]');assert.equal(await page.getByLabel('Speed',{exact:true}).inputValue(),'1');await page.getByLabel('Speed',{exact:true}).fill('2');await page.getByLabel('Speed',{exact:true}).press('Tab');
- await page.getByRole('combobox',{name:'Performer',exact:true}).selectOption('StaticProp');await page.getByRole('combobox',{name:'Performance',exact:true}).selectOption('hold');await page.getByLabel('Hold frame',{exact:true}).fill('5');await page.getByLabel('Hold frame',{exact:true}).press('Tab');
+ await page.getByRole('combobox',{name:'Performer',exact:true}).selectOption('StaticProp');await page.getByRole('combobox',{name:'Performance',exact:true}).selectOption('hold');
+ for(const invalid of ['','1.5','25']){await page.getByLabel('Hold frame',{exact:true}).fill(invalid);assert.equal(await saveButton.isDisabled(),true);assert.match(await page.locator('#action-frame-error').innerText(),/Hold frame/);}
+ await page.getByLabel('Hold frame',{exact:true}).fill('5');await page.getByLabel('Hold frame',{exact:true}).press('Tab');
  assert.match(await page.locator('.action-savebar').innerText(),/2 performers/);assert.equal(report.requests.filter(r=>r.path.endsWith('/action-save')).length,0);assert.equal((await app.store.get(project.id)).workbench.scenes[0].current,cpId);
  await click('[data-action="tab"][data-tab="film"]');assert.match(await page.locator('#dialog').innerText(),/Keep your Action changes/);await click('#dialog [data-action="close"]');report.checks.push('Two-performer local draft, Undo and unsaved-navigation guard with no job per field change');
- await page.screenshot({path:path.join(out,'02-action-draft.png'),fullPage:true});await click('[data-action="action-save"]');await ready();
+ await page.screenshot({path:path.join(out,'02-action-draft.png'),fullPage:true});
+ // A real pointer click straight from an edited input must submit exactly once;
+ // do not Tab/blur first, which used to conceal the disappearing Save button.
+ await page.getByLabel('Hold frame',{exact:true}).fill('4');await page.getByLabel('Hold frame',{exact:true}).press('Tab');await page.getByLabel('Hold frame',{exact:true}).fill('5');
+ const saveBox=await saveButton.boundingBox();assert(saveBox);await page.mouse.click(saveBox.x+saveBox.width/2,saveBox.y+saveBox.height/2);
+ await page.waitForFunction(()=>document.body.classList.contains('working')||document.querySelector('#notice')?.textContent.includes('Performance saved'),null,{timeout:10000});await ready();
  project=await app.store.get(project.id);const saved=project.workbench.scenes[0],cp=saved.checkpoints.find(c=>c.id===saved.current);assert.notEqual(cp.id,cpId);assert.deepEqual(saved.completed,{world:cpId});assert.equal(saved.stage,'action');assert.equal(report.requests.filter(r=>r.path.endsWith('/action-save')).length,1);
  const nativeState=(await app.store.runs(project.id)).find(r=>r.action==='action-audit'&&r.checkpointId===cp.id&&r.state==='SUCCEEDED').inspection;
  const rig=nativeState.performers.find(p=>p.name==='SyntheticRig0'),prop=nativeState.performers.find(p=>p.name==='StaticProp');assert.equal(rig.tracks.find(t=>!t.mute).strips[0].scale,.5);assert.equal(rig.tracks.find(t=>!t.mute).strips[0].start,20);assert(prop.tracks.every(t=>t.mute));assert.deepEqual(nativeState.frame_range,[1,24]);

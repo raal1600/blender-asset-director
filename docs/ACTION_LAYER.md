@@ -15,6 +15,16 @@ The visible planned playback range expands when needed to include complete takes
 Save includes that exact range, within the existing 3600-interval bound. It never
 silently trims a later-starting or slowed take to the previous playback window.
 
+Start frame is a whole number from -100000 to 100000; Speed is a finite number
+from 0.1 to 4 (1 is normal speed), including values such as 1.25. Hold frame is a
+whole number within the inspected scene range. Empty or invalid numeric input
+stays visible as an unsaved local draft with a field-specific error; it never
+becomes zero, an infinite playback range, or a request. Switching performers
+retains those errors and Save remains disabled until all are corrected. Undo
+restores a complete field-edit session, including invalid intermediate text.
+Typing and blurring timing fields update validation without replacing the Save
+button or the viewer, so clicking Save directly from a field submits once.
+
 The server-derived `action-playback-v1` profile exports one combined scene clip
 with the actual FPS/range and a verified zero-time origin. Blender's default
 per-object scene-animation splitting is explicitly disabled. Performer choices
@@ -122,6 +132,10 @@ desktop tests and contain no genuine human approvals.
 
 Browser tests compare both generated skins and a moving prop against evaluated
 Blender samples, then exercise timing/hold, Undo, Save, Discard and return to World.
+They also cover invalid/empty timing, correction, performer switching with an
+invalid draft, stable focused controls, and a pointer Save without a preparatory
+Tab/blur. One real save request must produce the independently inspected native
+result; field edits alone must create no job.
 Legacy preview-only tests precompute performer inspection before their unchanged-
 manifest baseline; they still forbid scene mutations and approvals.
 Static tests cover held performers, never-animated geometry and a single-frame

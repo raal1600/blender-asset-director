@@ -6,6 +6,7 @@
 .action-preview-scope{font-size:12px;color:var(--muted);margin:10px 0}
 .action-controls{display:grid;grid-template-columns:minmax(140px,1fr) minmax(210px,1.5fr) minmax(90px,.45fr) minmax(80px,.4fr);gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
 .action-controls label{margin:0;min-width:0}.action-controls input,.action-controls select{width:100%;min-width:0;box-sizing:border-box}
+.action-controls .action-field-error{display:block;margin-top:5px;color:var(--danger,#d46a63);font-size:12px;line-height:1.4}.action-controls .action-field-error[hidden]{display:none}.action-controls input[aria-invalid="true"]{border-color:var(--danger,#d46a63)}
 .action-details{margin:14px 0;font-size:12px}.action-details>p{max-width:900px;line-height:1.6}
 .scene-playback-label{font-size:12px;white-space:nowrap}.action-workspace .viewer-animation output{white-space:nowrap;min-width:120px}
 .action-workspace .viewer-animation label[hidden]{display:none}

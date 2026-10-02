@@ -19,7 +19,11 @@ export function validateActionRequest(request,inspect=false){
     assert(object(c)&&typeof c.performer==='string'&&c.performer.length>0&&c.performer.length<=255&&!seen.has(c.performer),'Choose distinct observed performers.');seen.add(c.performer);
     const keys=c.mode==='clip'?['performer','mode','take_id','start','speed']:['performer','mode','frame'];
     assert(Object.keys(c).length===keys.length&&Object.keys(c).every(k=>keys.includes(k)),'Unknown Action fields.');
-    if(c.mode==='clip')assert(typeof c.take_id==='string'&&/^take_[a-f0-9]{64}$/.test(c.take_id)&&integer(c.start)&&typeof c.speed==='number'&&Number.isFinite(c.speed)&&c.speed>=.1&&c.speed<=4,'Choose an observed take, start and speed from 0.1 to 4.');
+    if(c.mode==='clip'){
+      assert(typeof c.take_id==='string'&&/^take_[a-f0-9]{64}$/.test(c.take_id),'Choose an observed take for this performer.');
+      assert(integer(c.start),'Start frame must be a whole number from -100000 to 100000.');
+      assert(typeof c.speed==='number'&&Number.isFinite(c.speed)&&c.speed>=.1&&c.speed<=4,'Speed must be a number from 0.1 to 4 (1 is normal speed).');
+    }
     else assert(c.mode==='hold'&&integer(c.frame),'Choose native motion or hold an observed pose.');
   }
   if(request.frame_range!==undefined)assert(Array.isArray(request.frame_range)&&request.frame_range.length===2&&request.frame_range.every(integer)&&request.frame_range[0]<=request.frame_range[1]&&request.frame_range[1]-request.frame_range[0]<=3600,'Playback range exceeds the supported bound.');
