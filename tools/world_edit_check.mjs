@@ -108,6 +108,10 @@ try{
  await picker.selectOption(ids[1]);const secondX=Number(await x.inputValue());
  await host.getByLabel('Placement Heading',{exact:true}).fill('30');await host.getByLabel('Placement Scale',{exact:true}).fill('1.25');await moveX(secondX-2);
  assert.match(await page.locator('.world-savebar').innerText(),/2 assets/);
+ await click('.world-more > summary');await click('[data-action="history"]');
+ await page.keyboard.press('Escape');await idle();
+ assert.equal(await page.locator('.world-more').getAttribute('open'),null);
+ assert.match(await page.locator('.world-savebar').innerText(),/2 assets/,'Menu return preserves the pending placement draft');
  const saved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/workbench/world-save');
  await page.locator('[data-action="save-world"]').click();const saveResponse=await saved;assert.equal(saveResponse.status(),200,await saveResponse.text());
  await page.waitForFunction(()=>!document.body.classList.contains('working'),null,{timeout:215000});await ready();
@@ -118,7 +122,7 @@ try{
  const rotated=savedData.transforms.find(t=>t.instance===ids[1]).after;assert(Math.abs(Math.hypot(rotated[0],rotated[4],rotated[8])-1.25)<1e-4);assert(Math.abs(Math.atan2(rotated[4],rotated[0])-Math.PI/6)<1e-4);
  assert.deepEqual(await fileHash(source),sourceBefore);assert.deepEqual(await fileHash(path.join(project.directory,relative)),sourceBefore);
  await page.screenshot({path:path.join(out,'03-saved.png'),fullPage:true});
- report.checks.push('One Save runs real Blender, verifies two transforms and reopened file, preserves original/checkpoint and does not approve World');
+ report.checks.push('Menu history return preserves the draft and unobstructed Save runs real Blender, verifies two transforms/reopen and preserves originals without World approval');
  report.saved={checkpointId:after.id,sha256:after.sha256,jobId:after.jobId,transforms:savedData.transforms};
  assert.equal(report.requests.filter(r=>r.path.endsWith('/world-save')).length,1);
  const newPicker=page.locator('[data-world-pick]');await newPicker.selectOption(ids[0]);

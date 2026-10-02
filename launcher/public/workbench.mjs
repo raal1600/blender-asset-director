@@ -512,7 +512,19 @@ if(a==='scan'){if(!confirm('Rescan the original database packages? This updates 
  if(a==='retry'){if(!confirm('Archive the failed native attempt using job-retry? Starting it again is a separate action.'))return;await next('retry',{jobId:d.job,confirmed:true});close();await load();return;}
  if(a==='resolve'){if(!confirm('Confirm you stopped the external Blender task or encoder. The launcher does not terminate it for you.'))return;await next('resolve',{sceneId:d.scene||null,runId:d.run,confirmStopped:true});close();await load();return;}
 }
-document.addEventListener('click',e=>{const button=e.target.closest('button[data-action]');if(button&&!button.disabled)perform(()=>dispatch(button.dataset.action,button.dataset));});
+document.addEventListener('pointerdown',e=>{const menu=document.querySelector('.world-more[open]');if(menu&&!menu.contains(e.target))menu.open=false;});
+document.addEventListener('keydown',e=>{
+ if(e.key!=='Escape'||e.defaultPrevented||document.querySelector('dialog[open]'))return;
+ const menu=document.querySelector('.world-more[open]');if(!menu)return;
+ e.preventDefault();menu.open=false;menu.querySelector('summary').focus();
+});
+document.addEventListener('click',e=>{
+ const button=e.target.closest('button[data-action]');if(!button||button.disabled)return;
+ const menu=button.closest('.world-more');
+ // Return modal focus to the visible disclosure, not its now-hidden item.
+ if(menu){menu.open=false;menu.querySelector('summary').focus();}
+ perform(()=>dispatch(button.dataset.action,button.dataset));
+});
 document.addEventListener('input',e=>{if(e.target.dataset.renderSetting){editOutputSetting(e.target);return;}if(!e.target.dataset.layerField||e.target.dataset.layerField==='selected')return;e.target.setCustomValidity('');try{editLayerField(e.target);}catch(error){e.target.setCustomValidity(error.message);}syncLayerDraftUI();});
 document.addEventListener('change',e=>{if(e.target.id==='film-cut'){perform(()=>dispatch('film-cut',{id:e.target.value}));return;}if(e.target.dataset.renderSetting){editOutputSetting(e.target);return;}if(e.target.id==='lighting-evidence-shot'||e.target.id==='lighting-evidence-before'){perform(()=>dispatch('lighting-evidence',{shot:$('lighting-evidence-shot').value,before:e.target.id==='lighting-evidence-before'?e.target.value:undefined,page:e.target.id==='lighting-evidence-before'?$('dialog').dataset.evidencePage:0}));return;}if(e.target.dataset.layerField){e.target.setCustomValidity('');try{editLayerField(e.target);notice('');}catch(error){e.target.setCustomValidity(error.message);notice(error.message);}currentLayerDraft()?.finishEdit();syncLayerDraftUI();return;}if(e.target.dataset.actionField){try{editActionField(e.target.dataset.actionField,e.target.value);}catch(error){notice(error.message);}return;}if(e.target.id==='world-use-confirm'){const button=$('dialog').querySelector('[data-action="world-use-confirm"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='prepare-confirm'){const button=$('dialog').querySelector('[data-action="source-prepare"]');if(button)button.disabled=!e.target.checked||busy;}if(e.target.id==='scene-picker')perform(()=>dispatch('scene',{id:e.target.value}));if(['browser-kind','browser-scope','browser-activity','browser-subcategory'].includes(e.target.id))perform(()=>dispatch(e.target.id,{value:e.target.value}));});
 document.addEventListener('submit',e=>{if(e.target.id==='browser-search'){e.preventDefault();perform(()=>dispatch('browser-search',{}));}});
