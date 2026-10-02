@@ -30,3 +30,16 @@ test('label hints are editable suggestions; drag is one undo group and pace reus
  const d=timelineDraft(cp,run);d.add(take,'clip_one');d.edit('travel',true);d.edit('pace','2.5');const before=d.selectedClip;d.finishEdit();d.moveEndpoint([2,3]);d.moveEndpoint([3,4]);d.finishEdit();d.undo();assert.deepEqual(d.selectedClip,before);
  d.add(take,'clip_two');d.edit('travel',true);assert.equal(d.selectedClip.travel.meters_per_cycle,2.5);
 });
+
+test('turning travel off restores non-travel duration including authored trims and Undo',()=>{
+ const d=timelineDraft(cp,run);d.add(take,'clip_one');d.edit('travel',true);d.edit('pace','2.5');
+ d.add(take,'clip_two');d.edit('travel',true);assert.equal(d.selectedClip.frames,11);d.finishEdit();d.edit('travel',false);assert.equal(d.selectedClip.frames,25);
+ d.undo();assert.equal(d.selectedClip.frames,11);assert(d.selectedClip.travel);d.finishEdit();d.edit('travel',false);
+ d.edit('frames','15');d.edit('travel',true);assert.equal(d.selectedClip.frames,11);d.finishEdit();d.edit('travel',false);assert.equal(d.selectedClip.frames,15);
+ d.discard();assert(!d.dirty);
+});
+
+test('disabling a reloaded saved path uses the native take duration at its current speed',()=>{
+ const saved=structuredClone(run);saved.inspection.performers[0].timeline.clips=[{id:'clip_saved',take_id:take,start:1,frames:49,speed:.5,repeat_reviewed:true,travel:{delta_m:[0,5],meters_per_cycle:5}}];
+ const d=timelineDraft(cp,saved);d.select('One','clip_saved');d.edit('travel',false);assert.equal(d.selectedClip.frames,49);assert.equal(d.selectedClip.travel,null);d.undo();assert.deepEqual(d.selectedClip,saved.inspection.performers[0].timeline.clips[0]);
+});

@@ -6,10 +6,10 @@ const copy=v=>structuredClone(v);
 export function suggestedPath(label){const words=String(label).toLowerCase().split(/[^a-z]+/);return words.some(w=>['back','backward','backwards'].includes(w))?[0,-1]:words.includes('right')?[1,0]:words.includes('left')?[-1,0]:[0,1];}
 export function timelineDraft(checkpoint,run){
  const audit=run.inspection,baseline=new Map(audit.performers.map(p=>[p.name,copy(p.timeline?.clips||[])]));
- let tracks=copy(baseline),history=[],raw=new Map(),gesture=null,selected=audit.performers.find(p=>p.takes.length)?.name||audit.performers[0]?.name||null,clipId=null;
+ let tracks=copy(baseline),history=[],raw=new Map(),stationaryFrames=new Map(),gesture=null,selected=audit.performers.find(p=>p.takes.length)?.name||audit.performers[0]?.name||null,clipId=null;
  const performer=name=>{const p=audit.performers.find(p=>p.name===name);if(!p)throw Error('Choose an observed performer.');return p;};
  const editable=name=>{const p=performer(name);if(p.unsupported||p.timeline?.error)throw Error(p.unsupported||p.timeline.error);return p;};
- const remember=key=>{if(!key||gesture!==key){history.push({tracks:copy(tracks),raw:copy(raw),selected,clipId});if(history.length>100)history.shift();}gesture=key;};
+ const remember=key=>{if(!key||gesture!==key){history.push({tracks:copy(tracks),raw:copy(raw),stationaryFrames:copy(stationaryFrames),selected,clipId});if(history.length>100)history.shift();}gesture=key;};
  const sorted=name=>[...tracks.get(name)].sort((a,b)=>a.start-b.start);
  const issue=(name,c)=>{try{const take=performer(name).takes.find(t=>t.id===c.take_id);if(!take)throw Error('Saved take changed; inspect in Blender.');validateTimeline({performer:name,mode:'timeline',clips:[c]});timelineTiming(c,take);if(c.travel&&take.travel_blocker)throw Error(take.travel_blocker);return null;}catch(e){return e.message;}};
  const changed=()=>[...tracks].filter(([name,clips])=>JSON.stringify(clips)!==JSON.stringify(baseline.get(name)));
@@ -33,8 +33,8 @@ export function timelineDraft(checkpoint,run){
    editable(selected);const c=tracks.get(selected).find(c=>c.id===clipId);if(!c)throw Error('Select a clip first.');
    const key=c.id+':'+field;remember(key);
    if(field==='travel'){
-    if(text){const take=performer(selected).takes.find(t=>t.id===c.take_id);if(take.travel_blocker)throw Error(take.travel_blocker);const calibrated=[...tracks.get(selected)].reverse().find(x=>x.id!==c.id&&x.take_id===c.take_id&&x.travel?.meters_per_cycle>0);c.travel={delta_m:suggestedPath(take.action),meters_per_cycle:calibrated?.travel.meters_per_cycle||0};}
-    else{c.travel=null;for(const [k,v] of raw)if(v.clip===c.id&&['pace','direction','distance'].includes(v.field))raw.delete(k);}
+    if(text){const take=performer(selected).takes.find(t=>t.id===c.take_id);if(take.travel_blocker)throw Error(take.travel_blocker);if(!c.travel)stationaryFrames.set(c.id,c.frames);const calibrated=[...tracks.get(selected)].reverse().find(x=>x.id!==c.id&&x.take_id===c.take_id&&x.travel?.meters_per_cycle>0);c.travel={delta_m:suggestedPath(take.action),meters_per_cycle:calibrated?.travel.meters_per_cycle||0};}
+    else{if(c.travel){const take=performer(selected).takes.find(t=>t.id===c.take_id);c.frames=stationaryFrames.get(c.id)??Math.ceil((take.range[1]-take.range[0])/c.speed)+1;}c.travel=null;for(const [k,v] of raw)if(v.clip===c.id&&['pace','direction','distance'].includes(v.field))raw.delete(k);}
    }else if(field==='repeat_reviewed')c.repeat_reviewed=!!text;
    else{
     const n=typeof text==='string'&&text.trim()!==''?Number(text):NaN;
@@ -55,8 +55,8 @@ export function timelineDraft(checkpoint,run){
   shiftFollowing(){const c=this.selectedClip;if(!c)return;remember();let next=clipEnd(c)+1;for(const item of sorted(selected).filter(x=>x.id!==c.id&&x.start>=c.start)){item.start=next;next=clipEnd(item)+1;}},
   arrow(){const c=this.selectedClip,p=performer(selected);if(!c?.travel)return null;const origin=[...(p.timeline?.origin_m||[0,0,0])];for(const old of sorted(selected)){if(old.id===c.id)break;if(old.travel){origin[0]+=old.travel.delta_m[0];origin[1]+=old.travel.delta_m[1];}}return {origin_m:origin,delta_m:c.travel.delta_m,meters_per_unit:p.timeline.meters_per_unit,label:'Unsaved path · '+Math.hypot(...c.travel.delta_m).toFixed(2)+' m'};},
   finishEdit(){gesture=null;},
-  undo(){gesture=null;if(history.length){const old=history.pop();({tracks,raw,selected,clipId}=old);}},
-  discard(){tracks=copy(baseline);history=[];raw.clear();gesture=null;clipId=null;},
+  undo(){gesture=null;if(history.length){const old=history.pop();({tracks,raw,stationaryFrames,selected,clipId}=old);}},
+  discard(){tracks=copy(baseline);history=[];raw.clear();stationaryFrames.clear();gesture=null;clipId=null;},
   handoff(frame){if(this.dirty)throw Error('Save or discard Action changes before opening another editor.');performer(selected);frame=frame??audit.reference_frame;if(!Number.isInteger(frame)||frame<audit.frame_range[0]||frame>audit.frame_range[1])throw Error('Choose a frame in the saved scene.');return {version:'action-layer-v1',checkpointId:checkpoint.id,sha256:checkpoint.sha256,inspectionId:run.id,audit_sha256:audit.sha256,performer:selected,frame};},
   request(requestId){if(this.invalid)throw Error(this.errors[0].message);if(!this.changes.length)throw Error('No Action changes to save.');if(this.changes.length>32)throw Error('Save at most 32 performers at once.');const range=this.playbackRange;if(range[1]-range[0]>3600)throw Error('Timeline exceeds 3600 frame intervals.');return {version:'action-layer-v1',requestId,checkpointId:checkpoint.id,sha256:checkpoint.sha256,inspectionId:run.id,audit_sha256:audit.sha256,changes:this.changes,frame_range:range};}
  };

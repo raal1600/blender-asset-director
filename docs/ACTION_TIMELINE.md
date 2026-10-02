@@ -11,6 +11,9 @@ occupying 1–50 leaves 51 as the next append position. Other performers have
 independent tracks. Earlier clips remain editable; moving following clips is an
 explicit operation, not an implicit overwrite. Emptying a track holds its first
 pose rather than reviving a previously muted animation. Undo/Discard are local.
+Turning off travel restores the clip's local pre-travel duration; after reloading
+a saved path it defaults to one native cycle at the selected speed. Explicit
+non-travel trims remain available under Timing and path.
 
 The red endpoint can be dragged in the viewer or moved with arrow keys (0.1 m,
 Shift 1 m). Distance and world direction also have numeric controls. Name-based
