@@ -26,7 +26,9 @@ export function previewFailure(error) {
   return {title:'3D preview unavailable',message:textures?'This asset exceeds the in-app texture conversion limits. You can inspect the full-resolution asset in Blender.':'Director could not prepare this in-app preview. You can inspect the asset separately in Blender.',detail};
 }
 
-export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,release}) {
+export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,actionEdit,release}) {
+  let actionPath=null;
+  let seekActionFrame=null;
   let disposed=false,renderer,controls,world,mixer,editor,frame=0,observer,model,action,playing=false,last=0,dirty=true,resize,loadedScenes=[],playback=null;
   let shotView=null,shotTime=0,shotFixed=true;
   const abort=new AbortController(),cleanups=[];
@@ -104,6 +106,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,r
         node('clock').textContent=playback?'Frame '+current+' · '+time.toFixed(2)+' s':time.toFixed(2)+' s';node('time').value=String(shotView?current:time);};
       const select=()=>{mixer.stopAllAction();playing=false;node('play').textContent='Play';const clip=takes[Number(node('take').value)],staticPose=clip.duration===0;action=mixer.clipAction(clip);action.reset().setLoop(staticPose||shotRig?THREE.LoopOnce:THREE.LoopRepeat,Infinity);action.clampWhenFinished=staticPose||!!shotRig;action.play();mixer.update(0);node('time').max=String(clip.duration);node('play').disabled=staticPose;node('time').disabled=staticPose;clock();reset();dirty=true;};
       if(takes.length)select();else{host.querySelector('.viewer-animation').hidden=true;}
+      seekActionFrame=value=>{if(!playback||shotView||!action)return;playing=false;node('play').textContent='Play';action.time=(Math.max(playback.start,Math.min(playback.end,value))-playback.start)/playback.fps;mixer.update(0);clock();dirty=true;};
       if(record.profile==='action-playback-v1'){
         if(playback.static===true){host.querySelector('.viewer-animation').hidden=false;node('play').disabled=true;node('time').disabled=true;clock();}
         node('take').closest('label').hidden=true;
@@ -132,6 +135,11 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,r
         editor=attachWorldEditor({THREE,host,model,gltf,world,camera,orbit:controls,canvas,record,...worldEdit,invalidate:()=>{dirty=true;}});
         worldEdit.changed?.(editor.state);
       }
+      if(actionEdit&&record.profile==='action-playback-v1'){
+        const {attachActionPath}=await import('./action-path-editor.mjs');if(disposed)return;
+        actionPath=attachActionPath({THREE,host,world,camera,canvas,orbit:controls,...actionEdit,invalidate:()=>{dirty=true;}});
+        cleanups.push(()=>actionPath?.dispose());
+      }
       host.dataset.viewerState='ready';host.dataset.previewId=record.previewId;
       function animate(now){if(disposed)return;frame=requestAnimationFrame(animate);if(document.hidden||(!host.closest('dialog')&&document.querySelector('dialog[open]'))){last=now;return;}const dt=Math.min((now-(last||now))/1000,.1);last=now;if(playing){if(shotView){const duration=(shotView.shot.end-shotView.shot.start+1)/shotView.fps;shotTime=(shotTime+dt)%duration;}else mixer.update(dt);clock();dirty=true;}if(controls.enabled)controls.update();if(dirty){
         if(shotRig&&shotFixed){const width=surface.clientWidth,height=surface.clientHeight,v=shotViewport(width,height,shotView.aspect);renderer.setScissorTest(false);renderer.setViewport(0,0,width,height);renderer.setClearColor(0x080b10);renderer.clear();renderer.setViewport(v.x,v.y,v.width,v.height);renderer.setScissor(v.x,v.y,v.width,v.height);renderer.setScissorTest(true);renderer.setClearColor(0x161c25);renderer.render(world,shotRig.camera);renderer.setScissorTest(false);}
@@ -148,7 +156,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,r
       const details=document.createElement('details'),summary=document.createElement('summary'),reason=document.createElement('p');summary.textContent='Technical details';reason.textContent=failure.detail;details.append(summary,reason);box.append(details);host.append(box);host.dataset.viewerState='failed';
     }
   })();
-  return {dispose,ready,get dirty(){return !!editor?.dirty;},get draft(){return editor?.state;},
+  return {dispose,ready,seekFrame:value=>seekActionFrame?.(value),updateActionPath:()=>actionPath?.update(),get dirty(){return !!editor?.dirty;},get draft(){return editor?.state;},
     get currentFrame(){return shotView?shotFrame(shotView,shotTime):playback?Math.min(playback.end,Math.round(playback.start+(action?.time||0)*playback.fps)):null;},
     request:id=>{if(!editor)throw Error('This saved scene needs placement preparation in Blender.');return editor.request(id);},
     targets:()=>editor?.targets()||[],undo:()=>editor?.undo(),discard:()=>editor?.discard(),setEnabled:value=>editor?.setEnabled(value)};

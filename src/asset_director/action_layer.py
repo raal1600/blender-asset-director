@@ -81,6 +81,9 @@ def audit():
             continue
         ad, takes = obj.animation_data, []
         for action, slot in bindings(obj):
+            from .action_timeline import is_generated
+            if is_generated(action):
+                continue
             if not ops.curves(action, slot):
                 continue
             # A layered action needs its actual binding, not whichever slot is first.
@@ -99,15 +102,16 @@ def audit():
             takes.append(record); bound.add((action.name, slot_id(slot)))
         require(len(takes) <= 256, 'RESOURCE_LIMIT', 'Performer has too many native takes')
         control = ancestor_control(obj)
+        from .action_timeline import describe
         performers.append({'name': obj.name, 'type': obj.type, 'asset_id': obj.get('bad_asset'),
                            'instance': control.get('bad_placement_instance') if control else None,
                            'placement_control': control.name if control else None,
                            'active': {'action': ad.action.name, 'slot': slot_id(getattr(ad, 'action_slot', None))} if ad and ad.action else None,
                            'tracks': [track_record(t) for t in ad.nla_tracks] if ad else [],
-                           'takes': takes, 'unsupported': reason(obj)})
+                           'takes': takes, 'unsupported': reason(obj), 'timeline': describe(obj, takes)})
     unassigned = [{'action': a.name, 'slot': slot_id(slot)} for a in bpy.data.actions
                   for slot in list(getattr(a, 'slots', [])) or [None]
-                  if ops.curves(a, slot) and (a.name, slot_id(slot)) not in bound]
+                  if not a.get('bad_action_travel_v1') and ops.curves(a, slot) and (a.name, slot_id(slot)) not in bound]
     result = {'version': contract.VERSION, 'fps': scene.render.fps / scene.render.fps_base,
               'frame_range': [scene.frame_start, scene.frame_end], 'reference_frame': scene.frame_current,
               'performers': performers, 'unassigned': unassigned,
@@ -175,6 +179,11 @@ def apply(options, job_id):
     require(bpy.app.background, 'BACKGROUND_REQUIRED', 'Action edits require a separate worker')
     scene = bpy.context.scene; before = audit()
     require(before['sha256'] == options['audit_sha256'], 'ACTION_CHANGED', 'Saved Action context changed; inspect again')
+    if all(c['mode'] == 'timeline' for c in options['changes']):
+        from .action_timeline import apply as apply_timeline
+        return apply_timeline(options, job_id, before)
+    require(all(not scene.objects[c['performer']].get('bad_action_timeline_v1') for c in options['changes'] if c['performer'] in scene.objects),
+            'TIMELINE_REVIEW_REQUIRED', 'Edit the saved clips in the timeline or in Blender')
     pending = []
     for change in options['changes']:
         item = next((p for p in before['performers'] if p['name'] == change['performer']), None)
@@ -228,6 +237,9 @@ def apply(options, job_id):
 
 
 def verify(report):
+    if report.get('timeline_version'):
+        from .action_timeline import verify as verify_timeline
+        return verify_timeline(report)
     scene = bpy.context.scene
     for change in report['changes']:
         obj = scene.objects.get(change['performer']);require(obj is not None, 'ACTION_RESULT_CHANGED', 'Performer missing')

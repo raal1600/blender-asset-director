@@ -1,6 +1,7 @@
 /** Performer-first presentation and local-only timing draft. No implicit approval. */
 import {taskBanner} from './workbench-task.mjs';
 import {progressLabel} from './workbench-progress.mjs';
+import {timelineControls,timelineTracks} from './action-timeline-view.mjs';
 
 // Automatic read-only inspection can race a reload/second tab. Refresh once,
 // reuse its exact native receipt, and never retry a mutation or failed job.
@@ -87,9 +88,11 @@ export function actionView({project,scene,stages,checkpoint,runs,locked,taskStat
   <div class="action-savebar"><span role="status">${esc(status)}</span><div>${button('Discard changes','action-discard','ghost',!draft?.dirty||!!saving)}${button('Undo','action-undo','ghost',!draft?.canUndo||stale)}${button('Save changes','action-save',draft?.dirty?'primary':'ghost',!draft?.dirty||draft?.invalid||stale)}</div></div>
   ${scene.task?taskBanner(scene,taskStatus,esc,b):''}${run?`<div class="note" role="status">${esc(progressLabel(run))} ${b('Inspect operation','recover',{run:run.id},'ghost')}</div>`:''}
   ${!cap?.action_layer?'<p class="note warn">Install the matching Action runtime before using native motion controls.</p>':''}
-  ${controls}
+  ${draft?.timeline?timelineControls(draft,esc,disabled):controls}
+  ${!draft?.timeline&&cap?.action_timeline?button('Build a motion timeline','motion-enable','ghost',!!draft?.dirty):''}
   ${checkpoint?'<section class="viewer-3d" data-scene-viewer aria-label="Saved scene in 3D"></section>':'<p>No saved World yet. Return to World to add your scene.</p>'}
   <p class="action-preview-scope">${esc(actionPreviewScope(draft,stale))}</p>
+  ${draft?.timeline?`<section class="motion-timeline" data-motion-tracks aria-label="Character action timelines">${timelineTracks(draft,esc)}</section>`:''}
   ${draft?`${p?.unsupported?`<p class="note warn">${esc(p.unsupported)}. Use Blender or the reviewed specialist.</p>`:''}<details class="action-details"><summary>Timing and motion details</summary><p>${esc(draft.audit.fps)} fps · scene frames ${esc(draft.audit.frame_range.join('–'))}. Native source keys and World placement stay intact. Timing changes use the complete take; no loop, retarget or inferred mapping.</p>${button('Hold whole scene at current frame','action-hold-all','ghost',disabled)}${p?.type==='ARMATURE'?button('Edit rig controls in Blender','action-rig','ghost',!cap?.action_task||!!draft.dirty):''}${button('Inspect performers again','action-inspect','ghost',!!draft.dirty)}${draft.audit.unassigned.length?`<p>${draft.audit.unassigned.length} unbound action slot(s) need reviewed binding in Blender; they are not assigned by name.</p>`:''}</details>`:checkpoint?`<p role="status">${attempt?.state==='FAILED'?esc(attempt.error):'Inspecting saved performers and their native motion…'}</p>${!active?button(attempt?'Retry performer inspection':'Inspect performers','action-inspect'):''}`:''}
   <section class="world-next"><div class="grow"><h2>Review the motion, then continue</h2><p>Check timing, deformation and contacts. A still scene is valid too. Saving and playback are not approval.</p></div>${button('Action ready · continue to Shots','action-ready','primary',!checkpoint||!!draft?.dirty||stale||!draft)}</section></section>`;
 }
