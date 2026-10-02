@@ -11,11 +11,13 @@ import sys
 from .core import Library, atomic_json, fields, file_hash, load_json, require, within
 
 STAGES = {"world": "Layout", "action": "Animation", "shots": "Layout", "light": "Shading", "render": "Rendering"}
-TASK_FIELDS = {"schema", "id", "projectId", "sceneId", "stage", "projectDirectory", "library", "input", "workingScene", "checkpointScene", "returnFile", "targets", "camera", "frame", "action", "state", "startedAt", "processId", "selectedSources", "frameRange", "handoff"}
+TASK_FIELDS = {"schema", "id", "projectId", "sceneId", "stage", "projectDirectory", "library", "input", "workingScene", "checkpointScene", "returnFile", "targets", "camera", "frame", "action", "state", "startedAt", "processId", "selectedSources", "frameRange", "handoff", "actionContext", "rigControls"}
 
 
 def validate(task):
-    fields(task, TASK_FIELDS, TASK_FIELDS - {"processId", "frameRange", "handoff"})
+    fields(task, TASK_FIELDS, TASK_FIELDS - {"processId", "frameRange", "handoff", "actionContext", "rigControls"})
+    from .action_task import validate_context
+    validate_context(task)
     require(task.get("handoff") in (None, "explicit-save-v1"), "INVALID_TASK", "Unknown editing handoff")
     require(task["schema"] == 1 and task["stage"] in STAGES, "INVALID_TASK", "Unknown task schema or stage")
     for key, prefix in (("id", "task_"), ("projectId", "prj_"), ("sceneId", "sc_")):
@@ -118,6 +120,9 @@ def configure(task, project):
         require(isinstance(embedded, list) and set(embedded) <= set(baseline),
                 "LICENSE_SCOPE_MISMATCH", "Use the library that owns this checkpoint's restricted lineage")
     configured = False
+    if task['stage'] == 'action':
+        from .action_task import verify_observed
+        verify_observed(task)
     window = bpy.context.window
     if window and not bpy.app.background:
         workspace = (bpy.data.workspaces.get("Asset Director - " + task["stage"].title()) or
@@ -127,11 +132,32 @@ def configure(task, project):
             workspace.name = "Asset Director - " + task["stage"].title()
             configured = True
     scene = bpy.context.scene
+    from . import world_placement
+    world_placement.restore_widgets(scene)
+    placement = None
+    if task['stage'] == 'world':
+        # Only the separate task copy is prepared. Don't Save still retains the
+        # input checkpoint; explicit Save records the new placement structure.
+        placement = world_placement.prepare(scene)
+        world_placement.hide_widgets(scene)
+        if window:
+            for area in window.screen.areas:
+                if area.type == 'VIEW_3D':
+                    space = area.spaces.active
+                    space.overlay.show_bones = False
+                    space.show_gizmo_object_translate = False
+                    space.show_gizmo_object_rotate = False
+                    space.show_gizmo_object_scale = False
     if task.get("frameRange"):
         start, end = task["frameRange"]
         require(scene.frame_start <= start <= end <= scene.frame_end, "TARGET_CHANGED", "Shot range leaves the saved scene")
-        scene.frame_preview_start, scene.frame_preview_end = start, end
+        # Enabling initializes a previously unused preview range from the scene.
+        # Blender also clamps each endpoint against the other. Widen the start
+        # first so an earlier, disjoint shot can move the end backwards safely.
         scene.use_preview_range = True
+        scene.frame_preview_start = min(scene.frame_preview_start, start)
+        scene.frame_preview_end = end
+        scene.frame_preview_start = start
         require([scene.frame_preview_start, scene.frame_preview_end] == [start, end],
                 "INVALID_TASK", "Blender did not retain the requested playback range")
     for name in task["targets"]:
@@ -153,9 +179,13 @@ def configure(task, project):
     if task["camera"]:
         scene.camera = camera  # Preserve the requested camera after timeline markers.
     active = bpy.context.view_layer.objects.active
-    if task["stage"] == "action" and active and active.type == "ARMATURE":
-        if bpy.ops.object.mode_set.poll():
-            bpy.ops.object.mode_set(mode="POSE")
+    if placement and task['targets'] and all(world_placement.ancestor_control(scene.objects[n]) for n in task['targets']):
+        world_placement.select_instances([scene.objects[n] for n in task['targets']])
+    if task['stage'] == 'action':
+        from .action_task import presentation
+        presentation(task, task.get('rigControls', False))
+        # A saved shot preview window must not silently restrict Action playback.
+        scene.use_preview_range = False
     if window and scene.camera and task["stage"] in {"shots", "light"}:
         for area in window.screen.areas:
             if area.type == "VIEW_3D" and area.spaces.active.region_3d:
@@ -163,7 +193,7 @@ def configure(task, project):
     bpy.ops.wm.save_as_mainfile(filepath=str(within(project, task["workingScene"])), check_existing=False, relative_remap=True)
     with Library(task["library"]) as lib:
         lp.retain_derivation(lib, within(project, task["workingScene"]), baseline)
-    return {"project": project, "baseline": baseline, "gui_configured": configured}
+    return {"project": project, "baseline": baseline, "gui_configured": configured, 'world_placement': placement}
 
 
 def checkpoint(task, initialized):
@@ -246,6 +276,11 @@ def main(filename):
             layout.label(text="Task: " + task["id"][5:13])
             layout.label(text="Save to keep changes. Unsaved edits stay out of Director." if task.get("handoff") else "Your original checkpoint is preserved.")
             layout.operator(AD_OT_checkpoint.bl_idname)
+            if task['stage'] == 'action' and task.get('actionContext'):
+                layout.separator()
+                layout.label(text='Performer: ' + task['actionContext']['performer'])
+                layout.operator('asset_director.action_controls', text='Show rig controls').enabled = True
+                layout.operator('asset_director.action_controls', text='Hide rig controls').enabled = False
             if task["selectedSources"]:
                 layout.separator()
                 layout.label(text="Selected sources (not imported):")
@@ -260,6 +295,12 @@ def main(filename):
 
     bpy.utils.register_class(AD_OT_checkpoint)
     bpy.utils.register_class(AD_PT_task)
+    if task['stage'] == 'action':
+        from .action_task import install_tools
+        install_tools(task)
+    if task['stage'] == 'world' and not bpy.app.background:
+        from .world_placement import install_tools
+        install_tools(task, state['world_placement'])
     # Search (F3) can find the operator in every workspace, not only VIEW_3D.
     atomic_json(status_file, {"taskId": task["id"], "projectId": task["projectId"], "sceneId": task["sceneId"],
                               "state": "READY", "gui_configured": state["gui_configured"],

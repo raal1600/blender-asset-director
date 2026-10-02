@@ -1,4 +1,5 @@
 import {validateRenderDevice} from './render-device.mjs';
+import {taskScenePaths} from './task-paths.mjs';
 /** Real local scene work. No prototype fixtures, fake progress, or model calls. */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -170,14 +171,16 @@ export class Workbench {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);await this.unlocked(p);
     assert(s.candidate,'No candidate to discard.');s.candidate=null;return this.store.save(p,p.revision);
   }
-  async openTask(id,sceneId,revision,{targets=[],camera=null,frame=null,frameRange=null}={}) {
+  async openTask(id,sceneId,revision,{targets=[],camera=null,frame=null,frameRange=null,rigControls=false,actionContext=null}={}) {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);
     assert(!s.candidate&&!s.task&&!s.run,'Review or resolve the existing scene task first.',409);
+    assert(typeof rigControls==='boolean'&&(!rigControls||s.stage==='action'&&actionContext),'Inspect an Action performer before showing rig controls.');
     assert(Array.isArray(targets)&&targets.length<=64&&targets.every(x=>typeof x==='string'&&x.length<=255),'Invalid targets.');
     assert(camera===null||typeof camera==='string'&&camera.length<=255,'Invalid camera.');
     assert(frame===null||Number.isInteger(frame)&&frame>=-100000&&frame<=100000,'Invalid frame.');
     assert(frameRange===null||Array.isArray(frameRange)&&frameRange.length===2&&frameRange.every(Number.isInteger)&&frameRange[0]>=-100000&&frameRange[1]<=100000&&frameRange[1]>=frameRange[0]&&frameRange[1]-frameRange[0]<360,'Invalid task playback range.');
     const cap=await this.available();assert(cap.task_workspace,'Install the matching development harness to enable task workspaces.',409);
+    assert(!actionContext||cap.action_task==='action-task-v1','Install the matching Action task runtime before performer handoff.',409);
     assert((await this.store.verify(id)).ok,'Pinned sources changed before task launch.',409);
     let input=null;if(s.current){const cp=await this.verify(p,s);input={path:cp.path,sha256:cp.sha256};}
     const selectedSources=[];
@@ -185,10 +188,10 @@ export class Workbench {
       const v=await json(await safe(this.store.registry,`versions/${ref.sourceId}/${ref.version}.json`));
       selectedSources.push({sourceId:ref.sourceId,version:ref.version,path:await safe(this.store.database,v.relative)});
     }
-    const taskId=uid('task_');await this.lock(p,taskId);
+    const taskId=uid('task_'),taskPaths=taskScenePaths(p.directory,sceneId,taskId);await this.lock(p,taskId);
     const task={schema:1,id:taskId,projectId:id,sceneId,stage:s.stage,projectDirectory:p.directory,library:this.config.library,
-      input,workingScene:`Scenes/${sceneId}--edit-${taskId}.blend`,checkpointScene:`Scenes/${sceneId}--saved-${taskId}.blend`,
-      returnFile:`Docs/Workbench/${taskId}-return.json`,selectedSources,targets,camera,frame,...(frameRange?{frameRange}:{}),...(cap.explicit_save_handoff?{handoff:'explicit-save-v1'}:{}),action:'workbench-edit',state:'RUNNING',startedAt:now()};
+      input,...taskPaths,
+      returnFile:`Docs/Workbench/${taskId}-return.json`,selectedSources,targets,camera,frame,...(actionContext?{actionContext,rigControls}:{}),...(frameRange?{frameRange}:{}),...(cap.explicit_save_handoff?{handoff:'explicit-save-v1'}:{}),action:'workbench-edit',state:'RUNNING',startedAt:now()};
     const file=await safe(p.directory,`Runs/${taskId}.json`);
     try {
       await writeJson(file,task);s.task=taskId;await this.store.save(p,p.revision);
@@ -328,7 +331,8 @@ export class Workbench {
     const p=await this.project(id,revision);await this.unlocked(p);
     assert(confirmed===true&&p.jobs.some(j=>j.id===jobId),'Confirm retry of a project-owned job.');
     const job=await this.runtime.job(jobId);
-    assert(['render-readiness','preview','render-frames'].includes(job.specification.operation)&&['FAILED','INTERRUPTED'].includes(job.state),
+    assert(['render-readiness','preview','render-frames','world-transform','world-prepare-audit','world-prepare',
+      'action-audit','action-edit','scene-layer-audit','scene-layer-edit'].includes(job.specification.operation)&&['FAILED','INTERRUPTED'].includes(job.state),
       'Only failed workbench jobs can be reset for explicit retry.',409);
     // Native job-retry archives the failed attempt; the next Run is separate.
     return this.runtime.harness(['job-retry',jobId]);

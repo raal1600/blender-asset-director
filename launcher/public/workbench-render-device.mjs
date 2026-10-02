@@ -6,9 +6,9 @@ export function renderDevices(ready,cap){
  }
  return result;
 }
-export function deviceControl(ready,cap,esc){
- const devices=renderDevices(ready,cap);
- return '<label class="full">Render device<select id="render-device">'+devices.map((d,i)=>'<option value="'+i+'">'+esc(d.backend==='CPU'?d.name:d.name+' · OptiX GPU')+'</option>').join('')+'</select></label><p class="full muted">GPU uses the selected card for OptiX rendering and denoising when enabled. No automatic CPU fallback; a failed GPU render keeps its evidence. Choose CPU explicitly to retry.</p>'+(ready?.device_warnings||[]).map(x=>'<p class="full warn">'+esc(x)+'</p>').join('');
+export function deviceControl(ready,cap,esc,choice={backend:'CPU'},disabled=false){
+ const devices=renderDevices(ready,cap),index=devices.findIndex(d=>d.backend===choice?.backend&&(d.backend==='CPU'||d.id===choice.id));
+ return '<label class="full">Render device<select id="render-device" data-render-setting="device" '+(disabled?'disabled':'')+'>'+(index<0?'<option value="-1" selected>Previously selected device unavailable — choose explicitly</option>':'')+devices.map((d,i)=>'<option value="'+i+'" '+(i===index?'selected':'')+'>'+esc(d.backend==='CPU'?d.name:d.name+' · OptiX GPU')+'</option>').join('')+'</select></label><p class="full muted">GPU uses the selected card for OptiX rendering and denoising when enabled. No automatic CPU fallback; a failed GPU render keeps its evidence. Choose CPU explicitly to retry.</p>'+(ready?.device_warnings||[]).map(x=>'<p class="full warn">'+esc(x)+'</p>').join('');
 }
 export function selectedDevice(ready,cap,index){
  const d=renderDevices(ready,cap)[Number(index)];

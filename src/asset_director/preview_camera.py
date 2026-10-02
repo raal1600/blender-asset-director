@@ -40,4 +40,5 @@ def render_previews(directory, options):
     require(scene.camera == original and all(m.camera == bound for m, bound in bindings),
             "PREVIEW_SETTINGS_NOT_RESTORED", "Camera or timeline bindings were not restored")
     return {**result, "camera": camera.name, "frames": options.get("frames", [1]),
+            "dependencies": before["dependencies"],
             "scene_camera_restored": True, "timeline_camera_bindings_restored": True}

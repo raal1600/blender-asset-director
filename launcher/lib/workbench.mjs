@@ -1,6 +1,12 @@
 import {openAssetPreview} from './asset-preview.mjs';
 import {focusTask} from './workbench-task.mjs';
 import {syncTask} from './task-save.mjs';
+import {saveWorld} from './world-transform.mjs';
+import {inspectWorldPreparation,prepareWorld} from './world-prepare.mjs';
+import {inspectAction,saveAction} from './action-layer.mjs';
+import {resolveActionContext} from './action-context.mjs';
+import {inspectSceneLayer,saveSceneLayer} from './scene-layer.mjs';
+import {previewEvidence,previewEvidenceMedia} from './preview-evidence.mjs';
 /** Scene workbench facade: native file/catalog adapters over the shared job lifecycle. */
 import fs from 'node:fs/promises';
 import {constants} from 'node:fs';
@@ -13,6 +19,21 @@ import {withCatalog} from './workbench-catalog.mjs';
 import {assertBlendEnvelope} from './workbench-files.mjs';
 
 export class Workbench extends withCatalog(WorkbenchCore) {
+  previewEvidence(...args){return previewEvidence(this,...args);}
+  async media(id,parameters){
+    if(parameters.kind==='preview-evidence'||parameters.runId!==undefined){
+      assert(parameters.kind==='preview-evidence'&&Object.keys(parameters).every(k=>['projectId','sceneId','kind','runId'].includes(k)),'Invalid historical preview media request.');
+      return previewEvidenceMedia(this,id,parameters.sceneId,parameters.runId);
+    }
+    return super.media(id,parameters);
+  }
+  inspectSceneLayer(...args){return inspectSceneLayer(this,...args);}
+  saveSceneLayer(...args){return saveSceneLayer(this,...args);}
+  saveWorld(...args){return saveWorld(this,...args);}
+  inspectWorldPreparation(...args){return inspectWorldPreparation(this,...args);}
+  prepareWorld(...args){return prepareWorld(this,...args);}
+  inspectAction(...args){return inspectAction(this,...args);}
+  saveAction(...args){return saveAction(this,...args);}
   previewAsset(...args){return openAssetPreview(this,...args);}
   focusTask(...args){return focusTask(this,...args);}
   syncTask(...args){return syncTask(this,...args);}
@@ -20,6 +41,11 @@ export class Workbench extends withCatalog(WorkbenchCore) {
   selectShot(...args){return selectShot(this,...args);}
   async openTask(id,sceneId,revision,context={}) {
     const p=await this.project(id,revision),scene=this.scene(p,sceneId);
+    if(context.actionContext){
+      const selected=await resolveActionContext(this,p,scene,context.actionContext);
+      assert(!context.rigControls||selected.performer.type==='ARMATURE','This performer has no armature controls.');
+      context={...context,targets:[selected.performer.name],frame:selected.request.frame};
+    }
     return super.openTask(id,sceneId,revision,taskShotContext(scene,checkpointFor(scene),context));
   }
   async importCheckpoint(id,sceneId,revision,sourceScene) {

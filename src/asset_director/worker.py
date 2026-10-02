@@ -106,6 +106,18 @@ def execute(job_path, *, live=False):
             elif op == "scene-audit":
                 data = scene_ops.scene_audit()
                 data["source_file_sha256"] = spec["inputs"][0]["sha256"]
+            elif op in {'world-transform', 'world-placement-audit'}:
+                from asset_director import world_transform
+                data = world_transform.apply(options) if op == 'world-transform' else world_transform.audit()
+            elif op in {'world-prepare-audit', 'world-prepare'}:
+                from asset_director import world_prepare
+                data = world_prepare.apply(options) if op == 'world-prepare' else world_prepare.audit()
+            elif op in {'action-audit', 'action-edit'}:
+                from asset_director import action_layer
+                data = action_layer.apply(options, job['id']) if op == 'action-edit' else action_layer.audit()
+            elif op in {'scene-layer-audit', 'scene-layer-edit'}:
+                from asset_director import scene_layer
+                data = scene_layer.audit(options['layer']) if op == 'scene-layer-audit' else scene_layer.apply(options, job['id'])
             elif op == "camera-fit": data = scene_ops.camera_fit(options, job["id"])
             elif op == "camera-plan": data = scene_ops.camera_plan(options, job["id"])
             elif op == "look-audit": data = scene_ops.look_audit()
@@ -175,6 +187,9 @@ def execute(job_path, *, live=False):
                             collection.objects.link(obj)
                         obj["bad_asset"] = asset.id; obj["bad_job"] = job["id"]
                     data = {"objects": [o.name for o in created], "source": asset.id}
+                    if options.get('placement') == 'world-v1':
+                        from asset_director.world_placement import prepare as prepare_placement
+                        data['world_placement'] = prepare_placement(bpy.context.scene, only_job=job['id'])
                 # The launcher adopts a byte-identical candidate into project Scenes.
                 # Preserve external references across that move, without touching sources.
                 bpy.ops.file.make_paths_absolute()
@@ -233,6 +248,14 @@ def execute(job_path, *, live=False):
                 if spec.get("license_grants"):
                     bpy.context.scene[lp.SCENE_KEY] = json.dumps(spec["license_grants"])
                 bpy.ops.wm.save_as_mainfile(filepath=str(dest), check_existing=False)
+                if op == 'world-transform':
+                    world_transform.verify_saved(data, dest)
+                if op == 'world-prepare':
+                    world_prepare.verify_saved(data, dest)
+                if op == 'action-edit':
+                    action_layer.verify_saved(data, dest)
+                if op == 'scene-layer-edit':
+                    scene_layer.verify_saved(data, dest)
                 lp.retain_derivation(lib, dest, spec.get("license_grants", []))
             if spec.get("license_grants"):
                 data["project_rights"] = {"grants": spec["license_grants"], "raw_redistribution": "DENIED", "scope": lp.SCOPE}

@@ -41,6 +41,11 @@ def file_hash(path: Path) -> str:
             h.update(block)
     return h.hexdigest()
 
+
+def implementation_hash() -> str:
+    """Hash every portable/runtime module by content; never cache by mtime."""
+    return digest({p.name: file_hash(p) for p in sorted(Path(__file__).parent.glob("*.py"))})
+
 def load_json(path: Path, max_bytes: int = 16 * 1024 * 1024) -> Any:
     require(path.stat().st_size <= max_bytes, "INPUT_TOO_LARGE", "JSON input exceeds the size limit")
     try:

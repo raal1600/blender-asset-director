@@ -13,6 +13,7 @@ URL = f'https://registry.npmjs.org/three/-/three-{VERSION}.tgz'
 INTEGRITY = 'cr/fIM2ddMSVbYVgkfD4jLJv7Fh/8ZTjvo+7gQeSVGUZHxpx9FDwoL5iC7hUz/LiRA8wMbqfnb90xKfm1/HHkQ=='
 FILES = ('LICENSE', 'build/three.module.js', 'build/three.core.js',
          'examples/jsm/loaders/GLTFLoader.js', 'examples/jsm/controls/OrbitControls.js',
+         'examples/jsm/controls/TransformControls.js',
          'examples/jsm/utils/BufferGeometryUtils.js', 'examples/jsm/utils/SkeletonUtils.js')
 
 

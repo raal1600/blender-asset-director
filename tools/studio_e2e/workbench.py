@@ -50,7 +50,7 @@ def review_scene(s):
             if page.locator('.world-inspection').count() and page.locator('.world-inspection').get_attribute('open') is None:
                 page.locator('.world-inspection > summary').click()
             panel = page.locator('.rendered-evidence')
-            if panel.get_attribute('open') is None:
+            if panel.count() and panel.get_attribute('open') is None:
                 panel.locator('summary').click()
         page.locator(selector).click()
         idle()
@@ -109,7 +109,9 @@ def review_scene(s):
         assert digest(s.scene) == s.scene_hash
         page.reload()
         idle()
-        expect(page.locator('h1')).to_have_text('Synthetic workbench scene')
+        expect(page.locator('h1')).to_have_text('Bring your world to life')
+        expect(page.locator('#scene-picker option:checked')).to_have_text('Synthetic workbench scene')
+        expect(page.locator('#scene-picker')).to_have_value(scene['id'])
         page.screenshot(path=str(s.evidence.directory / 'workbench-desktop.png'))
         page.set_viewport_size({'width': 390, 'height': 844})
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Mobile page overflow'
@@ -185,6 +187,10 @@ def catalog_and_film(s, click, idle, check):
         while True:
             snapshot = state()
             result = snapshot['project']['workbench']['scenes'][0]
+            failures = [r for r in snapshot['runs'] if r.get('sceneId') == result['id']
+                        and r['state'] in ('FAILED', 'INTERRUPTED') and not r.get('recovery')]
+            assert not failures, 'World add failed; preserved receipts: ' + str(failures)
+            expect(page.locator('#notice')).to_be_hidden()
             if result['candidate'] and result['candidate'] != previous and not snapshot['locked']:
                 break
             if page.locator('#dialog[open] [name="world-collection"]').count():
@@ -250,7 +256,11 @@ def catalog_and_film(s, click, idle, check):
     # These confirmations test state transitions, not manual authoring/quality.
     for activity in ['world', 'action']:
         assert state()['project']['workbench']['scenes'][0]['stage'] == activity
-        click('[data-action="approve"]')
+        if activity == 'action':
+            expect(page.locator('[data-action="action-ready"]')).to_be_enabled(timeout=220000)
+            click('[data-action="action-ready"]')
+        else:
+            click('[data-action="approve"]')
     # Save a named shot from observed camera metadata; never invent cameras.
     camera_names = [o['name'] for o in imported['audit']['objects'] if o['type'] == 'CAMERA']
     assert len(camera_names) >= 2
@@ -263,14 +273,18 @@ def catalog_and_film(s, click, idle, check):
     scene = state()['project']['workbench']['scenes'][0]
     definition = scene['shots'][0]
     assert scene['selectedShot'] == definition['id'] and definition['revision'] == 1
+    expect(page.locator('[data-action="layer-ready"]')).to_be_enabled(timeout=220000)
+    click('[data-action="layer-ready"]')
+    assert state()['project']['workbench']['scenes'][0]['stage'] == 'light'
+    expect(page.locator('[data-action="preview"]')).to_be_enabled(timeout=220000)
     click('[data-action="preview"]')
     click('[data-action="save-preview"]')
     scene = settle()
     assert scene['preview']['camera'] == definition['camera']
     assert scene['preview']['shotId'] == definition['id'] and scene['preview']['shotRevision'] == 1
-    for activity in ['shots', 'light']:
-        assert state()['project']['workbench']['scenes'][0]['stage'] == activity
-        click('[data-action="approve"]')
+    expect(page.locator('[data-action="layer-ready"]')).to_be_enabled(timeout=220000)
+    click('[data-action="layer-ready"]')
+    assert state()['project']['workbench']['scenes'][0]['stage'] == 'render'
     assert s.api('workbench/capabilities')['encoder'], 'Film journey needs real FFmpeg and FFprobe' 
     click('[data-action="readiness"]')
     scene = settle()
@@ -286,11 +300,11 @@ def catalog_and_film(s, click, idle, check):
     shot = scene['renders'][-1]
     assert shot['shotId'] == definition['id'] and shot['shotRevision'] == definition['revision']
     assert shot['video']['frames'] == 4 and shot['video']['state'] == 'SUCCEEDED' and not shot['approved']
-    click('[data-action="play-render"][data-id="' + shot['id'] + '"]')
-    wait_for_media(page, '#review-video')
-    page.locator('#review-video').evaluate('(v) => v.play()')
-    wait_for_media(page, '#review-video', started=True)
-    click('#dialog [data-action="close"]')
+    movie_selector = 'video[aria-label="Rendered shot movie"]'
+    expect(page.locator(movie_selector)).to_have_attribute('data-id', shot['id'])
+    wait_for_media(page, movie_selector)
+    page.locator(movie_selector).evaluate('(v) => v.play()')
+    wait_for_media(page, movie_selector, started=True)
     click('[data-action="approve-render"][data-id="' + shot['id'] + '"]')
     click('[data-action="tab"][data-tab="film"]')
     click('[data-action="add-clip"][data-id="' + shot['id'] + '"]')
@@ -312,7 +326,7 @@ def catalog_and_film(s, click, idle, check):
     with s.evidence.checkpoint('workbench_shot_roundtrip') as shot_check:
         # Revise timing without changing scene bytes: the old render must become
         # historical. Old green scene hashes cannot validate a changed shot.
-        click('[data-action="edit-source"][data-id="' + scene['id'] + '"]')
+        click('.film-strip [data-action="edit-source"][data-id="' + scene['id'] + '"]')
         click('[data-action="stage"][data-stage="shots"]')
         click('[data-action="edit-shot"][data-id="' + definition['id'] + '"]')
         page.locator('#shot-end').fill('3')

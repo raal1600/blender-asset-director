@@ -1,4 +1,12 @@
 /** Scene-local camera decisions; no simulated previews or duplicate scene workflows. */
+export function viewerTaskFrame(scene,frame){
+  if(!Number.isInteger(frame)||!['action','shots','light','render'].includes(scene.stage))return {};
+  if(scene.stage!=='action'){
+    const shot=scene.shots?.find(s=>s.id===scene.selectedShot);if(!shot)return {};
+    if(frame<shot.start||frame>shot.end)throw Error('Viewer frame is outside the selected shot. Reload before opening Blender.');
+  }
+  return {frame};
+}
 export function shotPanel({scene,checkpoint,locked,esc,b}) {
   const editable=scene.stage==='shots'&&!locked&&!scene.candidate;
   return `<section class="library shot-library"><header><h3>Shots in this scene</h3><p>Different cameras into the same staged world.</p></header><div class="object-list">${b('Whole scene','scene-context',{},!scene.selectedShot?'active':'ghost',locked||!!scene.candidate)}${(scene.shots||[]).map(shot=>`<div class="shot-row">${b(shot.name,'select-shot',{id:shot.id},scene.selectedShot===shot.id?'active':'',locked||!!scene.candidate)}<small>${esc(shot.camera)} · ${shot.start}–${shot.end} · v${shot.revision}</small>${editable?b('Edit shot','edit-shot',{id:shot.id},'small ghost'):''}</div>`).join('')||'<p>No named shots yet. Save an observed camera and the moment it captures.</p>'}</div><footer>${scene.stage==='shots'?b('Save camera as shot','new-shot',{},'',!editable||!checkpoint):'<p>Keep this shot’s camera and timing through lighting and rendering. Lights remain shared scene state.</p>'}${checkpoint&&!checkpoint.audit?b('Inspect saved scene','readiness',{},'ghost',locked||!!scene.candidate):''}</footer></section>`;

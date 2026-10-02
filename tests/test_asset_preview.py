@@ -25,6 +25,15 @@ class PreviewTests(unittest.TestCase):
         atomic_json(self.request,data or self.data)
         return snapshot(self.request)
 
+    def test_world_profile_is_validated_and_reaches_only_the_separate_preview(self):
+        before=file_hash(self.file)
+        for invalid in ['world',None,False,[],{}]:
+            with self.assertRaisesRegex(DirectorError,'Unknown preview profile'):
+                self.run_snapshot({**self.data,'preview_profile':invalid})
+        _,_,asset=self.run_snapshot({**self.data,'preview_profile':'world-static-v1'})
+        self.assertEqual(asset.metadata['preview_profile'],'world-static-v1')
+        self.assertEqual(file_hash(self.file),before)
+
     def test_copy_has_separate_library_unknown_rights_and_no_original_changes(self):
         before=file_hash(self.file);request,directory,asset=self.run_snapshot()
         self.assertEqual(file_hash(self.file),before)
@@ -35,6 +44,25 @@ class PreviewTests(unittest.TestCase):
             self.assertEqual(job['specification']['inputs'],[])
             self.assertEqual(job['specification']['license_grants'],[])
         with self.assertRaisesRegex(DirectorError,'immutable'):self.run_snapshot()
+
+    def test_combined_action_profile_cannot_be_requested_for_an_asset(self):
+        with self.assertRaisesRegex(DirectorError, 'saved scene'):
+            self.run_snapshot({**self.data, 'preview_profile': 'action-playback-v1'})
+        self.assertFalse((self.preview/'library').exists())
+
+    def test_shot_profile_needs_native_checkpoint_identity_before_copying(self):
+        shot={'version':'shot-view-v1','id':'shot_'+'1'*8+'-'+'1'*4+'-'+'1'*4+'-'+'1'*4+'-'+'1'*12,
+              'revision':1,'name':'Wide','camera':'Observed','start':1,'end':9}
+        for patch in [{'preview_profile':'shot-framing-v1'}, {'shot_view':shot},
+                      {'preview_profile':'shot-framing-v1','shot_view':shot}]:
+            with self.assertRaises(DirectorError):self.run_snapshot(self.data|patch)
+            self.assertFalse((self.preview/'library').exists())
+        scene=self.source/'scene.blend';scene.write_bytes(b'synthetic checkpoint bytes')
+        value=self.data|{'file':'scene.blend','source_kind':'checkpoint','preview_profile':'look-inspection-v1','shot_view':shot,
+                        'files':[{'path':'scene.blend','size':scene.stat().st_size,'sha256':file_hash(scene)}]}
+        atomic_json(self.request,value);_,_,asset=snapshot(self.request,embedded=True)
+        self.assertEqual(asset.metadata['shot_view'],shot)
+        self.assertEqual(asset.metadata['preview_profile'],'look-inspection-v1')
 
     def test_changed_member_refused_before_snapshot_allocation(self):
         self.file.write_bytes(b'changed')

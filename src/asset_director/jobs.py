@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 import threading
 import time
-from .core import Asset, DirectorError, Library, SCHEMA, atomic_json, canonical, digest, fields, file_hash, load_json, require, rights, tokens, within
+from .core import Asset, DirectorError, Library, SCHEMA, atomic_json, canonical, digest, fields, file_hash, implementation_hash, load_json, require, rights, tokens, within
 from . import camera_plan
 from . import look_contract
 from . import motion_contract
@@ -14,8 +14,20 @@ from . import transfer_contract
 from . import bone_display_contract
 from . import sequence_contract
 from . import render_sequence
+from . import world_transform_contract
+from . import world_prepare_contract
+from . import action_layer_contract
+from . import scene_layer_contract
 
 OPS = {
+    "scene-layer-audit": {"layer"},
+    "scene-layer-edit": scene_layer_contract.FIELDS,
+    "action-audit": set(),
+    "action-edit": action_layer_contract.FIELDS,
+    "world-transform": world_transform_contract.FIELDS,
+    "world-placement-audit": set(),
+    "world-prepare-audit": set(),
+    "world-prepare": world_prepare_contract.FIELDS,
     "render-readiness": set(),
     "render-frames": render_sequence.FIELDS,
     **sequence_contract.OPS,
@@ -38,30 +50,47 @@ OPS = {
     "index": {"max_clips", "sample"},
     "asset-contents": {"file", "request_scope"},
     "asset-preview": {"file", "embedded"},
-    "import": {"collection", "selection", "file"},
+    "import": {"collection", "selection", "file", "placement"},
     "retarget": {"target_object", "source_object", "action", "slot", "mapping", "alignment", "pose_space", "start", "end", "source_fps", "target_fps", "allow_unskinned_fixture", "transfer_binding", "max_output_intervals"},
     "assemble": {"target_object", "clips", "fps", "controller_speed", "direction", "terrain_object", "travel_frames"},
     "qa": {"target_object", "start", "end", "terrain_object", "sole_offsets"},
     "preview": {"frames", "width", "height", "samples", "target_object", "stage", "camera"},
 }
-MUTATIONS = {"asset-preview", "sequence-execute", "bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
+MUTATIONS = {"action-edit", "world-transform", "asset-preview", "sequence-execute", "bone-display", "native-clip", "stage-floor", "import", "retarget", "assemble", "preview", "camera-fit", "camera-plan",
              "light-adjust", "world-adjust", "look-adjust", "light-rig"}
-TARGET_REQUIRED = {"render-readiness", "render-frames", "sequence-plan", "sequence-execute", "sequence-check", "bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
+TARGET_REQUIRED = {"action-audit", "action-edit", "world-transform", "world-placement-audit", "render-readiness", "render-frames", "sequence-plan", "sequence-execute", "sequence-check", "bone-display-audit", "bone-display", "transfer-plan", "contact-check","stage-floor", "retarget", "assemble", "qa", "preview", "scene-audit", "camera-fit", "camera-check",
                    "camera-plan", "look-audit", "light-adjust", "world-adjust", "look-adjust", "light-rig"}
 
 OPS.update(motion_contract.OPS)
 MUTATIONS.update(motion_contract.MUTATIONS)
 TARGET_REQUIRED.update(motion_contract.TARGETS)
-
-
-def implementation_hash():
-    return digest({p.name: file_hash(p) for p in sorted(Path(__file__).parent.glob("*.py"))})
+MUTATIONS.add('scene-layer-edit')
+MUTATIONS.add('world-prepare')
+TARGET_REQUIRED.update({'world-prepare-audit', 'world-prepare'})
+TARGET_REQUIRED.update({'scene-layer-audit', 'scene-layer-edit'})
 
 
 def prepare(lib: Library, operation: str, input_file: str | None = None, asset_id: str | None = None, options=None) -> dict:
     require(operation in OPS, "UNKNOWN_OPERATION", "Unknown Blender operation")
     options = copy.deepcopy(options or {})
     fields(options, OPS[operation])
+    if operation in {'world-prepare-audit', 'world-prepare'}:
+        if operation == 'world-prepare':world_prepare_contract.validate(options)
+        require(input_file is not None and asset_id is None and Path(input_file).suffix.lower() == '.blend',
+                'TARGET_REQUIRED', 'Compatibility preparation requires an exact saved scene, not a source asset')
+    if operation in {'scene-layer-audit', 'scene-layer-edit'}:
+        scene_layer_contract.validate(options, inspect=operation == 'scene-layer-audit')
+        require(input_file is not None and asset_id is None and Path(input_file).suffix.lower() == '.blend',
+                'TARGET_REQUIRED', 'Camera/light layers require an inspected saved scene, not a source asset')
+    if operation in {'action-audit', 'action-edit'}:
+        if operation == 'action-edit':action_layer_contract.validate(options)
+        require(input_file is not None and asset_id is None and Path(input_file).suffix.lower() == '.blend',
+                'TARGET_REQUIRED', 'Action editing requires an inspected saved scene, not a guessed source asset')
+    if operation in {'world-transform', 'world-placement-audit'}:
+        if operation == 'world-transform':
+            world_transform_contract.validate(options)
+        require(input_file is not None and asset_id is None and Path(input_file).suffix.lower() == '.blend',
+                'TARGET_REQUIRED', 'World placement requires a saved scene checkpoint, not an asset')
     if operation in sequence_contract.OPS:
         sequence_contract.validate(operation, options)
         require(input_file is not None and asset_id is None, "TARGET_REQUIRED",

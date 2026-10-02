@@ -62,7 +62,7 @@ export const withCatalog=Base=>class extends Base {
   async verify(p,scene,checkpointId=scene.current){await verifyNative(this.store,this.runtime,p);return super.verify(p,scene,checkpointId);}
   async approve(...args){const p=await this.project(args[0],args[2]);await verifyNative(this.store,this.runtime,p);return super.approve(...args);}
   async openTask(...args){const p=await this.project(args[0],args[2]);await verifyNative(this.store,this.runtime,p);return super.openTask(...args);}
-  async codex(id,sceneId,revision){const p=await this.project(id,revision);await verifyNative(this.store,this.runtime,p);return startSpecialist(this,p,sceneId);}
+  async codex(id,sceneId,revision,context={}){const p=await this.project(id,revision);await verifyNative(this.store,this.runtime,p);return startSpecialist(this,p,sceneId,context);}
   async clips(p,refs){await verifyNative(this.store,this.runtime,p);return super.clips(p,refs);}
   async keepBuilding(id,sceneId,revision) {
     const p=await this.project(id,revision),s=this.scene(p,sceneId);await this.unlocked(p);
@@ -123,7 +123,7 @@ export const withCatalog=Base=>class extends Base {
     // checkpoint byte checks without launching that same native verification twice.
     const baseId=s.candidate||s.current;
     const cp=baseId?await timed('verify-checkpoint',()=>super.verify(p,s,baseId)):null;
-    const options=operation==='import'?{file,collection:sceneId,...(selection?{selection}: {})}:{file,request_scope:id+':'+sceneId};
+    const options=operation==='import'?{file,collection:sceneId,placement:'world-v1',...(selection?{selection}: {})}:{file,request_scope:id+':'+sceneId};
     const runId='run_'+randomUUID(),record=Object.assign(diagnostic,{schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',assetId:aid,sourceVersion:a.version,checkpointId:cp?.id||null,startedAt:now(),authorization:confirmed?'explicit-launcher-user-action':'read-only',options});
     await this.lock(p,runId);
     const receipt=await safe(p.directory,`Runs/${runId}.json`);

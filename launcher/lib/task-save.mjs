@@ -6,6 +6,7 @@ import {constants} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {assert,exists,fileHash,json,now,safe,writeJson} from './storage.mjs';
 import {approveCheckpoint,validHash,validId} from './workbench-model.mjs';
+import {validTaskScenePaths} from './task-paths.mjs';
 export const SAVE_MODE='explicit-save-v1';
 
 export async function syncTask(work,id,sceneId,revision) {
@@ -14,8 +15,7 @@ export async function syncTask(work,id,sceneId,revision) {
   const task=await json(await safe(p.directory,`Runs/${s.task}.json`));
   if(task.handoff!==SAVE_MODE)return {changed:false,legacy:true};
   assert(task.id===s.task&&task.projectId===id&&task.sceneId===sceneId&&task.action==='workbench-edit','Wrong editing task identity.',409);
-  assert(task.projectDirectory===p.directory&&task.stage===s.stage&&
-    task.workingScene===`Scenes/${sceneId}--edit-${task.id}.blend`&&task.checkpointScene===`Scenes/${sceneId}--saved-${task.id}.blend`,
+  assert(task.projectDirectory===p.directory&&task.stage===s.stage&&validTaskScenePaths(task),
     'Editing task paths or activity changed.',409);
   assert(Number.isSafeInteger(task.processId)&&task.processId>0,'Task process identity is unavailable.',409);
   assert(!work.running.has(task.id),'Task is still running.',409);

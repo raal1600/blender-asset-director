@@ -27,7 +27,8 @@ Both endpoints require the existing loopback Bearer session, same-origin checks,
 project/scene identities and an exact recorded version/member or checkpoint hash.
 Every original is verified before preparation, after conversion and before a
 cached derivative is served. Source files, catalog and project manifests are not
-modified. Returned preview IDs belong to the current server session and scene.
+modified. Serving a preview requires a current session grant for its scene;
+verified successful IDs may be reused after explicit preparation in a new session.
 
 The direct glTF/GLB path needs no Blender process. It packages only recorded
 relative buffers and PNG/JPEG textures into an embedded GLB. External/data URLs,
@@ -40,9 +41,52 @@ Embedded BLEND copies use short, source-mapped paths for both catalog assets and
 checkpoints, avoiding nested Windows path failures without altering source paths.
 
 Private outputs and failures live in `SystemRuntime/UserData/ViewerPreviews`.
-Successful previews are reused within the running server session, bound to exact
-sources. The implementation refuses more than 64 session copies, a 512 MiB /
-4096-file source package, 128 MiB GLB, 10000 nodes, 2 million displayed vertices,
+Successful previews are reused across sessions only after validating an indexed
+provenance record, exact source/profile/shot identity, current launcher/native
+implementation and Blender executable hash, metadata/output hashes, successful
+native evidence (where applicable), and the GLB description. Altered evidence
+refuses visibly and remains on disk; an old/unindexed attempt is never promoted
+into a trusted cache entry automatically. Native identity checking is deliberate
+work on a warm request, not a zero-cost cache lookup.
+
+At most 64 recently accessed preview descriptors, and at most 32 MiB of their
+serialized metadata, remain in memory (not a promise about total process RSS). Older
+descriptors may be evicted without deleting files; reopening them re-verifies the
+persisted cache. Preparing a 65th preview does not require restarting Director.
+An old media grant that was evicted must be prepared again before serving bytes.
+Repeated concurrent preparation is serialized and reuses the verified result;
+failed promises do not poison the queue. Source and project scope is rechecked
+for every request. No session token or credential is persisted in this cache.
+
+Closing or replacing a view aborts its preparation/geometry HTTP requests. The
+existing authenticated preparation handler observes that disconnect and cancels
+queued or preflight work before allocating a conversion attempt. This signal is
+limited to read-only preview preparation; it never cancels an explicit scene Save,
+render, review or other writer just because a browser went away. There is no new
+unauthenticated cancellation endpoint or general Blender command channel.
+
+Once a conversion attempt has been allocated, its bounded native work completes
+normally. A departed view receives no active lease; verified successful bytes can
+be reused when reopened. Actual failures keep their original failure evidence.
+This cancels obsolete requests, not already-started Blender processes. No process
+is killed, source changed, checkpoint created or approval inferred by navigation.
+
+The implementation still refuses a source above 512 MiB / 4096 files,
+with one compatible optimization for saved checkpoints: new native audits may
+record `preview-dependencies-v1`, bound to the exact saved file SHA-256. For clean
+snapshots with simple absolute file references, the copy includes that checkpoint
+and only its observed, already-pinned dependencies. Both the Blender path inventory
+and supported data-block references must agree. This does not import a missing
+dependency, grant rights, or skip production-wide pinned-source verification.
+
+Older audits, wrong-byte observations, relative paths, linked libraries,
+time-varying resources and unknown path types retain conservative all-pinned
+copying. Existing projects are not rewritten to obtain the optimization. Actual
+native conversion still rejects unrecorded references and verifies copied bytes.
+The source-copy limit is unchanged; it applies after the safe selection.
+
+Other limits remain:
+128 MiB GLB, 10000 nodes, 2 million displayed vertices,
 128 textures, 8192-pixel texture dimensions or 64 million decoded texture pixels.
 Conversion supports up to 3600 frames per take / saved scene and 20000 total take
 frames. Before another copy it reserves space under a 100 GiB preview-folder budget.
@@ -50,6 +94,55 @@ This is a cumulative storage ceiling, not preallocated disk space; the per-previ
 source, conversion and GLB limits above remain unchanged.
 No automatic deletion of old copies or failed evidence is performed. Very large
 packages, procedural/simulation/volume content and rig-only files use Blender.
+
+## Reviewed preview cleanup
+
+Studio -> Preview storage scans private derivatives and presents removable payload
+bytes, protected copies and exact relative targets. It does not clean the asset
+library or project history. Nothing is removed until the user confirms the exact
+current review, including that these cached copies are not open manually in Blender.
+Windows native ownership uses a filtered, bounded process query. Timeout,
+unreadable process details or malformed results refuse cleanup with a redacted
+reason and no removal; they are not interpreted as an idle Blender. Raw command
+lines are never included in the response. The native test holds its own generated
+preview open until the ownership check finishes, with a separate bounded deadline,
+rather than relying on an eight-second window on a loaded host.
+Viewing another scene or Final film releases the prior in-app view; another open
+window still protects its copy. Each UI view has a separate scope-bound grant.
+Closing a view releases its cleanup protection, not the existing bounded session
+media descriptor. Previously prepared historical bytes remain readable until LRU
+eviction or explicit cleanup. Media reads share the cleanup queue, so removal
+waits for an in-flight read and revokes its descriptor before removing payloads.
+Lost/crashed view grants remain protected until session restart rather than being
+expired on a timer. Older API clients without view IDs receive conservative
+session protection for their 64 most recent preparations.
+
+Only indexed, successful, byte-verified derivatives whose original sources still
+verify are eligible. For native previews this includes the copied source payload,
+model GLBs and derived BLEND files, not request/viewer metadata, catalog databases,
+job/result/receipt records or worker logs. Failed, interrupted, unindexed, unknown,
+linked, multiply-linked, drifted or actively viewed copies remain protected.
+Scanning is bounded to 50,000 files, review metadata to 16 MiB and each removal
+batch to 128 copies. These are conservative refusals, not recursive deletion.
+
+Apply rechecks the complete review and native process command lines, then each
+target immediately before unlinking. Missing native process information refuses
+removal. Command-line checks cannot discover a file opened later through Blender's
+File menu, so the user's explicit closed-copy confirmation is still required.
+Normal scene-editing Blender windows must not be closed just to clean previews.
+Preparation and removal are serialized; one closed browser view cannot revoke
+another view's protection. Abandoned asynchronous views release their grant if
+preparation finishes later, without pretending that the native job was cancelled.
+
+The cache-index pointer is removed first so a partial attempt cannot be reused.
+Its original record, reviewed hashes, write-ahead target and actual removals remain
+in a synced JSON journal under ViewerPreviews/Cleanup. Any failure stops further
+removal and reports PARTIAL with the journal path; remaining evidence is protected,
+not retried or erased automatically. This is not an atomic multi-file transaction.
+Removed payloads have no undo but can be regenerated from verified originals.
+Net recovered space differs from payload bytes because the journal is retained.
+
+## Preview fidelity and failure presentation
 
 Native Blender conversion now reduces static textures only in temporary image
 datablocks: at most 2048 pixels per edge and 16 Mi pixels total (smaller when
@@ -93,6 +186,36 @@ uses actual catalog intake, real native conversion and real Chrome WebGL, checks
 rendered-pixel changes for navigation/animation, and verifies originals/catalog/
 manifest preservation. Screenshots and logs remain in the explicit evidence
 directory and are not automatically published.
+
+`preview-cache.test.mjs` covers fresh-session reuse, 66 distinct previews with a
+64-entry memory bound, profile isolation, concurrent repeated requests and
+corrupt/escaped/oversized metadata refusal. `preview_cache_check.mjs` measures
+actual native cold/warm/restart conversion and transfer, verifies fresh-session
+authentication, original/manifest preservation and real workbench WebGL/selection
+before and after restart. Timings are measured evidence, not universal promises.
+Its RSS measurement covers the launcher only, not Blender or browser peak memory.
+`preview_cleanup_check.mjs` drives two real browser views, actual native conversion,
+an owned short-lived Blender process, authenticated removal refusal, scripted
+decline/confirmation, exact allowlisted cleanup and actual native rebuilding. It
+verifies retained database/log/receipt/source/checkpoint/manifest hashes. Unit
+coverage separately simulates a locked-file partial failure and protects drift,
+unknown files and hard links. Test decisions are not human production approvals.
+Representative large-source timing and broader resource measurements remain
+separate acceptance work; automatic cache eviction never deletes disk files.
+
+`preview_cancel_check.mjs` verifies browser navigation actually aborts the request,
+queued cancellation avoids a native conversion, an observed RUNNING native job
+finishes safely, and returning reuses its exact result without another conversion.
+Its deterministic queue gate holds the response of a real completed first native
+job; it does not simulate native success or claim a native process was interrupted.
+Original/checkpoint/manifest preservation and absent active-view leaks are checked.
+
+`preview_dependencies_fixture.py` observes real saved texture, packed-image,
+relative-path, sequence, modifier-cache and linked-library cases.
+`preview_dependencies_check.mjs` verifies the authenticated native conversion and
+browser canvas copy only the needed recorded inputs and reuse the same result.
+Semantic camera/light fingerprints exclude this copy-only metadata; the native
+Save/reopen and existing source/checkpoint byte checks remain independent gates.
 
 Synthetic/local test success is not exact-commit CI success, desktop WebView
 acceptance, a runtime update or production/creative acceptance. Installation

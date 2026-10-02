@@ -21,28 +21,40 @@ main(manifest)
 working = within(project, task['workingScene'])
 assert not save_file(task).exists(), 'Initialization must not count as user Save'
 initial = file_hash(working)
-bpy.ops.mesh.primitive_cube_add()
-obj = bpy.context.object
-obj.name = 'ExplicitSaveSubject'
+if mode.startswith('world-'):
+    from asset_director.world_placement import select_instances, ancestor_control
+    skin=bpy.data.objects['SyntheticSkin0']
+    obj=ancestor_control(skin)
+    assert obj is not None
+    assert select_instances([skin,bpy.data.objects['SyntheticRig0']]) == {obj}
+else:
+    bpy.ops.mesh.primitive_cube_add()
+    obj = bpy.context.object
+    obj.name = 'ExplicitSaveSubject'
 obj.location.x = 1
-if mode in {'save', 'saved-then-unsaved', 'repeat-save'}:
+bpy.context.view_layer.update()
+if mode in {'save', 'saved-then-unsaved', 'repeat-save', 'world-save'}:
     bpy.ops.wm.save_as_mainfile(filepath=str(working), check_existing=False)
     assert save_file(task).exists()
     first = load_json(save_file(task))
     assert first['sha256'] == file_hash(working)
+    history = project / 'Docs' / 'Workbench' / ('save-' + first['saveId'] + '.json')
+    assert load_json(history) == first
+    history_hash = file_hash(history)
     if mode in {'saved-then-unsaved', 'repeat-save'}:
         obj.location.x = 9
     if mode == 'repeat-save':
         bpy.ops.wm.save_as_mainfile(filepath=str(working), check_existing=False)
         assert first['saveId'] != load_json(save_file(task))['saveId']
+        assert file_hash(history) == history_hash
 elif mode == 'recovery-copy':
     bpy.ops.wm.save_as_mainfile(filepath=str(project / 'Scenes' / 'recovery-only.blend'), check_existing=False, copy=True)
     assert not save_file(task).exists(), 'A different recovery/copy destination must not publish'
-elif mode == 'no-save':
+elif mode in {'no-save', 'world-no-save'}:
     assert not save_file(task).exists()
 else:
     raise ValueError('Unknown fixture mode')
-if mode in {'no-save', 'recovery-copy'}:
+if mode in {'no-save', 'recovery-copy', 'world-no-save'}:
     assert file_hash(working) == initial
 atomic_json(project / 'Docs' / 'native-save-result.json', dict(mode=mode, status='PASS',
             background=bpy.app.background, session=load_json(session_file(task))['state'],

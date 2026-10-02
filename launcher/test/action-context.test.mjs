@@ -1,0 +1,31 @@
+/** Synthetic context checks; not authenticated Codex execution or native UI proof. */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import {randomUUID} from 'node:crypto';
+import {resolveActionContext} from '../lib/action-context.mjs';
+import {startSpecialist} from '../lib/workbench-specialist.mjs';
+import {json,writeJson} from '../lib/storage.mjs';
+const id=p=>p+randomUUID();
+test('specialist context binds saved performer, placement, take and frame; stale context launches nothing',async t=>{
+ const directory=await fs.mkdtemp(path.join(os.tmpdir(),'action-context-'));t.after(()=>fs.rm(directory,{recursive:true,force:true}));
+ const cp={id:id('cp_'),sha256:'a'.repeat(64),path:'Scenes/synthetic.blend'},scene={id:id('sc_'),stage:'action',current:cp.id,checkpoints:[cp],sources:[],catalog:[],shots:[]};
+ const p={id:id('prj_'),directory,revision:4,name:'Generated context',brief:'Synthetic test only',assets:[],workbench:{catalogPins:[],scenes:[scene]}};
+ const request={version:'action-layer-v1',checkpointId:cp.id,sha256:cp.sha256,inspectionId:id('run_'),audit_sha256:'b'.repeat(64),performer:'Observed rig',frame:5};
+ const performer={name:request.performer,type:'ARMATURE',instance:'observed-instance',placement_control:'Actual control',takes:[{id:'take_'+'c'.repeat(64),performer:request.performer}]};
+ const record={projectId:p.id,sceneId:scene.id,checkpointId:cp.id,checkpointSha256:cp.sha256,action:'action-audit',state:'SUCCEEDED',inspection:{version:request.version,sha256:request.audit_sha256,fps:30,frame_range:[1,9],performers:[performer]}};
+ const filename=path.join(directory,'Runs',request.inspectionId+'.json');await writeJson(filename,record);
+ let launches=0;
+ const work={scene:()=>scene,unlocked:async()=>{},verify:async()=>cp,store:{get:async()=>p,verify:async()=>({ok:true}),root:directory},config:{skill:directory},runtime:{launchTerminal:async()=>{launches++;return {processId:123};}}};
+ const selected=await resolveActionContext(work,p,scene,request);assert.deepEqual(selected.performer,performer);
+ for(const patch of [{performer:'Invented'}, {frame:99}, {audit_sha256:'0'.repeat(64)}, {sha256:'1'.repeat(64)}, {script:'no'}])await assert.rejects(startSpecialist(work,p,scene.id,{actionContext:{...request,...patch}}));
+ await writeJson(filename,{...record,sceneId:id('sc_')});await assert.rejects(startSpecialist(work,p,scene.id,{actionContext:request}),/another scene/);
+ assert.equal(launches,0);await writeJson(filename,record);
+ const opened=await startSpecialist(work,p,scene.id,{actionContext:request});assert.equal(launches,1);
+ const saved=await json(path.join(directory,'Docs/Codex',opened.sessionId+'.json'));
+ assert.deepEqual(saved.task.performance,selected);assert.equal(saved.task.activity,'action');assert.equal(saved.task.checkpoint.sha256,cp.sha256);
+ assert.equal(saved.task.reviewStatus,'PROPOSAL_REQUIRED_NOT_APPROVED');assert.match(saved.prompt,/Do not guess mappings/);assert.match(saved.prompt,/required approvals|explicit review/);
+ assert.equal(p.revision,4);assert.equal(scene.current,cp.id);
+});

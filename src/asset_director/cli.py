@@ -7,9 +7,7 @@ from pathlib import Path
 import shutil
 import sys
 from . import __version__
-from .core import DirectorError, Library, canonical, load_json, plan, require
-from .providers import Providers, capabilities
-from . import jobs
+from .core import DirectorError, Library, canonical, implementation_hash, load_json, plan, require
 from . import settings
 
 
@@ -18,20 +16,24 @@ def compact_asset(a):
         "local_files": len(a["local_files"]), "motion": {k:a["metadata"][k] for k in ("action", "slot", "source_object", "fps", "frame_range", "duration", "motion_family", "visual_review") if k in a["metadata"]}}
 
 
-def parser():
+def parser(*, workbench_only=False):
     p = argparse.ArgumentParser(prog="asset-director", description="Search, acquire, index and adapt existing Blender assets; JSON output.")
     p.add_argument("--library", default=settings.library_path())
     s = p.add_subparsers(dest="command", required=True)
-    q=s.add_parser("sequence-prepare"); q.add_argument("--review", required=True, help="Approval of an exact sequence-plan")
-    q=s.add_parser("transfer-prepare"); q.add_argument("--review",required=True,help="Explicit approval of a completed transfer-plan job")
-    q=s.add_parser("configure"); q.add_argument("--blender"); q.add_argument("--skill-path")
-    q=s.add_parser("film-assemble"); q.add_argument("--plan",required=True); q.add_argument("--project",required=True); q.add_argument("--ffmpeg",required=True); q.add_argument("--ffprobe",required=True)
     q=s.add_parser("workbench-preview"); q.add_argument("--request",required=True); q.add_argument("--blender",required=True); q.add_argument("--embedded",action="store_true")
     q=s.add_parser("workbench-intake"); q.add_argument("--request",required=True); q.add_argument("--evidence",required=True); q.add_argument("--blender",required=True)
     s.add_parser("workbench-capabilities")
     q=s.add_parser("workbench-catalog"); q.add_argument("--query",default=""); q.add_argument("--offset",type=int,default=0); q.add_argument("--limit",type=int,default=24); q.add_argument("--asset"); q.add_argument("--verify",action="store_true"); q.add_argument("--kind",choices=["model","pack","animation","material","hdri"]); q.add_argument("--kinds",nargs="+",choices=["model","pack","animation","material","hdri"]); q.add_argument("--subcategory"); q.add_argument("--labels")
     q.add_argument("--exclude-project", help="Exclude retained catalog identities in this launcher project")
     q=s.add_parser("workbench-verify"); q.add_argument("--project",required=True)
+    if workbench_only:
+        return p
+    from .providers import capabilities
+    from . import jobs
+    q=s.add_parser("sequence-prepare"); q.add_argument("--review", required=True, help="Approval of an exact sequence-plan")
+    q=s.add_parser("transfer-prepare"); q.add_argument("--review",required=True,help="Explicit approval of a completed transfer-plan job")
+    q=s.add_parser("configure"); q.add_argument("--blender"); q.add_argument("--skill-path")
+    q=s.add_parser("film-assemble"); q.add_argument("--plan",required=True); q.add_argument("--project",required=True); q.add_argument("--ffmpeg",required=True); q.add_argument("--ffprobe",required=True)
     s.add_parser("doctor"); s.add_parser("providers"); s.add_parser("report"); s.add_parser("rebuild-catalog")
     q=s.add_parser("plan"); q.add_argument("brief")
     q=s.add_parser("studio-plan"); q.add_argument("--brief",required=True); q.add_argument("--audit",required=True)
@@ -53,20 +55,50 @@ def parser():
     return p
 
 
+def _workbench_only(argv):
+    """Choose a small parser, not a permissive argument-parsing shortcut.
+
+    All arguments still pass through the same argparse definitions. Unusual
+    global-option spellings fall back to the full parser for compatibility.
+    """
+    remaining = argv
+    if remaining and remaining[0] == '--library':
+        remaining = remaining[2:]
+    elif remaining and remaining[0].startswith('--library='):
+        remaining = remaining[1:]
+    return bool(remaining and remaining[0] in {
+        'workbench-capabilities', 'workbench-verify', 'workbench-catalog',
+        'workbench-preview', 'workbench-intake',
+    })
+
+
+def workbench_capabilities():
+    """Runtime metadata is independent of any catalog and does not open SQLite."""
+    return {"schema":1,"render_frames":True,"gpu_render":True,"film_assemble":True,"task_workspace":True,"explicit_save_handoff":True,"preview_camera":True,"catalog":True,"asset_preview":True,"asset_contents":True,"runtime":__version__,"implementation":implementation_hash(),"limits":{"frames_per_shot":360,"frames_per_film":3600,"render_seconds":900},"audio":False,
+            'action_layer':'action-layer-v1', 'action_task':'action-task-v1',
+            'scene_layer':'scene-layer-v1', 'world_prepare':'world-prepare-v1',
+            'shot_preview':'shot-camera-samples-v1'}
+
+
 def main(argv=None):
     try:
-        args = parser().parse_args(argv)
+        argv = list(sys.argv[1:] if argv is None else argv)
+        args = parser(workbench_only=_workbench_only(argv)).parse_args(argv)
+        if args.command == 'workbench-capabilities':
+            print(canonical(workbench_capabilities()))
+            return 0
         if args.command == "workbench-preview":
             from .asset_preview import prepare
             print(canonical(prepare(args.request, args.blender, embedded=args.embedded)))
             return 0
+        if not args.command.startswith('workbench-'):
+            from .providers import Providers, capabilities
+            from . import jobs
         with Library(args.library) as lib:
             command=args.command
             if command.startswith("motion-") or command == "retarget-profile":
                 from .motion_cli import dispatch
                 result = dispatch(lib, args)
-            elif command == "workbench-capabilities":
-                result={"schema":1,"render_frames":True,"gpu_render":True,"film_assemble":True,"task_workspace":True,"explicit_save_handoff":True,"preview_camera":True,"catalog":True,"asset_preview":True,"asset_contents":True,"runtime":__version__,"implementation":jobs.implementation_hash(),"limits":{"frames_per_shot":360,"frames_per_film":3600,"render_seconds":900},"audio":False}
             elif command == "workbench-verify":
                 from .workbench_catalog import verify_project
                 result=verify_project(lib,args.project)

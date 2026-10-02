@@ -72,6 +72,11 @@ def create_scene(filename, number):
     background = next(n for n in scene.world.node_tree.nodes if n.type == 'BACKGROUND')
     background.inputs['Strength'].default_value = .2
     scene.frame_set(1)
+    # Exercise disabled/uninitialized and disjoint saved preview ranges. The
+    # handoff must select the shot without changing the scene's Action timing.
+    if number in (2, 3):
+        scene.use_preview_range = True
+        scene.frame_preview_start, scene.frame_preview_end = ((3, 4) if number == 2 else (1, 2))
     bpy.ops.wm.save_as_mainfile(filepath=str(filename), check_existing=False)
     return subject.name, camera.name
 
@@ -89,14 +94,19 @@ def main():
             source = project / 'Scenes' / ('source-' + str(number) + '.blend')
             subject, camera = create_scene(source, number)
             source_hash = file_hash(source)
+            shot_range = {1: [3, 4], 2: [1, 2], 3: [3, 3]}[number]
             task = {'schema': 1, 'id': task_id, 'projectId': project_id, 'sceneId': scene_id, 'stage': 'shots',
                     'projectDirectory': str(project), 'library': str(lib.root), 'input': {'path': source.relative_to(project).as_posix(), 'sha256': source_hash},
                     'workingScene': 'Scenes/edit-' + str(number) + '.blend', 'checkpointScene': 'Scenes/checkpoint-' + str(number) + '.blend',
                     'returnFile': 'Docs/Workbench/' + task_id + '-return.json', 'targets': [camera], 'camera': camera,
-                    'frame': 1, 'frameRange': [1, 4], 'action': 'workbench-edit', 'state': 'RUNNING', 'startedAt': 'synthetic-fixture', 'selectedSources': []}
+                    'frame': shot_range[0], 'frameRange': shot_range, 'action': 'workbench-edit', 'state': 'RUNNING', 'startedAt': 'synthetic-fixture', 'selectedSources': []}
             initialized = task_workspace.initialize(task)
             check(not initialized['gui_configured'], 'headless_does_not_claim_gui', scene=number)
-            check(bpy.context.scene.use_preview_range and bpy.context.scene.frame_preview_end == 4, 'task_playback_range_selected', scene=number)
+            check(bpy.context.scene.use_preview_range and
+                  [bpy.context.scene.frame_preview_start, bpy.context.scene.frame_preview_end] == shot_range,
+                  'task_playback_range_selected', scene=number, expected=shot_range)
+            check([bpy.context.scene.frame_start, bpy.context.scene.frame_end] == [1, 4] and
+                  bpy.context.scene.frame_current == shot_range[0], 'task_action_timing_preserved', scene=number)
             check(bpy.context.scene.camera.name == camera, 'exact_camera_selected', scene=number)
             check(bpy.context.view_layer.objects.active.name == camera, 'exact_target_selected', scene=number)
             bpy.data.objects[camera].data.lens = 45 + number

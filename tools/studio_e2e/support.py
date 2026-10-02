@@ -2,7 +2,7 @@
 
 Never point this at an existing studio. No provider/model calls or personal data.
 """
-from contextlib import closing
+from contextlib import closing, contextmanager
 import argparse
 import hashlib
 import json
@@ -24,6 +24,22 @@ import urllib.error
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/ci'))
 from evidence import digest, read, write
+
+
+@contextmanager
+def disposable_studio(evidence):
+    """Remove only a successful owned fixture; preserve failures and active writers."""
+    temporary = Path(tempfile.mkdtemp(prefix='synthetic-studio-e2e-')).resolve()
+    evidence.report['retained_test_root'] = str(temporary)
+    yield str(temporary)
+    # Exceptions skip removal. Do not hide the original failure with rmtree errors
+    # or delete a directory whose pending workers could still be writing.
+    if (temporary.parent != Path(tempfile.gettempdir()).resolve()
+            or not temporary.name.startswith('synthetic-studio-e2e-')
+            or temporary.is_symlink()):
+        raise RuntimeError('Refusing cleanup outside the exact generated fixture root')
+    shutil.rmtree(temporary)
+    evidence.report.pop('retained_test_root', None)
 
 
 def command(args, env, timeout=240):
@@ -298,9 +314,15 @@ class Studio:
             self.browser.close()
             self.browser = self.page = None
         if self.server and self.server.poll() is None:
-            self.server.terminate()
-            try:
-                self.server.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                self.server.kill()
-                self.server.wait(timeout=10)
+            if not getattr(self, 'session', None):
+                raise RuntimeError('No authenticated fixture session for safe shutdown; test files retained')
+            deadline = time.monotonic() + 225
+            while self.server.poll() is None:
+                state = self.api('lifecycle')
+                if not state['busy']:
+                    self.api('stop', {})
+                    self.server.wait(timeout=15)
+                    return
+                if time.monotonic() >= deadline:
+                    raise TimeoutError('Fixture still has unfinished work; backend and test files retained')
+                time.sleep(.1)

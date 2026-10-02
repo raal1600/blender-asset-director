@@ -72,6 +72,12 @@ def main():
                 (session['motionSceneId'],'action',2000,3334,{'animation'}),
                 (session['lookSceneId'],'light',4000,0,{'material','hdri'})]:
                 choose_scene(scene_id)
+                # Action keeps its secondary library route under More. Exercise
+                # that real progressive-disclosure path, not a hidden button.
+                if activity in ('action','light'):
+                    click('.world-more > summary')
+                    label='Find motion in library' if activity=='action' else 'Find materials / HDRIs'
+                    expect(page.get_by_role('button',name=label,exact=True)).to_be_visible()
                 click('[data-action="browse-assets"]:visible >> nth=0')
                 expect(page.locator('#browser-activity')).to_have_value(activity)
                 expect(page.locator('.browser-asset')).to_have_count(24)

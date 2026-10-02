@@ -61,7 +61,11 @@ def create(lib, asset, member):
     scene.name = 'Asset Director - PREVIEW COPY'
     for workspace in bpy.data.workspaces:
         if workspace.name == 'Layout': workspace.name = 'Asset Director - Preview'
-    return {'preview_only': True, 'checkpoint': asset.metadata.get('preview_checkpoint', False), 'objects': [{'name': o.name, 'type': o.type} for o in bpy.data.objects],
+    return {'preview_only': True, 'checkpoint': asset.metadata.get('preview_checkpoint', False),
+            'preview_profile': asset.metadata.get('preview_profile', 'inspection-v1'),
+            'shot_view': asset.metadata.get('shot_view'),
+            'reference_frame': scene.frame_current,
+            'objects': [{'name': o.name, 'type': o.type} for o in bpy.data.objects],
             'takes': takes, 'unassigned_actions': unassigned, 'native_clip': native,
             'fps': scene.render.fps / scene.render.fps_base, 'blender_version': bpy.app.version_string,
             'notice': 'Inspection copy, not selected/imported, no rights or animation-quality approval.'}

@@ -31,7 +31,23 @@ const scene=project.workbench.scenes[0],checkpointId='cp_'+randomUUID(),relative
 await fs.copyFile(path.join(input,'scene.blend'),path.join(project.directory,relative),constants.COPYFILE_EXCL);
 scene.checkpoints.push({id:checkpointId,path:relative,...await fileHash(path.join(project.directory,relative)),parent:null,stage:'world',createdAt:new Date().toISOString(),source:'synthetic-generated-native-file',audit:null});scene.candidate=checkpointId;
 await app.store.save(project,project.revision);
+// Explicit synthetic Action state, not a user approval or an accepted movie.
+let actionProject=await app.store.create('Synthetic Action viewer','Generated stage fixture; no human approval.');
+await app.workbench.create(actionProject.id,actionProject.revision,'Saved motion scene');
+actionProject=await app.store.get(actionProject.id);
+const actionScene=actionProject.workbench.scenes[0],actionCheckpoint='cp_'+randomUUID(),actionPath='Scenes/'+actionCheckpoint+'.blend';
+await fs.copyFile(path.join(input,'scene.blend'),path.join(actionProject.directory,actionPath),constants.COPYFILE_EXCL);
+actionScene.checkpoints.push({id:actionCheckpoint,path:actionPath,...await fileHash(path.join(actionProject.directory,actionPath)),parent:null,stage:'world',createdAt:new Date().toISOString(),source:'synthetic-generated-action-fixture-not-human-approval',audit:null});
+actionScene.current=actionCheckpoint;actionScene.completed.world=actionCheckpoint;actionScene.stage='action';
+await app.store.save(actionProject,actionProject.revision);
+// Precompute native performer inspection before the read-only viewer baseline.
+// The separate Action journey tests automatic inspection and deliberate saves.
+actionProject=await app.store.get(actionProject.id);
+await app.workbench.inspectAction(actionProject.id,actionScene.id,actionProject.revision,{version:'action-layer-v1',requestId:'run_'+randomUUID(),checkpointId:actionCheckpoint,sha256:actionScene.checkpoints[0].sha256});
+const inspectionDeadline=Date.now()+205000;
+while(app.workbench.running.size){if(Date.now()>inspectionDeadline)throw Error('Synthetic performer inspection timed out');await new Promise(resolve=>setTimeout(resolve,100));}
+if(!(await app.store.runs(actionProject.id)).some(r=>r.action==='action-audit'&&r.state==='SUCCEEDED'))throw Error('Synthetic performer inspection failed');
 const asset=await app.workbench.catalogDetail(project.id,intake.asset_id);
 await writeJson(path.join(root,'browser-session.json'),{fixture:'synthetic-embedded-viewer',origin:app.origin,token:app.token,root,projectId:project.id,sceneId:created.sceneId,assetId:asset.id,version:asset.version,checkpointId,
-  projectManifest:path.join(project.directory,'project.json'),catalog:path.join(library,'catalog.sqlite'),sourceFiles:asset.files.map(f=>({path:path.join(library,f.path),sha256:f.sha256}))});
+  projectManifest:path.join(project.directory,'project.json'),actionProjectId:actionProject.id,actionSceneId:actionScene.id,actionManifest:path.join(actionProject.directory,'project.json'),catalog:path.join(library,'catalog.sqlite'),sourceFiles:asset.files.map(f=>({path:path.join(library,f.path),sha256:f.sha256}))});
 console.log('Synthetic embedded viewer ready; session stays in its private fixture.');

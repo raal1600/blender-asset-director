@@ -88,6 +88,8 @@ def bounding_box(points):
 
 
 def scene_audit():
+    from .preview_dependencies import inventory
+    preview_dependencies = inventory()
     scene=bpy.context.scene
     require(len(scene.objects)<=10000,'RESOURCE_LIMIT','Scene exceeds bounded audit size')
     objects=[]
@@ -99,6 +101,9 @@ def scene_audit():
         # Observed provenance is distinct from the launcher's selected sources.
         item['asset_id'] = obj.get('bad_asset') if isinstance(obj.get('bad_asset'), str) else None
         item['import_job'] = obj.get('bad_job') if isinstance(obj.get('bad_job'), str) else None
+        if isinstance(obj.get('bad_placement_instance'), str):
+            item['placement_instance'] = obj['bad_placement_instance']
+            item['placement_control'] = obj.get('bad_placement_control') == 1
         animation = obj.animation_data
         if animation and animation.action:
             action = animation.action
@@ -132,7 +137,8 @@ def scene_audit():
                                    'colorspace':node.image.colorspace_settings.name})
         materials.append({'name':mat.name,'uses_nodes':mat.use_nodes,'images':images,
                           'node_types':sorted(n.bl_idname for n in mat.node_tree.nodes) if mat.use_nodes else []})
-    return {'objects':objects,'materials':materials,'fps':scene.render.fps/scene.render.fps_base,
+    return {'objects':objects,'materials':materials,'preview_dependencies':preview_dependencies,
+            'fps':scene.render.fps/scene.render.fps_base,
             'frame_range':[scene.frame_start,scene.frame_end], 'frame_current':scene.frame_current,
             'resolution':[scene.render.resolution_x,scene.render.resolution_y],
             'pixel_aspect':[scene.render.pixel_aspect_x,scene.render.pixel_aspect_y],

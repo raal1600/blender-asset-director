@@ -1,5 +1,6 @@
 import {unfinishedState} from './lib/lifecycle.mjs';
 import {EmbeddedPreviews} from './lib/embedded-preview.mjs';
+import {PreviewCleanup} from './lib/preview-cleanup.mjs';
 import {taskForExit,actOnExitTask} from './lib/exit-task.mjs';
 import {Console} from 'node:console';
 import {createWriteStream} from 'node:fs';
@@ -23,10 +24,11 @@ export async function createApp({root,config,port=48731,runtime:injected}) {
   const serialize = action => { const p = queue.then(action); queue = p.catch(()=>{}); return p; };
   const workbench=new Workbench(store,runtime,config,serialize);
   const viewers=new EmbeddedPreviews(workbench);
+  const previewCleanup=new PreviewCleanup(viewers);
   const server = http.createServer(async(req,res) => {
     res.setHeader('Cache-Control','no-store'); res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy','no-referrer');
 res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
-    const send = (code,value) => {res.writeHead(code,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
+    const send = (code,value) => {if(res.destroyed||res.writableEnded)return;res.writeHead(code,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
     try {
       assert(req.headers.host === new URL(origin).host,'Invalid host.',403);
       assert(!req.headers.origin || req.headers.origin === origin,'Cross-origin request refused.',403);
@@ -40,11 +42,21 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assets['/library-usage.mjs']='library-usage.mjs';
         assets['/library-preparation.mjs']='library-preparation.mjs';
         assets['/workbench-world.mjs']='workbench-world.mjs';
+        assets['/workbench-world-prepare.mjs']='workbench-world-prepare.mjs';
         assets['/world-add-flow.mjs']='world-add-flow.mjs';
         assets['/workbench-world.css']='workbench-world.css';
+        assets['/workbench-action.mjs']='workbench-action.mjs';
+        assets['/workbench-action.css']='workbench-action.css';
+        assets['/workbench-scene-layer.mjs']='workbench-scene-layer.mjs';
+        assets['/workbench-scene-layer.css']='workbench-scene-layer.css';
+        assets['/lighting-evidence.mjs']='lighting-evidence.mjs';
+        assets['/workbench-render.mjs']='workbench-render.mjs';
+        assets['/workbench-film.mjs']='workbench-film.mjs';
         assets['/viewer-3d.mjs']='viewer-3d.mjs';
+        assets['/workbench-preview-storage.mjs']='workbench-preview-storage.mjs';
+        for(const name of ['world-draft.mjs','world-editor.mjs','shot-view.mjs'])assets['/'+name]=name;
         assets['/icon.svg']='icon.svg';
-        for(const name of ['build/three.module.js','build/three.core.js','examples/jsm/loaders/GLTFLoader.js','examples/jsm/controls/OrbitControls.js','examples/jsm/utils/BufferGeometryUtils.js','examples/jsm/utils/SkeletonUtils.js'])assets['/vendor/three/'+name]='vendor/three/'+name;
+        for(const name of ['build/three.module.js','build/three.core.js','examples/jsm/loaders/GLTFLoader.js','examples/jsm/controls/OrbitControls.js','examples/jsm/controls/TransformControls.js','examples/jsm/utils/BufferGeometryUtils.js','examples/jsm/utils/SkeletonUtils.js'])assets['/vendor/three/'+name]='vendor/three/'+name;
         assert(Object.hasOwn(assets,url.pathname),'Not found.',404);
         const ext = path.extname(assets[url.pathname]); res.setHeader('Content-Type',ext === '.html' ? 'text/html; charset=utf-8' : ext === '.css' ? 'text/css; charset=utf-8' : ext === '.svg' ? 'image/svg+xml' : 'text/javascript; charset=utf-8');
         return res.end(await fs.readFile(path.join(here,'public',assets[url.pathname])));
@@ -57,6 +69,12 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assert(req.headers['content-type']?.startsWith('application/json'),'Expected JSON.',415);
         let data = ''; for await (const part of req) { data += part; assert(data.length <= 65536,'Request too large.',413); }
         body = data ? JSON.parse(data) : {};
+      }
+      let previewSignal;
+      if(req.method==='POST'&&url.pathname==='/api/workbench/viewer-prepare'){
+        const cancellation=new AbortController();previewSignal=cancellation.signal;
+        const departed=()=>{if(!res.writableEnded)cancellation.abort();};
+        res.once('close',departed);if(res.destroyed)departed();
       }
       const lifecycle = async () => {
         const {reasons,tasks,needsAttention} = await unfinishedState(store,config);
@@ -72,6 +90,10 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         return send(200,{message:'Launcher stopped. Blender and Codex remain open.'});
       }
       assert(!stopping,'Launcher is shutting down.',503);
+      if(req.method==='GET'&&url.pathname==='/api/workbench/preview-evidence'){
+        const {projectId,sceneId,...parameters}=Object.fromEntries(url.searchParams);
+        return send(200,await workbench.previewEvidence(projectId,sceneId,parameters));
+      }
       if(req.method==='GET'&&url.pathname==='/api/workbench/viewer-model') {
         const data=await viewers.bytes(url.searchParams.get('projectId'),url.searchParams.get('sceneId'),url.searchParams.get('previewId'));
         res.writeHead(200,{'Content-Type':'model/gltf-binary','Content-Length':data.length});return res.end(data);
@@ -101,6 +123,8 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
           if (p === '/api/blender') return runtime.blender();
           if (p === '/api/session') return {app:'asset-director-launcher',version:'0.1.0',root};
         } else {
+          if(p==='/api/viewer-cache/plan')return viewers.exclusive(()=>previewCleanup.plan());
+          if(p==='/api/viewer-cache/apply')return viewers.exclusive(()=>previewCleanup.apply(body));
           if(p==='/api/lifecycle/task-close')return actOnExitTask(workbench,body,'close');
           if(p==='/api/lifecycle/task-recover')return actOnExitTask(workbench,body,'recover');
           if(p.startsWith('/api/workbench/')) {
@@ -115,10 +139,18 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='source-prepare')return workbench.prepareSource(id,sid,rev,body.request);
             if(command==='catalog-label')return workbench.labelCatalog(id,sid,rev,body.request);
             if(command==='asset-preview')return workbench.previewAsset(id,sid,rev,body.request);
-            if(command==='viewer-prepare')return viewers.prepare(id,sid,rev,body.request);
+            if(command==='viewer-prepare')return viewers.prepare(id,sid,rev,body.request,body.viewerId,previewSignal);
+            if(command==='viewer-release')return viewers.release(id,sid,body.viewerId);
             if(command==='catalog-job')return workbench.catalogJob(id,sid,rev,body.request);
             if(command==='keep-building')return workbench.keepBuilding(id,sid,rev);
             if(command==='world-undo')return workbench.undoWorld(id,sid,rev);
+            if(command==='world-save')return workbench.saveWorld(id,sid,rev,body.request);
+            if(command==='world-prepare-inspect')return workbench.inspectWorldPreparation(id,sid,rev,body.request);
+            if(command==='world-prepare')return workbench.prepareWorld(id,sid,rev,body.request);
+            if(command==='action-inspect')return workbench.inspectAction(id,sid,rev,body.request);
+            if(command==='action-save')return workbench.saveAction(id,sid,rev,body.request);
+            if(command==='scene-layer-inspect')return workbench.inspectSceneLayer(id,sid,rev,body.request);
+            if(command==='scene-layer-save')return workbench.saveSceneLayer(id,sid,rev,body.request);
             if(command==='source')return workbench.selectSource(id,sid,rev,body.sourceId,body.selected);
             if(command==='inspect')return workbench.inspect(id,sid,rev,body.checkpointId);
             if(command==='import')return workbench.importCheckpoint(id,sid,rev,body.sourceScene);
@@ -135,7 +167,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='arrange')return workbench.arrange(id,rev,body.clips);
             if(command==='assemble')return workbench.assemble(id,rev,body.confirmed);
             if(command==='approve-cut')return workbench.approveCut(id,rev,body.cutId);
-            if(command==='codex')return workbench.codex(id,sid,rev);
+            if(command==='codex')return workbench.codex(id,sid,rev,body.context);
             assert(false,'Unknown workbench action.',404);
           }
           // Legacy manifest edits cannot retarget an in-flight workbench writer.
