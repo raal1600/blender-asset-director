@@ -3,6 +3,7 @@ import {isDeepStrictEqual} from 'node:util';
 import {assert,json,safe} from './storage.mjs';
 import {validHash,validId} from './workbench-model.mjs';
 import {checkpointJob} from './checkpoint-job.mjs';
+import {validateTimeline,timelineTiming} from '../public/action-timeline-contract.mjs';
 
 const version='action-layer-v1';
 const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
@@ -17,6 +18,7 @@ export function validateActionRequest(request,inspect=false){
   const seen=new Set();
   for(const c of request.changes){
     assert(object(c)&&typeof c.performer==='string'&&c.performer.length>0&&c.performer.length<=255&&!seen.has(c.performer),'Choose distinct observed performers.');seen.add(c.performer);
+    if(c.mode==='timeline'){validateTimeline(c);continue;}
     const keys=c.mode==='clip'?['performer','mode','take_id','start','speed']:['performer','mode','frame'];
     assert(Object.keys(c).length===keys.length&&Object.keys(c).every(k=>keys.includes(k)),'Unknown Action fields.');
     if(c.mode==='clip'){
@@ -27,6 +29,7 @@ export function validateActionRequest(request,inspect=false){
     else assert(c.mode==='hold'&&integer(c.frame),'Choose native motion or hold an observed pose.');
   }
   if(request.frame_range!==undefined)assert(Array.isArray(request.frame_range)&&request.frame_range.length===2&&request.frame_range.every(integer)&&request.frame_range[0]<=request.frame_range[1]&&request.frame_range[1]-request.frame_range[0]<=3600,'Playback range exceeds the supported bound.');
+  assert(!request.changes.some(c=>c.mode==='timeline')||request.changes.every(c=>c.mode==='timeline'),'Save timeline changes separately from legacy changes.');
   return request;
 }
 
@@ -51,7 +54,19 @@ export async function saveAction(work,id,sceneId,revision,request){
       for(const c of request.changes){
         const performer=run.inspection.performers.find(p=>p.name===c.performer);
         assert(performer&&!performer.unsupported,'This performer needs detailed Blender editing.',409);
-        if(c.mode==='clip')assert(performer.takes.some(t=>t.id===c.take_id&&t.performer===c.performer),'This motion does not belong to the selected performer.',409);
+        if(c.mode==='timeline'){
+          assert(performer.timeline?.version==='action-timeline-v1'&&!performer.timeline.error,'Inspect this timeline in the matching runtime.',409);
+          const range=request.frame_range||run.inspection.frame_range;
+          for(const clip of c.clips){
+            const take=performer.takes.find(t=>t.id===clip.take_id&&t.performer===c.performer);
+            assert(take,'This motion does not belong to the selected performer.',409);
+            const timing=timelineTiming(clip,take);
+            assert(!(c.clips.some(c=>c.travel)||timing.cycles>1+1e-9)||!take.travel_blocker,take.travel_blocker||'Native travelling cycles need Blender review.',409);
+            assert(!clip.travel||!take.travel_blocker,take.travel_blocker||'Travel is unavailable.',409);
+            assert(clip.start>=range[0]&&clip.start+clip.frames-1<=range[1],'Playback must contain every clip.');
+          }
+        }
+        else if(c.mode==='clip')assert(performer.takes.some(t=>t.id===c.take_id&&t.performer===c.performer),'This motion does not belong to the selected performer.',409);
         else assert(c.frame>=run.inspection.frame_range[0]&&c.frame<=run.inspection.frame_range[1],'Hold a frame within the observed scene range.',409);
       }
     },

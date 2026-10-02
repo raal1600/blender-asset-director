@@ -1,5 +1,10 @@
 # Performer-first Action layer
 
+The opt-in [motion timeline](ACTION_TIMELINE.md) extends this contract with
+editable native clips and conservatively guarded planar travel. Its separate
+development/acceptance status must not be confused with this legacy single-take
+path. Existing saved timelines cannot be overwritten by legacy clip/hold controls.
+
 This source slice adds performer-first browser controls and bounded saved-scene
 operations, not a retargeting system or motion-quality approval. The compact
 Action view automatically inspects the exact saved checkpoint, offers performer-

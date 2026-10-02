@@ -1,0 +1,32 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {timelineDraft,suggestedPath} from '../public/action-timeline-draft.mjs';
+import {validateTimeline,timelineTiming} from '../public/action-timeline-contract.mjs';
+const take='take_'+'a'.repeat(64),other='take_'+'b'.repeat(64);
+const cp={id:'cp_saved',sha256:'a'.repeat(64)},run={id:'run_saved',inspection:{sha256:'b'.repeat(64),frame_range:[1,250],fps:24,reference_frame:1,performers:['One','Two'].map((name,i)=>({name,takes:[{id:i?other:take,action:'Native',range:[1,25],travel_blocker:null}],timeline:{version:'action-timeline-v1',clips:[],origin_m:[0,0,0],meters_per_unit:1}}))}};
+test('travel derives occupancy; append starts after the inclusive last frame',()=>{
+ const d=timelineDraft(cp,run);d.add(take,'clip_one');d.edit('travel',true);assert(d.invalid);d.edit('distance','5');d.edit('pace','2.5');assert(d.invalid);d.edit('repeat_reviewed',true);assert(!d.invalid);
+ assert.equal(d.selectedClip.frames,49);assert.equal(d.nextFrame(),50);assert.deepEqual(d.arrow().delta_m.map(v=>Math.round(v)),[0,5]);
+ d.add(take,'clip_two');assert.equal(d.selectedClip.start,50);assert.equal(d.request('run_save').changes[0].clips.length,2);
+ d.select('Two');d.add(other,'clip_other');assert.equal(d.selectedClip.start,1);assert.equal(d.count,2);
+ assert.equal(run.inspection.performers[0].timeline.clips.length,0);
+});
+test('editing, explicit ripple, delete, undo and invalid raw input remain local',()=>{
+ const d=timelineDraft(cp,run);d.add(take,'clip_one');d.add(take,'clip_two');d.select('One','clip_one');d.edit('frames','40');d.edit('repeat_reviewed',true);assert(d.invalid);d.shiftFollowing();assert(!d.invalid);assert.equal(d.clips('One')[1].start,41);
+ d.edit('speed','');assert(d.invalid);assert.equal(d.input('speed'),'');d.finishEdit();d.select('Two');assert.throws(()=>d.request('run_save'));d.select('One','clip_one');d.undo();assert(!d.invalid);
+ d.remove();assert.equal(d.clips('One').length,1);d.undo();assert.equal(d.clips('One').length,2);d.discard();assert(!d.dirty);
+});
+test('saved timeline reload preserves clips; revisions cannot mutate original receipt',()=>{
+ const d=timelineDraft(cp,run);d.add(take,'clip_one');const saved=structuredClone(run);saved.inspection.performers[0].timeline.clips=d.clips('One');const reloaded=timelineDraft(cp,saved);assert(!reloaded.dirty);assert.equal(reloaded.nextFrame(),26);reloaded.select('One','clip_one');reloaded.edit('start','10');assert.equal(saved.inspection.performers[0].timeline.clips[0].start,1);assert.throws(()=>reloaded.handoff(1),/Save or discard/);
+});
+test('wire bounds, overlap, cross-take and unreviewed repeat refuse',()=>{
+ const d=timelineDraft(cp,run);assert.throws(()=>d.add(other,'clip_wrong'));d.add(take,'clip_one');const c=d.selectedClip;
+ assert.throws(()=>validateTimeline({performer:'One',mode:'timeline',clips:[c,{...c,id:'clip_two',start:25}]}),/overlap/);
+ assert.throws(()=>timelineTiming({...c,frames:60},run.inspection.performers[0].takes[0]),/repeatable/);
+ for(const patch of [{frames:NaN},{speed:Infinity},{start:1.2},{repeat_reviewed:1},{travel:{delta_m:[0,0],meters_per_cycle:1}}])assert.throws(()=>validateTimeline({performer:'One',mode:'timeline',clips:[{...c,...patch}]}));
+});
+test('label hints are editable suggestions; drag is one undo group and pace reuses an authored cycle',()=>{
+ assert.deepEqual(suggestedPath('walk_back'),[0,-1]);assert.deepEqual(suggestedPath('walk:right'),[1,0]);assert.deepEqual(suggestedPath('walk left'),[-1,0]);
+ const d=timelineDraft(cp,run);d.add(take,'clip_one');d.edit('travel',true);d.edit('pace','2.5');const before=d.selectedClip;d.finishEdit();d.moveEndpoint([2,3]);d.moveEndpoint([3,4]);d.finishEdit();d.undo();assert.deepEqual(d.selectedClip,before);
+ d.add(take,'clip_two');d.edit('travel',true);assert.equal(d.selectedClip.travel.meters_per_cycle,2.5);
+});

@@ -6,6 +6,8 @@ import {worldAddQueue,addCatalogFlow} from './world-add-flow.mjs';
 import {openViewer} from './viewer-3d.mjs';
 import {worldActionNeedsSave} from './world-draft.mjs';
 import {actionView,actionDraft,actionInspection,ensureActionInspection,actionDraftStatus,actionPreviewScope} from './workbench-action.mjs';
+import {timelineDraft} from './action-timeline-draft.mjs';
+import {syncTimelineUI} from './action-timeline-view.mjs';
 import {sceneLayerView,sceneLayerDraft,layerInspection,ensureLayerInspection,cameraForm} from './workbench-scene-layer.mjs';
 import {lightingEvidenceView} from './lighting-evidence.mjs';
 import {outputView,outputContext,outputPreferences,outputValuesValid} from './workbench-render.mjs';
@@ -32,6 +34,8 @@ function rememberFilmPosition(){for(const node of document.querySelectorAll('#ap
 let assetViewer=null,sceneViewer=null,sceneViewerKey=null;
 let draftDestination=null,worldSave=null,actionSave=null;
 const actionDrafts=new Map();
+const motionEnabled=new Set();
+const motionReturnFrames=new Map();
 const actionInspectionAttempts=new Set();
 const layerDrafts=new Map(),layerInspectionAttempts=new Set(),layerSelections=new Map();
 let layerSave=null;
@@ -142,8 +146,9 @@ let previewStoragePlan=null;
 function clearAssetViewer(){assetViewer?.dispose();assetViewer=null;}
 function clearSceneViewer(){sceneViewer?.dispose();sceneViewer=null;sceneViewerKey=null;}
 const sceneViewKey=()=>cp()?projectId+':'+sceneId+':'+s().stage+':'+cp().id+':'+cp().sha256+':'+JSON.stringify(shotFor(s())):null;
-function showSceneViewer(host){clearSceneViewer();sceneViewer=startViewer(host,{kind:'checkpoint',id:cp().id});sceneViewerKey=sceneViewKey();}
+function showSceneViewer(host){clearSceneViewer();sceneViewer=startViewer(host,{kind:'checkpoint',id:cp().id});sceneViewerKey=sceneViewKey();const key=projectId+':'+sceneId,viewer=sceneViewer;if(s().stage==='action'&&motionReturnFrames.has(key))void viewer.ready.then(()=>{if(sceneViewer===viewer){viewer.seekFrame(motionReturnFrames.get(key));motionReturnFrames.delete(key);}});}
 function startViewer(host,request){const context={projectId,sceneId,revision:p().revision},viewerId='viewer_'+crypto.randomUUID();return openViewer({host,
+ actionEdit:request.kind==='checkpoint'&&s().stage==='action'?{getDraft:()=>currentActionDraft(),onChange:()=>syncActionDraftUI(),canEdit:()=>!busy&&!state.locked&&!s()?.task&&!s()?.run&&!actionSave&&currentActionDraft()?.checkpointId===cp()?.id&&currentActionDraft()?.sha256===cp()?.sha256}:undefined,
  worldEdit:request.kind==='checkpoint'&&s().stage==='world'?{labels:Object.fromEntries((p().workbench.catalogPins||[]).map(a=>[a.id,a.title])),changed:()=>syncWorldDraftUI()}:undefined,
  inspectInBlender:request.kind==='checkpoint'?undefined:()=>perform(async()=>{if(projectId!==context.projectId||sceneId!==context.sceneId||$(request.kind==='catalog'?'catalog-file':'source-file')?.value!==request.file)throw Error('Preview context changed; reopen the asset first.');await dispatch('asset-preview-open',request);}),
  prepare:signal=>api('workbench/viewer-prepare',{...context,request,viewerId},signal),
@@ -170,7 +175,8 @@ function currentActionDraft(){
  if(old&&(old.dirty||old.checkpointId===checkpoint?.id&&old.sha256===checkpoint?.sha256))return old;
  if(s()?.stage!=='action'||!checkpoint)return null;
  const run=actionInspection(state.runs,s(),checkpoint);if(!run)return null;
- const draft=actionDraft(checkpoint,run);actionDrafts.set(key,draft);return draft;
+ const useTimeline=cap?.action_timeline==='action-timeline-v1'&&run.inspection.performers.every(p=>p.timeline?.version==='action-timeline-v1')&&(motionEnabled.has(key)||run.inspection.performers.some(p=>p.timeline.managed));
+ const draft=useTimeline?timelineDraft(checkpoint,run):actionDraft(checkpoint,run);actionDrafts.set(key,draft);return draft;
 }
 function scheduleActionInspection(){
  setTimeout(()=>{
@@ -187,6 +193,7 @@ async function saveActionDraft(){
  const draft=currentActionDraft();if(!draft?.dirty)return;
  if((draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256))throw Error('Action draft is stale. Discard it and reload the saved scene.');
  if(!actionSave)actionSave={draft,body:{projectId,sceneId,revision:p().revision,request:draft.request('run_'+crypto.randomUUID())}};
+ if(draft.timeline)motionReturnFrames.set(projectId+':'+sceneId,draft.nextFrame());
  const attempt=actionSave;syncActionDraftUI();
  try{await api('workbench/action-save',attempt.body);}catch(error){await load();if(!state.runs.some(r=>r.id===attempt.body.request.requestId)){actionSave=null;throw error;}}
  const deadline=Date.now()+205000;
@@ -226,6 +233,8 @@ function syncActionDraftUI(){
   const error=$('action-'+input.dataset.actionField+'-error');if(error){error.textContent=message;error.hidden=!message;}
  }
  const ready=document.querySelector('[data-action="action-ready"]');if(ready)ready.disabled=blocked||!cp()||!draft||draft.dirty||stale;
+ syncTimelineUI(draft,esc,blocked||stale||unsupported);sceneViewer?.updateActionPath();
+ if(draft?.timeline){const legacy=document.querySelector('[data-action="action-hold-all"]');if(legacy)legacy.hidden=true;const text=document.querySelector('.action-details>p');if(text)text.textContent='Timeline clips retain native source keys and World placement. Repeats require explicit review. Travel is authored, with contacts and joins still needing playback review.';const heading=document.querySelector('.action-heading p');if(heading)heading.textContent='Choose an animation, shape its path, then save it as an editable clip.';}
 }
 function syncWorldDraftUI(){
  const draft=sceneViewer?.draft,stale=!!draft&&sceneViewerKey!==sceneViewKey(),blocked=busy||!!worldSave||state?.locked||!!s()?.task||!!s()?.run||!!additions.state().count;
@@ -386,6 +395,14 @@ async function dispatch(a,d){
  if(a==='action-discard'){if(actionSave)throw Error('Wait for the Save receipt.');currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);clearSceneViewer();await load();return;}
  if(a==='action-undo'){currentActionDraft()?.undo();render();return;}
  if(a==='action-save'){await saveActionDraft();return;}
+ if(a==='motion-enable'){
+  if(currentActionDraft()?.dirty)throw Error('Save or discard existing choices first.');
+  const old=currentActionDraft();if(!old?.audit.performers.every(p=>p.timeline?.version==='action-timeline-v1'))throw Error('Use Inspect performers again to load timeline support for this saved scene.');
+  motionEnabled.add(projectId+':'+sceneId);actionDrafts.delete(projectId+':'+sceneId);render();return;
+ }
+ if(a==='motion-select'){currentActionDraft().select(d.performer,d.clip);render();return;}
+ if(a==='motion-delete'){currentActionDraft().remove();render();return;}
+ if(a==='motion-ripple'){currentActionDraft().shiftFollowing();render();return;}
  if(a==='action-hold-all'){const draft=currentActionDraft();draft.holdAll(sceneViewer?.currentFrame??draft.audit.reference_frame);render();return;}
  if(actionSave&&worldActionNeedsSave(a))throw Error('Action Save is still running. Refresh status or inspect its receipt.');
  if(currentActionDraft()?.dirty&&worldActionNeedsSave(a)){
@@ -531,6 +548,19 @@ if(a==='scan'){if(!confirm('Rescan the original database packages? This updates 
  if(a==='retry'){if(!confirm('Archive the failed native attempt using job-retry? Starting it again is a separate action.'))return;await next('retry',{jobId:d.job,confirmed:true});close();await load();return;}
  if(a==='resolve'){if(!confirm('Confirm you stopped the external Blender task or encoder. The launcher does not terminate it for you.'))return;await next('resolve',{sceneId:d.scene||null,runId:d.run,confirmStopped:true});close();await load();return;}
 }
+function editMotion(node){
+ if(busy||state.locked||s()?.task||s()?.run||actionSave)return;
+ const draft=currentActionDraft();if(!draft?.timeline||draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale; reload before editing.');
+ draft.edit(node.dataset.motionField,node.type==='checkbox'?node.checked:node.value);syncActionDraftUI();
+}
+document.addEventListener('input',e=>{if(!e.target.dataset.motionField||e.target.type==='checkbox')return;try{editMotion(e.target);notice('');}catch(error){notice(error.message);}});
+document.addEventListener('change',e=>{
+ try{
+  if(e.target.hasAttribute('data-motion-add')){if(busy||state.locked)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){draft.add(e.target.value);const take=draft.audit.performers.find(p=>p.name===draft.selected).takes.find(t=>t.id===e.target.value);if(!take.travel_blocker)draft.edit('travel',true);render();}}
+  else if(e.target.dataset.motionField){if(e.target.type==='checkbox'){editMotion(e.target);render();}currentActionDraft()?.finishEdit();}
+ }catch(error){notice(error.message);}
+});
+document.addEventListener('focusout',e=>{if(e.target.dataset.motionField)currentActionDraft()?.finishEdit();});
 document.addEventListener('pointerdown',e=>{const menu=document.querySelector('.world-more[open]');if(menu&&!menu.contains(e.target))menu.open=false;});
 document.addEventListener('keydown',e=>{
  if(e.key!=='Escape'||e.defaultPrevented||document.querySelector('dialog[open]'))return;
