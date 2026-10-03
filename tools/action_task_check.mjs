@@ -40,6 +40,11 @@ try{
    const actionContext={version:request.version,checkpointId:cp.id,sha256:cp.sha256,inspectionId:request.requestId,audit_sha256:inspected.inspection.sha256,performer:mode==='save'?'SyntheticRig1':'SyntheticRig0',frame:5};
    const body={projectId:p.id,sceneId:scene.id,revision:p.revision,context:{actionContext,rigControls:mode==='save'}};
    const prior=children.size;
+   const legacyId='run_'+randomUUID(),legacyFile=path.join(p.directory,'Runs',legacyId+'.json');
+   await writeJson(legacyFile,{...inspected,id:legacyId,implementation:undefined,fixture:'SIMULATED_LEGACY_RUNTIME_BINDING'});
+   const legacyHash=await fileHash(legacyFile);
+   const stale=await post('task-open',{...body,context:{...body.context,actionContext:{...actionContext,inspectionId:legacyId}}},409);
+   assert.match(stale.error,/predates this runtime/);assert.deepEqual(await fileHash(legacyFile),legacyHash);
    await post('task-open',{...body,context:{...body.context,actionContext:{...actionContext,audit_sha256:'0'.repeat(64)}}},409);
    await post('task-open',{...body,context:{rigControls:true,actionContext:{...actionContext,performer:'StaticProp'}}},400);
    assert.equal(children.size,prior);assert.equal(await exists(path.join(p.directory,'Runs/.workbench-writer.lock')),false);

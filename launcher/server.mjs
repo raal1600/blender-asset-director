@@ -46,6 +46,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assets['/world-add-flow.mjs']='world-add-flow.mjs';
         assets['/workbench-world.css']='workbench-world.css';
         assets['/workbench-action.mjs']='workbench-action.mjs';
+        assets['/action-inspection.mjs']='action-inspection.mjs';
         assets['/workbench-action.css']='workbench-action.css';
         for(const name of ['action-timeline-contract.mjs','action-timeline-draft.mjs','action-timeline-view.mjs','action-path-editor.mjs'])assets['/'+name]=name;
         assets['/workbench-scene-layer.mjs']='workbench-scene-layer.mjs';

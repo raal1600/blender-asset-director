@@ -1,6 +1,7 @@
 /** Scene-bound performer handoff. Browser names never establish native ownership. */
 import {assert,json,safe} from './storage.mjs';
 import {validHash,validId} from './workbench-model.mjs';
+import {assertCurrentActionInspection} from './action-inspection.mjs';
 
 export async function resolveActionContext(work,p,scene,request){
   assert(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).length===7&&
@@ -14,6 +15,7 @@ export async function resolveActionContext(work,p,scene,request){
   assert(run.projectId===p.id&&run.sceneId===scene.id&&run.action==='action-audit'&&run.state==='SUCCEEDED'&&
     run.checkpointId===cp.id&&run.checkpointSha256===cp.sha256&&run.inspection?.version===request.version&&
     run.inspection.sha256===request.audit_sha256,'Performer inspection is stale or belongs to another scene.',409);
+  await assertCurrentActionInspection(work,run);
   const performer=run.inspection.performers.find(v=>v.name===request.performer);
   assert(performer,'Select an observed performer.',409);
   assert(request.frame>=run.inspection.frame_range[0]&&request.frame<=run.inspection.frame_range[1],'Choose a frame in the inspected scene.',409);

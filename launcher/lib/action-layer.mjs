@@ -3,6 +3,7 @@ import {isDeepStrictEqual} from 'node:util';
 import {assert,json,safe} from './storage.mjs';
 import {validHash,validId} from './workbench-model.mjs';
 import {checkpointJob} from './checkpoint-job.mjs';
+import {assertCurrentActionInspection} from './action-inspection.mjs';
 import {validateTimeline,timelineTiming} from '../public/action-timeline-contract.mjs';
 
 const version='action-layer-v1';
@@ -39,7 +40,8 @@ function verifyAudit(data){
 
 export async function inspectAction(work,id,sceneId,revision,request){
   validateActionRequest(request,true);
-  return checkpointJob(work,id,sceneId,revision,request,{stage:'action',operation:'action-audit',options:{},readOnly:true,verify:verifyAudit});
+  return checkpointJob(work,id,sceneId,revision,request,{stage:'action',operation:'action-audit',options:{},readOnly:true,verify:verifyAudit,
+    implementation:async()=>{const cap=await work.available();assert(validHash(cap.implementation)&&cap.action_layer===version,'Matching Action runtime identity is unavailable.',409);return cap.implementation;}});
 }
 
 export async function saveAction(work,id,sceneId,revision,request){
@@ -51,6 +53,7 @@ export async function saveAction(work,id,sceneId,revision,request){
       const run=await json(await safe(p.directory,`Runs/${request.inspectionId}.json`));
       assert(run.projectId===id&&run.sceneId===sceneId&&run.action==='action-audit'&&run.state==='SUCCEEDED'&&run.checkpointId===cp.id&&run.checkpointSha256===cp.sha256&&run.inspection?.sha256===request.audit_sha256,'Action inspection is stale or belongs to another scene.',409);
       verifyAudit(run.inspection);
+      await assertCurrentActionInspection(work,run);
       for(const c of request.changes){
         const performer=run.inspection.performers.find(p=>p.name===c.performer);
         assert(performer&&!performer.unsupported,'This performer needs detailed Blender editing.',409);

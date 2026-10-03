@@ -6,6 +6,7 @@ import {worldAddQueue,addCatalogFlow} from './world-add-flow.mjs';
 import {openViewer} from './viewer-3d.mjs';
 import {worldActionNeedsSave} from './world-draft.mjs';
 import {actionView,actionDraft,actionInspection,ensureActionInspection,actionDraftStatus,actionPreviewScope} from './workbench-action.mjs';
+import {actionInspectionAttempt,currentActionInspection,actionInspectionRefresh} from './action-inspection.mjs';
 import {timelineDraft} from './action-timeline-draft.mjs';
 import {syncTimelineUI} from './action-timeline-view.mjs';
 import {sceneLayerView,sceneLayerDraft,layerInspection,ensureLayerInspection,cameraForm} from './workbench-scene-layer.mjs';
@@ -172,9 +173,10 @@ function reconcileWorldSave(){
 function currentActionDraft(){
  if(!state||!projectId||!sceneId)return null;
  const key=projectId+':'+sceneId,old=actionDrafts.get(key),checkpoint=cp();
- if(old&&(old.dirty||old.checkpointId===checkpoint?.id&&old.sha256===checkpoint?.sha256))return old;
+ if(old?.dirty)return old; // Never discard unsaved choices during an inspection refresh.
  if(s()?.stage!=='action'||!checkpoint)return null;
- const run=actionInspection(state.runs,s(),checkpoint);if(!run)return null;
+ const run=actionInspection(state.runs,s(),checkpoint,cap);if(!run)return null;
+ if(old?.run.id===run.id&&old.checkpointId===checkpoint.id&&old.sha256===checkpoint.sha256)return old;
  const useTimeline=cap?.action_timeline==='action-timeline-v1'&&run.inspection.performers.every(p=>p.timeline?.version==='action-timeline-v1')&&(motionEnabled.has(key)||run.inspection.performers.some(p=>p.timeline.managed));
  const draft=useTimeline?timelineDraft(checkpoint,run):actionDraft(checkpoint,run),saved=motionReturnFrames.get(key);
  if(draft.timeline&&saved?.checkpointId===checkpoint.id&&saved.sha256===checkpoint.sha256&&draft.audit.performers.some(p=>p.name===saved.performer))draft.select(saved.performer);
@@ -183,16 +185,17 @@ function currentActionDraft(){
 function scheduleActionInspection(){
  setTimeout(()=>{
   if(busy||tab!=='scenes'||s()?.stage!=='action'||!cp()||state.locked||cap?.action_layer!=='action-layer-v1'||currentActionDraft())return;
-  const key=projectId+':'+sceneId+':'+cp().id+':'+cp().sha256;
-  const attempted=actionInspectionAttempts.has(key)||state.runs.some(r=>r.action==='action-audit'&&r.sceneId===sceneId&&r.checkpointId===cp().id&&r.checkpointSha256===cp().sha256);
+  const key=projectId+':'+sceneId+':'+cp().id+':'+cp().sha256+':'+cap.implementation;
+  const attempted=actionInspectionAttempts.has(key)||state.runs.some(r=>actionInspectionAttempt(r,s(),cp(),cap));
   if(!attempted){actionInspectionAttempts.add(key);const chosen={projectId,sceneId,checkpointId:cp().id,sha256:cp().sha256};perform(async()=>{
-   await ensureActionInspection({...chosen,read:()=>api('workbench/state?'+new URLSearchParams({projectId:chosen.projectId,compact:true})),create:revision=>api('workbench/action-inspect',{projectId:chosen.projectId,sceneId:chosen.sceneId,revision,request:{version:'action-layer-v1',requestId:'run_'+crypto.randomUUID(),checkpointId:chosen.checkpointId,sha256:chosen.sha256}})});
+   await ensureActionInspection({...chosen,cap,read:()=>api('workbench/state?'+new URLSearchParams({projectId:chosen.projectId,compact:true})),create:revision=>api('workbench/action-inspect',{projectId:chosen.projectId,sceneId:chosen.sceneId,revision,request:{version:'action-layer-v1',requestId:'run_'+crypto.randomUUID(),checkpointId:chosen.checkpointId,sha256:chosen.sha256}})});
    await load();
   });}
  },0);
 }
 async function saveActionDraft(){
  const draft=currentActionDraft();if(!draft?.dirty)return;
+ if(!currentActionInspection(draft.run,cap))throw Error(actionInspectionRefresh+' Your local choices are retained; discard them explicitly to refresh.');
  if((draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256))throw Error('Action draft is stale. Discard it and reload the saved scene.');
  if(!actionSave)actionSave={draft,body:{projectId,sceneId,revision:p().revision,request:draft.request('run_'+crypto.randomUUID())}};
  const attempt=actionSave;syncActionDraftUI();

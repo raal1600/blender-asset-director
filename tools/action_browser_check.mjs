@@ -23,6 +23,15 @@ try{
  await app.workbench.create(project.id,project.revision,'Combined performance');project=await app.store.get(project.id);
  const scene=project.workbench.scenes[0],cpId='cp_'+randomUUID(),relative='Scenes/'+cpId+'.blend';await fs.copyFile(source,path.join(project.directory,relative),fs.constants.COPYFILE_EXCL);
  scene.checkpoints.push({id:cpId,path:relative,...original,parent:null,stage:'world',audit});scene.current=cpId;scene.stage='action';scene.completed={world:cpId};await app.store.save(project,project.revision);
+ // Upgrade regression: a generated legacy receipt has the same checkpoint but
+ // predates implementation-bound inspections and timeline audit fields.
+ const oldJob=await app.runtime.harness(['job-prepare','action-audit','--input',source]);
+ const oldAudit=structuredClone(await app.workbench.result(await app.runtime.harness(['job-run',oldJob.id,'--blender',blender])));
+ for(const performer of oldAudit.performers){delete performer.timeline;for(const take of performer.takes)delete take.travel_blocker;}
+ const oldFile=path.join(project.directory,'Runs/run_'+randomUUID()+'.json');
+ await writeJson(oldFile,{schema:1,id:path.basename(oldFile,'.json'),projectId:project.id,sceneId:scene.id,checkpointId:cpId,checkpointSha256:original.sha256,
+   action:'action-audit',state:'SUCCEEDED',startedAt:'2000-01-01T00:00:00Z',inspection:oldAudit,fixture:'SIMULATED_LEGACY_AUDIT_SCHEMA_NOT_A_HISTORICAL_RECEIPT'});
+ const oldHash=await fileHash(oldFile);
  const {chromium}=await import(pathToFileURL(playwright).href);browser=await chromium.launch(chrome?{executablePath:chrome}:{channel:'chrome'});
  page=await browser.newPage({viewport:{width:1440,height:1000},serviceWorkers:'block'});page.setDefaultTimeout(30000);
  const safe=value=>String(value).replaceAll(app.token,'[REDACTED]');
@@ -38,6 +47,16 @@ try{
  await click('[data-action="project"][data-id="'+project.id+'"]');await inspectionStarted;await page.reload();await ready();await Promise.all(pending);
  assert.equal(await page.locator('#notice').isVisible(),false);
  assert.equal(report.requests.filter(r=>r.path.endsWith('/action-inspect')).length,1,'Reload must reuse the running inspection, not start another');
+ const refreshed=(await app.store.runs(project.id)).filter(r=>r.action==='action-audit'&&r.state==='SUCCEEDED'&&r.implementation);
+ assert.equal(refreshed.length,1);assert.equal(refreshed[0].implementation,(await app.workbench.available()).implementation);
+ assert(refreshed[0].inspection.performers.every(p=>p.timeline?.version==='action-timeline-v1'));
+ assert.deepEqual(await fileHash(oldFile),oldHash);assert.equal((await app.store.get(project.id)).workbench.scenes[0].current,cpId);
+ await page.getByRole('button',{name:'Build a motion timeline',exact:true}).click();
+ await page.getByRole('region',{name:'Character action timelines',exact:true}).waitFor();
+ await page.screenshot({path:path.join(out,'00-upgrade-timeline.png'),fullPage:true});
+ await page.reload();await ready();await Promise.all(pending);
+ assert.equal(report.requests.filter(r=>r.path.endsWith('/action-inspect')).length,1);
+ report.checks.push('Legacy same-checkpoint receipt is preserved; browser automatically obtains one current native inspection and timeline opens without manual reinspection');
  assert.equal(await page.locator('.action-workspace').count(),1);assert.equal(await page.getByLabel('Animation take').isVisible(),false);assert.match(await page.locator('.scene-playback-label').innerText(),/Whole scene.*24 fps/);
  await page.screenshot({path:path.join(out,'01-action-ready.png'),fullPage:true});await fs.writeFile(path.join(out,'01-action-ready.txt'),safe(await page.locator('body').ariaSnapshot()),{flag:'wx'});
  assert.deepEqual(report.errors,[]);report.checks.push('Action opens with automatic real performer inspection and whole-scene playback, no arbitrary global take selector');
