@@ -74,6 +74,7 @@ def audit():
             'RESOURCE_LIMIT', 'Action inspection exceeds its keyframe budget; inspect this scene in Blender')
     helpers = widgets(scene)
     performers, bound, cached, binding_count = [], set(), {}, 0
+    gait_budget = [3120]  # At most 48 x 65 evaluated poses for this inspection.
     for obj in sorted(scene.objects, key=lambda o: o.name):
         if obj in helpers or obj.get('bad_placement_control') == 1 or obj.type not in {'ARMATURE', 'MESH', 'EMPTY', 'CURVE'}:
             continue
@@ -108,7 +109,7 @@ def audit():
                            'placement_control': control.name if control else None,
                            'active': {'action': ad.action.name, 'slot': slot_id(getattr(ad, 'action_slot', None))} if ad and ad.action else None,
                            'tracks': [track_record(t) for t in ad.nla_tracks] if ad else [],
-                           'takes': takes, 'unsupported': reason(obj), 'timeline': describe(obj, takes)})
+                           'takes': takes, 'unsupported': reason(obj), 'timeline': describe(obj, takes, gait_budget)})
     unassigned = [{'action': a.name, 'slot': slot_id(slot)} for a in bpy.data.actions
                   for slot in list(getattr(a, 'slots', [])) or [None]
                   if not a.get('bad_action_travel_v1') and ops.curves(a, slot) and (a.name, slot_id(slot)) not in bound]

@@ -560,7 +560,7 @@ function editMotion(node){
 document.addEventListener('input',e=>{if(!e.target.dataset.motionField||e.target.type==='checkbox')return;try{editMotion(e.target);notice('');}catch(error){notice(error.message);}});
 document.addEventListener('change',e=>{
  try{
-  if(e.target.hasAttribute('data-motion-add')){if(busy||state.locked)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){draft.add(e.target.value);const take=draft.audit.performers.find(p=>p.name===draft.selected).takes.find(t=>t.id===e.target.value);if(!take.travel_blocker)draft.edit('travel',true);render();}}
+  if(e.target.hasAttribute('data-motion-add')){if(busy||state.locked)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){draft.add(e.target.value);const take=draft.audit.performers.find(p=>p.name===draft.selected).takes.find(t=>t.id===e.target.value);if(!take.travel_blocker&&take.gait?.status==='estimated')draft.edit('travel',true);render();}}
   else if(e.target.dataset.motionField){if(e.target.type==='checkbox'){editMotion(e.target);render();}currentActionDraft()?.finishEdit();}
  }catch(error){notice(error.message);}
 });

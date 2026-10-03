@@ -1,4 +1,4 @@
-"""Bounded, explicit native clips and planar travel. No inferred gait speed."""
+"""Bounded native clips and planar travel; optional inspected gait calibration."""
 import math
 import re
 from .core import fields, require
@@ -30,7 +30,10 @@ def validate(change):
         require(end <= 100000, 'INVALID_TIMING', 'Clip exceeds the frame limit')
         travel = clip['travel']
         if travel is not None:
-            fields(travel, {'delta_m', 'meters_per_cycle'}, {'delta_m', 'meters_per_cycle'})
+            fields(travel, {'delta_m', 'meters_per_cycle', 'gait_id'}, {'delta_m', 'meters_per_cycle'})
+            require('gait_id' not in travel or isinstance(travel['gait_id'], str)
+                    and re.fullmatch(r'[a-f0-9]{64}', travel['gait_id']),
+                    'INVALID_TRAVEL', 'Automatic pace needs an exact inspected gait identity')
             require(isinstance(travel['delta_m'], list) and len(travel['delta_m']) == 2
                     and all(number(v, -10000, 10000) for v in travel['delta_m'])
                     and 0 < math.hypot(*travel['delta_m']) <= 10000
@@ -48,6 +51,14 @@ def timing(clip, take):
     cycles = (clip['frames'] - 1) * clip['speed'] / span
     travel = clip['travel']
     if travel:
+        if 'gait_id' in travel:
+            gait = take.get('gait') or {}
+            require(gait.get('status') == 'estimated' and gait.get('id') == travel['gait_id'],
+                    'GAIT_CHANGED', 'Automatic pace changed; inspect the saved performer again')
+            distance = math.hypot(*travel['delta_m'])
+            require(abs(travel['meters_per_cycle'] - gait['meters_per_cycle']) < 1e-7
+                    and math.dist([v / distance for v in travel['delta_m']], gait['direction']) < 1e-6,
+                    'INVALID_TRAVEL', 'Automatic travel must use the inspected pace and direction; use reviewed manual calibration for overrides')
         cycles = math.hypot(*travel['delta_m']) / travel['meters_per_cycle']
         expected = math.ceil(cycles * span / clip['speed'] - 1e-9) + 1
         require(clip['frames'] == expected, 'INVALID_TRAVEL', 'Distance, pace and occupied frames disagree')

@@ -38,6 +38,7 @@ BLENDER_SUITES = {
         ('ground-contact', 'ground_contact_fixture.py', 'ground_contact_report.json', False, ()),
     ),
     'motion': (
+        ('gait-profile', 'gait_profile_fixture.py', 'RESULTS.json', False, ()),
         ('headless', 'headless_fixture.py', 'fixture_report.json', True, ()),
         ('retarget-pipeline', 'retarget_pipeline_fixture.py', 'retarget_pipeline_report.json', True, ()),
         ('motion-foundation', 'motion_foundation_fixture.py', 'motion_foundation_report.json', True, ()),

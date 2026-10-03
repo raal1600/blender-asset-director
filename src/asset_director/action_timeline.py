@@ -83,8 +83,10 @@ def travel_reason(obj, action, slot):
     return None
 
 
-def describe(obj, takes):
+def describe(obj, takes, gait_budget=None):
     from .action_layer import bindings
+    from . import gait_sampling, gait_profile
+    if gait_budget is None: gait_budget = [3120]
     saved, error = None, None
     try: saved = load(obj)
     except DirectorError as exc: error = str(exc)
@@ -92,11 +94,13 @@ def describe(obj, takes):
     for take in takes:
         a, slot = pairs[(take['action'], take['slot'])]
         take['travel_blocker'] = travel_reason(obj, a, slot)
+        take['gait'] = (gait_profile.unavailable(take['travel_blocker']) if take['travel_blocker']
+                        else gait_sampling.inspect(obj, a, slot, take, gait_budget))
     scale = bpy.context.scene.unit_settings.scale_length
     origin = saved['origin_m'] if saved else [float(v) * scale for v in obj.matrix_world.translation]
     return {'version': contract.VERSION, 'managed': saved is not None, 'clips': saved['clips'] if saved else [],
             'origin_m': origin, 'meters_per_unit': scale, 'error': error,
-            'notice': 'Path direction and pace are authored, not inferred motion or contact approval.'}
+            'notice': 'Automatic pace is a bounded support-motion estimate, not contact or performance approval.'}
 
 
 def apply(options, job_id, before):
@@ -182,8 +186,10 @@ def apply(options, job_id, before):
             path[GENERATED] = 1
             ad.action = path
             displacement = Vector((0, 0, 0))
-            for clip in change['clips']:
-                for f, step in [(clip['start'], False), (clip['start'] + clip['frames'] - 1, True)]:
+            for clip, take, action, slot, plan in motions:
+                # Stop travel when native motion stops, including fractional
+                # final frames; the rounded occupied tail is a hold, not slide.
+                for f, step in [(clip['start'], False), (plan['native_end'], True)]:
                     if step and clip['travel']:
                         displacement += Vector((*clip['travel']['delta_m'], 0)) / unit
                     obj.delta_location = Vector(base_delta) + inverse @ displacement
