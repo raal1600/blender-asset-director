@@ -2,21 +2,23 @@
 import {taskBanner} from './workbench-task.mjs';
 import {progressLabel} from './workbench-progress.mjs';
 import {timelineControls,timelineTracks} from './action-timeline-view.mjs';
+import {actionInspectionAttempt,currentActionInspection} from './action-inspection.mjs';
 
 // Automatic read-only inspection can race a reload/second tab. Refresh once,
 // reuse its exact native receipt, and never retry a mutation or failed job.
-export async function ensureActionInspection({read,create,sceneId,checkpointId,sha256}){
+export async function ensureActionInspection({read,create,sceneId,checkpointId,sha256,cap}){
+  if(!/^[a-f0-9]{64}$/.test(cap?.implementation))return;
   for(let attempt=0;attempt<2;attempt++){
     const state=await read(),scene=state.project.workbench.scenes.find(s=>s.id===sceneId);
     const cp=scene?.checkpoints.find(c=>c.id===(scene.candidate||scene.current));
     if(scene?.stage!=='action'||cp?.id!==checkpointId||cp.sha256!==sha256||state.locked)return;
-    if(state.runs.some(r=>r.action==='action-audit'&&r.sceneId===sceneId&&r.checkpointId===checkpointId&&r.checkpointSha256===sha256))return;
+    if(state.runs.some(r=>actionInspectionAttempt(r,scene,cp,cap)))return;
     try{await create(state.project.revision);return;}catch(error){if(error.status!==409||attempt===1)throw error;}
   }
 }
 
-export function actionInspection(runs,scene,checkpoint){
-  return runs.find(r=>r.action==='action-audit'&&r.sceneId===scene.id&&r.checkpointId===checkpoint?.id&&r.checkpointSha256===checkpoint?.sha256&&r.state==='SUCCEEDED')||null;
+export function actionInspection(runs,scene,checkpoint,cap){
+  return runs.find(r=>r.state==='SUCCEEDED'&&actionInspectionAttempt(r,scene,checkpoint,cap))||null;
 }
 export function actionDraft(checkpoint,run){
   const audit=run.inspection,changes=new Map(),errors=new Map(),history=[];
@@ -71,8 +73,8 @@ export function actionDraftStatus(draft){return draft?.invalid?'Check timing for
 export function actionPreviewScope(draft,stale=false){return stale?'Older saved checkpoint · local draft retained':draft?.invalid?'Playback shows the saved scene. Correct the highlighted timing fields before saving.':draft?.dirty?'Playback shows the saved scene. Save changes to preview the new motion. Planned playback: frames '+draft.playbackRange.join('–')+'; expanded if needed to include each full take.':'Play the whole saved scene together. Inspection lighting is approximate; playback does not approve motion.';}
 
 export function actionView({project,scene,stages,checkpoint,runs,locked,taskStatus,cap,draft,saving,esc,b}){
-  const active=locked||!!scene.task||!!scene.run||!!saving,stale=!!draft&&(draft.checkpointId!==checkpoint?.id||draft.sha256!==checkpoint?.sha256);
-  const run=runs.find(r=>r.id===scene.run),attempt=runs.find(r=>r.action==='action-audit'&&r.sceneId===scene.id&&r.checkpointId===checkpoint?.id);
+  const active=locked||!!scene.task||!!scene.run||!!saving,stale=!!draft&&(draft.checkpointId!==checkpoint?.id||draft.sha256!==checkpoint?.sha256||!currentActionInspection(draft.run,cap));
+  const run=runs.find(r=>r.id===scene.run),attempt=runs.find(r=>actionInspectionAttempt(r,scene,checkpoint,cap));
   const p=draft?.audit.performers.find(p=>p.name===draft.selected),value=p?draft.value(p.name):null;
   const disabled=active||stale||!draft||!!p?.unsupported;
   const button=(label,action,cls='',off=false)=>b(label,action,{},cls,active||off);

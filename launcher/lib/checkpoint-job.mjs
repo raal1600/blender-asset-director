@@ -16,6 +16,7 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
     const prior=await json(receipt);
     assert(prior.projectId===id&&prior.sceneId===sceneId&&prior.action===operation&&prior.requestIdentity===identity,'Save request identity conflicts with an earlier operation.',409);
     assert(['PREPARING','RUNNING','SUCCEEDED'].includes(prior.state),'Previous Save failed; inspect its retained attempt before retrying.',409);
+    if(policy.implementation)assert(prior.implementation===await policy.implementation(),'Inspection runtime changed; request a new inspection without rewriting the old receipt.',409);
     return {run:prior,reused:true};
   }
   assert(p.revision===revision,'Project changed. Refresh before saving this draft.',409);
@@ -30,9 +31,11 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
   const relative=readOnly?null:checkpointScenePath(p.directory,sceneId,cpId);
   if(!readOnly)assert((await work.interactions(id).sourceStatus()).ready,'Review the exact production source use before saving.',409);
   await policy.check?.({p,scene,cp});
+  const implementation=policy.implementation?await policy.implementation():null;
   const savedBase=scene.current,draftBase=scene.candidate;
   const record={schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',
     requestIdentity:identity,checkpointId:cp.id,checkpointSha256:cp.sha256,requestedRevision:revision,
+    ...(implementation?{implementation}:{}),
     startedAt:now(),authorization:readOnly?'explicit-launcher-inspection':candidateOnly?'explicit-launcher-preparation':'explicit-launcher-save',options,
     ...(candidateOnly?{publication:'SEPARATE_CANDIDATE_ONLY'}:{}),
     ...(policy.context?{context:policy.context}:{})};
@@ -42,6 +45,7 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
     const optionsFile=await safe(p.directory,`Docs/Workbench/${runId}-options.json`);await writeJson(optionsFile,options);
     const job=await work.runtime.harness(['job-prepare',operation,'--input',await safe(p.directory,cp.path),'--options',optionsFile]);
     record.jobId=job.id;
+    if(implementation)assert(job.specification?.implementation===implementation,'Native inspection runtime changed before execution.',409);
     assert(['PLANNED','SUCCEEDED'].includes(job.state),'Native Save needs explicit retry/recovery before execution.',409);
     await work.store.bindJob(id,job,q=>{
       const s=work.scene(q,sceneId);
@@ -51,6 +55,7 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
     const complete=async()=>{
       try {
         const output=await work.runtime.harness(['job-run',job.id,'--blender',work.config.blender,'--timeout','180'],195000);
+        if(implementation)assert(output.specification?.implementation===implementation,'Native inspection runtime identity changed.',409);
         const data=await work.result(output);await policy.verify(data);
         let source,actual;
         if(!readOnly){

@@ -12,7 +12,14 @@ owned native takes or a held pose, and keeps timing choices in a local draft.
 Undo, Discard and navigation protection do not run Blender. Explicit Save runs
 one bounded batch, refreshes the saved scene and does not complete the activity.
 Automatic inspection precedes preview creation; reloads reuse an already recorded
-inspection. One fresh-state retry is permitted only for a read-only revision
+inspection from the same native implementation. Legacy/unbound or other-runtime
+inspections remain historical; unchanged scene bytes do not make their audit
+schema compatible. The browser requests a fresh read-only inspection after an
+upgrade. Current-runtime failures still require explicit retry. Dirty local
+choices are retained and blocked, never silently discarded during refresh.
+The server checks implementation identity before Action Save, manual Blender
+handoff and specialist context, and binds new receipts to the actual native job.
+One fresh-state retry is permitted only for a read-only revision
 conflict. Failed jobs are retained and require explicit retry; Saves are not
 automatically replayed with a new identity or weaker revision check.
 The preview is labelled as saved performance while a timing draft is unsaved.
@@ -68,6 +75,10 @@ versions. Unsaved choices must first be saved or discarded. Handoff is a request
 for a proposal, not approval, retarget permission or proof of model execution.
 Old tasks without the optional context remain readable. New context requires the
 matching `action-task-v1` capability; no silent fallback to an older runtime.
+If dedicated Blender setup fails before installing its save handler, automatic
+return reports the identity-checked startup failure rather than a raw missing
+save-session file error. Missing/unreadable evidence never means Don't Save:
+files and writer ownership remain until explicit guarded stopped-task recovery.
 
 `action-audit` observes actual object/action/slot bindings from active actions and
 NLA strips. Unbound lookalike actions are reported separately, never offered by
@@ -117,6 +128,14 @@ jobs are stopped before releasing the owned lease; it never removes saved files.
 
 Portable contract and launcher tests cover bounds, refusal, writer exclusion,
 idempotency, exact result verification and preservation. Generated native tests:
+
+Upgrade regressions seed a clearly labelled synthetic legacy inspection for the
+same checkpoint. The real browser must refresh it once, open the timeline and
+complete its existing Save/playback/manual-handoff journey without rewriting the
+old receipt. Backend tests refuse legacy and other-runtime handoffs before taking
+a writer lease, and detect a runtime change during job preparation. Save-return
+tests cover missing/malformed session evidence and identity-checked setup failure
+without adopting files, clearing the task or fabricating a Don't Save decision.
 
 ```text
 blender --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 11 --python tools/action_layer_fixture.py -- <world-fixture>/placed.blend <new-action-output>

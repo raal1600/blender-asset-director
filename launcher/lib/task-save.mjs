@@ -22,7 +22,18 @@ export async function syncTask(work,id,sceneId,revision) {
   const process=work.runtime.inspectWorkbenchTask?await work.runtime.inspectWorkbenchTask(p,task):{state:'unknown'};
   if(process.state!=='stopped')return {changed:false,process:process.state};
   const identity=r=>r&&r.schema===1&&r.taskId===task.id&&r.projectId===id&&r.sceneId===sceneId&&r.stage===task.stage&&r.processId===task.processId&&r.mode===SAVE_MODE;
-  const session=await json(await safe(p.directory,`Docs/Workbench/${task.id}-save-session.json`));
+  // Setup can fail before the save handler is installed. Preserve the writer
+  // and its evidence; never manufacture a session or infer a Don't Save choice.
+  const statusFile=await safe(p.directory,`Docs/Workbench/${task.id}-status.json`);
+  if(await exists(statusFile)){
+    let status;
+    try{status=await json(statusFile);}catch{assert(false,'Blender task status is unreadable. Files are preserved; inspect the task before recovery.',409);}
+    assert(status?.taskId===task.id&&status.projectId===id&&status.sceneId===sceneId,'Blender task status identity changed; files are preserved.',409);
+    assert(status.state!=='FAILED','Blender task setup failed: '+String(status.message||'Unknown setup failure').slice(0,1000)+'. Files are preserved. Inspect the stopped task and use Recover stopped task before reopening Blender.',409);
+  }
+  let session;
+  try{session=await json(await safe(p.directory,`Docs/Workbench/${task.id}-save-session.json`));}
+  catch{assert(false,'Blender save-session evidence is missing or unreadable. No changes were adopted; files are preserved. Inspect the stopped task before recovery.',409);}
   assert(identity(session)&&session.workingScene===task.workingScene,'Editing session identity changed; files are preserved.',409);
   assert(['READY','SAVED'].includes(session.state),'Blender save or context needs inspection. '+(session.message||session.state),409);
   const file=await safe(p.directory,task.workingScene),hash=await fileHash(file);

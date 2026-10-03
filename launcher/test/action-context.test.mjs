@@ -15,14 +15,16 @@ test('specialist context binds saved performer, placement, take and frame; stale
  const p={id:id('prj_'),directory,revision:4,name:'Generated context',brief:'Synthetic test only',assets:[],workbench:{catalogPins:[],scenes:[scene]}};
  const request={version:'action-layer-v1',checkpointId:cp.id,sha256:cp.sha256,inspectionId:id('run_'),audit_sha256:'b'.repeat(64),performer:'Observed rig',frame:5};
  const performer={name:request.performer,type:'ARMATURE',instance:'observed-instance',placement_control:'Actual control',takes:[{id:'take_'+'c'.repeat(64),performer:request.performer}]};
- const record={projectId:p.id,sceneId:scene.id,checkpointId:cp.id,checkpointSha256:cp.sha256,action:'action-audit',state:'SUCCEEDED',inspection:{version:request.version,sha256:request.audit_sha256,fps:30,frame_range:[1,9],performers:[performer]}};
+ const record={implementation:'e'.repeat(64),projectId:p.id,sceneId:scene.id,checkpointId:cp.id,checkpointSha256:cp.sha256,action:'action-audit',state:'SUCCEEDED',inspection:{version:request.version,sha256:request.audit_sha256,fps:30,frame_range:[1,9],performers:[performer]}};
  const filename=path.join(directory,'Runs',request.inspectionId+'.json');await writeJson(filename,record);
  let launches=0;
  const work={scene:()=>scene,unlocked:async()=>{},verify:async()=>cp,store:{get:async()=>p,verify:async()=>({ok:true}),root:directory},config:{skill:directory},runtime:{launchTerminal:async()=>{launches++;return {processId:123};}}};
+ work.available=async()=>({implementation:record.implementation});
  const selected=await resolveActionContext(work,p,scene,request);assert.deepEqual(selected.performer,performer);
  for(const patch of [{performer:'Invented'}, {frame:99}, {audit_sha256:'0'.repeat(64)}, {sha256:'1'.repeat(64)}, {script:'no'}])await assert.rejects(startSpecialist(work,p,scene.id,{actionContext:{...request,...patch}}));
  await writeJson(filename,{...record,sceneId:id('sc_')});await assert.rejects(startSpecialist(work,p,scene.id,{actionContext:request}),/another scene/);
  assert.equal(launches,0);await writeJson(filename,record);
+ await writeJson(filename,{...record,implementation:undefined});await assert.rejects(startSpecialist(work,p,scene.id,{actionContext:request}),/predates this runtime/);assert.equal(launches,0);await writeJson(filename,record);
  const opened=await startSpecialist(work,p,scene.id,{actionContext:request});assert.equal(launches,1);
  const saved=await json(path.join(directory,'Docs/Codex',opened.sessionId+'.json'));
  assert.deepEqual(saved.task.performance,selected);assert.equal(saved.task.activity,'action');assert.equal(saved.task.checkpoint.sha256,cp.sha256);

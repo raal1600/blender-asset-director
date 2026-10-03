@@ -17,10 +17,11 @@ async function fixture(t){
   for(const name of ['Animations','Characters','Meshes','AssetDirector'])await fs.mkdir(path.join(root,'Database',name),{recursive:true});
   const store=new Store(root);await store.init();let project=await store.create('Action test','Generated transport fixture');
   const config={library:path.join(root,'Database/AssetDirector'),blender:process.execPath};
-  const jobs=new Map(),calls=[],control={fail:false,wrong:false,pause:null};
+  const jobs=new Map(),calls=[],control={fail:false,wrong:false,pause:null,implementation:'e'.repeat(64),jobImplementation:null};
   const runtime={config,harness:async args=>{
+    if(args[0]==='workbench-capabilities')return {implementation:control.implementation,action_layer:'action-layer-v1',action_task:'action-task-v1',task_workspace:true};
     calls.push(args);if(args[0]==='job-prepare'){
-      const job={id:'j_'+randomUUID().replaceAll('-','').slice(0,24),state:'PLANNED',outputs:[],specification:{operation:args[1],options:await json(args[args.indexOf('--options')+1]),inputs:[]}};jobs.set(job.id,job);return job;
+      const job={id:'j_'+randomUUID().replaceAll('-','').slice(0,24),state:'PLANNED',outputs:[],specification:{implementation:control.jobImplementation||control.implementation,operation:args[1],options:await json(args[args.indexOf('--options')+1]),inputs:[]}};jobs.set(job.id,job);return job;
     }
     assert.equal(args[0],'job-run');const job=jobs.get(args[1]);if(control.pause)await control.pause;
     if(control.fail)throw Error('Synthetic native failure');
@@ -91,4 +92,29 @@ test('inflight Action retry reuses receipt and cannot run a second writer',async
   await assert.rejects(f.work.saveAction(p.id,f.scene.id,p.revision,{...f.request,audit_sha256:'f'.repeat(64)}),/conflicts/);
   const current=await f.store.get(p.id);await assert.rejects(f.work.saveAction(p.id,f.scene.id,current.revision,{...f.request,requestId:uid('run_')}),/active scene task/);
   finish();await f.wait();assert.equal(f.calls.filter(c=>c[0]==='job-run').length,2);
+});
+
+test('runtime upgrade refuses legacy and mismatched inspections before any Save or Blender launch',async t=>{
+ const f=await fixture(t),p=await f.inspect(),filename=path.join(p.directory,`Runs/${f.base.requestId}.json`),record=await json(filename),count=f.calls.length;
+ assert.equal(record.implementation,f.control.implementation);
+ let launched=0;f.work.runtime.launchWorkbenchTask=async()=>{launched++;throw Error('Must not launch');};
+ const context={version:'action-layer-v1',checkpointId:f.cp.id,sha256:f.cp.sha256,inspectionId:f.base.requestId,audit_sha256:inspection.sha256,performer:'Performer',frame:5};
+ for(const implementation of [undefined,'f'.repeat(64)]){
+  await writeJson(filename,{...record,implementation});
+  await assert.rejects(f.work.saveAction(p.id,f.scene.id,p.revision,f.request),/predates this runtime/);
+  await assert.rejects(f.work.openTask(p.id,f.scene.id,p.revision,{actionContext:context}),/predates this runtime/);
+  assert.equal(await exists(path.join(p.directory,'Runs/.workbench-writer.lock')),false);
+ }
+ assert.equal(launched,0);assert.equal(f.calls.length,count);assert.equal((await f.store.get(p.id)).revision,p.revision);
+ await writeJson(filename,record);f.control.implementation='f'.repeat(64);
+ await assert.rejects(f.work.inspectAction(p.id,f.scene.id,f.project.revision,f.base),/runtime changed/);
+ assert.deepEqual(await json(filename),record,'Old receipt is not rewritten');
+});
+
+test('inspection refuses a runtime change during preparation and preserves checkpoint',async t=>{
+ const f=await fixture(t);f.control.jobImplementation='f'.repeat(64);
+ await assert.rejects(f.inspect(),/runtime changed before execution/);
+ assert.equal(f.calls.filter(c=>c[0]==='job-run').length,0);
+ assert.equal((await f.store.get(f.project.id)).workbench.scenes[0].current,f.cp.id);
+ assert.equal((await json(path.join(f.project.directory,`Runs/${f.base.requestId}.json`))).state,'FAILED');
 });

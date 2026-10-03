@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {actionDraft,actionInspection,actionView,ensureActionInspection} from '../public/workbench-action.mjs';
-const cp={id:'cp_saved',sha256:'hash'},run={id:'run_inspect',inspection:{sha256:'audit',fps:24,reference_frame:5,frame_range:[1,9],unassigned:[],performers:[{name:'One',takes:[{id:'take_one',action:'Observed',range:[1,9]}]},{name:'Two',takes:[{id:'take_two',action:'Other',range:[1,9]}]}]}};
+const cap={implementation:'e'.repeat(64),action_layer:'action-layer-v1'};
+const cp={id:'cp_saved',sha256:'hash'},run={id:'run_inspect',implementation:cap.implementation,inspection:{version:'action-layer-v1',sha256:'audit',fps:24,reference_frame:5,frame_range:[1,9],unassigned:[],performers:[{name:'One',takes:[{id:'take_one',action:'Observed',range:[1,9]}]},{name:'Two',takes:[{id:'take_two',action:'Other',range:[1,9]}]}]}};
 test('automatic inspection refreshes stale read context once and reuses another tab receipt without duplicate execution',async()=>{
  const state={project:{revision:1,workbench:{scenes:[{id:'scene',stage:'action',current:cp.id,checkpoints:[cp]}]}},runs:[],locked:false};
- const args={sceneId:'scene',checkpointId:cp.id,sha256:cp.sha256,read:async()=>structuredClone(state)};
+ const args={sceneId:'scene',checkpointId:cp.id,sha256:cp.sha256,cap,read:async()=>structuredClone(state)};
  let calls=0;
- await ensureActionInspection({...args,create:async()=>{calls++;state.project.revision++;state.runs.push({action:'action-audit',sceneId:'scene',checkpointId:cp.id,checkpointSha256:cp.sha256,state:'RUNNING'});throw Object.assign(Error('Project changed'),{status:409});}});
+ await ensureActionInspection({...args,create:async()=>{calls++;state.project.revision++;state.runs.push({implementation:cap.implementation,action:'action-audit',sceneId:'scene',checkpointId:cp.id,checkpointSha256:cp.sha256,state:'RUNNING'});throw Object.assign(Error('Project changed'),{status:409});}});
  assert.equal(calls,1);state.runs[0].state='FAILED';await ensureActionInspection({...args,create:async()=>{throw Error('Failed job must not be retried');}});
  state.runs=[];state.project.workbench.scenes[0].current='cp_new';await ensureActionInspection({...args,create:async()=>{throw Error('Checkpoint change must not execute');}});
  state.project.workbench.scenes[0].current=cp.id;calls=0;
@@ -22,7 +23,19 @@ test('Action draft selects real performers, batches edits and never changes the 
 });
 test('Action inspection never crosses scene or checkpoint identities',()=>{
  const rows=[{...run,action:'action-audit',sceneId:'scene',checkpointId:cp.id,checkpointSha256:cp.sha256,state:'SUCCEEDED'}];
- assert.equal(actionInspection(rows,{id:'scene'},cp),rows[0]);assert.equal(actionInspection(rows,{id:'other'},cp),null);assert.equal(actionInspection(rows,{id:'scene'},{...cp,sha256:'new'}),null);
+ assert.equal(actionInspection(rows,{id:'scene'},cp,cap),rows[0]);assert.equal(actionInspection(rows,{id:'other'},cp,cap),null);assert.equal(actionInspection(rows,{id:'scene'},{...cp,sha256:'new'},cap),null);
+});
+
+test('unchanged checkpoint gets a new read-only inspection after runtime upgrade, preserving old receipts',async()=>{
+ const old={...run,implementation:undefined,action:'action-audit',sceneId:'scene',checkpointId:cp.id,checkpointSha256:cp.sha256,state:'SUCCEEDED'};
+ const original=structuredClone(old),scene={id:'scene',stage:'action',current:cp.id,checkpoints:[cp]},state={project:{revision:7,workbench:{scenes:[scene]}},runs:[old],locked:false};
+ let calls=0;const args={sceneId:scene.id,checkpointId:cp.id,sha256:cp.sha256,cap,read:async()=>state,create:async rev=>{assert.equal(rev,7);calls++;}};
+ assert.equal(actionInspection(state.runs,scene,cp,cap),null);await ensureActionInspection(args);assert.equal(calls,1);assert.deepEqual(old,original);
+ state.runs=[{...old,implementation:'f'.repeat(64),state:'FAILED'}];await ensureActionInspection(args);assert.equal(calls,2);
+ state.runs=[{...old,implementation:cap.implementation,state:'FAILED'}];await ensureActionInspection(args);assert.equal(calls,2,'Never auto-retry current-runtime failure');
+ const fresh={...old,implementation:cap.implementation};state.runs=[old,fresh];assert.equal(actionInspection(state.runs,scene,cp,cap),fresh);
+ await ensureActionInspection(args);assert.equal(calls,2);
+ assert.equal(actionInspection(state.runs,scene,cp,{}),null,'Unknown runtime must fail closed');
 });
 test('manual and specialist handoff uses the selected saved performer and refuses unsaved choices',()=>{
  const d=actionDraft(cp,run);d.select('Two');assert.deepEqual(d.handoff(7),{version:'action-layer-v1',checkpointId:cp.id,sha256:cp.sha256,inspectionId:run.id,audit_sha256:run.inspection.sha256,performer:'Two',frame:7});
@@ -35,7 +48,7 @@ test('timing drafts show and explicitly save an expanded full-take range instead
 test('Action presentation stays performer-first and labels unsaved playback honestly',()=>{
  const d=actionDraft(cp,run);d.change('One',{mode:'hold',frame:5});
  const scene={id:'scene',stage:'action',name:'Generated',completed:{world:cp.id},checkpoints:[cp]};
- const html=actionView({project:{workbench:{scenes:[scene]}},scene,stages:[{id:'world',short:'World'},{id:'action',short:'Action'}],checkpoint:cp,runs:[],locked:false,cap:{task_workspace:true,action_layer:'action-layer-v1'},draft:d,esc:v=>String(v??''),b:(t,a)=>'<button data-action="'+a+'">'+t+'</button>'});
+ const html=actionView({project:{workbench:{scenes:[scene]}},scene,stages:[{id:'world',short:'World'},{id:'action',short:'Action'}],checkpoint:cp,runs:[],locked:false,cap:{...cap,task_workspace:true},draft:d,esc:v=>String(v??''),b:(t,a)=>'<button data-action="'+a+'">'+t+'</button>'});
  assert.match(html,/Performer<select/);assert.match(html,/Playback shows the saved scene/);assert.match(html,/Save changes to preview the new motion/);assert.match(html,/Hold a pose/);assert.doesNotMatch(html,/Inspect saved candidate|Keep checkpoint/);
 });
 test('Action timing rejects invalid direct changes before draft or history mutation',()=>{

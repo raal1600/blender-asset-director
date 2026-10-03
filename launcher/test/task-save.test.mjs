@@ -72,3 +72,19 @@ test('new handoff banner does not require checkpoint collection',()=>{
   assert.match(html,/Save &amp; return/);assert.doesNotMatch(html,/Collect saved checkpoint/);
   assert.equal(taskObservation({...status,observed_at:0},'task').kind,'returning');
 });
+
+for(const kind of ['startup-failed','missing-session','invalid-session','foreign-status'])test('stopped '+kind+' reports recovery context without adopting files or releasing writer',async t=>{
+  const f=await fixture(t);f.stop();await fs.unlink(f.sessionFile);
+  if(kind==='invalid-session')await fs.writeFile(f.sessionFile,'{');
+  if(kind==='startup-failed'||kind==='foreign-status')await writeJson(path.join(f.p.directory,`Docs/Workbench/${f.task.id}-status.json`),{
+    taskId:kind==='foreign-status'?'task_foreign':f.task.id,projectId:f.p.id,sceneId:f.task.sceneId,state:'FAILED',message:'Performer bindings changed before manual handoff'});
+  const before=await fileHash(f.working);
+  await assert.rejects(f.sync(),error=>{
+    assert.equal(error.status,409);assert.doesNotMatch(error.message,/ENOENT|Unexpected end/);
+    assert.match(error.message,kind==='startup-failed'?/Blender task setup failed: Performer bindings changed/:kind==='foreign-status'?/status identity changed/:/save-session.*(missing|unreadable)/i);
+    return true;
+  });
+  assert.deepEqual(await fileHash(f.working),before);assert.equal((await f.fresh()).workbench.scenes[0].task,f.task.id);
+  assert.equal((await f.fresh()).workbench.scenes[0].current,f.previous.current);
+  assert.equal(await exists(path.join(f.p.directory,'Runs/.interactive-execution.lock')),true);
+});
