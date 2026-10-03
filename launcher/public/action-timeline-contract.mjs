@@ -1,5 +1,6 @@
 /** Shared wire validation; native Blender independently verifies every binding. */
 export const timelineVersion='action-timeline-v1';
+export const stitchVersion='native-stitch-v1';
 const fail=message=>{throw Error(message);};
 const object=v=>v&&typeof v==='object'&&!Array.isArray(v);
 const keys=(v,list)=>object(v)&&Object.keys(v).length===list.length&&Object.keys(v).every(k=>list.includes(k));
@@ -8,10 +9,12 @@ export const clipEnd=c=>c.start+c.frames-1;
 export function validateTimeline(change){
  if(!keys(change,['performer','mode','clips'])||change.mode!=='timeline'||!Array.isArray(change.clips)||change.clips.length>64)fail('Use at most 64 clips per performer.');
  let end=-100001;const ids=new Set();
- for(const c of change.clips){
-  if(!keys(c,['id','take_id','start','frames','speed','repeat_reviewed','travel'])||typeof c.id!=='string'||!/^clip_[a-zA-Z0-9_-]{1,64}$/.test(c.id)||ids.has(c.id)||typeof c.take_id!=='string'||!/^take_[a-f0-9]{64}$/.test(c.take_id))fail('Choose distinct clips and observed takes.');ids.add(c.id);
+ for(const [index,c] of change.clips.entries()){
+  if(!keys(c,['id','take_id','start','frames','speed','repeat_reviewed','travel',...(c?.transition!==undefined?['transition']:[])])||typeof c.id!=='string'||!/^clip_[a-zA-Z0-9_-]{1,64}$/.test(c.id)||ids.has(c.id)||typeof c.take_id!=='string'||!/^take_[a-f0-9]{64}$/.test(c.take_id))fail('Choose distinct clips and observed takes.');ids.add(c.id);
   if(!Number.isInteger(c.start)||!number(c.start,-100000,100000)||!Number.isInteger(c.frames)||!number(c.frames,2,3601)||!number(c.speed,.1,4)||typeof c.repeat_reviewed!=='boolean'||clipEnd(c)>100000)fail('Use integer frames and speed from 0.1 to 4.');
-  if(c.start<=end)fail('Clips overlap on this character. Move or shorten the clip.');end=clipEnd(c);
+  if(c.start<=end)fail('Clips overlap on this character. Move or shorten the clip.');
+  if(c.transition!==undefined&&c.transition!==null){const t=c.transition;if(index===0||!keys(t,['frames','match_phase'])||!Number.isInteger(t.frames)||!number(t.frames,2,120)||typeof t.match_phase!=='boolean')fail('A connection needs a previous clip and 2 to 120 added frames.');if(c.start!==end+1+t.frames)fail('Connected clips must follow their visible transition; move following clips together.');}
+  end=clipEnd(c);
   if(c.travel!==null){const t=c.travel,fields=['delta_m','meters_per_cycle',...(t?.gait_id!==undefined?['gait_id']:[])];if(!keys(t,fields)||t.gait_id!==undefined&&!/^[a-f0-9]{64}$/.test(t.gait_id)||!Array.isArray(t.delta_m)||t.delta_m.length!==2||!t.delta_m.every(v=>number(v,-10000,10000))||!number(Math.hypot(...t.delta_m),Number.MIN_VALUE,10000)||!number(t.meters_per_cycle,.001,1000))fail('Manual travel needs a calibrated metres-per-cycle value. Use automatic pace when available.');}
  }
  if(change.clips.length&&end-change.clips[0].start>3600)fail('Timeline exceeds 3600 frame intervals.');
@@ -30,4 +33,13 @@ export function timelineTiming(c,take){
  if(!number(cycles,.001,100))fail('Keep each clip within 100 cycles.');
  if(cycles>1+1e-9&&!c.repeat_reviewed)fail('Review feet and the loop join, then check repeatable cycle below to allow repeats.');
  return {cycles,end:clipEnd(c),nativeEnd:c.start+cycles*span/c.speed};
+}
+export function connection(previous,c,previousTake,take){
+ if(!c.transition)return null;
+ const a=timelineTiming(previous,previousTake),b=timelineTiming(c,take),duration=c.start-a.nativeEnd;
+ if(!number(duration,Number.MIN_VALUE,122))fail('Invalid connection interval.');
+ const velocity=(clip,t)=>clip.travel?clip.travel.delta_m.map(v=>v/(t.nativeEnd-clip.start)):[0,0];
+ const va=velocity(previous,a),vb=velocity(c,b),na=Math.hypot(...va),nb=Math.hypot(...vb);
+ if(na>1e-9&&nb>1e-9&&va.reduce((n,v,i)=>n+v*vb[i],0)/(na*nb)<Math.cos(135*Math.PI/180))fail('This sharp reversal needs a turn or stop clip, or a reviewed Blender edit.');
+ return {start:a.nativeEnd,end:c.start,duration_frames:duration,velocity_in:va,velocity_out:vb,delta_m:va.map((v,i)=>(v+vb[i])*duration*.5)};
 }

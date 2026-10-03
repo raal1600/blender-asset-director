@@ -12,7 +12,7 @@ import {exists,fileHash,json,writeJson} from '../lib/storage.mjs';
 const uid=p=>p+randomUUID(),take='take_'+'b'.repeat(64);
 const inspection={version:'action-layer-v1',sha256:'a'.repeat(64),frame_range:[1,48],fps:24,unassigned:[],
   performers:[{name:'Performer',unsupported:null,takes:[{id:take,performer:'Performer'}]},{name:'Other',unsupported:null,takes:[]},{name:'Constrained',unsupported:'Manual review',takes:[]}]};
-async function fixture(t){
+async function fixture(t,observed=inspection){
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'action-layer-test-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
   for(const name of ['Animations','Characters','Meshes','AssetDirector'])await fs.mkdir(path.join(root,'Database',name),{recursive:true});
   const store=new Store(root);await store.init();let project=await store.create('Action test','Generated transport fixture');
@@ -26,9 +26,9 @@ async function fixture(t){
     assert.equal(args[0],'job-run');const job=jobs.get(args[1]);if(control.pause)await control.pause;
     if(control.fail)throw Error('Synthetic native failure');
     const folder=path.join(config.library,'jobs',job.id);await fs.mkdir(folder,{recursive:true});
-    let data=inspection;
+    let data=observed;
     if(job.specification.operation==='action-edit'){
-      data={version:inspection.version,request:job.specification.options,reopened:!control.wrong,performance_acceptance:'NOT_EVALUATED',scene_audit:{objects:[]},action_audit:inspection};
+      data={version:inspection.version,request:job.specification.options,reopened:!control.wrong,performance_acceptance:'NOT_EVALUATED',scene_audit:{objects:[]},action_audit:observed};
       await fs.writeFile(path.join(folder,'result.blend'),'BLENDER SYNTHETIC ACTION RESULT');
       job.outputs.push({path:`jobs/${job.id}/result.blend`,...await fileHash(path.join(folder,'result.blend'))});
     }
@@ -117,4 +117,23 @@ test('inspection refuses a runtime change during preparation and preserves check
  assert.equal(f.calls.filter(c=>c[0]==='job-run').length,0);
  assert.equal((await f.store.get(f.project.id)).workbench.scenes[0].current,f.cp.id);
  assert.equal((await json(path.join(f.project.directory,`Runs/${f.base.requestId}.json`))).state,'FAILED');
+});
+
+test('connection Save preflight requires measured compatible channels before a writer or job',async t=>{
+ const second='take_'+'c'.repeat(64);
+ for(const problem of ['none','old-inspection','different-channels','native-root','unobserved-channels']){
+  const observed=structuredClone(inspection),p=observed.performers[0];
+  p.timeline={version:'action-timeline-v1',stitch_version:'native-stitch-v1',error:null,clips:[]};
+  p.takes=[take,second].map(id=>({id,performer:p.name,range:[1,25],travel_blocker:null,stitch_blocker:null,stitch_channels:'d'.repeat(64)}));
+  if(problem==='old-inspection')delete p.timeline.stitch_version;
+  if(problem==='different-channels')p.takes[1].stitch_channels='f'.repeat(64);
+  if(problem==='native-root')p.takes[1].stitch_blocker='Native root owns travel';
+  if(problem==='unobserved-channels')for(const item of p.takes)delete item.stitch_channels;
+  const f=await fixture(t,observed),project=await f.inspect(),calls=f.calls.length;
+  const ca={id:'clip_a',take_id:take,start:1,frames:25,speed:1,repeat_reviewed:false,travel:null};
+  const cb={...ca,id:'clip_b',take_id:second,start:32,transition:{frames:6,match_phase:true}};
+  const request={...f.request,frame_range:[1,80],changes:[{performer:p.name,mode:'timeline',clips:[ca,cb]}]};
+  if(problem==='none'){await f.work.saveAction(project.id,f.scene.id,project.revision,request);await f.wait();assert.equal(f.calls.length,calls+2);}
+  else{await assert.rejects(f.work.saveAction(project.id,f.scene.id,project.revision,request),/matching connection inspection/);assert.equal(f.calls.length,calls);assert.equal(await exists(path.join(project.directory,'Runs/.workbench-writer.lock')),false);assert.equal((await f.store.get(project.id)).revision,project.revision);}
+ }
 });

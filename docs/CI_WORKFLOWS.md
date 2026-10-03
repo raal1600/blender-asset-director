@@ -71,9 +71,9 @@ test tray/focus behavior. These execute on every coordinated revision instead of
 being hidden behind a launcher-only path filter.
 
 `blender-regressions.yml` retains the original fixtures and adds isolated asset
-preview, import-visibility and gait-profile coverage, for **23 fixture invocations** across
+preview, import-visibility, gait-profile and native clip-connection coverage, for **24 fixture invocations** across
 Blender **4.5.3, 5.0.0 and 5.2.1**. They are separated into three real-Blender
-subsystems: **authoring** (10), **motion** (8), and **continuity** (5). This includes
+subsystems: **authoring** (10), **motion** (9), and **continuity** (5). This includes
 normal and custom-role transfer, proxy skin, source/action identity, grounding and
 full-take sequencing. These are deeper integration/regression checks, not proof
 that the browser/installed-app route exercises every motion operation. Within a

@@ -1,0 +1,65 @@
+/** Synthetic browser -> authenticated API -> native Blender -> saved playback. */
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import {randomUUID} from 'node:crypto';
+import {createApp} from '../launcher/server.mjs';
+import {exists,fileHash,json,writeJson} from '../launcher/lib/storage.mjs';
+const [out,generated,python,blender,playwright,chrome]=process.argv.slice(2);
+assert([out,generated,python,blender,playwright].every(x=>x&&path.isAbsolute(x)));
+assert(!await exists(out));const native=await json(path.join(generated,'RESULTS.json'));assert.equal(native.status,'PASS');assert.equal(native.input_kind,'GENERATED');
+await fs.mkdir(out,{recursive:true});
+const repo=fileURLToPath(new URL('../',import.meta.url)),source=path.join(generated,'source.blend'),original=await fileHash(source);
+const report={kind:'generated-motion-stitch-browser',checks:[],errors:[],requests:[],not_tested:['Live runtime','Human performance/contact approval','Foot locking or terrain adaptation']};
+let app,browser,page;
+try{
+ app=await createApp({root:path.join(out,'Studio'),port:0,config:{python,blender,skill:path.join(repo,'skills/blender-asset-director'),library:path.join(out,'Studio/Database/AssetDirector')}});
+ const job=await app.runtime.harness(['job-prepare','scene-audit','--input',source]),audit=await app.workbench.result(await app.runtime.harness(['job-run',job.id,'--blender',blender]));
+ let project=await app.store.create('Synthetic clip connections','Generated non-human joint motion only');await app.workbench.create(project.id,project.revision,'Connected movement');project=await app.store.get(project.id);
+ const scene=project.workbench.scenes[0],cpId='cp_'+randomUUID(),relative='Scenes/'+cpId+'.blend';await fs.copyFile(source,path.join(project.directory,relative),fs.constants.COPYFILE_EXCL);
+ scene.checkpoints.push({id:cpId,path:relative,...original,parent:null,stage:'world',audit});scene.current=cpId;scene.stage='action';scene.completed={world:cpId};await app.store.save(project,project.revision);
+ const {chromium}=await import(pathToFileURL(playwright).href);browser=await chromium.launch(chrome?{executablePath:chrome}:{channel:'chrome'});page=await browser.newPage({viewport:{width:1440,height:1100},serviceWorkers:'block'});page.setDefaultTimeout(30000);
+ const safe=v=>String(v).replaceAll(app.token,'[REDACTED]');page.on('pageerror',e=>report.errors.push(safe(e.message)));page.on('console',m=>{if(m.type()==='error')report.errors.push(safe(m.text()));});page.on('dialog',d=>d.dismiss());
+ page.on('request',r=>{if(r.url().startsWith(app.origin+'/'))report.requests.push({path:new URL(r.url()).pathname,method:r.method()});else if(/^https?:/.test(r.url()))report.errors.push('Unexpected external request');});
+ const ready=()=>page.waitForFunction(()=>!document.body.classList.contains('working')&&document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready'&&!document.querySelector('[data-action-field="performer"]')?.disabled,null,{timeout:205000});
+ const snapshot=()=>page.locator('body').ariaSnapshot();
+ const click=async selector=>{await snapshot();await page.locator(selector).click();await page.waitForFunction(()=>!document.body.classList.contains('working'));};
+ const field=name=>page.locator('[data-motion-field="'+name+'"]');
+ await page.goto(app.origin+'/workbench#'+app.token);await click('[data-action="project"][data-id="'+project.id+'"]');await ready();await click('[data-action="motion-enable"]');
+ await snapshot();await page.getByLabel('Performer',{exact:true}).selectOption('TestPerformer0');
+ await snapshot();await page.getByLabel('Add animation').selectOption({label:'Observed 0 0'});await field('travel').check();await snapshot();await page.getByLabel('Metres per cycle',{exact:true}).fill('1');await page.getByLabel('Direction (world degrees)',{exact:true}).fill('-90');
+ await snapshot();await page.getByLabel('Add animation').selectOption({label:'Observed 0 1'});
+ assert.equal(await field('smooth').isChecked(),true);assert.equal(await field('repeat_reviewed').isChecked(),false);assert.equal(await field('repeat_reviewed').isVisible(),true);
+ assert.equal(await page.getByRole('button',{name:'Connection 26 to 31',exact:true}).count(),1);assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 32–56/);
+ report.checks.push('Compatible native clips append with a visible six-frame connection and no invented loop approval');
+ await field('travel').check();await page.getByLabel('Metres per cycle',{exact:true}).fill('1');await page.getByLabel('Direction (world degrees)',{exact:true}).fill('0');
+ assert.equal(await page.locator('[data-action="action-save"]').isEnabled(),true);assert.match(await page.locator('[data-motion-connection]').innerText(),/0\.21 m/);
+ await page.getByLabel('Direction (world degrees)',{exact:true}).fill('90');assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);assert.match(await page.locator('[data-motion-errors]').innerText(),/turn or stop/);
+ await page.getByLabel('Direction (world degrees)',{exact:true}).fill('0');assert.equal(await page.locator('[data-action="action-save"]').isEnabled(),true);
+ report.checks.push('Measured path velocities expose added distance; a sharp reversal refuses before any job executes');
+ await page.getByLabel('Transition frames',{exact:true}).fill('');assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);assert.equal(await field('transition_frames').getAttribute('aria-invalid'),'true');
+ await page.getByLabel('Transition frames',{exact:true}).fill('10');await page.getByLabel('Speed',{exact:true}).focus();assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 36–60/);
+ await click('[data-action="action-undo"]');assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 32–56/);
+ await field('smooth').uncheck();assert.equal(await page.locator('.motion-transition').count(),0);assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 26–50/);await field('smooth').check();
+ report.checks.push('Transition duration is editable, raw errors stay visible, Undo restores timing and a hard cut remains available');
+ await page.getByRole('button',{name:'Observed 0 0 frames 1 to 25',exact:true}).click();await snapshot();await page.getByLabel('Distance (m)',{exact:true}).fill('2');
+ assert.equal(await page.getByRole('button',{name:'Connection 50 to 55',exact:true}).count(),1);assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);
+ // Generated mathematical loop only; never an answer to a human review request.
+ await field('repeat_reviewed').check();assert.equal(await page.locator('[data-action="action-save"]').isEnabled(),true);await page.getByLabel('Distance (m)',{exact:true}).fill('1');
+ await page.getByRole('button',{name:'Observed 0 1 frames 32 to 56',exact:true}).click();await snapshot();await field('repeat_reviewed').check();
+ assert.equal(report.requests.filter(r=>r.path.endsWith('/action-save')).length,0);await page.screenshot({path:path.join(out,'01-connected-draft.png'),fullPage:true});
+ report.checks.push('Changing an earlier distance ripples connected clips; repeated cycles need explicit synthetic review; drafts stay local');
+ await click('[data-action="action-save"]');await ready();project=await app.store.get(project.id);
+ const saved=project.workbench.scenes[0],cp=saved.checkpoints.find(c=>c.id===saved.current);assert.notEqual(cp.id,cpId);assert.deepEqual(saved.completed,{world:cpId});
+ const run=(await app.store.runs(project.id)).find(r=>r.action==='action-audit'&&r.checkpointId===cp.id&&r.state==='SUCCEEDED');assert(run);const rig=run.inspection.performers.find(p=>p.name==='TestPerformer0');
+ assert.equal(rig.timeline.clips.length,2);const join=rig.timeline.connections[0];assert(join.matched_phase>.65&&join.matched_phase<.85);assert(Math.abs(join.phase-(join.matched_phase+join.duration_frames/24)%1)<1e-6);assert(join.match_cost_after<join.match_cost_before*.1);assert.equal(join.contact_acceptance,'NOT_EVALUATED');
+ assert.equal(report.requests.filter(r=>r.path.endsWith('/action-save')).length,1);report.checks.push('One Save executes real Blender, verifies the measured phase bridge and creates an unapproved separate checkpoint');
+ await page.reload();await ready();assert.equal(await page.locator('.motion-clip').count(),2);assert.equal(await page.locator('.motion-transition').count(),1);
+ await page.locator('[data-view="play"]').click();await page.waitForFunction(()=>Number(document.querySelector('[data-view="time"]').value)>1.3);await page.locator('[data-view="play"]').click();
+ await page.screenshot({path:path.join(out,'02-saved-playback.png'),fullPage:true});report.checks.push('Reload retains connection occupancy and plays the actual saved scene through the join');
+ await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'Observed 0 1 frames 32 to 56',exact:true}).click();await snapshot();await page.screenshot({path:path.join(out,'03-narrow.png'),fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ assert.deepEqual(await fileHash(source),original);assert.deepEqual(await fileHash(path.join(project.directory,relative)),original);assert.deepEqual(report.errors,[]);
+ report.checks.push('Source bytes and previous checkpoint remain intact; no narrow overflow, external requests or browser errors');report.status='PASS';report.projectId=project.id;report.checkpoint={id:cp.id,sha256:cp.sha256};report.join=join;
+}catch(error){report.status='FAIL';report.error=String(error).replaceAll(app?.token||'never-match-token','[REDACTED]');process.exitCode=1;if(page)await page.screenshot({path:path.join(out,'FAILURE.png'),fullPage:true}).catch(()=>{});}
+finally{await browser?.close();if(app){app.server.closeAllConnections();await new Promise(resolve=>app.server.close(resolve));}await writeJson(path.join(out,'RESULTS.json'),report);console.log(JSON.stringify({status:report.status,checks:report.checks.length,error:report.error}));}

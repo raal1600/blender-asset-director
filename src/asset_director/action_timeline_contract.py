@@ -5,6 +5,7 @@ from .core import fields, require
 from .motion_timing import number
 
 VERSION = 'action-timeline-v1'
+STITCH_VERSION = 'native-stitch-v1'
 
 
 def validate(change):
@@ -13,8 +14,8 @@ def validate(change):
     require(change['mode'] == 'timeline' and isinstance(clips, list) and len(clips) <= 64,
             'INVALID_TIMELINE', 'Use at most 64 clips per performer')
     seen, end = set(), -100001
-    for clip in clips:
-        fields(clip, {'id', 'take_id', 'start', 'frames', 'speed', 'repeat_reviewed', 'travel'},
+    for index, clip in enumerate(clips):
+        fields(clip, {'id', 'take_id', 'start', 'frames', 'speed', 'repeat_reviewed', 'travel', 'transition'},
                {'id', 'take_id', 'start', 'frames', 'speed', 'repeat_reviewed', 'travel'})
         require(isinstance(clip['id'], str) and re.fullmatch(r'clip_[a-zA-Z0-9_-]{1,64}', clip['id'])
                 and clip['id'] not in seen, 'INVALID_TIMELINE', 'Clips need distinct stable identities')
@@ -26,6 +27,14 @@ def validate(change):
                 and number(clip['speed'], .1, 4) and type(clip['repeat_reviewed']) is bool,
                 'INVALID_TIMING', 'Use bounded integer frames and speed from 0.1 to 4')
         require(clip['start'] > end, 'TIMELINE_OVERLAP', 'Clips on one performer cannot overlap; move or shorten the clip')
+        join = clip.get('transition')
+        if join is not None:
+            fields(join, {'frames', 'match_phase'}, {'frames', 'match_phase'})
+            require(index > 0 and type(join['frames']) is int and 2 <= join['frames'] <= 120
+                    and type(join['match_phase']) is bool,
+                    'INVALID_TRANSITION', 'A connection needs a previous clip and 2 to 120 added frames')
+            require(clip['start'] == end + 1 + join['frames'], 'INVALID_TRANSITION',
+                    'Connected clips must follow their visible transition; move following clips together')
         end = clip['start'] + clip['frames'] - 1
         require(end <= 100000, 'INVALID_TIMING', 'Clip exceeds the frame limit')
         travel = clip['travel']
@@ -70,3 +79,26 @@ def timing(clip, take):
             'Review this take as a repeatable cycle before repeating it')
     return {'cycles': cycles, 'end': clip['start'] + clip['frames'] - 1,
             'native_end': clip['start'] + cycles * span / clip['speed']}
+
+
+def connection(previous, clip, previous_take, take):
+    """Continue measured path velocities through extra time, never stretch strides.
+
+    Units are metres per *scene frame*. Facing is not inferred from travel.
+    The added displacement is explicit and also displayed by the browser.
+    """
+    if not clip.get('transition'):
+        return None
+    a, b = timing(previous, previous_take), timing(clip, take)
+    duration = clip['start'] - a['native_end']
+    require(0 < duration <= 122, 'INVALID_TRANSITION', 'Invalid connection interval')
+    def velocity(c, t):
+        return [v / (t['native_end'] - c['start']) for v in c['travel']['delta_m']] if c['travel'] else [0., 0.]
+    va, vb = velocity(previous, a), velocity(clip, b)
+    na, nb = math.hypot(*va), math.hypot(*vb)
+    if na > 1e-9 and nb > 1e-9:
+        require(sum(x*y for x, y in zip(va, vb)) / (na*nb) >= math.cos(math.radians(135)),
+                'STITCH_DIRECTION_REVIEW', 'This sharp reversal needs a turn or stop clip, or a reviewed Blender edit')
+    return {'start': a['native_end'], 'end': clip['start'], 'duration_frames': duration,
+            'velocity_in': va, 'velocity_out': vb,
+            'delta_m': [(x+y)*duration*.5 for x, y in zip(va, vb)]}

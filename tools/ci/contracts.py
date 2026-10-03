@@ -39,6 +39,7 @@ BLENDER_SUITES = {
     ),
     'motion': (
         ('gait-profile', 'gait_profile_fixture.py', 'RESULTS.json', False, ()),
+        ('motion-stitch', 'motion_stitch_fixture.py', 'RESULTS.json', False, ()),
         ('headless', 'headless_fixture.py', 'fixture_report.json', True, ()),
         ('retarget-pipeline', 'retarget_pipeline_fixture.py', 'retarget_pipeline_report.json', True, ()),
         ('motion-foundation', 'motion_foundation_fixture.py', 'motion_foundation_report.json', True, ()),

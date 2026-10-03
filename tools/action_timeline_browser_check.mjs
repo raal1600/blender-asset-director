@@ -37,7 +37,10 @@ try{
  report.checks.push('Red endpoint supports actual pointer drag and keyboard adjustment; each gesture undoes as one edit');
  await distance.fill('5');await page.getByLabel('Metres per cycle',{exact:true}).fill('2.5');assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);
  await page.getByLabel('Direction (world degrees)',{exact:true}).fill('-90');await page.locator('[data-motion-field="repeat_reviewed"]').check();await idle();assert.equal(await page.locator('[data-action="action-save"]').isEnabled(),true);assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 1–49/);
- await page.getByLabel('Add animation').selectOption(take);await page.locator('[data-motion-field="travel"]').uncheck();assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 50–74/);
+ await page.getByLabel('Add animation').selectOption(take);await page.locator('body').ariaSnapshot();
+ // Keep this journey's original hard-cut/ripple coverage. The separate
+ // connection journey verifies the new default bridge and its saved geometry.
+ await page.locator('[data-motion-field="smooth"]').uncheck();await page.locator('[data-motion-field="travel"]').uncheck();assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 50–74/);
  await page.getByLabel('Performer',{exact:true}).selectOption('TimelineRig1');const take2=await page.locator('[data-motion-add] option').nth(1).getAttribute('value');await page.getByLabel('Add animation').selectOption(take2);await page.locator('[data-motion-field="travel"]').uncheck();assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 1–25/);
  assert.equal(report.requests.filter(r=>r.path.endsWith('/action-save')).length,0);report.checks.push('Distance drives clip occupancy, next clip appends, other character keeps its independent track; no jobs while drafting');
  await page.screenshot({path:path.join(out,'03-timeline-draft.png'),fullPage:true});

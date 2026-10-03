@@ -4,7 +4,7 @@ import {assert,json,safe} from './storage.mjs';
 import {validHash,validId} from './workbench-model.mjs';
 import {checkpointJob} from './checkpoint-job.mjs';
 import {assertCurrentActionInspection} from './action-inspection.mjs';
-import {validateTimeline,timelineTiming} from '../public/action-timeline-contract.mjs';
+import {validateTimeline,timelineTiming,connection,stitchVersion} from '../public/action-timeline-contract.mjs';
 
 const version='action-layer-v1';
 const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
@@ -60,10 +60,15 @@ export async function saveAction(work,id,sceneId,revision,request){
         if(c.mode==='timeline'){
           assert(performer.timeline?.version==='action-timeline-v1'&&!performer.timeline.error,'Inspect this timeline in the matching runtime.',409);
           const range=request.frame_range||run.inspection.frame_range;
-          for(const clip of c.clips){
+          for(const [index,clip] of c.clips.entries()){
             const take=performer.takes.find(t=>t.id===clip.take_id&&t.performer===c.performer);
             assert(take,'This motion does not belong to the selected performer.',409);
             const timing=timelineTiming(clip,take);
+            if(clip.transition){
+              const previous=c.clips[index-1],previousTake=performer.takes.find(t=>t.id===previous?.take_id);
+              assert(performer.timeline.stitch_version===stitchVersion&&previousTake&&take.stitch_blocker===null&&previousTake.stitch_blocker===null&&validHash(take.stitch_channels)&&take.stitch_channels===previousTake.stitch_channels,'These clips need a matching connection inspection or Blender review.',409);
+              connection(previous,clip,previousTake,take);
+            }
             assert(!(c.clips.some(c=>c.travel)||timing.cycles>1+1e-9)||!take.travel_blocker,take.travel_blocker||'Native travelling cycles need Blender review.',409);
             assert(!clip.travel||!take.travel_blocker,take.travel_blocker||'Travel is unavailable.',409);
             assert(clip.start>=range[0]&&clip.start+clip.frames-1<=range[1],'Playback must contain every clip.');

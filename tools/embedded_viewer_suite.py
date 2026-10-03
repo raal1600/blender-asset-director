@@ -79,6 +79,13 @@ def main():
                         '--python-exit-code','11','--python',str(ROOT/'tools/gait_profile_fixture.py'),'--',
                         str(output/'gait-profile-native')],
                        cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
+    with (output/'motion-stitch-native.log').open('wb') as log:
+        subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
+                        '--python-exit-code','11','--python',str(ROOT/'tools/motion_stitch_fixture.py'),'--',
+                        str(output/'motion-stitch-native')],
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=300,check=True)
+        subprocess.run([args.node,str(ROOT/'tools/motion_stitch_glb_check.mjs'),str(output/'motion-stitch-native')],
+                       cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=60,check=True)
     with (output/'action-preview.log').open('wb') as log:
         subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--threads','2',
                         '--python-exit-code','11','--python',str(ROOT/'tools/action_preview_fixture.py'),'--',
@@ -205,6 +212,10 @@ def main():
                    str(output/'gait-profile-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
         reported_browser(command, output, 'gait-browser', 300)
+        command = [args.node, str(ROOT/'tools/motion_stitch_browser_check.mjs'), str(output/'motion-stitch-browser'),
+                   str(output/'motion-stitch-native'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        reported_browser(command, output, 'motion-stitch-browser', 300)
         command = [args.node, str(ROOT/'tools/action_static_browser_check.mjs'), str(output/'action-static-browser'),
                    str(output/'action-static'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)

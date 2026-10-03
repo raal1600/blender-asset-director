@@ -8,8 +8,9 @@ Each observed performer owns up to 64 non-overlapping clips. Clip identities,
 native action/slot/hash, inclusive start and occupied frames, speed, explicit loop
 review and optional planar travel are saved in the separate checkpoint. A clip
 occupying 1–50 leaves 51 as the next append position. Other performers have
-independent tracks. Earlier clips remain editable; moving following clips is an
-explicit operation, not an implicit overwrite. Emptying a track holds its first
+independent tracks. Earlier clips remain editable; connected following clips move
+with their preceding clip, while independent clips retain explicit ripple control.
+Emptying a track holds its first
 pose rather than reviving a previously muted animation. Undo/Discard are local.
 Turning off travel restores the clip's local pre-travel duration; after reloading
 a saved path it defaults to one native cycle at the selected speed. Explicit
@@ -65,12 +66,20 @@ Conservative native-channel bounds refuse planar travel (including out-and-back)
 procedural curves, conflicting object rotation/scale and unsupported ownership.
 Such sources need reviewed Blender editing, not automatic root-motion cancellation.
 Mixed travelling-native clips plus a new path are refused. This is not retargeting,
-foot IK, terrain following, collision avoidance, curved paths or automatic blends.
+foot IK, terrain following, collision avoidance or arbitrary curved paths.
 Changing the World parent transform or scene units after authoring travel makes
 the saved path context require Blender review; it is never silently reinterpreted.
 
+The optional [native connection adapter](LIGHTWEIGHT_MOTION_STITCHING.md) joins
+compatible clips on the same performer. It adds a visible, editable interval
+rather than overlapping or trimming source clips. Matching is based on observed
+native poses/channels and velocities, never animation labels. Its short curved
+path connector is distinct from the straight per-clip travel controls. Neither
+the adapter nor phase matching establishes foot-contact or human approval.
+
 Wire `action-layer-v1` remains backward-compatible for legacy clip/hold operations;
 new `mode: timeline` needs observed `action-timeline-v1` capability and inspection.
+Connections additionally require an exact `native-stitch-v1` inspection.
 Legacy edits cannot silently replace a managed timeline. The existing authenticated
 Save endpoint, source-use checks, revision/checkpoint/hash binding, job lease,
 idempotency, separate outputs and downstream invalidation apply unchanged.
