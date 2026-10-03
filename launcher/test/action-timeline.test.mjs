@@ -43,3 +43,23 @@ test('disabling a reloaded saved path uses the native take duration at its curre
  const saved=structuredClone(run);saved.inspection.performers[0].timeline.clips=[{id:'clip_saved',take_id:take,start:1,frames:49,speed:.5,repeat_reviewed:true,travel:{delta_m:[0,5],meters_per_cycle:5}}];
  const d=timelineDraft(cp,saved);d.select('One','clip_saved');d.edit('travel',false);assert.equal(d.selectedClip.frames,49);assert.equal(d.selectedClip.travel,null);d.undo();assert.deepEqual(d.selectedClip,saved.inspection.performers[0].timeline.clips[0]);
 });
+
+test('automatic gait fills pace and observed heading; five metres adds cycles, not stretched strides',()=>{
+ const inspected=structuredClone(run);inspected.inspection.performers[0].takes[0].gait={status:'estimated',id:'c'.repeat(64),meters_per_cycle:2,direction:[-1,0]};
+ const d=timelineDraft(cp,inspected);d.add(take,'clip_auto');d.edit('travel',true);
+ assert.deepEqual(d.selectedClip.travel.delta_m,[-2,0]);assert.equal(d.selectedClip.frames,25);assert(!d.invalid);
+ d.edit('distance','5');assert.equal(d.selectedClip.frames,61);assert(d.invalid);assert.match(d.errors[0].message,/loop join/);
+ d.edit('repeat_reviewed',true);assert(!d.invalid);assert.equal(d.nextFrame(),62);
+ assert.throws(()=>d.edit('pace','5'),/Automatic travel/);d.moveEndpoint([-6,10]);assert.deepEqual(d.selectedClip.travel.delta_m,[-6,0]);
+ d.moveEndpoint([2,10]);assert(d.selectedClip.travel.delta_m[0]<0); // Cannot reverse a backward gait.
+ d.edit('automatic',false);assert(!d.selectedClip.travel.gait_id);assert(!d.selectedClip.repeat_reviewed);
+ d.edit('pace','3');d.edit('direction','90');d.edit('automatic',true);assert.equal(d.selectedClip.travel.meters_per_cycle,2);assert.equal(d.selectedClip.travel.gait_id,'c'.repeat(64));
+});
+
+test('forged automatic profile, heading or pace refuses; legacy manual travel still works',()=>{
+ const t={range:[1,25],gait:{status:'estimated',id:'c'.repeat(64),meters_per_cycle:2,direction:[0,1]}};
+ const c={id:'clip_auto',take_id:take,start:1,frames:25,speed:1,repeat_reviewed:false,travel:{delta_m:[0,2],meters_per_cycle:2,gait_id:t.gait.id}};
+ assert.equal(timelineTiming(c,t).cycles,1);
+ for(const patch of [{gait_id:'d'.repeat(64)},{meters_per_cycle:5},{delta_m:[2,0]}])assert.throws(()=>timelineTiming({...c,travel:{...c.travel,...patch}},t));
+ const d=timelineDraft(cp,run);d.add(take,'clip_manual');d.edit('travel',true);d.edit('pace','1');assert(!d.invalid);
+});

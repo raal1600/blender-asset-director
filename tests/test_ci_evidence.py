@@ -33,8 +33,10 @@ class CoverageContractTests(unittest.TestCase):
     def test_exact_partitions_and_original_fixture_inventory(self):
         self.assertEqual(len(partitions()), 23)
         fixtures = [row for suite in BLENDER_SUITES.values() for row in suite]
-        self.assertEqual(len(fixtures), 22)
-        self.assertEqual(len({row[0] for row in fixtures}), 22)
+        self.assertEqual(len(fixtures), 23)
+        self.assertEqual(len({row[0] for row in fixtures}), 23)
+        self.assertEqual(len([row for row in fixtures if row[0] != 'gait-profile']), 22)
+        self.assertIn(('gait-profile', 'gait_profile_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['motion'])
         self.assertIn('asset-preview', {row[0] for row in fixtures})
         self.assertIn('import-visibility', {row[0] for row in fixtures})
         for _, script, expected, _, _ in fixtures:

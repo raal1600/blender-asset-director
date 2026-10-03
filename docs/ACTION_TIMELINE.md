@@ -16,16 +16,43 @@ a saved path it defaults to one native cycle at the selected speed. Explicit
 non-travel trims remain available under Timing and path.
 
 The red endpoint can be dragged in the viewer or moved with arrow keys (0.1 m,
-Shift 1 m). Distance and world direction also have numeric controls. Name-based
-direction is only an editable world-axis suggestion: it does not establish the
-character's facing or animation semantics. The arrow does not turn the character.
+Shift 1 m). Automatic pace constrains the endpoint to the inspected gait direction;
+Up/Right lengthen and Down/Left shorten the path. Distance has a numeric control.
+Manual calibration retains editable world direction. Its name-based hint does
+not establish facing or animation semantics. The arrow does not turn the character.
 Saved scene playback remains labelled separately from the unsaved path overlay.
 
-In-place animation has no measured travel speed. The user supplies metres per
-native cycle; further clips using that take can reuse the authored value. Duration
+In-place animation has no recorded root travel speed. When two independent low
+support landmarks can be identified geometrically, the inspector samples 65 poses
+of the actual bound action/slot on a disposable unskinned rig copy. The original
+static parent space, scene units and world orientation are respected; original
+objects, frame, actions, rest/skin and bindings are restored/preserved. Names never
+classify gait or infer a retarget mapping. At most 48 takes / 3,120 sampled poses
+are analyzed per inspection, with 1–120 native frame intervals per take;
+ambiguous/large rigs or undersampled long takes get an explicit fallback.
+
+`stance-pace-v1` estimates displacement per cycle from the opposite of horizontal
+support velocity during low, vertically stable stance. It requires bilateral
+agreement, alternating support, sufficient coverage, bounded velocity residual,
+lift and endpoint closure. A squat, jump, static pose, nonclosing take or conflicting
+native travel is not silently treated as a walk. The result remains an estimate,
+not proof of ground contact, smooth transitions or an actual sole-based IK solve.
+
+Selecting a supported gait automatically supplies pace and heading at normal
+speed. The primary input is distance: longer paths add native cycles and duration,
+not longer strides. Unsupported takes stay as valid native clips instead of
+opening an invalid travel form. Explicit manual calibration remains available in
+Timing and path, including for existing saved clips; values are never silently
+replaced. Automatic profiles carry an exact inspection identity, and Blender
+revalidates profile, pace and direction before mutation. Overrides must explicitly
+leave automatic mode. Uncertain native samples do not manufacture a speed.
+
+Duration
 is ceil(distance / metres-per-cycle * native-frame-span / speed) + one inclusive
-endpoint frame. The final fractional interval is an endpoint hold. Repetition
-requires an explicit repeatable-cycle review. This review is not final Action,
+endpoint frame. Translation stops at the fractional native endpoint; the rounded
+occupied tail is a hold. Repetition requires an explicit repeatable-cycle review,
+shown beside the distance/duration rather than hidden in advanced controls. The
+Save bar explains the exact blocker. This review is not final Action,
 foot-contact, transition, source-license or film approval. Distance cannot by
 itself determine a physically correct pace.
 
@@ -50,7 +77,15 @@ idempotency, separate outputs and downstream invalidation apply unchanged.
 
 ## Verification
 
-Portable tests: `tests/test_action_timeline.py` and launcher timeline/asset tests.
+Portable tests: `tests/test_action_timeline.py`, `tests/test_gait_profile.py` and
+launcher timeline/asset tests. `tools/gait_profile_fixture.py` checks an actual
+generated alternating-support rig, preservation, deterministic inspection,
+forged-calibration and unreviewed-repeat refusal, exact endpoint, saved identity
+and observed support-drift reduction. Its optional private-copy mode only executes
+one cycle; it never creates human loop approval for a licensed asset.
+`tools/gait_browser_check.mjs` exercises distance-first UI, constrained pointer and
+keyboard edits, inline validation, explicit manual overrides, real Save/reload,
+occupied frames and actual saved GLB playback in an isolated authenticated studio.
 Real generated native fixture: `tools/action_timeline_fixture.py -- <new-output>`
 under background Blender with auto-execution disabled. It checks two rigs, scaled
 rotated parent/unit conversion, exact travel, deformation, occupancy, revision,
