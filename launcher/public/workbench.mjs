@@ -561,7 +561,7 @@ document.addEventListener('input',e=>{if(!e.target.dataset.motionField||e.target
 document.addEventListener('change',e=>{
  try{
   if(e.target.hasAttribute('data-motion-add')){if(busy||state.locked)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){draft.add(e.target.value);const take=draft.audit.performers.find(p=>p.name===draft.selected).takes.find(t=>t.id===e.target.value);if(!take.travel_blocker&&take.gait?.status==='estimated')draft.edit('travel',true);render();}}
-  else if(e.target.dataset.motionField){if(e.target.type==='checkbox'){editMotion(e.target);render();}currentActionDraft()?.finishEdit();}
+  else if(e.target.dataset.motionField){if(e.target.type==='checkbox'){const field=e.target.dataset.motionField,detailsOpen=!!document.querySelector('[data-motion-details]')?.open;editMotion(e.target);render();const details=document.querySelector('[data-motion-details]');if(detailsOpen&&details)details.open=true;document.querySelector(`[data-motion-field="${field}"]`)?.focus({preventScroll:true});}currentActionDraft()?.finishEdit();}
  }catch(error){notice(error.message);}
 });
 document.addEventListener('focusout',e=>{if(e.target.dataset.motionField)currentActionDraft()?.finishEdit();});

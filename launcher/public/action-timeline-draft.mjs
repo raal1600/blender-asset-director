@@ -15,9 +15,9 @@ export function timelineDraft(checkpoint,run){
  const canConnect=(p,previous,take)=>{const prior=p.takes.find(t=>t.id===previous?.take_id);return p.timeline?.stitch_version===stitchVersion&&take?.stitch_blocker===null&&prior?.stitch_blocker===null&&/^[0-9a-f]{64}$/.test(take.stitch_channels||'')&&take.stitch_channels===prior.stitch_channels;};
  const reflow=order=>{for(let i=1;i<order.length;i++)if(order[i].transition)order[i].start=clipEnd(order[i-1])+1+order[i].transition.frames;};
  const join=(name,c)=>{const p=performer(name),order=sorted(name),previous=order[order.findIndex(x=>x.id===c.id)-1];if(!c.transition)return null;if(!canConnect(p,previous,p.takes.find(t=>t.id===c.take_id)))throw Error('These clips need a matching connection inspection or Blender review.');return connection(previous,c,p.takes.find(t=>t.id===previous.take_id),p.takes.find(t=>t.id===c.take_id));};
- const issue=(name,c)=>{try{const take=performer(name).takes.find(t=>t.id===c.take_id);if(!take)throw Error('Saved take changed; inspect in Blender.');timelineTiming(c,take);if(c.travel&&take.travel_blocker)throw Error(take.travel_blocker);join(name,c);return null;}catch(e){return e.message;}};
+ const issue=(name,c)=>{try{const take=performer(name).takes.find(t=>t.id===c.take_id);if(!take)throw Error('Saved take changed; inspect in Blender.');if(c.travel&&!c.travel.gait_id&&(!Number.isFinite(c.travel.meters_per_cycle)||c.travel.meters_per_cycle<.001||c.travel.meters_per_cycle>1000))return {field:'pace',message:'Set metres per cycle to calibrate this path, or turn off path movement.'};timelineTiming(c,take);if(c.travel&&take.travel_blocker)throw Error(take.travel_blocker);join(name,c);return null;}catch(e){return {field:'clip',message:e.message};}};
  const changed=()=>[...tracks].filter(([name,clips])=>JSON.stringify(clips)!==JSON.stringify(baseline.get(name)));
- const errors=()=>{const list=[...raw.values()].filter(x=>x.message).map(copy);for(const [name,clips] of tracks){for(const c of clips){const message=issue(name,c);if(message)list.push({performer:name,clip:c.id,field:'clip',message});}try{validateTimeline({performer:name,mode:'timeline',clips:sorted(name)});}catch(e){list.push({performer:name,field:'track',message:e.message});}}return list;};
+ const errors=()=>{const list=[...raw.values()].filter(x=>x.message).map(copy);for(const [name,clips] of tracks){for(const c of clips){const problem=issue(name,c);if(problem&&!raw.has(c.id+':'+problem.field))list.push({performer:name,clip:c.id,...problem});}try{validateTimeline({performer:name,mode:'timeline',clips:sorted(name)});}catch(e){list.push({performer:name,field:'track',message:e.message});}}return list;};
  return {timeline:true,checkpointId:checkpoint.id,sha256:checkpoint.sha256,run,audit,
   get selected(){return selected;},get selectedClip(){return copy(tracks.get(selected)?.find(c=>c.id===clipId)||null);},
   get dirty(){return changed().length>0||raw.size>0;},get count(){return changed().length;},get canUndo(){return history.length>0;},get errors(){return errors();},get invalid(){return errors().length>0;},
@@ -73,7 +73,19 @@ export function timelineDraft(checkpoint,run){
   },
   moveEndpoint(delta){if(!Array.isArray(delta)||delta.length!==2||!delta.every(Number.isFinite)||Math.hypot(...delta)<.001||Math.hypot(...delta)>10000)return;editable(selected);const c=tracks.get(selected).find(c=>c.id===clipId);if(!c?.travel)return;const order=sorted(selected);remember(c.id+':drag');const take=performer(selected).takes.find(t=>t.id===c.take_id);if(c.travel.gait_id){const g=take.gait,projection=Math.max(.001,delta.reduce((n,v,i)=>n+v*g.direction[i],0));c.travel=automaticTravel(take,projection);}else c.travel.delta_m=[...delta];for(const field of ['distance','direction'])raw.delete(c.id+':'+field);if(c.travel.meters_per_cycle>0)c.frames=plannedFrames(take,c.travel,c.speed);reflow(order);},
   shiftFollowing(){const c=this.selectedClip;if(!c)return;remember();let next=clipEnd(c)+1;for(const item of sorted(selected).filter(x=>x.id!==c.id&&x.start>=c.start)){item.start=next+(item.transition?.frames||0);next=clipEnd(item)+1;}},
-  arrow(){const c=this.selectedClip,p=performer(selected);if(!c?.travel)return null;const origin=[...(p.timeline?.origin_m||[0,0,0])];for(const old of sorted(selected)){try{const delta=join(selected,old)?.delta_m;if(delta){origin[0]+=delta[0];origin[1]+=delta[1];}}catch{return null;}if(old.id===c.id)break;if(old.travel){origin[0]+=old.travel.delta_m[0];origin[1]+=old.travel.delta_m[1];}}return {origin_m:origin,delta_m:c.travel.delta_m,meters_per_unit:p.timeline.meters_per_unit,label:'Unsaved path · '+Math.hypot(...c.travel.delta_m).toFixed(2)+' m'+(c.travel.gait_id?' · drag along the observed gait direction':' · manual direction')};},
+  arrow(){
+   const c=this.selectedClip,p=performer(selected);if(!c?.travel)return null;
+   const origin=[...(p.timeline?.origin_m||[0,0,0])];let pendingConnection=false;
+   // Geometry stays editable while timing or a connection needs correction.
+   // Include known displacements, but never invent an unresolved bridge's travel.
+   for(const old of sorted(selected)){
+    try{const delta=join(selected,old)?.delta_m;if(delta){origin[0]+=delta[0];origin[1]+=delta[1];}}
+    catch{pendingConnection=true;}
+    if(old.id===c.id)break;
+    if(old.travel){origin[0]+=old.travel.delta_m[0];origin[1]+=old.travel.delta_m[1];}
+   }
+   return {origin_m:origin,delta_m:c.travel.delta_m,meters_per_unit:p.timeline.meters_per_unit,pending_connection:pendingConnection,label:'Unsaved path · '+Math.hypot(...c.travel.delta_m).toFixed(2)+' m'+(c.travel.gait_id?' · drag along the observed gait direction':' · manual direction')};
+  },
   finishEdit(){gesture=null;},
   undo(){gesture=null;if(history.length){const old=history.pop();({tracks,raw,stationaryFrames,selected,clipId}=old);}},
   discard(){tracks=copy(baseline);history=[];raw.clear();stationaryFrames.clear();gesture=null;clipId=null;},

@@ -12,6 +12,8 @@ export function attachActionPath({THREE,host,world,camera,canvas,orbit,getDraft,
   arrow.position.copy(origin);arrow.setDirection(delta.clone().normalize());arrow.setLength(length,Math.min(length*.2,.3/unit),Math.min(length*.12,.16/unit));handle.position.copy(origin).add(delta);handle.scale.setScalar(Math.max(.03/unit,Math.min(.12/unit,length*.12)));plane.set(new THREE.Vector3(0,1,0),-origin.y);label.textContent=(d.dirty?'Unsaved':'Saved')+' path · '+Math.hypot(...current.delta_m).toFixed(2)+' m · drag the red endpoint; facing stays unchanged.';
   if(d.selectedClip?.travel?.gait_id){label.textContent=(d.dirty?'Unsaved':'Saved')+' path · '+Math.hypot(...current.delta_m).toFixed(2)+' m · drag to change distance along the observed gait; facing stays unchanged.';endpoint.title='Drag along path; Up/Right lengthen, Down/Left shorten (0.1 m, Shift 1 m)';}
   else endpoint.title='Drag endpoint; arrow keys move 0.1 m, Shift moves 1 m';
+  if(current.pending_connection)label.textContent+=' Connection placement pending; correct the clip settings.';
+  label.dataset.pendingConnection=String(!!current.pending_connection);
   const screen=handle.position.clone().project(camera);endpoint.hidden=screen.z>1||screen.z< -1||Math.abs(screen.x)>1||Math.abs(screen.y)>1;endpoint.style.left=((screen.x+1)/2*canvas.clientWidth)+'px';endpoint.style.top=((-screen.y+1)/2*canvas.clientHeight)+'px';endpoint.disabled=!canEdit();invalidate();
  }
  function aim(e){const r=canvas.getBoundingClientRect();point.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(point,camera);}

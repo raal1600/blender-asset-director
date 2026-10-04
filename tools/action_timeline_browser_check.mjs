@@ -25,6 +25,7 @@ try{
  page.on('response',r=>{if(new URL(r.url()).pathname==='/api/workbench/viewer-model'&&r.ok())void r.body().then(bytes=>models.push(bytes));});
  const idle=()=>page.waitForFunction(()=>!document.body.classList.contains('working'));
  const click=async selector=>{await page.locator('body').ariaSnapshot();await page.locator(selector).click();await idle();};
+ const advanced=async()=>{const details=page.locator('details[data-motion-details]');if(!await details.evaluate(node=>node.open))await click('details[data-motion-details] > summary');};
  const ready=()=>page.waitForFunction(()=>!document.body.classList.contains('working')&&document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready'&&!document.querySelector('[data-action-field="performer"]')?.disabled,null,{timeout:205000});
  const inspect=async()=>{project=await app.store.get(project.id);const s=project.workbench.scenes[0],cp=s.checkpoints.find(c=>c.id===s.current);const run=(await app.store.runs(project.id)).find(r=>r.action==='action-audit'&&r.checkpointId===cp.id&&r.state==='SUCCEEDED');assert(run);return {s,cp,run};};
  await page.goto(app.origin+'/workbench#'+app.token);await idle();await click('[data-action="project"][data-id="'+project.id+'"]');await ready();
@@ -52,7 +53,7 @@ try{
  await page.getByLabel('Animation time',{exact:true}).press('End');assert.match(await page.locator('[data-view="clock"]').innerText(),/Frame 250 /);await page.screenshot({path:path.join(out,'04b-playback-end.png'),fullPage:true});await page.getByLabel('Animation time',{exact:true}).press('Home');assert.match(await page.locator('[data-view="clock"]').innerText(),/Frame 1 /);report.checks.push('Saved whole-scene playback advances in the browser and the full original frame range remains scrubbable');
  const originalMovie=await fileHash(path.join(project.directory,first.cp.path));
  await click('[data-action="motion-select"][data-performer="TimelineRig0"][data-clip="'+rig.timeline.clips[0].id+'"]');
- await page.getByLabel('Distance (m)',{exact:true}).fill('2.5');await click('[data-action="motion-ripple"]');
+ await page.getByLabel('Distance (m)',{exact:true}).fill('2.5');await advanced();await click('[data-action="motion-ripple"]');
  await click('[data-action="action-save"]');await ready();const second=await inspect();assert.notEqual(second.cp.id,first.cp.id);const changed=second.run.inspection.performers.find(p=>p.name==='TimelineRig0');assert.equal(changed.timeline.clips[0].frames,25);assert.equal(changed.timeline.clips[1].start,26);assert.deepEqual(await fileHash(path.join(project.directory,first.cp.path)),originalMovie);report.checks.push('Reload preserves editable clips; revision and explicit ripple create a separate checkpoint without overwriting the previous result');
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'05-mobile.png'),fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  assert.deepEqual(await fileHash(source),original);assert.deepEqual(await fileHash(path.join(project.directory,relative)),original);assert.deepEqual(report.errors,[]);assert(models.length>=3);report.checks.push('Actual saved GLBs refresh, narrow layout stays usable, original bytes preserved, no external requests or console errors');

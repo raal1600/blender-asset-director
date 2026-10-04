@@ -91,7 +91,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,a
         grid.scale.setScalar(radius/gridRadius);grid.position.set(center.x,box.min.y-.002*radius,center.z);
         controls.minDistance=radius*.02;controls.maxDistance=radius*100;controls.target.copy(center);controls.update();dirty=true;
       };
-      reset();resize=()=>{if(disposed)return;const width=surface.clientWidth,height=surface.clientHeight;if(width>0&&height>0){renderer.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();dirty=true;}};
+      reset();resize=()=>{if(disposed)return;const width=surface.clientWidth,height=surface.clientHeight;if(width>0&&height>0){renderer.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();actionPath?.update();dirty=true;}};
       observer=new ResizeObserver(resize);observer.observe(surface);resize();
       const resetView=()=>{if(shotRig)shotMode(true);else reset();};
       listen(node('reset'),'click',resetView);listen(canvas,'keydown',e=>{if(e.key.toLowerCase()==='f'){e.preventDefault();resetView();}});

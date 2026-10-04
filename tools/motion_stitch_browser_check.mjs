@@ -26,6 +26,24 @@ try{
  const snapshot=()=>page.locator('body').ariaSnapshot();
  const click=async selector=>{await snapshot();await page.locator(selector).click();await page.waitForFunction(()=>!document.body.classList.contains('working'));};
  const field=name=>page.locator('[data-motion-field="'+name+'"]');
+ const advanced=async()=>{const details=page.locator('details[data-motion-details]');if(!await details.evaluate(node=>node.open))await click('details[data-motion-details] > summary');};
+ const checkLayout=async(width,height,name)=>{
+  await page.setViewportSize({width,height});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await snapshot();
+  const viewer=await page.locator('[data-scene-viewer]').boundingBox(),inspector=await page.locator('[data-motion-inspector]').boundingBox(),timeline=await page.locator('[data-motion-tracks]').boundingBox();assert(viewer&&inspector&&timeline);
+  const canvas=await page.locator('[data-scene-viewer] .viewer-canvas').boundingBox(),endpoint=await page.getByRole('button',{name:'Move path endpoint',exact:true}).boundingBox();assert(canvas&&endpoint,'Pending path has an accessible endpoint after resizing');
+  const center={x:endpoint.x+endpoint.width/2-canvas.x,y:endpoint.y+endpoint.height/2-canvas.y};assert(center.x>0&&center.x<canvas.width&&center.y>0&&center.y<canvas.height,'Endpoint is inside the resized canvas');
+  const projection={x:(center.x-canvas.width/2)/canvas.height,y:(center.y-canvas.height/2)/canvas.height};
+  // With unchanged perspective camera/orbit, pixel offsets scale with canvas
+  // height. This catches stale DOM handles after the WebGL projection resizes.
+  const previous=report.layouts?.[0]?.projection;if(previous){assert(Math.abs(projection.x-previous.x)<.006,'Endpoint X tracks the resized camera projection');assert(Math.abs(projection.y-previous.y)<.006,'Endpoint Y tracks the resized camera projection');}
+  const order=await page.evaluate(()=>!!(document.querySelector('[data-scene-viewer]').compareDocumentPosition(document.querySelector('[data-motion-inspector]'))&Node.DOCUMENT_POSITION_FOLLOWING));assert.equal(order,true,'Viewer must precede the inspector in reading order');
+  if(width>=1000){assert(inspector.x>=viewer.x+viewer.width-2,'Desktop inspector belongs beside the viewer');assert(Math.abs(inspector.y-viewer.y)<8,'Desktop viewer and inspector share a top edge');assert(viewer.width>inspector.width,'Viewer remains the primary desktop surface');assert(Math.abs(timeline.x-viewer.x)<8,'Timeline aligns under the desktop viewer');}
+  else assert(inspector.y>=viewer.y+viewer.height-2,'Narrow layout puts the viewer before clip settings');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'No page-level horizontal overflow');
+  assert.equal(await page.locator('details[data-motion-details]').evaluate(node=>node.open),false,'Advanced timing is collapsed by default');
+  await page.locator('[data-scene-viewer]').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,name),fullPage:true});
+  (report.layouts??=[]).push({width,height,viewer,inspector,timeline,canvas,endpoint,projection});
+ };
  await page.goto(app.origin+'/workbench#'+app.token);await click('[data-action="project"][data-id="'+project.id+'"]');await ready();await click('[data-action="motion-enable"]');
  await snapshot();await page.getByLabel('Performer',{exact:true}).selectOption('TestPerformer0');
  await snapshot();await page.getByLabel('Add animation').selectOption({label:'Observed 0 0'});await field('travel').check();await snapshot();await page.getByLabel('Metres per cycle',{exact:true}).fill('1');await page.getByLabel('Direction (world degrees)',{exact:true}).fill('-90');
@@ -33,15 +51,28 @@ try{
  assert.equal(await field('smooth').isChecked(),true);assert.equal(await field('repeat_reviewed').isChecked(),false);assert.equal(await field('repeat_reviewed').isVisible(),true);
  assert.equal(await page.getByRole('button',{name:'Connection 26 to 31',exact:true}).count(),1);assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 32–56/);
  report.checks.push('Compatible native clips append with a visible six-frame connection and no invented loop approval');
- await field('travel').check();await page.getByLabel('Metres per cycle',{exact:true}).fill('1');await page.getByLabel('Direction (world degrees)',{exact:true}).fill('0');
+ await field('travel').check();
+ // Reproduce an uncalibrated connected clip: geometric editing must not depend
+ // on a bridge that cannot yet be validated or executed.
+ const pace=page.getByLabel('Metres per cycle',{exact:true}),distance=page.getByLabel('Distance (m)',{exact:true}),handle=page.getByRole('button',{name:'Move path endpoint',exact:true});
+ assert.equal(await pace.inputValue(),'');assert.equal(await pace.isVisible(),true);assert.equal(await pace.getAttribute('aria-invalid'),'true');assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);
+ assert.match(await page.locator('[data-motion-error="pace"]').innerText(),/Set metres per cycle to calibrate this path, or turn off path movement\./);assert.match(await page.locator('.action-savebar [role="status"]').innerText(),/metres per cycle/i);assert(await pace.getAttribute('aria-describedby'));await handle.waitFor({state:'visible'});assert.match(await page.locator('[data-motion-path]').innerText(),/connection placement pending/i);
+ const pendingPosts=report.requests.filter(r=>r.method==='POST').length,pendingRuns=(await app.store.runs(project.id)).length,priorDistance=await distance.inputValue();
+ await handle.scrollIntoViewIfNeeded();await handle.focus();await handle.press('ArrowRight');assert.notEqual(await distance.inputValue(),priorDistance);assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);await click('[data-action="action-undo"]');assert.equal(await distance.inputValue(),priorDistance);
+ await handle.scrollIntoViewIfNeeded();const endpoint=await handle.boundingBox();assert(endpoint);await page.mouse.move(endpoint.x+endpoint.width/2,endpoint.y+endpoint.height/2);await page.mouse.down();await page.mouse.move(endpoint.x+endpoint.width/2+30,endpoint.y+endpoint.height/2+12,{steps:8});await page.mouse.up();assert.notEqual(await distance.inputValue(),priorDistance);await click('[data-action="action-undo"]');assert.equal(await distance.inputValue(),priorDistance);
+ assert.equal(report.requests.filter(r=>r.method==='POST').length,pendingPosts);assert.equal((await app.store.runs(project.id)).length,pendingRuns);assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);
+ await checkLayout(1440,1100,'00-pending-connection-desktop.png');await checkLayout(1440,900,'00-pending-connection-short-desktop.png');await checkLayout(390,844,'00-pending-connection-narrow.png');await page.setViewportSize({width:1440,height:1100});
+ report.checks.push('Missing connected-clip calibration keeps a visible provisional red path editable by pointer and keyboard; pace errors block Save without mutation jobs');
+ report.checks.push('Viewer-first desktop and mobile layouts retain a compact inspector, collapsed advanced timing and no page overflow');
+ await pace.fill('1');await page.getByLabel('Direction (world degrees)',{exact:true}).fill('0');assert.match(await page.locator('[data-motion-pace]').innerText(),/^Manual pace ·/);assert.doesNotMatch(await page.locator('[data-motion-pace]').innerText(),/needed/i);
  assert.equal(await page.locator('[data-action="action-save"]').isEnabled(),true);assert.match(await page.locator('[data-motion-connection]').innerText(),/0\.21 m/);
  await page.getByLabel('Direction (world degrees)',{exact:true}).fill('90');assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);assert.match(await page.locator('[data-motion-errors]').innerText(),/turn or stop/);
  await page.getByLabel('Direction (world degrees)',{exact:true}).fill('0');assert.equal(await page.locator('[data-action="action-save"]').isEnabled(),true);
  report.checks.push('Measured path velocities expose added distance; a sharp reversal refuses before any job executes');
- await page.getByLabel('Transition frames',{exact:true}).fill('');assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);assert.equal(await field('transition_frames').getAttribute('aria-invalid'),'true');
+ await advanced();await page.getByLabel('Transition frames',{exact:true}).fill('');assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);assert.equal(await field('transition_frames').getAttribute('aria-invalid'),'true');
  await page.getByLabel('Transition frames',{exact:true}).fill('10');await page.getByLabel('Speed',{exact:true}).focus();assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 36–60/);
  await click('[data-action="action-undo"]');assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 32–56/);
- await field('smooth').uncheck();assert.equal(await page.locator('.motion-transition').count(),0);assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 26–50/);await field('smooth').check();
+ await advanced();await field('smooth').uncheck();assert.equal(await page.locator('.motion-transition').count(),0);assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 26–50/);assert.equal(await page.locator('details[data-motion-details]').evaluate(node=>node.open),true);await field('smooth').check();assert.equal(await page.locator('details[data-motion-details]').evaluate(node=>node.open),true);
  report.checks.push('Transition duration is editable, raw errors stay visible, Undo restores timing and a hard cut remains available');
  await page.getByRole('button',{name:'Observed 0 0 frames 1 to 25',exact:true}).click();await snapshot();await page.getByLabel('Distance (m)',{exact:true}).fill('2');
  assert.equal(await page.getByRole('button',{name:'Connection 50 to 55',exact:true}).count(),1);assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);

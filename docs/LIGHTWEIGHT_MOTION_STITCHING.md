@@ -80,6 +80,28 @@ pace still needs explicit calibration or a native clip without added travel.
 
 ## Verification and acceptance
 
+### Correctable paths and compact clip controls
+
+The Action editor keeps the saved-scene viewer and timeline together, beside a
+compact selected-clip inspector on wide screens. Narrow layouts put the viewer
+before the inspector. Required manual calibration remains visible; advanced
+timing and clip operations stay collapsed until requested or a field there needs
+correction. Changing a checkbox preserves an explicitly opened timing panel.
+
+A missing calibration or refused connection must not hide the red correction
+handle. Its provisional origin includes known preceding path/bridge displacement
+but omits any unresolved connection displacement, visibly labelled as pending.
+This is draft geometry, not an executable or approved motion prediction. Save
+still requires valid pace, timing, connection and source evidence. Resizing the
+viewer reprojects the keyboard/pointer handle with the 3D endpoint.
+
+The isolated browser journey covers missing pace, pointer/keyboard corrections,
+refusal without mutation jobs, responsive placement, calibration, actual Blender
+Save and saved playback. Screenshots and real-image inspection are separate from
+assertion results; a passing DOM test alone does not certify the visual layout.
+
+### Required evidence
+
 Portable Python and launcher tests cover the contract, bounds, explicit added
 distance, source-independent pose math, connected ripple/undo, native-channel
 preflight and old-timeline compatibility. Generated-only native coverage is in
