@@ -71,13 +71,17 @@ class Sampler:
         self.data = obj.data.copy() if obj.type == 'ARMATURE' else None
         if self.data:
             self.clone.data = self.data
-        self.clone.animation_data_clear()
+        from .native_motion_basis import seed
+        try:
+            self.native_basis = seed(self.clone, obj)
+        except Exception:
+            bpy.data.objects.remove(self.clone, do_unlink=True)
+            if self.data:
+                bpy.data.armatures.remove(self.data)
+            raise
         self.clone.delta_location = (0, 0, 0)
         self.clone.hide_viewport = False
         self.scene.collection.objects.link(self.clone)
-        self.base = {'': self.clone.matrix_basis.copy()}
-        if obj.type == 'ARMATURE':
-            self.base.update({p.name: p.matrix_basis.copy() for p in self.clone.pose.bones})
         self.count = 0
 
     def read(self, motion, elapsed, phase=0., endpoint=False):
@@ -85,8 +89,8 @@ class Sampler:
         require(self.count <= 4096, 'RESOURCE_LIMIT', 'Connection inspection exceeded 4096 pose samples')
         clip, take, action, slot, _ = motion
         clone = self.clone
-        for name, basis in self.base.items():
-            (clone.pose.bones[name] if name else clone).matrix_basis = basis
+        from .native_motion_basis import restore
+        restore(clone, self.native_basis)
         clone.delta_location = (0, 0, 0)
         ad = clone.animation_data_create(); ad.action = action; ad.use_nla = False
         if slot is not None:
@@ -97,7 +101,8 @@ class Sampler:
         result = {}
         for name in channel_spec(clone, action, slot):
             owner = clone.pose.bones[name] if name else clone
-            _, q, _ = owner.matrix_basis.decompose()
+            from .motion_heading import rotation
+            q = rotation(owner)
             require(all(v > 0 and math.isfinite(v) for v in owner.scale),
                     'STITCH_SCALE_REVIEW', 'Reflected or singular scales need Blender review')
             result[name] = {'location': list(owner.location), 'q': list(q.normalized()), 'scale': list(owner.scale)}
@@ -172,6 +177,7 @@ def prepare(obj, motions):
                 require(math.dist(a['']['location'], b['']['location']) < 1e-5,
                         'STITCH_ROOT_REVIEW', 'Object placements differ; align this motion explicitly in Blender')
             plans[index]['join'] = {**geometry, 'samples': samples, 'pose_cost_before': cost_before,
+                                    'channels': {n: [list(pair) for pair in sorted(v)] for n, v in channel_spec(obj, action, slot).items()},
                                     'pose_cost_after': pose_after, 'phase_note': phase_note,
                                     'matched_phase': matched_phase,
                                     'match_cost_before': match_before,
@@ -195,20 +201,25 @@ def bake(obj, plan, job_id, clip_id):
     for frame, pose in plan['samples']:
         for name, state in pose.items():
             owner = obj.pose.bones[name] if name else obj
-            owner.location = state['location']; owner.scale = state['scale']
             q = Quaternion(state['q'])
             if name in quaternions and q.dot(quaternions[name]) < 0:
                 q.negate()
             quaternions[name] = q.copy()
             if owner.rotation_mode == 'QUATERNION':
-                owner.rotation_quaternion = q; prop = 'rotation_quaternion'
+                prop = 'rotation_quaternion'; values = list(q)
             elif owner.rotation_mode == 'AXIS_ANGLE':
-                axis, angle = q.to_axis_angle(); owner.rotation_axis_angle = (angle, *axis); prop = 'rotation_axis_angle'
+                axis, angle = q.to_axis_angle(); prop = 'rotation_axis_angle'; values = [angle, *axis]
             else:
-                owner.rotation_euler = q.to_euler(owner.rotation_mode, eulers.get(name, owner.rotation_euler.copy()))
-                eulers[name] = owner.rotation_euler.copy(); prop = 'rotation_euler'
-            for channel in ('location', prop, 'scale'):
-                owner.keyframe_insert(channel, frame=frame)
+                converted = q.to_euler(owner.rotation_mode, eulers.get(name, owner.rotation_euler.copy()))
+                eulers[name] = converted.copy(); prop = 'rotation_euler'; values = list(converted)
+            expected = {'location': state['location'], 'scale': state['scale'], prop: values}
+            # A bridge must not acquire previously unkeyed default channels.
+            # Retain exact original ownership and let verification refuse a
+            # bridge that cannot be represented by those native components.
+            for channel, index in plan['channels'][name]:
+                target = getattr(owner, channel)
+                target[index] = expected[channel][index]
+                owner.keyframe_insert(channel, index=index, frame=frame)
     for curve in ops.curves(action):
         for key in curve.keyframe_points:
             key.interpolation = 'LINEAR'

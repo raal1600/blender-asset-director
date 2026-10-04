@@ -13,6 +13,15 @@ export function animationEntries(animations,profile='inspection-v1',staticScene=
   });
 }
 
+/** Explicit Reset view includes the selected draft path, not just saved geometry. */
+export function actionPathPoints(path){
+  if(!path||!Number.isFinite(path.meters_per_unit)||path.meters_per_unit<=0||
+     !Array.isArray(path.origin_m)||path.origin_m.length!==3||!path.origin_m.every(Number.isFinite)||
+     !Array.isArray(path.delta_m)||path.delta_m.length!==2||!path.delta_m.every(Number.isFinite))return [];
+  const [x,y,z]=path.origin_m,u=path.meters_per_unit,[dx,dy]=path.delta_m;
+  return [[x/u,z/u,-y/u],[(x+dx)/u,z/u,-(y+dy)/u]];
+}
+
 function releaseTree(root) {
   const geometries=new Set(),materials=new Set(),textures=new Set(),skeletons=new Set();
   for(const tree of Array.isArray(root)?root:[root])tree?.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.skeleton)skeletons.add(o.skeleton);for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[])materials.add(m);});
@@ -83,7 +92,9 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,a
       const reset=()=>{
         // Fit the evaluated pose, not the bind pose cached before animation.
         model.updateMatrixWorld(true);model.traverse(o=>o.skeleton?.update());
-        box.setFromObject(model,true);box.getCenter(center);box.getSize(size);radius=Math.max(size.length()/2,.01);
+        box.setFromObject(model,true);
+        if(!shotRig)for(const point of actionPathPoints(actionEdit?.getDraft?.()?.arrow?.()))box.expandByPoint(new THREE.Vector3(...point));
+        box.getCenter(center);box.getSize(size);radius=Math.max(size.length()/2,.01);
         if(!Number.isFinite(radius)||radius>1e9)throw Error('Invalid animated dimensions.');
         camera.near=Math.max(radius/10000,.00001);camera.far=radius*1000;camera.updateProjectionMatrix();
         const limitingFov=Math.min(THREE.MathUtils.degToRad(camera.fov/2),Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.aspect));

@@ -3,7 +3,8 @@ export const actionInspectionRefresh='Performer inspection predates this runtime
 export function currentActionInspection(run,cap){
   return /^[a-f0-9]{64}$/.test(cap?.implementation)&&run?.implementation===cap.implementation&&
     run.inspection?.version==='action-layer-v1'&&Array.isArray(run.inspection.performers)&&
-    (!cap.action_timeline||run.inspection.performers.every(p=>p.timeline?.version===cap.action_timeline));
+    (!cap.action_timeline||run.inspection.performers.every(p=>p.timeline?.version===cap.action_timeline))&&
+    (!cap.action_motion_edit||run.inspection.performers.every(p=>p.timeline?.edit_version===cap.action_motion_edit));
 }
 export function actionInspectionAttempt(run,scene,checkpoint,cap){
   return /^[a-f0-9]{64}$/.test(cap?.implementation)&&run.action==='action-audit'&&run.sceneId===scene.id&&

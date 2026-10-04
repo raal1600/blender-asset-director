@@ -1,0 +1,62 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {timelineDraft} from '../public/action-timeline-draft.mjs';
+import {connection,timelineTiming,validateTimeline} from '../public/action-timeline-contract.mjs';
+import {timelineControls,timelineTracks} from '../public/action-timeline-view.mjs';
+import {actionDraftStatus} from '../public/workbench-action.mjs';
+const cp={id:'cp_saved',sha256:'a'.repeat(64)},first='take_'+'b'.repeat(64),second='take_'+'c'.repeat(64);
+function fixture(){return {id:'run_inspected',inspection:{sha256:'d'.repeat(64),frame_range:[1,250],fps:24,reference_frame:1,performers:[{name:'Observed',takes:[first,second].map((id,i)=>({id,action:'Native '+i,range:[1,25+i*10],stitch_blocker:null,heading_blocker:null,stitch_channels:'e'.repeat(64),travel_blocker:null})),timeline:{version:'action-timeline-v1',stitch_version:'native-stitch-v1',edit_version:'native-motion-edit-v1',clips:[],origin_m:[0,0,0],meters_per_unit:1}}]}};}
+const make=()=>timelineDraft(cp,fixture());
+test('legacy records and original audit stay byte compatible until an explicit edit',()=>{
+ const run=fixture(),seed=timelineDraft(cp,run);seed.add(first,'clip_a');seed.add(second,'clip_b');run.inspection.performers[0].timeline.clips=seed.clips('Observed');const before=JSON.stringify(run),d=timelineDraft(cp,run);d.select('Observed','clip_b','transition');assert(!d.dirty);assert.equal(JSON.stringify(run),before);assert.deepEqual(d.changes,[]);assert(!Object.hasOwn(d.selectedClip,'heading_deg'));assert(!Object.hasOwn(d.selectedClip.transition,'mode'));
+ d.edit('transition_mode','turn');assert.equal(JSON.stringify(run),before);d.undo();assert(!d.dirty);assert.equal(d.selectedPart,'transition');
+});
+test('turn has separate heading and bounded braking displacement, not just a crossfade',()=>{
+ const d=make();d.add(first,'clip_a');d.edit('travel',true);d.edit('pace','1');d.edit('direction','-90');d.add(first,'clip_b');d.edit('travel',true);d.edit('direction','0');const blend=d.connection;
+ d.select('Observed','clip_b','transition');d.edit('transition_mode','turn');d.edit('heading_deg','90');assert(!d.invalid);const turn=d.connection;assert.equal(turn.mode,'turn');assert.equal(turn.turn_delta_deg,90);assert.deepEqual(turn.delta_m,blend.delta_m.map(v=>v/4));assert.equal(d.input('direction'),0,'Manual path stays separate from body rotation');
+ d.edit('heading_deg','180');assert(d.invalid);assert.match(d.errors.map(e=>e.message).join(' '),/135 degrees/);assert.throws(()=>d.request('run_save'));d.edit('heading_deg','90');d.edit('transition_mode','blend');assert(d.invalid);assert.match(d.errors[0].message,/Turn and connect/);
+});
+test('automatic heading rotates its measured direction while manual heading never invents forward motion',()=>{
+ const run=fixture(),t=run.inspection.performers[0].takes[0];t.gait={status:'estimated',id:'f'.repeat(64),meters_per_cycle:2,direction:[0,-1]};const d=timelineDraft(cp,run);d.add(first,'clip_a');d.edit('travel',true);d.edit('heading_deg','90');assert(!d.invalid);assert(Math.abs(d.selectedClip.travel.delta_m[0]-2)<1e-10);assert(Math.abs(d.selectedClip.travel.delta_m[1])<1e-10);d.edit('automatic',false);const manual=d.selectedClip.travel.delta_m;d.edit('heading_deg','0');assert.deepEqual(d.selectedClip.travel.delta_m,manual);
+});
+test('heading support is checked for every used take before Save',()=>{
+ const run=fixture();run.inspection.performers[0].takes[0].heading_blocker='Observed root motion needs Blender review.';const d=timelineDraft(cp,run);d.add(first,'clip_a');d.add(second,'clip_b');d.edit('transition_mode','turn');d.edit('heading_deg','90');assert(d.invalid);assert.equal(d.errors[0].clip,'clip_a');assert.match(d.errors[0].message,/root motion/);assert.match(actionDraftStatus(d),/Native 0 · frames 1–25/);assert.throws(()=>d.request('run_save'));
+});
+test('trim and split preserve source samples and Undo; travel split refuses without losing edits',()=>{
+ const d=make();d.add(first,'clip_a');d.edit('source_in','3');d.edit('source_out','23');d.finishEdit();assert.deepEqual(d.selectedClip.source_range,[3,23]);assert.equal(d.selectedClip.frames,21);d.split(11,'clip_right');const [a,b]=d.clips('Observed');assert.deepEqual(a.source_range,[3,12]);assert.deepEqual(b.source_range,[13,23]);assert.equal(a.frames,10);assert.equal(b.start,11);assert.equal(b.frames,11);assert(!d.invalid);d.undo();assert.equal(d.clips('Observed').length,1);assert.deepEqual(d.selectedClip.source_range,[3,23]);assert.throws(()=>d.edit('travel',true),/full native/);
+ const t=make();t.add(first,'clip_travel');t.edit('travel',true);t.edit('pace','1');const before=t.selectedClip;assert.throws(()=>t.split(10),/Travelling clips/);assert.deepEqual(t.selectedClip,before);assert.throws(()=>t.split(1),/Travelling clips/);
+});
+test('invalid source text stays visible and prevents save; source coordinates remain bounded',()=>{
+ const d=make();d.add(first,'clip_a');d.edit('source_in','26');assert(d.invalid);assert.equal(d.input('source_in'),'26');d.edit('source_in','');assert.equal(d.input('source_in'),'');assert.throws(()=>d.request('run_save'));d.edit('source_in','20');d.edit('source_out','19');assert.match(d.errors[0].message,/Out must be after/);d.edit('source_out','24');assert(!d.invalid);assert.deepEqual(d.selectedClip.source_range,[20,24]);
+ const c=d.selectedClip,t=fixture().inspection.performers[0].takes[0];assert.throws(()=>timelineTiming({...c,source_range:[0,24]},t),/inside/);assert.throws(()=>timelineTiming({...c,repeat_reviewed:true},t),/one native pass/);assert.throws(()=>validateTimeline({performer:'Observed',mode:'timeline',clips:[{...c,source_range:[4,4]}]}),/increasing/);
+});
+test('split preserves a previously shortened native interval and refuses endpoint-only fragments',()=>{
+ const d=make();d.add(first,'clip_a');d.edit('frames','15');d.split(10,'clip_b');assert.deepEqual(d.clips('Observed').map(c=>c.source_range),[[1,9],[10,15]]);assert(!d.invalid);d.undo();assert.throws(()=>d.split(15),/at least two frames/);assert.equal(d.clips('Observed').length,1);
+});
+test('replacement is explicit, ripple-safe, clears old calibration and can be undone',()=>{
+ const d=make();d.add(first,'clip_a');d.edit('travel',true);d.edit('pace','2');d.add(first,'clip_b');d.select('Observed','clip_a');const before=d.clips('Observed');d.replace(second);assert.equal(d.selectedClip.take_id,second);assert.equal(d.selectedClip.travel,null);assert.equal(d.selectedClip.repeat_reviewed,false);assert.equal(d.selectedClip.frames,35);assert.equal(d.clips('Observed')[1].start,42);assert(!d.invalid);d.undo();assert.deepEqual(d.clips('Observed'),before);assert.throws(()=>d.replace('take_'+'0'.repeat(64)),/observed native/);
+});
+test('intermediate animation is an observed independent clip without manufactured review',()=>{
+ const d=make();d.add(first,'clip_a');d.add(first,'clip_b');const before=d.clips('Observed');d.select('Observed','clip_b','transition');d.insertBefore(second,'clip_turn_asset');const clips=d.clips('Observed');assert.deepEqual(clips.map(c=>c.id),['clip_a','clip_turn_asset','clip_b']);assert.equal(clips[1].take_id,second);assert.equal(clips[1].travel,null);assert.equal(clips[1].repeat_reviewed,false);assert.equal(clips[1].transition.match_phase,false);assert.equal(clips[2].transition.match_phase,false);assert.equal(clips[2].start,73);assert(!d.invalid);d.undo();assert.deepEqual(d.clips('Observed'),before);assert.equal(d.selectedPart,'transition');
+});
+test('transition selection, removal and reorder are independently undoable',()=>{
+ const d=make();d.add(first,'clip_a');d.add(second,'clip_b');d.select('Observed','clip_b','transition');const before=d.clips('Observed');d.remove();assert.equal(d.clips('Observed').length,2);assert.equal(d.selectedClip.transition,undefined);assert.equal(d.selectedClip.start,26);d.undo();assert.deepEqual(d.clips('Observed'),before);assert.equal(d.selectedPart,'transition');d.select('Observed','clip_b');d.move(-1);assert.deepEqual(d.clips('Observed').map(c=>c.id),['clip_b','clip_a']);assert.equal(d.clips('Observed')[0].start,1);assert(!d.invalid);d.undo();assert.deepEqual(d.clips('Observed'),before);
+});
+test('stale automatic profile never silently refreshes during drag or numeric edits',()=>{
+ const run=fixture(),t=run.inspection.performers[0].takes[0];t.gait={status:'estimated',id:'f'.repeat(64),meters_per_cycle:2,direction:[0,1]};const d=timelineDraft(cp,run);d.add(first,'clip_a');d.edit('travel',true);const saved=structuredClone(run);saved.inspection.performers[0].timeline.clips=d.clips('Observed');saved.inspection.performers[0].takes[0].gait={...t.gait,id:'a'.repeat(64),meters_per_cycle:2.1};const edited=timelineDraft(cp,saved);edited.select('Observed','clip_a');assert(edited.invalid);edited.edit('distance','1.5');edited.moveEndpoint([0,1.2]);assert.equal(edited.selectedClip.travel.gait_id,'f'.repeat(64));assert.equal(edited.selectedClip.travel.meters_per_cycle,2);assert(edited.needsPaceRefresh);const before=edited.clips('Observed');edited.refreshPace();assert(!edited.needsPaceRefresh);assert.equal(edited.selectedClip.travel.gait_id,'a'.repeat(64));assert.equal(edited.selectedClip.repeat_reviewed,false);assert(Math.abs(Math.hypot(...edited.selectedClip.travel.delta_m)-1.2)<1e-10);assert(!edited.invalid);edited.undo();assert.deepEqual(edited.clips('Observed'),before);
+});
+test('rounded presentation does not quantize the stored vector or pace',()=>{
+ const d=make();d.add(first,'clip_a');d.edit('travel',true);d.edit('pace','1.23456789');d.moveEndpoint([1.23456789,2.34567891]);const before=d.selectedClip;assert.equal(d.input('pace'),1.235);assert.equal(d.input('distance'),Number(Math.hypot(...before.travel.delta_m).toFixed(3)));assert.deepEqual(d.selectedClip,before);
+});
+test('dependent connections point to the actual stale clip instead of blaming valid later clips',()=>{
+ const run=fixture(),take=run.inspection.performers[0].takes[0];take.gait={status:'estimated',id:'f'.repeat(64),meters_per_cycle:2,direction:[0,1]};const seed=timelineDraft(cp,run);seed.add(first,'clip_a');seed.edit('travel',true);seed.add(first,'clip_b');seed.edit('travel',true);run.inspection.performers[0].timeline.clips=seed.clips('Observed');run.inspection.performers[0].timeline.clips[0].travel.gait_id='0'.repeat(64);const d=timelineDraft(cp,run);d.select('Observed','clip_b');assert(d.invalid);assert.equal(d.errors.filter(e=>e.message.includes('Automatic pace changed')).length,1);assert.equal(d.errors[0].clip,'clip_a');assert.equal(d.arrow().pending_connection,true);assert.throws(()=>d.request('run_save'));d.select('Observed','clip_a');assert.equal(d.errors.length,1);d.refreshPace();assert(!d.invalid);assert.equal(d.clips('Observed')[1].travel.gait_id,'f'.repeat(64));
+});
+test('client exposes primary clip editing and an independent compact connection inspector',()=>{
+ const d=make();d.add(first,'clip_a');d.add(second,'clip_b');const controls=timelineControls(d,String);assert.match(controls,/data-motion-replace/);assert.match(controls,/data-action="motion-split"/);assert(controls.indexOf('data-action="motion-delete"')<controls.indexOf('data-motion-details'));assert.match(controls,/data-motion-trim/);d.select('Observed','clip_b','transition');const join=timelineControls(d,String);assert.match(join,/Selected transition/);assert.match(join,/Turn and connect/);assert.match(join,/data-motion-insert/);assert.doesNotMatch(join,/data-motion-replace/);const tracks=timelineTracks(d,String);assert.match(tracks,/motion-transition selected/);assert.doesNotMatch(tracks,/motion-clip selected/);
+});
+test('old inspection cannot author unverified new edit features',()=>{
+ const run=fixture();delete run.inspection.performers[0].timeline.edit_version;const d=timelineDraft(cp,run);d.add(first,'clip_a');assert.throws(()=>d.replace(second),/matching motion-edit/);assert.throws(()=>d.edit('heading_deg','90'),/matching motion-edit/);assert.throws(()=>d.split(10),/matching motion-edit/);assert(!d.dirty||d.selectedClip.heading_deg===undefined);
+});
+test('server wire validation refuses a heading jump before native execution but accepts equivalent wrap',()=>{
+ const d=make();d.add(first,'clip_a');d.add(second,'clip_b');let clips=d.clips('Observed');clips[1].heading_deg=90;assert.throws(()=>validateTimeline({performer:'Observed',mode:'timeline',clips}),/Turn and connect/);clips[0].heading_deg=180;clips[1].heading_deg=-180;assert.doesNotThrow(()=>validateTimeline({performer:'Observed',mode:'timeline',clips}));
+});

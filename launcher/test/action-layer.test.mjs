@@ -19,7 +19,7 @@ async function fixture(t,observed=inspection){
   const config={library:path.join(root,'Database/AssetDirector'),blender:process.execPath};
   const jobs=new Map(),calls=[],control={fail:false,wrong:false,pause:null,implementation:'e'.repeat(64),jobImplementation:null};
   const runtime={config,harness:async args=>{
-    if(args[0]==='workbench-capabilities')return {implementation:control.implementation,action_layer:'action-layer-v1',action_task:'action-task-v1',task_workspace:true};
+    if(args[0]==='workbench-capabilities')return {implementation:control.implementation,action_layer:'action-layer-v1',action_task:'action-task-v1',task_workspace:true,...control.capabilities};
     calls.push(args);if(args[0]==='job-prepare'){
       const job={id:'j_'+randomUUID().replaceAll('-','').slice(0,24),state:'PLANNED',outputs:[],specification:{implementation:control.jobImplementation||control.implementation,operation:args[1],options:await json(args[args.indexOf('--options')+1]),inputs:[]}};jobs.set(job.id,job);return job;
     }
@@ -136,4 +136,40 @@ test('connection Save preflight requires measured compatible channels before a w
   if(problem==='none'){await f.work.saveAction(project.id,f.scene.id,project.revision,request);await f.wait();assert.equal(f.calls.length,calls+2);}
   else{await assert.rejects(f.work.saveAction(project.id,f.scene.id,project.revision,request),/matching connection inspection/);assert.equal(f.calls.length,calls);assert.equal(await exists(path.join(project.directory,'Runs/.workbench-writer.lock')),false);assert.equal((await f.store.get(project.id)).revision,project.revision);}
  }
+});
+
+test('native edit preflight checks capability, source range and every heading owner before a job',async t=>{
+ const second='take_'+'c'.repeat(64);
+ for(const problem of ['none','old-inspection','unobserved-heading','blocked-heading','outside-range','trimmed-travel','heading-with-blend']){
+  const observed=structuredClone(inspection),p=observed.performers[0];
+  p.timeline={version:'action-timeline-v1',stitch_version:'native-stitch-v1',edit_version:'native-motion-edit-v1',error:null,clips:[]};
+  p.takes=[take,second].map(id=>({id,performer:p.name,range:[1,25],travel_blocker:null,heading_blocker:null,stitch_blocker:null,stitch_channels:'d'.repeat(64)}));
+  const ca={id:'clip_a',take_id:take,start:1,frames:25,speed:1,repeat_reviewed:false,travel:null};
+  const cb={...ca,id:'clip_b',take_id:second,start:32,frames:13,source_range:[7,19],heading_deg:90,transition:{frames:6,match_phase:false,mode:'turn'}};
+  if(problem==='old-inspection')delete p.timeline.edit_version;
+  if(problem==='unobserved-heading')delete p.takes[0].heading_blocker;
+  if(problem==='blocked-heading')p.takes[0].heading_blocker='Native rotation needs Blender';
+  if(problem==='outside-range')cb.source_range=[7,31];
+  if(problem==='trimmed-travel')cb.travel={delta_m:[0,1],meters_per_cycle:1};
+  if(problem==='heading-with-blend')cb.transition.mode='blend';
+  const f=await fixture(t,observed),project=await f.inspect(),count=f.calls.length;
+  const request={...f.request,frame_range:[1,80],changes:[{performer:p.name,mode:'timeline',clips:[ca,cb]}]};
+  if(problem==='none'){
+   await f.work.saveAction(project.id,f.scene.id,project.revision,request);const saved=await f.wait();
+   assert.notEqual(saved.workbench.scenes[0].current,f.cp.id);assert.equal(f.calls.length,count+2);
+   assert.deepEqual((await json(path.join(project.directory,`Runs/${request.requestId}.json`))).state,'SUCCEEDED');
+  }else{
+   await assert.rejects(f.work.saveAction(project.id,f.scene.id,project.revision,request),/inspect|rotation|Trim|Trimmed|Turn and connect/i);
+   assert.equal(f.calls.length,count,problem);assert.equal(await exists(path.join(project.directory,'Runs/.workbench-writer.lock')),false);
+   assert.equal((await f.store.get(project.id)).revision,project.revision);
+  }
+ }
+});
+
+test('new motion-edit runtime requires fresh capability-bound inspection without rewriting old receipts',async t=>{
+ const f=await fixture(t),project=await f.inspect(),filename=path.join(project.directory,`Runs/${f.base.requestId}.json`),before=await fileHash(filename),count=f.calls.length;
+ f.control.capabilities={action_motion_edit:'native-motion-edit-v1'};
+ await assert.rejects(f.work.saveAction(project.id,f.scene.id,project.revision,f.request),/predates this runtime/);
+ assert.equal(f.calls.length,count);assert.deepEqual(await fileHash(filename),before);
+ assert.equal((await f.store.get(project.id)).workbench.scenes[0].current,f.cp.id);
 });

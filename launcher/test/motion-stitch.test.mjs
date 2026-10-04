@@ -7,7 +7,7 @@ const cp={id:'cp_saved',sha256:'a'.repeat(64)},take='take_'+'b'.repeat(64);
 function fixture(){return {id:'run_inspected',inspection:{sha256:'c'.repeat(64),frame_range:[1,250],fps:24,reference_frame:1,performers:[{name:'Observed',takes:[{id:take,action:'No semantic label',range:[1,25],stitch_blocker:null,stitch_channels:'d'.repeat(64),travel_blocker:null}],timeline:{version:'action-timeline-v1',stitch_version:'native-stitch-v1',clips:[],origin_m:[0,0,0],meters_per_unit:1}}]}};}
 test('compatible append adds visible transition, connected ripple and reversible cut',()=>{
  const run=fixture(),d=timelineDraft(cp,run);d.add(take,'clip_a');d.add(take,'clip_b');assert.equal(d.selectedClip.start,32);assert.equal(d.selectedClip.transition.frames,6);assert(!d.invalid);
- assert.match(timelineTracks(d,String),/Connection 26 to 31/);assert.match(timelineControls(d,String),/Smooth connection/);
+ assert.match(timelineTracks(d,String),/Connection 26 to 31/);assert.match(timelineControls(d,String),/Connect to previous clip/);
  d.edit('transition_frames','10');assert.equal(d.selectedClip.start,36);d.finishEdit();d.undo();assert.equal(d.selectedClip.start,32);
  d.select('Observed','clip_a');d.edit('speed','0.5');d.edit('frames','49');assert.equal(d.clips('Observed')[1].start,56);
  d.select('Observed','clip_b');d.edit('smooth',false);assert.equal(d.selectedClip.start,50);assert.equal(d.selectedClip.transition,undefined);d.finishEdit();d.undo();assert.equal(d.selectedClip.start,56);

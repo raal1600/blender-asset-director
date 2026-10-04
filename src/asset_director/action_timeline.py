@@ -18,10 +18,11 @@ def is_generated(action):
 
 def load(obj):
     from .action_layer import track_record, channels
+    from .native_motion_basis import MAX_TIMELINE_JSON_BYTES
     raw = obj.get(PROPERTY)
     if raw is None:
         return None
-    require(isinstance(raw, str) and len(raw) <= 200000, 'TIMELINE_CHANGED', 'Invalid saved timeline metadata')
+    require(isinstance(raw, str) and len(raw.encode('utf-8')) <= MAX_TIMELINE_JSON_BYTES, 'TIMELINE_CHANGED', 'Invalid saved timeline metadata')
     try:
         value = json.loads(raw)
         contract.validate({'performer': obj.name, 'mode': 'timeline', 'clips': value['clips']})
@@ -85,7 +86,7 @@ def travel_reason(obj, action, slot):
 
 def describe(obj, takes, gait_budget=None):
     from .action_layer import bindings
-    from . import gait_sampling, gait_profile, motion_stitch
+    from . import gait_sampling, gait_profile, motion_stitch, motion_heading
     if gait_budget is None: gait_budget = [3120]
     saved, error = None, None
     try: saved = load(obj)
@@ -97,20 +98,26 @@ def describe(obj, takes, gait_budget=None):
         take['stitch_blocker'] = motion_stitch.reason(obj, a, slot)
         take['stitch_channels'] = (digest({n: sorted(v) for n, v in motion_stitch.channel_spec(obj, a, slot).items()})
                                    if take['stitch_blocker'] is None else None)
+        try:
+            take['heading_blocker'] = motion_heading.reason(obj, a, slot)
+        except DirectorError as exc:
+            take['heading_blocker'] = str(exc)
         take['gait'] = (gait_profile.unavailable(take['travel_blocker']) if take['travel_blocker']
                         else gait_sampling.inspect(obj, a, slot, take, gait_budget))
     scale = bpy.context.scene.unit_settings.scale_length
     origin = saved['origin_m'] if saved else [float(v) * scale for v in obj.matrix_world.translation]
     return {'version': contract.VERSION, 'managed': saved is not None, 'clips': saved['clips'] if saved else [],
             'stitch_version': contract.STITCH_VERSION, 'connections': saved.get('connections', []) if saved else [],
+            'edit_version': contract.EDIT_VERSION,
             'origin_m': origin, 'meters_per_unit': scale, 'error': error,
             'notice': 'Automatic pace is a bounded support-motion estimate, not contact or performance approval.'}
 
 
 def apply(options, job_id, before):
-    from . import action_layer as layer, motion_stitch, motion_stitch_math, sequence_math
+    from . import action_layer as layer, motion_stitch, motion_stitch_math, motion_heading, native_motion_basis
     scene = bpy.context.scene
     pending = []
+    native_bases, heading_bases = {}, {}
     # Every clip, owner, travel and timing is validated before any mutation.
     for change in options['changes']:
         item = next((p for p in before['performers'] if p['name'] == change['performer']), None)
@@ -118,6 +125,14 @@ def apply(options, job_id, before):
                 'ACTION_UNSUPPORTED', 'Performer or saved timeline needs Blender review')
         obj = scene.objects[item['name']]
         saved = load(obj)
+        heading_active = any(c.get('heading_deg', 0.) != 0 for c in change['clips']) or bool(saved and 'base_delta_rotation' in saved)
+        try:
+            native_bases[obj.name] = native_motion_basis.capture(obj)
+        except DirectorError:
+            if heading_active or saved and saved.get('native_basis') is not None:
+                raise
+        if heading_active:
+            heading_bases[obj.name] = motion_heading.state(obj, saved)
         motions = []
         has_travel = any(c['travel'] for c in change['clips'])
         for clip in change['clips']:
@@ -130,8 +145,11 @@ def apply(options, job_id, before):
                 require(not take['travel_blocker'], 'TRAVEL_UNSUPPORTED', take['travel_blocker'] or '')
             action, slot = next((a, s) for a, s in layer.bindings(obj)
                                 if a.name == take['action'] and layer.slot_id(s) == take['slot'])
-            motions.append((clip, take, action, slot, plan))
-        if any(c['travel'] for c in change['clips']) or saved:
+            if heading_active:
+                blocker = motion_heading.reason(obj, action, slot)
+                require(not blocker, 'HEADING_UNSUPPORTED', blocker or '')
+            motions.append((clip, dict(take, range=contract.source_range(clip, take)), action, slot, plan))
+        if any(c['travel'] for c in change['clips']) or saved or heading_active:
             parent = obj.parent.matrix_world @ obj.matrix_parent_inverse if obj.parent else obj.matrix_parent_inverse
             require(abs(parent.to_3x3().determinant()) > 1e-10, 'TRAVEL_UNSUPPORTED', 'Singular parent transform')
             require(all(not c.data_path.startswith('delta_') for a, slot in layer.bindings(obj)
@@ -148,8 +166,8 @@ def apply(options, job_id, before):
             if stitch['join']:
                 samples = stitch['join']['samples']
                 generated_keys += sum(len(pose)*10 for _, pose in samples)
-        if any(c['travel'] for c in change['clips']):
-            generated_keys += 6*len(motions) + sum(len(s['join']['samples'])*3 for s in stitches if s['join'])
+        if any(c['travel'] for c in change['clips']) or change['performer'] in heading_bases:
+            generated_keys += 14*len(motions) + sum(len(s['join']['samples'])*7 for s in stitches if s['join'])
     existing_keys = sum(len(c.keyframe_points) for a in bpy.data.actions for c in ops.curves(a))
     require(existing_keys+generated_keys <= 500000, 'RESOURCE_LIMIT',
             'Saved motion and requested connections exceed the inspection key budget; split or simplify the edit')
@@ -165,8 +183,10 @@ def apply(options, job_id, before):
         # Clear means hold the first timeline pose, not restore a hidden old walk.
         scene.frame_set(saved['clips'][0]['start'] if saved and saved['clips'] else before['frame_range'][0])
         bpy.context.view_layer.update()
-        held = {'object': obj.matrix_basis.copy(),
-                'bones': {p.name: p.matrix_basis.copy() for p in obj.pose.bones} if obj.type == 'ARMATURE' else {}}
+        def raw_pose(owner):
+            prop = 'rotation_quaternion' if owner.rotation_mode == 'QUATERNION' else 'rotation_axis_angle' if owner.rotation_mode == 'AXIS_ANGLE' else 'rotation_euler'
+            return {key: list(getattr(owner, key)) for key in ('location', prop, 'scale')}
+        held = {'object': raw_pose(obj), 'bones': {p.name: raw_pose(p) for p in obj.pose.bones} if obj.type == 'ARMATURE' else {}}
         base_delta = saved['base_delta'] if saved else list(obj.delta_location)
         origin = saved['origin_m'] if saved else item['timeline']['origin_m']
         ad = obj.animation_data_create()
@@ -179,10 +199,18 @@ def apply(options, job_id, before):
         for track in ad.nla_tracks:track.mute = True
         ad.use_nla = True
         obj.delta_location = base_delta
+        heading_base = heading_bases.get(obj.name)
+        if heading_base:
+            motion_heading.set_heading(obj, heading_base, 0.)
         if not motions:
-            obj.matrix_basis = held['object']
+            if heading_base:
+                motion_heading.set_heading(obj, heading_base, saved['clips'][0].get('heading_deg', 0.) if saved and saved['clips'] else 0.)
+            for prop, values in held['object'].items():
+                setattr(obj, prop, values)
             obj.delta_location = base_delta
-            for name, matrix in held['bones'].items():obj.pose.bones[name].matrix_basis = matrix
+            for name, pose in held['bones'].items():
+                for prop, values in pose.items():
+                    setattr(obj.pose.bones[name], prop, values)
         generated = {}
         connections, connection_checks = [], []
         for index, (clip, take, action, slot, plan) in enumerate(motions):
@@ -191,7 +219,7 @@ def apply(options, job_id, before):
                 join = stitch['join']
                 name, signature = motion_stitch.bake(obj, join, job_id, clip['id'])
                 generated[name] = signature
-                connections.append({k: v for k, v in join.items() if k != 'samples'} | {
+                connections.append({k: v for k, v in join.items() if k not in {'samples', 'channels'}} | {
                     'clip_id': clip['id'], 'phase': stitch['phase'], 'method': contract.STITCH_VERSION,
                     'contact_acceptance': 'NOT_EVALUATED', 'performance_acceptance': 'NOT_EVALUATED'})
                 samples = join['samples']
@@ -207,7 +235,7 @@ def apply(options, job_id, before):
                 require(abs(strip.frame_end-cursor) < .02,
                         'ACTION_RESULT_CHANGED', 'Native clip endpoint differs from planned timing')
             require(abs(cursor-plan['native_end']) < .02, 'ACTION_RESULT_CHANGED', 'Phase alignment changed clip duration')
-        if any(c['travel'] for c in change['clips']):
+        if any(c['travel'] for c in change['clips']) or heading_base and motions:
             # Parent inverse converts world metres to delta-location coordinates.
             parent = obj.parent.matrix_world @ obj.matrix_parent_inverse if obj.parent else obj.matrix_parent_inverse
             basis = parent.to_3x3()
@@ -218,18 +246,20 @@ def apply(options, job_id, before):
             path[GENERATED] = 1
             ad.action = path
             displacement = Vector((0, 0, 0))
+            previous_euler = None
             for index, (clip, take, action, slot, plan) in enumerate(motions):
                 join = stitches[index]['join']
                 if join:
-                    begin = list(displacement)
-                    finish = list(displacement + Vector((*join['delta_m'], 0))/unit)
-                    va = [*(v/unit for v in join['velocity_in']), 0.]
-                    vb = [*(v/unit for v in join['velocity_out']), 0.]
+                    begin = displacement.copy()
+                    finish = displacement + Vector((*join['delta_m'], 0))/unit
                     for f, _ in join['samples']:
                         u = (f-join['start'])/join['duration_frames']
-                        position = sequence_math.hermite(begin, finish, va, vb, join['duration_frames'], max(0., min(1., u)))
-                        obj.delta_location = Vector(base_delta) + inverse @ Vector(position)
+                        offset = motion_heading.path_at(join, max(0., min(1., u)))
+                        obj.delta_location = Vector(base_delta) + inverse @ (begin+Vector((*offset, 0))/unit)
                         obj.keyframe_insert('delta_location', frame=f, group='Director travel')
+                        if heading_base:
+                            prop, previous_euler = motion_heading.set_heading(obj, heading_base, motion_heading.heading_at(join, u), previous_euler)
+                            obj.keyframe_insert(prop, frame=f, group='Director heading')
                     displacement = Vector(finish)
                 # Stop travel when native motion stops, including fractional
                 # final frames; the rounded occupied tail is a hold, not slide.
@@ -238,6 +268,9 @@ def apply(options, job_id, before):
                         displacement += Vector((*clip['travel']['delta_m'], 0)) / unit
                     obj.delta_location = Vector(base_delta) + inverse @ displacement
                     obj.keyframe_insert('delta_location', frame=f, group='Director travel')
+                    if heading_base:
+                        prop, previous_euler = motion_heading.set_heading(obj, heading_base, clip.get('heading_deg', 0.), previous_euler)
+                        obj.keyframe_insert(prop, frame=f, group='Director heading')
             for curve in ops.curves(path):
                 for key in curve.keyframe_points:key.interpolation = 'LINEAR'
                 curve.extrapolation = 'CONSTANT'
@@ -252,7 +285,14 @@ def apply(options, job_id, before):
                     'generated': generated,
                     'parent_matrix': ops.flatten(obj.parent.matrix_world @ obj.matrix_parent_inverse if obj.parent else obj.matrix_parent_inverse),
                     'meters_per_unit': scene.unit_settings.scale_length}
-        obj[PROPERTY] = json.dumps(timeline, sort_keys=True, allow_nan=False)
+        if obj.name in native_bases:
+            timeline['native_basis'] = native_bases[obj.name]
+        if heading_base:
+            timeline.update(heading_base)
+        serialized = json.dumps(timeline, sort_keys=True, allow_nan=False)
+        require(len(serialized.encode('utf-8')) <= native_motion_basis.MAX_TIMELINE_JSON_BYTES,
+                'RESOURCE_LIMIT', 'Saved native motion metadata exceeds its bounded size; split the edit')
+        obj[PROPERTY] = serialized
         records.append({'performer': obj.name, 'mode': 'timeline', 'timeline': timeline,
                         'connection_checks': connection_checks, 'previous_tracks': item['tracks']})
     scene.frame_start, scene.frame_end = interval
@@ -271,10 +311,7 @@ def verify(report):
     for change in report['changes']:
         obj = bpy.context.scene.objects.get(change['performer'])
         require(obj is not None and load(obj) == change['timeline'], 'TIMELINE_CHANGED', 'Saved timeline changed')
-        for old in change['previous_tracks']:
-            track = obj.animation_data.nla_tracks.get(old['name'])
-            require(track is not None and layer.track_record(track) == dict(old, mute=True),
-                    'ACTION_PRESERVATION_FAILED', 'Previous native track changed')
+        layer.verify_previous_tracks(obj, change['previous_tracks'])
         scene = bpy.context.scene
         frame, subframe = scene.frame_current, scene.frame_subframe
         try:
@@ -282,7 +319,8 @@ def verify(report):
                 scene.frame_set(math.floor(f), subframe=f-math.floor(f)); bpy.context.view_layer.update()
                 for name, expected in pose.items():
                     owner = obj.pose.bones[name] if name else obj
-                    _, q, _ = owner.matrix_basis.decompose()
+                    from .motion_heading import rotation
+                    q = rotation(owner)
                     from . import sequence_math as sm
                     require(math.dist(owner.location, expected['location']) < 2e-4
                             and math.dist(owner.scale, expected['scale']) < 2e-4

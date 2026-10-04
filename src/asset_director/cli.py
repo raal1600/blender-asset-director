@@ -76,6 +76,7 @@ def workbench_capabilities():
     """Runtime metadata is independent of any catalog and does not open SQLite."""
     return {"schema":1,"render_frames":True,"gpu_render":True,"film_assemble":True,"task_workspace":True,"explicit_save_handoff":True,"preview_camera":True,"catalog":True,"asset_preview":True,"asset_contents":True,"runtime":__version__,"implementation":implementation_hash(),"limits":{"frames_per_shot":360,"frames_per_film":3600,"render_seconds":900},"audio":False,
             'action_layer':'action-layer-v1', 'action_task':'action-task-v1', 'action_timeline':'action-timeline-v1', 'action_stitch':'native-stitch-v1',
+            'action_motion_edit':'native-motion-edit-v1',
             'scene_layer':'scene-layer-v1', 'world_prepare':'world-prepare-v1',
             'shot_preview':'shot-camera-samples-v1'}
 

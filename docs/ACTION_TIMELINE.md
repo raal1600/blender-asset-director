@@ -1,5 +1,10 @@
 # Action motion timeline — development
 
+The additive [editable-motion capability](EDITABLE_MOTION_TRANSITIONS.md) adds
+native source trim/split, take replacement, explicit body turns and stable
+post-save calibration. Existing timelines retain the behavior described below
+until explicitly edited with the matching runtime.
+
 This adds an opt-in **Build a motion timeline** route inside the existing Action
 layer. It is source development, not an installed or production-approved release.
 World, Action, Shots, Light, Render and Final film remain the existing workflow.

@@ -69,9 +69,9 @@ try{
  await page.getByLabel('Direction (world degrees)',{exact:true}).fill('90');assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);assert.match(await page.locator('[data-motion-errors]').innerText(),/turn or stop/);
  await page.getByLabel('Direction (world degrees)',{exact:true}).fill('0');assert.equal(await page.locator('[data-action="action-save"]').isEnabled(),true);
  report.checks.push('Measured path velocities expose added distance; a sharp reversal refuses before any job executes');
- await advanced();await page.getByLabel('Transition frames',{exact:true}).fill('');assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);assert.equal(await field('transition_frames').getAttribute('aria-invalid'),'true');
- await page.getByLabel('Transition frames',{exact:true}).fill('10');await page.getByLabel('Speed',{exact:true}).focus();assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 36–60/);
- await click('[data-action="action-undo"]');assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 32–56/);
+ await click('[data-action="motion-select-transition"]');await page.getByLabel('Transition frames',{exact:true}).fill('');assert.equal(await page.locator('[data-action="action-save"]').isDisabled(),true);assert.equal(await field('transition_frames').getAttribute('aria-invalid'),'true');
+ await page.getByLabel('Transition frames',{exact:true}).fill('10');await click('[data-action="motion-select-clip"]');assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 36–60/);
+ await click('[data-action="action-undo"]');await click('[data-action="motion-select-clip"]');assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 32–56/);
  await advanced();await field('smooth').uncheck();assert.equal(await page.locator('.motion-transition').count(),0);assert.match(await page.locator('[data-motion-duration]').innerText(),/Frames 26–50/);assert.equal(await page.locator('details[data-motion-details]').evaluate(node=>node.open),true);await field('smooth').check();assert.equal(await page.locator('details[data-motion-details]').evaluate(node=>node.open),true);
  report.checks.push('Transition duration is editable, raw errors stay visible, Undo restores timing and a hard cut remains available');
  await page.getByRole('button',{name:'Observed 0 0 frames 1 to 25',exact:true}).click();await snapshot();await page.getByLabel('Distance (m)',{exact:true}).fill('2');

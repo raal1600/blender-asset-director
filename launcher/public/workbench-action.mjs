@@ -69,7 +69,7 @@ export function actionDraft(checkpoint,run){
   };
 }
 
-export function actionDraftStatus(draft){return draft?.invalid?(draft.timeline?'Cannot save yet: '+draft.errors[0].message:'Check timing for '+[...new Set(draft.errors.map(e=>e.performer))].join(', ')):draft?.dirty?'Unsaved Action changes · '+draft.count+' performer'+(draft.count===1?'':'s'):'Saved performance';}
+export function actionDraftStatus(draft){return draft?.invalid?(draft.timeline?'Cannot save yet: '+(draft.errorLabel?draft.errorLabel(draft.errors[0])+': ':'')+draft.errors[0].message:'Check timing for '+[...new Set(draft.errors.map(e=>e.performer))].join(', ')):draft?.dirty?'Unsaved Action changes · '+draft.count+' performer'+(draft.count===1?'':'s'):'Saved performance';}
 export function actionPreviewScope(draft,stale=false){return stale?'Older saved checkpoint · local draft retained':draft?.invalid?'Playback shows the saved scene. Resolve the message beside Save changes before saving.':draft?.dirty?'Playback shows the saved scene. Save changes to preview the new motion. Planned playback: frames '+draft.playbackRange.join('–')+'; expanded if needed to include each full take.':'Play the whole saved scene together. Inspection lighting is approximate; playback does not approve motion.';}
 
 export function actionView({project,scene,stages,checkpoint,runs,locked,taskStatus,cap,draft,saving,esc,b}){

@@ -1,5 +1,9 @@
 # Lightweight native-clip stitching — development
 
+See [editable native motion and explicit turns](EDITABLE_MOTION_TRANSITIONS.md)
+for the additive source-edit/heading capability. The original smooth-join mode
+described below remains supported; a turn is now a distinct selectable mode.
+
 No model, inference service, training data, downloaded dependency or animation-name
 classifier is used. Codex can plan and inspect; bounded Blender operations execute
 and verify. This does not reproduce a learned generative motion model.

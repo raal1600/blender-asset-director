@@ -404,7 +404,11 @@ async function dispatch(a,d){
   const old=currentActionDraft();if(!old?.audit.performers.every(p=>p.timeline?.version==='action-timeline-v1'))throw Error('Use Inspect performers again to load timeline support for this saved scene.');
   motionEnabled.add(projectId+':'+sceneId);actionDrafts.delete(projectId+':'+sceneId);render();return;
  }
- if(a==='motion-select'){currentActionDraft().select(d.performer,d.clip);render();return;}
+ if(a==='motion-select'){currentActionDraft().select(d.performer,d.clip,d.part);render();return;}
+ if(a==='motion-select-transition'||a==='motion-select-clip'){const draft=currentActionDraft();draft.select(draft.selected,draft.selectedClip.id,a==='motion-select-transition'?'transition':'clip');render();return;}
+ if(a==='motion-split'){currentActionDraft().split(Math.round(sceneViewer?.currentFrame??NaN));render();return;}
+ if(a==='motion-refresh-pace'){currentActionDraft().refreshPace();render();return;}
+ if(a==='motion-earlier'||a==='motion-later'){currentActionDraft().move(a==='motion-earlier'?-1:1);render();return;}
  if(a==='motion-delete'){currentActionDraft().remove();render();return;}
  if(a==='motion-ripple'){currentActionDraft().shiftFollowing();render();return;}
  if(a==='action-hold-all'){const draft=currentActionDraft();draft.holdAll(sceneViewer?.currentFrame??draft.audit.reference_frame);render();return;}
@@ -561,7 +565,8 @@ document.addEventListener('input',e=>{if(!e.target.dataset.motionField||e.target
 document.addEventListener('change',e=>{
  try{
   if(e.target.hasAttribute('data-motion-add')){if(busy||state.locked)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){draft.add(e.target.value);const take=draft.audit.performers.find(p=>p.name===draft.selected).takes.find(t=>t.id===e.target.value);if(!take.travel_blocker&&take.gait?.status==='estimated')draft.edit('travel',true);render();}}
-  else if(e.target.dataset.motionField){if(e.target.type==='checkbox'){const field=e.target.dataset.motionField,detailsOpen=!!document.querySelector('[data-motion-details]')?.open;editMotion(e.target);render();const details=document.querySelector('[data-motion-details]');if(detailsOpen&&details)details.open=true;document.querySelector(`[data-motion-field="${field}"]`)?.focus({preventScroll:true});}currentActionDraft()?.finishEdit();}
+  else if(e.target.hasAttribute('data-motion-replace')||e.target.hasAttribute('data-motion-insert')){if(busy||state.locked||s()?.task||s()?.run||actionSave)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){if(e.target.hasAttribute('data-motion-insert'))draft.insertBefore(e.target.value);else draft.replace(e.target.value);render();}}
+  else if(e.target.dataset.motionField){if(e.target.type==='checkbox'||e.target.tagName==='SELECT'){const field=e.target.dataset.motionField,detailsOpen=!!document.querySelector('[data-motion-details]')?.open;editMotion(e.target);render();const details=document.querySelector('[data-motion-details]');if(detailsOpen&&details)details.open=true;document.querySelector(`[data-motion-field="${field}"]`)?.focus({preventScroll:true});}currentActionDraft()?.finishEdit();}
  }catch(error){notice(error.message);}
 });
 document.addEventListener('focusout',e=>{if(e.target.dataset.motionField)currentActionDraft()?.finishEdit();});

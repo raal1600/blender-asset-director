@@ -162,7 +162,17 @@ def preserved(excluded, *, omit_objects=(), omit_actions=(), omit_parent=()):
 
 def add_strip(obj, action, slot, name, start, source_range, speed):
     ad = obj.animation_data_create()
-    track = ad.nla_tracks.new(); track.name = name
+    # Blender silently truncates NLA labels to 63 UTF-8 bytes and permits
+    # duplicates. Keep the distinguishing job/clip identity in a digest suffix.
+    prefix = name.encode('utf-8')[:40].decode('utf-8', errors='ignore')
+    label = name if len(name.encode('utf-8')) <= 63 else prefix+' '+digest(name)[:16]
+    if ad.nla_tracks.get(label) is not None:
+        ordinal = len(ad.nla_tracks)
+        while ad.nla_tracks.get(label) is not None:
+            label = prefix+' '+digest([name, ordinal])[:16]
+            ordinal += 1
+    track = ad.nla_tracks.new(prev=ad.nla_tracks[-1]) if ad.nla_tracks else ad.nla_tracks.new()
+    track.name = label
     strip = track.strips.new(action.name, int(start), action)
     if hasattr(strip, 'action_slot') and slot:
         strip.action_slot = slot
@@ -173,6 +183,19 @@ def add_strip(obj, action, slot, name, start, source_range, speed):
     strip.blend_type = 'REPLACE'; strip.extrapolation = 'HOLD'; strip.use_auto_blend = False
     strip.blend_in = strip.blend_out = 0
     return track
+
+
+def verify_previous_tracks(obj, previous):
+    """Verify the exact retained ordered prefix, not ambiguous display labels.
+
+    Edits append after muting the existing tracks. Duplicate old labels are
+    legitimate Blender state; every old strip, property and ordering must stay
+    identical apart from the explicitly requested track mute.
+    """
+    tracks = list(obj.animation_data.nla_tracks)
+    require(len(tracks) >= len(previous)
+            and [track_record(t) for t in tracks[:len(previous)]] == [dict(old, mute=True) for old in previous],
+            'ACTION_PRESERVATION_FAILED', 'Previous native track changed')
 
 
 def apply(options, job_id):
@@ -246,9 +269,7 @@ def verify(report):
         obj = scene.objects.get(change['performer']);require(obj is not None, 'ACTION_RESULT_CHANGED', 'Performer missing')
         ad = obj.animation_data
         require(ad and ad.action is None, 'ACTION_RESULT_CHANGED', 'Unexpected active action after NLA/hold edit')
-        for old in change['previous_tracks']:
-            track = ad.nla_tracks.get(old['name'])
-            require(track is not None and track_record(track) == dict(old, mute=True), 'ACTION_PRESERVATION_FAILED', 'Previous native track changed')
+        verify_previous_tracks(obj, change['previous_tracks'])
         if change['mode'] == 'clip':
             track = ad.nla_tracks.get(change['track']['name'])
             require(track is not None and track_record(track) == change['track'], 'ACTION_RESULT_CHANGED', 'Native clip timing differs')

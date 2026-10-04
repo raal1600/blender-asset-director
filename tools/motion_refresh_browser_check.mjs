@@ -1,0 +1,56 @@
+/** Real generated-only stale-pace recovery. Never edits a production receipt. */
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import {randomUUID} from 'node:crypto';
+import {createApp} from '../launcher/server.mjs';
+import {exists,fileHash,json,writeJson} from '../launcher/lib/storage.mjs';
+const [out,generated,python,blender,playwright,chrome]=process.argv.slice(2);
+assert([out,generated,python,blender,playwright].every(v=>v&&path.isAbsolute(v)));
+assert(!await exists(out));const fixture=await json(path.join(generated,'RESULTS.json'));
+assert.equal(fixture.status,'PASS');assert.equal(fixture.input_kind,'GENERATED');assert.equal(fixture.fixture_purpose,'INTENTIONALLY_STALE_SYNTHETIC_PACE');
+await fs.mkdir(out,{recursive:true});
+const repo=fileURLToPath(new URL('../',import.meta.url)),source=path.join(generated,'source.blend'),original=await fileHash(source);
+assert.equal(original.sha256,fixture.source_sha256);
+const report={kind:'generated-stale-pace-browser',checks:[],errors:[],requests:[],not_tested:['User projects or live runtime','Human motion/contact approval','Private or licensed motion inputs']};
+let app,browser,page;
+try{
+ app=await createApp({root:path.join(out,'Studio'),port:0,config:{python,blender,skill:path.join(repo,'skills/blender-asset-director'),library:path.join(out,'Studio/Database/AssetDirector')}});
+ const job=await app.runtime.harness(['job-prepare','scene-audit','--input',source]),audit=await app.workbench.result(await app.runtime.harness(['job-run',job.id,'--blender',blender]));
+ let project=await app.store.create('Synthetic pace refresh','Intentionally obsolete generated profile; no historical or user record edited');await app.workbench.create(project.id,project.revision,'Stale profile');project=await app.store.get(project.id);
+ const scene=project.workbench.scenes[0],cpId='cp_'+randomUUID(),relative='Scenes/'+cpId+'.blend';await fs.copyFile(source,path.join(project.directory,relative),fs.constants.COPYFILE_EXCL);
+ scene.checkpoints.push({id:cpId,path:relative,...original,parent:null,stage:'world',audit});scene.current=cpId;scene.stage='action';scene.completed={world:cpId};await app.store.save(project,project.revision);
+ const {chromium}=await import(pathToFileURL(playwright).href);browser=await chromium.launch(chrome?{executablePath:chrome}:{channel:'chrome'});page=await browser.newPage({viewport:{width:1440,height:1000},serviceWorkers:'block'});page.setDefaultTimeout(30000);
+ const safe=v=>String(v).replaceAll(app.token,'[REDACTED]');page.on('pageerror',e=>report.errors.push(safe(e.message)));page.on('console',m=>{if(m.type()==='error')report.errors.push(safe(m.text()));});page.on('dialog',d=>d.dismiss());
+ page.on('request',r=>{if(r.url().startsWith(app.origin+'/'))report.requests.push({path:new URL(r.url()).pathname,method:r.method()});else if(/^https?:/.test(r.url()))report.errors.push('Unexpected external request');});
+ const snapshot=()=>page.locator('body').ariaSnapshot(),ready=()=>page.waitForFunction(()=>!document.body.classList.contains('working')&&document.querySelector('[data-scene-viewer]')?.dataset.viewerState==='ready'&&!document.querySelector('[data-action-field="performer"]')?.disabled,null,{timeout:205000});
+ const click=async selector=>{await snapshot();await page.locator(selector).click();await page.waitForFunction(()=>!document.body.classList.contains('working'));await snapshot();};
+ const save=()=>page.locator('[data-action="action-save"]'),field=name=>page.locator(`[data-motion-field="${name}"]`),savedRequests=()=>report.requests.filter(r=>r.path.endsWith('/action-save')).length;
+ const state=async()=>{project=await app.store.get(project.id);const s=project.workbench.scenes[0],cp=s.checkpoints.find(c=>c.id===s.current),runs=await app.store.runs(project.id),run=runs.find(r=>r.action==='action-audit'&&r.checkpointId===cp.id&&r.state==='SUCCEEDED');assert(run);return {cp,rig:run.inspection.performers.find(p=>p.name===fixture.rig),runs};};
+ const saveAndRead=async()=>{const before=await state(),known=new Set(before.runs.map(r=>r.id));assert(await save().isEnabled());await click('[data-action="action-save"]');await ready();const after=await state(),edit=after.runs.find(r=>r.action==='action-edit'&&!known.has(r.id));assert.equal(edit?.state,'SUCCEEDED',edit?.error||'Native Save did not finish');assert.notEqual(after.cp.id,before.cp.id);assert.deepEqual(project.workbench.scenes[0].completed,{world:cpId});return after;};
+ await page.goto(app.origin+'/workbench#'+app.token);await click(`[data-action="project"][data-id="${project.id}"]`);await ready();
+ assert.equal(await page.locator('.motion-clip').count(),2);const initial=await state();assert.deepEqual(initial.rig.timeline.clips,fixture.clips);
+ await click('.motion-clip[data-clip="clip_following"]');await field('distance').fill(String(Math.hypot(...fixture.clips[1].travel.delta_m)*.8));
+ assert(await save().isDisabled());const status=await page.locator('.action-savebar [role="status"]').innerText();assert.match(status,/Synthetic alternate supports.*frames 1–13.*Automatic pace changed/);
+ const navigation=page.locator('[data-motion-errors] [data-action="motion-select"][data-clip="clip_legacy_first"]');assert.equal(await navigation.count(),1);await snapshot();await navigation.click();await snapshot();
+ assert(await page.getByRole('button',{name:'Refresh measured pace',exact:true}).isVisible());assert.equal(await page.locator('[data-motion-field="pace"]').count(),0);assert.equal(savedRequests(),0);assert.equal(await page.locator('[data-motion-errors] [data-action="motion-select"]').count(),0,'The valid later clip must not be blamed for its predecessor’s stale pace');
+ assert.deepEqual((await state()).rig.timeline.clips,fixture.clips);assert.deepEqual(await fileHash(source),original);
+ await page.screenshot({path:path.join(out,'01-stale-clip-identified.png'),fullPage:true});report.checks.push('Editing the second clip names and navigates to the stale first clip; no calibration or native Save is silently changed');
+ const distanceBefore=Number(await field('distance').inputValue());await click('[data-action="motion-refresh-pace"]');assert(Math.abs(Number(await field('distance').inputValue())-distanceBefore)<1e-9);assert(await save().isEnabled());assert.equal(savedRequests(),0);
+ assert.deepEqual((await state()).rig.timeline.clips,fixture.clips);await click('[data-action="action-undo"]');assert(await save().isDisabled());assert(await page.getByRole('button',{name:'Refresh measured pace',exact:true}).isVisible());await click('[data-action="motion-refresh-pace"]');
+ const refreshed=await saveAndRead(),first=refreshed.rig.timeline.clips[0],gait=refreshed.rig.takes.find(t=>t.id===first.take_id).gait;
+ assert.equal(first.travel.gait_id,gait.id);assert.notEqual(first.travel.gait_id,'0'.repeat(64));assert(Math.abs(Math.hypot(...first.travel.delta_m)-Math.hypot(...fixture.clips[0].travel.delta_m))<1e-8);assert.equal(first.repeat_reviewed,false);assert.equal(savedRequests(),1);
+ report.checks.push('Explicit refresh is one undoable draft operation, retains distance and needs one real Blender Save to publish a separately saved valid profile');
+ const refreshedHash=await fileHash(path.join(project.directory,refreshed.cp.path));await page.reload();await ready();await click('.motion-clip[data-clip="clip_legacy_first"]');
+ assert.equal(await page.locator('[data-action="motion-refresh-pace"]').count(),0);assert.equal(await page.locator('[data-motion-field="pace"]').count(),0);
+ const distance=field('distance'),small=Math.max(.05,gait.meters_per_cycle*.3);await distance.fill(String(small));assert(await save().isEnabled());
+ const handle=page.getByRole('button',{name:'Move path endpoint',exact:true});await handle.scrollIntoViewIfNeeded();await handle.focus();await handle.press('ArrowRight');assert(Math.abs(Number(await distance.inputValue())-(small+.1))<.001);await click('[data-action="action-undo"]');assert(Math.abs(Number(await distance.inputValue())-small)<.001);
+ const box=await handle.boundingBox();assert(box);await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+22,box.y+box.height/2-12,{steps:8});await page.mouse.up();assert.notEqual(Number(await distance.inputValue()),Number(small.toFixed(3)));await click('[data-action="action-undo"]');assert(Math.abs(Number(await distance.inputValue())-small)<.001);
+ assert.equal(savedRequests(),1);const numeric=await saveAndRead();assert.equal(numeric.rig.timeline.clips[0].travel.gait_id,gait.id);assert.equal(numeric.rig.timeline.clips[0].travel.meters_per_cycle,gait.meters_per_cycle);assert(Math.abs(Math.hypot(...numeric.rig.timeline.clips[0].travel.delta_m)-small)<1e-8);
+ await page.reload();await ready();await click('.motion-clip[data-clip="clip_legacy_first"]');await handle.scrollIntoViewIfNeeded();await handle.focus();await handle.press('ArrowRight');const keyboard=await saveAndRead();assert.equal(keyboard.rig.timeline.clips[0].travel.gait_id,gait.id);assert(Math.abs(Math.hypot(...keyboard.rig.timeline.clips[0].travel.delta_m)-(small+.1))<1e-8);
+ await click('.motion-clip[data-clip="clip_legacy_first"]');await page.screenshot({path:path.join(out,'02-reloaded-editable-pace.png'),fullPage:true});report.checks.push('Reloaded numeric, pointer and keyboard editing does not request metres-per-cycle; subsequent native saves retain the exact measured profile');
+ assert.deepEqual(await fileHash(source),original);assert.deepEqual(await fileHash(path.join(project.directory,relative)),original);assert.deepEqual(await fileHash(path.join(project.directory,refreshed.cp.path)),refreshedHash);assert.equal(savedRequests(),3);assert.deepEqual(report.errors,[]);
+ report.checks.push('Generated input, intentionally stale starting checkpoint and previous successful output remain bytewise intact; no external requests or console errors');report.status='PASS';report.projectId=project.id;report.checkpoints=[refreshed.cp,numeric.cp,keyboard.cp].map(({id,sha256})=>({id,sha256}));
+}catch(error){report.status='FAIL';report.error=String(error).replaceAll(app?.token||'never-match-token','[REDACTED]');process.exitCode=1;if(page)await page.screenshot({path:path.join(out,'FAILURE.png'),fullPage:true}).catch(()=>{});}
+finally{await browser?.close();if(app){app.server.closeAllConnections();await new Promise(resolve=>app.server.close(resolve));}await writeJson(path.join(out,'RESULTS.json'),report);console.log(JSON.stringify({status:report.status,checks:report.checks.length,error:report.error}));}
