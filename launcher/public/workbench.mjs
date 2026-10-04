@@ -8,7 +8,8 @@ import {worldActionNeedsSave} from './world-draft.mjs';
 import {actionView,actionDraft,actionInspection,ensureActionInspection,actionDraftStatus,actionPreviewScope} from './workbench-action.mjs';
 import {actionInspectionAttempt,currentActionInspection,actionInspectionRefresh} from './action-inspection.mjs';
 import {timelineDraft} from './action-timeline-draft.mjs';
-import {syncTimelineUI} from './action-timeline-view.mjs';
+import {actionSelectionFrame,actionSelectionStamp,actionSelectionSeeking} from './action-selection.mjs';
+import {syncTimelineUI,timelineControls} from './action-timeline-view.mjs';
 import {sceneLayerView,sceneLayerDraft,layerInspection,ensureLayerInspection,cameraForm} from './workbench-scene-layer.mjs';
 import {lightingEvidenceView} from './lighting-evidence.mjs';
 import {outputView,outputContext,outputPreferences,outputValuesValid} from './workbench-render.mjs';
@@ -37,6 +38,7 @@ let draftDestination=null,worldSave=null,actionSave=null;
 const actionDrafts=new Map();
 const motionEnabled=new Set();
 const motionReturnFrames=new Map();
+const actionSeeking=actionSelectionSeeking(()=>({viewer:sceneViewer,context:actionViewContext()}));
 const actionInspectionAttempts=new Set();
 const layerDrafts=new Map(),layerInspectionAttempts=new Set(),layerSelections=new Map();
 let layerSave=null;
@@ -145,11 +147,14 @@ let addPrompt=null;
 const worldPanels=new Map();
 let previewStoragePlan=null;
 function clearAssetViewer(){assetViewer?.dispose();assetViewer=null;}
-function clearSceneViewer(){sceneViewer?.dispose();sceneViewer=null;sceneViewerKey=null;}
+function clearSceneViewer(){actionSeeking.cancel();sceneViewer?.dispose();sceneViewer=null;sceneViewerKey=null;}
 const sceneViewKey=()=>cp()?projectId+':'+sceneId+':'+s().stage+':'+cp().id+':'+cp().sha256+':'+JSON.stringify(shotFor(s())):null;
-function showSceneViewer(host){clearSceneViewer();sceneViewer=startViewer(host,{kind:'checkpoint',id:cp().id});sceneViewerKey=sceneViewKey();const saved=motionReturnFrames.get(projectId+':'+sceneId),viewer=sceneViewer;if(s().stage==='action'&&saved&&!saved.applied&&saved.checkpointId===cp().id&&saved.sha256===cp().sha256)void viewer.ready.then(()=>{if(sceneViewer===viewer){viewer.seekFrame(saved.frame);saved.applied=true;}});}
+function actionViewContext(){const key=sceneViewKey();return tab==='scenes'&&s()?.stage==='action'&&sceneViewerKey===key?key:null;}
+function seekSelectedAction(){const draft=currentActionDraft(),current=draft?.checkpointId===cp()?.id&&draft?.sha256===cp()?.sha256;void actionSeeking.seek(sceneViewer,actionViewContext(),current?actionSelectionFrame(draft):null);}
+function renderActionSelection(){render();seekSelectedAction();}
+function showSceneViewer(host){clearSceneViewer();sceneViewer=startViewer(host,{kind:'checkpoint',id:cp().id});sceneViewerKey=sceneViewKey();const saved=motionReturnFrames.get(projectId+':'+sceneId);if(s().stage==='action'&&saved&&!saved.applied&&saved.checkpointId===cp().id&&saved.sha256===cp().sha256)void actionSeeking.seek(sceneViewer,actionViewContext(),saved.frame,()=>{saved.applied=true;});}
 function startViewer(host,request){const context={projectId,sceneId,revision:p().revision},viewerId='viewer_'+crypto.randomUUID();return openViewer({host,
- actionEdit:request.kind==='checkpoint'&&s().stage==='action'?{getDraft:()=>currentActionDraft(),onChange:()=>syncActionDraftUI(),canEdit:()=>!busy&&!state.locked&&!s()?.task&&!s()?.run&&!actionSave&&currentActionDraft()?.checkpointId===cp()?.id&&currentActionDraft()?.sha256===cp()?.sha256}:undefined,
+ actionEdit:request.kind==='checkpoint'&&s().stage==='action'?{getDraft:()=>currentActionDraft(),onChange:actionViewerChanged,canEdit:()=>!busy&&!state.locked&&!s()?.task&&!s()?.run&&!actionSave&&currentActionDraft()?.checkpointId===cp()?.id&&currentActionDraft()?.sha256===cp()?.sha256}:undefined,
  worldEdit:request.kind==='checkpoint'&&s().stage==='world'?{labels:Object.fromEntries((p().workbench.catalogPins||[]).map(a=>[a.id,a.title])),changed:()=>syncWorldDraftUI()}:undefined,
  inspectInBlender:request.kind==='checkpoint'?undefined:()=>perform(async()=>{if(projectId!==context.projectId||sceneId!==context.sceneId||$(request.kind==='catalog'?'catalog-file':'source-file')?.value!==request.file)throw Error('Preview context changed; reopen the asset first.');await dispatch('asset-preview-open',request);}),
  prepare:signal=>api('workbench/viewer-prepare',{...context,request,viewerId},signal),
@@ -211,13 +216,25 @@ async function saveActionDraft(){
 function editActionField(field,value){
  if(busy||state.locked)return;const draft=currentActionDraft();
  if(!draft||(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256))throw Error('Refresh the current performers before editing.');
- if(field==='performer'){draft.select(value);render();return;}
+ if(field==='performer'){draft.select(value);renderActionSelection();return;}
  const name=draft.selected;
  if(field==='mode'){
   const pose=Math.max(draft.audit.frame_range[0],Math.min(draft.audit.frame_range[1],sceneViewer?.currentFrame??draft.audit.reference_frame));
   draft.change(name,value==='keep'?{mode:'keep'}:value==='hold'?{mode:'hold',frame:pose}:{mode:'clip',take_id:value,start:draft.audit.frame_range[0],speed:1});
  }else{draft.editTiming(name,field,value);syncActionDraftUI();return;}
  render();
+}
+function actionViewerChanged({controls=false}={}){
+ // A first visual body turn can enable Turn and connect. Refresh only the
+ // inspector: keep the canvas, pointer capture, camera and playhead intact.
+ const inspector=document.querySelector('[data-motion-inspector]'),draft=currentActionDraft();
+ if(controls&&inspector&&draft?.timeline){
+  const selectors=['[data-motion-details]','[data-motion-trim]','.motion-arrange','.motion-insert','.motion-pace-help'];
+  const opened=selectors.filter(selector=>inspector.querySelector(selector)?.open);
+  inspector.innerHTML=timelineControls(draft,esc,true);
+  for(const selector of opened){const details=inspector.querySelector(selector);if(details)details.open=true;}
+ }
+ syncActionDraftUI();
 }
 function syncActionDraftUI(){
  const bar=document.querySelector('.action-savebar');if(!bar)return;
@@ -397,20 +414,20 @@ async function dispatch(a,d){
   draftDestination=null;close();await dispatch(destination.action,destination.data);return;
  }
  if(a==='action-discard'){if(actionSave)throw Error('Wait for the Save receipt.');currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);clearSceneViewer();await load();return;}
- if(a==='action-undo'){currentActionDraft()?.undo();render();return;}
+ if(a==='action-undo'){const draft=currentActionDraft(),selected=actionSelectionStamp(draft);actionSeeking.cancel();draft?.undo();render();if(selected!==actionSelectionStamp(currentActionDraft()))seekSelectedAction();return;}
  if(a==='action-save'){await saveActionDraft();return;}
  if(a==='motion-enable'){
   if(currentActionDraft()?.dirty)throw Error('Save or discard existing choices first.');
   const old=currentActionDraft();if(!old?.audit.performers.every(p=>p.timeline?.version==='action-timeline-v1'))throw Error('Use Inspect performers again to load timeline support for this saved scene.');
   motionEnabled.add(projectId+':'+sceneId);actionDrafts.delete(projectId+':'+sceneId);render();return;
  }
- if(a==='motion-select'){currentActionDraft().select(d.performer,d.clip,d.part);render();return;}
- if(a==='motion-select-transition'||a==='motion-select-clip'){const draft=currentActionDraft();draft.select(draft.selected,draft.selectedClip.id,a==='motion-select-transition'?'transition':'clip');render();return;}
- if(a==='motion-split'){currentActionDraft().split(Math.round(sceneViewer?.currentFrame??NaN));render();return;}
- if(a==='motion-refresh-pace'){currentActionDraft().refreshPace();render();return;}
- if(a==='motion-earlier'||a==='motion-later'){currentActionDraft().move(a==='motion-earlier'?-1:1);render();return;}
- if(a==='motion-delete'){currentActionDraft().remove();render();return;}
- if(a==='motion-ripple'){currentActionDraft().shiftFollowing();render();return;}
+ if(a==='motion-select'){currentActionDraft().select(d.performer,d.clip,d.part);renderActionSelection();return;}
+ if(a==='motion-select-transition'||a==='motion-select-clip'){const draft=currentActionDraft();draft.select(draft.selected,draft.selectedClip.id,a==='motion-select-transition'?'transition':'clip');renderActionSelection();return;}
+ if(a==='motion-split'){currentActionDraft().split(Math.round(sceneViewer?.currentFrame??NaN));renderActionSelection();return;}
+ if(a==='motion-refresh-pace'){currentActionDraft().refreshPace();renderActionSelection();return;}
+ if(a==='motion-earlier'||a==='motion-later'){currentActionDraft().move(a==='motion-earlier'?-1:1);renderActionSelection();return;}
+ if(a==='motion-delete'){currentActionDraft().remove();renderActionSelection();return;}
+ if(a==='motion-ripple'){currentActionDraft().shiftFollowing();renderActionSelection();return;}
  if(a==='action-hold-all'){const draft=currentActionDraft();draft.holdAll(sceneViewer?.currentFrame??draft.audit.reference_frame);render();return;}
  if(actionSave&&worldActionNeedsSave(a))throw Error('Action Save is still running. Refresh status or inspect its receipt.');
  if(currentActionDraft()?.dirty&&worldActionNeedsSave(a)){
@@ -562,10 +579,15 @@ function editMotion(node){
  draft.edit(node.dataset.motionField,node.type==='checkbox'?node.checked:node.value);syncActionDraftUI();
 }
 document.addEventListener('input',e=>{if(!e.target.dataset.motionField||e.target.type==='checkbox')return;try{editMotion(e.target);notice('');}catch(error){notice(error.message);}});
+// A newer direct playback gesture must not be overwritten by a delayed seek.
+document.addEventListener('pointerdown',e=>{if(e.target.closest('[data-scene-viewer] .viewer-canvas'))actionSeeking.cancel();},true);
+document.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Escape'].includes(e.key)&&e.target.closest('[data-scene-viewer] .viewer-canvas'))actionSeeking.cancel();},true);
+document.addEventListener('input',e=>{if(e.target.matches('[data-view="time"]')&&e.target.closest('[data-scene-viewer]'))actionSeeking.cancel();});
+document.addEventListener('click',e=>{if(e.target.closest('[data-view="play"]')?.closest('[data-scene-viewer]'))actionSeeking.cancel();});
 document.addEventListener('change',e=>{
  try{
-  if(e.target.hasAttribute('data-motion-add')){if(busy||state.locked)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){draft.add(e.target.value);const take=draft.audit.performers.find(p=>p.name===draft.selected).takes.find(t=>t.id===e.target.value);if(!take.travel_blocker&&take.gait?.status==='estimated')draft.edit('travel',true);render();}}
-  else if(e.target.hasAttribute('data-motion-replace')||e.target.hasAttribute('data-motion-insert')){if(busy||state.locked||s()?.task||s()?.run||actionSave)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){if(e.target.hasAttribute('data-motion-insert'))draft.insertBefore(e.target.value);else draft.replace(e.target.value);render();}}
+  if(e.target.hasAttribute('data-motion-add')){if(busy||state.locked)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){draft.add(e.target.value);const take=draft.audit.performers.find(p=>p.name===draft.selected).takes.find(t=>t.id===e.target.value);if(!take.travel_blocker&&take.gait?.status==='estimated')draft.edit('travel',true);renderActionSelection();}}
+  else if(e.target.hasAttribute('data-motion-replace')||e.target.hasAttribute('data-motion-insert')){if(busy||state.locked||s()?.task||s()?.run||actionSave)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){if(e.target.hasAttribute('data-motion-insert'))draft.insertBefore(e.target.value);else draft.replace(e.target.value);renderActionSelection();}}
   else if(e.target.dataset.motionField){if(e.target.type==='checkbox'||e.target.tagName==='SELECT'){const field=e.target.dataset.motionField,detailsOpen=!!document.querySelector('[data-motion-details]')?.open;editMotion(e.target);render();const details=document.querySelector('[data-motion-details]');if(detailsOpen&&details)details.open=true;document.querySelector(`[data-motion-field="${field}"]`)?.focus({preventScroll:true});}currentActionDraft()?.finishEdit();}
  }catch(error){notice(error.message);}
 });

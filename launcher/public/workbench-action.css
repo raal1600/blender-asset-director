@@ -2,8 +2,11 @@
 .action-heading,.action-savebar,.action-savebar>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .action-heading{margin:18px 0 12px}.action-heading h1{margin:0 0 6px;font-size:28px}.action-heading p{margin:0;color:var(--muted)}
 .action-savebar{padding:10px 0;font-size:12px;flex-wrap:wrap}.action-savebar button{padding:8px 12px}
+.action-workspace>.action-savebar{position:sticky;top:0;z-index:5;background:var(--bg,#14171b);border-bottom:1px solid var(--line)}
 .action-workspace .viewer-canvas{height:clamp(300px,47vh,590px)}
 .action-preview-scope{font-size:12px;color:var(--muted);margin:10px 0}
+.viewer-seek-note{font-size:12px;color:var(--warn,#ffcc87);margin:8px 12px;line-height:1.5}
+.motion-turn-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:12px}.motion-turn-toolbar[hidden]{display:none}.motion-turn-toolbar strong,.motion-turn-toolbar output{color:#ffcc87}.motion-turn-toolbar output{font-variant-numeric:tabular-nums;min-width:40px}.motion-turn-toolbar span{color:var(--muted);flex:1 1 260px;line-height:1.5}.motion-turn-handle{position:absolute;transform:translate(-50%,-50%);width:32px;height:32px;min-width:0!important;min-height:0;padding:0!important;border-radius:50%;background:#734f22!important;border:2px solid #ffd49c!important;color:#ffe9cd!important;font-size:23px;line-height:1;cursor:grab;touch-action:none;z-index:3}.motion-turn-handle[hidden]{display:none}.motion-turn-handle:focus-visible{outline:3px solid white;outline-offset:3px}.motion-turn-handle:active{cursor:grabbing}
 .action-controls{display:grid;grid-template-columns:minmax(140px,1fr) minmax(210px,1.5fr) minmax(90px,.45fr) minmax(80px,.4fr);gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
 .action-controls label{margin:0;min-width:0}.action-controls input,.action-controls select{width:100%;min-width:0;box-sizing:border-box}
 .action-controls .action-field-error{display:block;margin-top:5px;color:var(--danger,#d46a63);font-size:12px;line-height:1.4}.action-controls .action-field-error[hidden]{display:none}.action-controls input[aria-invalid="true"]{border-color:var(--danger,#d46a63)}

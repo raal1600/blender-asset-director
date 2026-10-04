@@ -102,6 +102,19 @@ export function timelineDraft(checkpoint,run){
    reflow(order);
   },
   moveEndpoint(delta){if(!Array.isArray(delta)||delta.length!==2||!delta.every(Number.isFinite)||Math.hypot(...delta)<.001||Math.hypot(...delta)>10000)return;editable(selected);const c=tracks.get(selected).find(c=>c.id===clipId);if(!c?.travel)return;const order=sorted(selected);remember(c.id+':drag');const take=performer(selected).takes.find(t=>t.id===c.take_id);if(c.travel.gait_id){const length=Math.hypot(...c.travel.delta_m),direction=c.travel.delta_m.map(v=>v/length),projection=Math.max(.001,delta.reduce((n,v,i)=>n+v*direction[i],0));c.travel.delta_m=direction.map(v=>v*projection);}else c.travel.delta_m=[...delta];for(const field of ['distance','direction'])raw.delete(c.id+':'+field);if(c.travel.meters_per_cycle>0)c.frames=plannedFrames(take,c.travel,c.speed);reflow(order);},
+  rotateHeading(degrees){
+   const p=extended(selected),c=tracks.get(selected).find(c=>c.id===clipId);
+   if(!c||!Number.isFinite(degrees))throw Error('Select an animation before rotating.');
+   const order=sorted(selected),previous=order[order.findIndex(x=>x.id===c.id)-1];
+   if(previous&&!c.transition)throw Error('Connect to previous clip before changing its orientation.');
+   for(const clip of order){const take=p.takes.find(t=>t.id===clip.take_id);if(take?.heading_blocker!==null)throw Error(take?.heading_blocker||'Inspect this performer before rotating.');}
+   const value=turnAngle(0,degrees),delta=turnAngle(c.heading_deg||0,value);
+   if(Math.abs(delta)<1e-8)return;
+   remember(c.id+':visual-turn');c.heading_deg=value;
+   if(c.transition){c.transition.mode='turn';c.transition.match_phase=false;}
+   if(c.travel?.gait_id)c.travel.delta_m=rotateDirection(c.travel.delta_m,delta);
+   raw.delete(c.id+':heading_deg');
+  },
   shiftFollowing(){const c=this.selectedClip;if(!c)return;remember();let next=clipEnd(c)+1;for(const item of sorted(selected).filter(x=>x.id!==c.id&&x.start>=c.start)){item.start=next+(item.transition?.frames||0);next=clipEnd(item)+1;}},
   arrow(){
    const c=this.selectedClip,p=performer(selected);if(!c?.travel)return null;

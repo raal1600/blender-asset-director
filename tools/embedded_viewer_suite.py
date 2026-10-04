@@ -232,6 +232,10 @@ def main():
                    str(output/'motion-stitch-native'), sys.executable, args.blender, str(module)]
         if args.chrome: command.append(args.chrome)
         reported_browser(command, output, 'motion-edits-browser', 600)
+        command = [args.node, str(ROOT/'tools/motion_visual_controls_browser_check.mjs'), str(output/'motion-visual-controls-browser'),
+                   str(output/'motion-stitch-native'), sys.executable, args.blender, str(module)]
+        if args.chrome: command.append(args.chrome)
+        reported_browser(command, output, 'motion-visual-controls-browser', 600)
         with (output/'motion-refresh-native.log').open('wb') as log:
             subprocess.run([args.blender, '--background', '--factory-startup', '--disable-autoexec', '--threads', '2',
                             '--python-exit-code', '11', '--python', str(ROOT/'tools/motion_refresh_fixture.py'),

@@ -14,6 +14,48 @@ Undo and Discard remain local until Save creates a new checkpoint.
 Reset view includes the selected red path, including long paths outside the
 current camera view. Dragging a path never automatically moves the view camera.
 
+### Selecting and turning in the viewer
+
+Selecting a clip pauses the saved scene preview at that clip's displayed first
+frame. Selecting an amber connection seeks its displayed first frame instead;
+**Edit connection** and **Back to animation** follow the same rule. A pending
+preview load cannot overwrite a newer selection or seek into another scene or
+checkpoint. Selection itself does not edit, save, create a job or approve motion.
+If a draft extends outside the saved preview's range, the viewer stays within
+the available saved frames and explains the timing limit. Save is required to
+see the new timing and motion.
+
+The amber **Character rotation** ring is separate from the red travel endpoint.
+It edits body turn and keeps the degree controls synchronized. It is available
+only for an inspected supported rig whose exported root and visible skin can
+be isolated without including another performer. Missing or ambiguous ownership
+leaves the visual control unavailable; detailed inspection remains in Blender.
+Rig-child accessories follow that isolated hierarchy. External rigid accessories
+connected only through Blender constraints have no trusted ownership in the
+current GLB preview; they are not included in the temporary orientation override.
+Review the complete native result after Save for those dependent objects.
+
+On the first rotation interaction, the viewer moves to the incoming clip's
+start and shows an **orientation-only draft** of that pose. This is not playback
+of an unsaved transition. A connected clip changes to **Turn and connect** when
+its body turn is edited with the ring. A later disconnected clip must first be
+connected; the control does not silently invent a transition interval. Automatic
+travel rotates its measured direction with body turn; manual travel remains a
+separate authored path. No anatomical facing is inferred from a name or pose.
+
+The rotation handle is keyboard-focusable. Arrow keys adjust the turn by 5°;
+Shift plus an arrow adjusts it by 15°. Holding Shift during a pointer drag snaps
+the angle in 5° increments. Escape cancels the current pointer rotation, and
+Undo restores a previous draft edit. Numeric body-turn controls remain available.
+Dragging the ring retains the canvas, view camera and pointer capture while its
+inspector updates.
+
+Play and timeline scrubbing remove the temporary orientation override and show
+the saved motion again; they do not discard the authored draft. Save creates a
+new native checkpoint, after which playback can show the executed turn. This
+preview does not plant feet, retarget a rig, solve contacts or certify a natural
+transition. Existing checkpoints and source animation keys remain untouched.
+
 The two connection modes are deliberately different:
 
 - Smooth join blends endpoint poses and planar velocities without changing body
@@ -39,10 +81,11 @@ not implemented, so trimming a repeated path is refused rather than silently
 using a full-cycle estimate. Connected later clips ripple when duration changes;
 independent gaps retain explicit shift controls.
 
-Playback shows the saved checkpoint, while the red arrow describes a local draft.
-Save and play to inspect an executed revision. There is no unsaved native-motion
-preview pipeline. Saving, playback and a successful numerical test are not
-human motion/contact approval.
+Playback shows the saved checkpoint, while the red arrow and paused rotation
+target describe a local draft. Save and play to inspect an executed revision.
+The orientation-only target is not an unsaved native-motion preview pipeline.
+Saving, playback and a successful numerical test are not human motion/contact
+approval.
 
 ## Stable native calibration
 
@@ -116,6 +159,15 @@ regressions remain required. Additional source-specific fixtures are:
   an explicitly synthetic obsolete calibration, navigation to the blocking clip,
   deliberate refresh without implicit Save, then numeric/pointer edits and
   repeated native saves with a stable profile identity.
+- `launcher/test/action-selection.test.mjs` and
+  `launcher/test/action-turn-preview.test.mjs`: selection races, unchanged draft
+  state, exact exported ownership, reversible orientation-only geometry and
+  saved-heading interpretation. These are local logic checks, not native
+  playback or human acceptance.
+- `tools/motion_visual_controls_browser_check.mjs`: a separate generated studio
+  exercises clip/connection seeking, pointer and keyboard rotation, inspector
+  synchronization, orientation-only versus saved playback, Undo and real native
+  Save/reload. No existing production is used as a test fixture.
 
 These fixtures join the existing CI evidence partitions without renaming or
 making earlier gates optional. Test definitions do not claim execution. Local
