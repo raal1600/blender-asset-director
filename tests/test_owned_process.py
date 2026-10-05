@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import signal
 import sys
 import tempfile
 import time
@@ -144,7 +145,11 @@ with (root/'worker.log').open('w') as stream:
         # exercising real filesystem failure instead of a mocked writer.
         (self.root/'guardian.json').mkdir()
         with self.assertRaises(OSError):guard.wait(10)
-        self.assertNotEqual(guard.process.returncode,0)
+        self.assertEqual(guard.process.returncode,125 if os.name=='nt' else -signal.SIGKILL,
+                         'Receipt failure must close the owned tree without Python shutdown')
+        log=(self.root/'worker.log').read_text(encoding='utf-8')
+        self.assertIn('GUARDIAN_REPORT_FAILED',log)
+        self.assertNotIn('Fatal Python error',log)
         self.gone(child['pid']);self.gone(child['grandchild'])
 
     def test_exited_process_with_retained_handle_is_not_observed_live(self):
