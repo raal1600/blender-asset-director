@@ -61,7 +61,13 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
         evaluated=clone.evaluated_get(bpy.context.evaluated_depsgraph_get())
         return evaluated.matrix_world@evaluated.pose.bones[profile['roles']['pelvis']].head
     state(a);hip_a=hip();origin=Vector((hip_a.x,hip_a.y,profile['ground_z']))
-    state(b);hip_b=hip()
+    state(ap);hip_ap=hip();state(app);hip_app=hip()
+    state(b);hip_b=hip();state(bn);hip_bn=hip();state(bnn);hip_bnn=hip()
+    # Match evaluated world-root velocity throughout the compact seam window.
+    # A position-only residual leaves the baker to correct the entire velocity
+    # error in its first quarter-frame segment, producing a sharp acceleration.
+    root_velocities=[(3*hip_a-4*hip_ap+hip_app)/(2*h)+Vector((*geometry['velocity_in'],0)),
+                     (-3*hip_b+4*hip_bn-hip_bnn)/(2*h)+Vector((*geometry['velocity_out'],0))]
     request={'schema':provider.REQUEST_SCHEMA,'conventions':dict(provider.CONVENTIONS),'skeleton':profile['skeleton'],
              'frames':model_frames,'seed':motion[0]['transition']['seed'],'target_placement':'predicted','argmax':True}
     emit('sampling_native_contexts')
@@ -96,7 +102,8 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
                   for edge,(k,j,l,p) in enumerate(((0,0,1,a),(-1,-2,-1,b)))] for n in spec}
     worlds=[ret.axes()@Vector(v)/profile['world_to_model_scale']+origin for v in result['roots']]
     expected_b=worlds[last].copy();expected_b.z=hip_b.z
-    root_errors=[hip_a-worlds[first],expected_b-worlds[last]]
+    root_errors=[(hip_a-worlds[first],root_velocities[0]-(worlds[first+1]-worlds[first])/step),
+                 (expected_b-worlds[last],root_velocities[1]-(worlds[last]-worlds[last-1])/step)]
     # Both source Actions own their native vertical motion. Placement is predicted XY.
     parent=obj.parent.matrix_world@obj.matrix_parent_inverse if obj.parent else obj.matrix_parent_inverse
     inverse=parent.to_3x3().inverted();samples=[];path=[];count=math.ceil(duration*4)
@@ -110,7 +117,7 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
         if index==0:p=copy.deepcopy(a)
         elif index==count:p=copy.deepcopy(b)
         state(p);desired=worlds[first+k].lerp(worlds[first+k+1],t)
-        for edge,value in enumerate(root_errors):desired+=Vector(seam.edge_residual(list(value),[0.,0.,0.],time,duration,window,edge))
+        for edge,(value,velocity) in enumerate(root_errors):desired+=Vector(seam.edge_residual(list(value),list(velocity),time,duration,window,edge))
         f=geometry['start']+time;samples.append((f,p));path.append((f,list(inverse@(desired-hip()))))
     from .motion_bricks_feet import cleanup
     samples,foot_retarget=cleanup(reader,obj,profile,request,result,samples,path,origin,geometry,(a,b,ap,app,bn,bnn,h),tangents,check)
@@ -121,6 +128,8 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
                 'model_fps':30,'generated_retime_ratio':retime,'native_clips_retimed':False,'roundtrip':roundtrip,
                 'resource_measurements':result['resource_measurements'],'raw_boundary_diagnostics':result['boundary_diagnostics'],
                 'seam_residual_free_model_indices':[first+window/step,last-window/step],
+                'root_seam_correction':{'method':'evaluated-world-velocity-compact-residual-v1','window_frames':window,
+                                        'native_velocities_m_per_frame':[list(v) for v in root_velocities]},
                 'foot_retarget':foot_retarget,'contact_quality':'NOT_VERIFIED','visual_quality':'REQUIRES_REVIEW'}
     if execution.get('directory'):
         filename='motion-bricks-'+motion[0]['id']+'.json'

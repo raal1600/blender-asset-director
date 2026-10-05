@@ -17,7 +17,7 @@ generated interval is separate from both full native clips.
 That reference uses explicitly reviewed root-only copies of the original
 in-place takes. A constant path previously caused roughly 34 mm of source floor
 penetration. Positional foot retargeting and the documented source preparation
-reduce the measured full-sequence penetration to 0.6 mm; reviewed generated
+reduce the measured full-sequence penetration to 0.9 mm; reviewed generated
 stance markers drift at most 18.0 mm for a 1.85 m character. Those are specific
 fixture measurements, not a promise for arbitrary clips, terrain or rigs.
 Unprepared source motion can still slide or penetrate. Numerical seams and
@@ -110,6 +110,11 @@ residuals match native endpoint value and angular velocity at the generated
 edges; their influence is zero in the recorded central interval. Body velocity
 uses the SO(3) right Jacobian and shortest quaternion paths. Generated world-root
 motion becomes the rig's separate path, avoiding double-applied root motion.
+The root residual matches evaluated native world velocity across the same compact
+window; correcting only the baked endpoint slope can concentrate acceleration
+in the first quarter-frame segment, especially at higher scene FPS. The real
+30/60-to-60-FPS regression retains the same 0.05-height/second velocity threshold
+and 1/1536-second derivative estimator before and after this correction.
 Native pose/path channels own their original intervals. Source and target
 vertical pose boundaries are retained. No frozen middle frame hides a seam.
 
