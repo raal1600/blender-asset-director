@@ -107,9 +107,9 @@ class CandidateTests(unittest.TestCase):
                         self.assertEqual(installed['status'],'CANDIDATE_INSTALLED')
                         self.assertEqual(installed['source_commit'],SHA)
                         configured=json.loads((destination/'SystemRuntime/UserData/Launcher/config.json').read_text())
-                        self.assertEqual(configured['python'],sys.executable)
+                        self.assertTrue(Path(configured['python']).samefile(sys.executable))
                         for name in ('blender','codex','ffmpeg','ffprobe'):
-                            self.assertEqual(configured[name],str(other_tool))
+                            self.assertTrue(Path(configured[name]).samefile(other_tool))
                         original_receipt=receipt_file.read_bytes()
                         again=subprocess.run(setup,capture_output=True,text=True,timeout=60)
                         self.assertNotEqual(again.returncode,0)

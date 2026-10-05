@@ -182,3 +182,30 @@ artifact meanings and known restrictions are in
   `setup-regression-after.log` passes. Final-candidate CI, immutable regression
   and normal ZIP installation must be rerun after this fix. Earlier green CI
   is not evidence that the previously untested setup entry point worked.
+
+## Final validation identity corrections
+
+- The real PowerShell installer passed on hosted Windows at `822a7762`, but its
+  regression compared long path spelling with a valid Windows 8.3 alias. The
+  assertion now checks physical file identity. `setup-83-path-proof` reproduces
+  the old assertion failure locally through a genuine 8.3 path and passes the
+  corrected test; no filesystem policy was changed.
+- The unchanged `6b39e17` package completed all 12 native WebView2 transition
+  checks through its documented Python installer as diagnostic evidence only.
+  Normal EXE/backend restart, revised Save, render and movie playback worked;
+  this does not erase that candidate's normal PowerShell setup failure.
+- That native run exposed a read-only resource observer defect: an older,
+  unrelated process retained a parent PID later reused by a test descendant.
+  PID-only traversal misattributed it. No unrelated process was terminated.
+  Sampling now binds PID and creation time, rejects children older than their
+  apparent parent and Windows snapshot/open PID reuse, and verifies release
+  against the same process identity. Query uncertainty remains UNKNOWN or
+  NOT_VERIFIED. OS-owned process containment is unchanged.
+- Eight focused observer tests and the full portable preflight (755 tests,
+  three pre-existing skips, installer self-test) pass. Original failed resource
+  reports remain unchanged; absent historical creation identities cannot be
+  reconstructed as passing evidence.
+- A separate review branch `fix/reliable-animation-transitions-final-20261005`
+  preserves the earlier branch and its active CI run. The existing workflow
+  cancels older same-branch runs on push, so the new branch avoids that action.
+  Final acceptance must bind the new exact commit independently.
