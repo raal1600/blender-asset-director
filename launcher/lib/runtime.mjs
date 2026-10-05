@@ -13,8 +13,8 @@ import { assert, exists, json, now, safe, writeJson } from './storage.mjs';
 
 const exec = promisify(execFile);
 const ps = path.join(process.env.SystemRoot || 'C:\\Windows','System32/WindowsPowerShell/v1.0/powershell.exe');
-export async function command(exe, args, timeout = 30000) {
-  try { return await exec(exe, args, { timeout, maxBuffer: 4*1024*1024, windowsHide: true, encoding: 'utf8', env: {...process.env, PYTHONIOENCODING:'utf-8'} }); }
+export async function command(exe, args, timeout = 30000, environment = {}) {
+  try { return await exec(exe, args, { timeout, maxBuffer: 4*1024*1024, windowsHide: true, encoding: 'utf8', env: {...process.env, ...environment, PYTHONIOENCODING:'utf-8'} }); }
   catch (e) { throw new Error(`Command failed (${e.code || 'timeout'}): ${(e.stdout || e.stderr || e.message).slice(0,1000)}`); }
 }
 export function addonQuery(type, port = 9876) {
@@ -38,7 +38,11 @@ export function addonQuery(type, port = 9876) {
 export class Runtime {
   constructor(store, config) { this.store = store; this.config = config; this.health = null; }
   async harness(args, timeout = 30000) {
-    const { stdout } = await command(this.config.python, [path.join(this.config.skill,'scripts/director.py'),'--library',this.config.library,...args],timeout);
+    const configured=this.config.motionBricksConfig;
+    assert(configured===undefined||typeof configured==='string'&&path.isAbsolute(configured),'MotionBricks configuration must be an absolute local file path.');
+    const provider=configured??path.join(this.store.root,'SystemRuntime/UserData/MotionBricks/provider.json');
+    const environment=configured||await exists(provider)?{ASSET_DIRECTOR_MOTION_BRICKS_CONFIG:provider}:{};
+    const { stdout } = await command(this.config.python, [path.join(this.config.skill,'scripts/director.py'),'--library',this.config.library,...args],timeout,environment);
     return JSON.parse(stdout.replace(/^\uFEFF/,''));
   }
   async launchAssetPreview(directory,receipt) {return launchAssetPreview(this,directory,receipt);}

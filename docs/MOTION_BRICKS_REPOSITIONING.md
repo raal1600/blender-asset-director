@@ -212,3 +212,21 @@ whole-device usage. The lock does not control unrelated external applications.
 cancellation, timeout and release after process termination. The headless mapping
 fixture also tests root-only source preparation on an existing managed timeline,
 wrong-foot landmark rejection and preservation of the original data.
+
+
+## Normal desktop startup
+
+For a studio installation, place the verified provider settings at
+`SystemRuntime/UserData/MotionBricks/provider.json` under that studio root. The
+normal desktop launcher passes this persisted configuration to its harness and
+isolated workers. No terminal environment variable is needed. Alternatively,
+set `motionBricksConfig` to an absolute local JSON path in the studio's existing
+`SystemRuntime/UserData/Launcher/config.json`. Explicit studio configuration takes
+precedence over inherited environment; other studios and host settings are not
+modified. Direct CLI use still supports `ASSET_DIRECTOR_MOTION_BRICKS_CONFIG`.
+
+Build/acquire the pinned backend using the documented provider setup first, and
+retain its verified binary/model paths and standalone `python_executable` in
+these settings. Missing or changed files produce setup/stale-provider errors,
+not an undisclosed deterministic fallback. Models are never packaged into the
+application or this repository.
