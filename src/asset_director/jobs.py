@@ -245,6 +245,12 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     specification = {"schema_version": SCHEMA, "operation": operation, "inputs": inputs, "asset_id": asset_id,
                      "source_files": source_files, "source_file": asset.metadata.get("file") if asset else None, "options": options, "implementation": implementation_hash(),
                      "license_grants": grant_ids, "license_files": license_files}
+    uses_provider = operation == 'action-audit' or (operation == 'action-edit' and any(
+        clip.get('transition', {}).get('mode') == 'generated'
+        for change in options.get('changes', []) for clip in change.get('clips', [])))
+    if uses_provider:
+        from .motion_bricks_provider import configuration_identity
+        specification['motion_provider'] = configuration_identity()
     if asset and asset.metadata.get('local_use_confirmation'):
         from .local_use import job_binding
         specification['local_use'] = job_binding(asset)
@@ -268,6 +274,10 @@ def read_job(lib: Library, jid: str) -> tuple[dict, Path]:
     require(job["id"] == jid and "j_" + digest(job["specification"])[:24] == jid and Path(job["library"]).resolve() == lib.root,
             "INVALID_JOB", "Job identity/library mismatch")
     require(job["specification"]["implementation"] == implementation_hash(), "STALE_IMPLEMENTATION", "Code changed; prepare a new job")
+    if 'motion_provider' in job['specification']:
+        from .motion_bricks_provider import configuration_identity
+        require(job['specification']['motion_provider'] == configuration_identity(),
+                'STALE_MOTION_PROVIDER', 'MotionBricks settings or installation changed; inspect and prepare a new job')
     fields(job["specification"]["options"], OPS[job["specification"]["operation"]])
     for f in job["specification"]["inputs"]:
         p = Path(f["path"])
@@ -289,7 +299,7 @@ def read_job(lib: Library, jid: str) -> tuple[dict, Path]:
 
 
 def child_environment() -> dict:
-    allowed = {"PATH", "SYSTEMROOT", "WINDIR", "HOME", "USERPROFILE", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "LD_LIBRARY_PATH"}
+    allowed = {"PATH", "SYSTEMROOT", "WINDIR", "HOME", "USERPROFILE", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "LD_LIBRARY_PATH", "ASSET_DIRECTOR_MOTION_BRICKS_CONFIG"}
     return {k:v for k,v in os.environ.items() if k.upper() in allowed}
 
 

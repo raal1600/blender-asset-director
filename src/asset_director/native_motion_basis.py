@@ -139,3 +139,31 @@ def restore(clone, basis):
             else:
                 owner.delta_rotation_euler = q.to_euler(owner.rotation_mode if owner.rotation_mode != 'AXIS_ANGLE' else 'XYZ')
     return clone
+
+
+def extend_prepared_sources(obj, verified, added):
+    """Record explicitly prepared Action copies without changing old defaults.
+
+    Only the offline preparation tool calls this after validating the original
+    baseline. Existing sources, placement, rest, units and static channels must
+    still match. This is not a general stale-baseline bypass.
+    """
+    from .action_layer import slot_id
+    timeline = _timeline(obj)
+    if 'native_basis' not in timeline: return
+    require(timeline['native_basis'] == verified, 'NATIVE_BASIS_CHANGED', 'Baseline changed during source preparation')
+    inputs,masks = _observed(obj)
+    old = verified['inputs']
+    require({k:v for k,v in inputs.items() if k!='sources'} == {k:v for k,v in old.items() if k!='sources'},
+            'NATIVE_BASIS_CHANGED', 'Rig, placement or units changed during source preparation')
+    key = lambda row:(row['action'],row['slot'])
+    before = {key(row):row for row in old['sources']}; after = {key(row):row for row in inputs['sources']}
+    expected = {(a.name,slot_id(s)) for a,s in added}
+    require(all(after.get(k)==v for k,v in before.items()) and set(after)-set(before)==expected,
+            'NATIVE_BASIS_CHANGED', 'Preparation changed an existing source or added an unexpected binding')
+    static = _static(_defaults(obj,timeline),masks)
+    require(_static(verified['defaults'],masks)==static, 'NATIVE_BASIS_CHANGED', 'Preparation changed an unkeyed native default')
+    value = copy.deepcopy(verified);value['inputs']=inputs;value['static']=static
+    value['identity']=digest({'version':VERSION,'inputs':inputs,'static':static})
+    timeline['native_basis']=value;obj['bad_action_timeline_v1']=json.dumps(timeline,sort_keys=True)
+    capture(obj)

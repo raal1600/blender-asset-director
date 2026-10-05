@@ -40,8 +40,14 @@ def validate(change):
             require(join is not None and join.get('mode') == 'turn', 'HEADING_TRANSITION_REQUIRED',
                     'Changing a clip heading needs an explicit turn transition')
         if join is not None:
-            fields(join, {'frames', 'match_phase', 'mode'}, {'frames', 'match_phase'})
-            require(join.get('mode', 'blend') in {'blend', 'turn'}, 'INVALID_TRANSITION', 'Choose a pose connection or an explicit turn preview')
+            fields(join, {'frames', 'match_phase', 'mode', 'seed', 'profile_sha256'}, {'frames', 'match_phase'})
+            if join.get('mode') == 'generated':
+                require(join['match_phase'] is False and type(join.get('seed')) is int and 0 <= join['seed'] < 2**32
+                        and isinstance(join.get('profile_sha256'), str) and re.fullmatch(r'[0-9a-f]{64}', join['profile_sha256']),
+                        'INVALID_TRANSITION', 'Generated repositioning needs a verified rig profile and seed, with phase matching off')
+            else:
+                require('seed' not in join and 'profile_sha256' not in join, 'INVALID_TRANSITION', 'Model settings require generated mode')
+            require(join.get('mode', 'blend') in {'blend', 'turn', 'generated'}, 'INVALID_TRANSITION', 'Choose a pose connection or an explicit turn preview')
             require(index > 0 and type(join['frames']) is int and 2 <= join['frames'] <= 120
                     and type(join['match_phase']) is bool,
                     'INVALID_TRANSITION', 'A connection needs a previous clip and 2 to 120 added frames')
@@ -140,10 +146,11 @@ def connection(previous, clip, previous_take, take):
             'A heading change needs an explicit turn transition or an authored intermediate take')
     require(abs(yaw) <= 135, 'TURN_SOURCE_REQUIRED',
             'A turn over 135 degrees needs an observed intermediate turn take or Blender editing')
-    if mode != 'turn' and na > 1e-9 and nb > 1e-9:
+    if mode == 'blend' and na > 1e-9 and nb > 1e-9:
         require(sum(x*y for x, y in zip(va, vb)) / (na*nb) >= math.cos(math.radians(135)),
                 'STITCH_DIRECTION_REVIEW', 'This sharp reversal needs a turn or stop clip, or a reviewed Blender edit')
     return {'start': a['native_end'], 'end': clip['start'], 'duration_frames': duration,
             'mode': mode, 'heading_in_deg': heading_a, 'heading_out_deg': heading_b, 'turn_delta_deg': yaw,
             'velocity_in': va, 'velocity_out': vb,
-            'delta_m': [(x+y)*duration*(.125 if mode == 'turn' else .5) for x, y in zip(va, vb)]}
+            'placement_pending': mode == 'generated',
+            'delta_m': [0., 0.] if mode == 'generated' else [(x+y)*duration*(.125 if mode == 'turn' else .5) for x, y in zip(va, vb)]}

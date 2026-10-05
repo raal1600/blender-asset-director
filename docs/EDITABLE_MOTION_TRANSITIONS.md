@@ -1,5 +1,10 @@
 # Editable native motion and explicit turns — development
 
+The separate [MotionBricks repositioning mode](MOTION_BRICKS_REPOSITIONING.md)
+preserves both native clips and generates only the connecting interval. Its
+provider, rig and quality limitations are explicit; the native modes below remain
+deterministic.
+
 This extends the existing Action layer; it is not a new application or an
 installed release. No model, new dependency, animation-name classifier, external
 asset download or inferred bone-role mapping is introduced.

@@ -202,14 +202,14 @@ def verify_previous_tracks(obj, previous):
             'ACTION_PRESERVATION_FAILED', 'Previous native track changed')
 
 
-def apply(options, job_id):
+def apply(options, job_id, *, execution=None):
     contract.validate(options)
     require(bpy.app.background, 'BACKGROUND_REQUIRED', 'Action edits require a separate worker')
     scene = bpy.context.scene; before = audit()
     require(before['sha256'] == options['audit_sha256'], 'ACTION_CHANGED', 'Saved Action context changed; inspect again')
     if all(c['mode'] == 'timeline' for c in options['changes']):
         from .action_timeline import apply as apply_timeline
-        return apply_timeline(options, job_id, before)
+        return apply_timeline(options, job_id, before, execution=execution)
     require(all(not scene.objects[c['performer']].get('bad_action_timeline_v1') for c in options['changes'] if c['performer'] in scene.objects),
             'TIMELINE_REVIEW_REQUIRED', 'Edit the saved clips in the timeline or in Blender')
     pending = []

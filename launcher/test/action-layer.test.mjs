@@ -197,3 +197,15 @@ test('Action cancellation refuses once atomic checkpoint publication has begun',
  const f=await fixture(t),p=await f.inspect(),entry=f.work.registerActionSave(p.id,f.scene.id,p.revision,f.request);entry.committing=true;
  await assert.rejects(f.work.cancelActionSave(p.id,f.scene.id,f.request.requestId),/already publishing/);assert.equal(entry.cancelled,false);
 });
+
+test('imported checkpoint camera inspection makes its observed shot available without changing the blend',async t=>{
+ const observed={version:'scene-layer-v1',layer:'shots',sha256:'c'.repeat(64),cameras:[{name:'Observed camera'}],
+  scene:{objects:[{name:'Observed camera',type:'CAMERA'}],frame_range:[1,72]},look:{state:{}},visual_acceptance:'NOT_EVALUATED'};
+ const f=await fixture(t,observed);let p=await f.store.get(f.project.id);p.workbench.scenes[0].stage='shots';p=await f.store.save(p,p.revision);
+ const before=await fileHash(f.source),request={...f.base,version:observed.version,layer:'shots'};
+ await f.work.inspectSceneLayer(p.id,f.scene.id,p.revision,request);p=await f.wait();const scene=p.workbench.scenes[0];
+ assert.equal(scene.current,f.cp.id);assert.equal(scene.checkpoints.length,1);assert.deepEqual(scene.checkpoints[0].audit,observed.scene);
+ assert.deepEqual(await fileHash(f.source),before);
+ const saved=await f.work.saveShot(p.id,scene.id,p.revision,{name:'Actual imported camera',camera:'Observed camera',start:1,end:72});
+ assert.equal(saved.workbench.scenes[0].shots[0].camera,'Observed camera');
+});

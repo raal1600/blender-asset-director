@@ -89,6 +89,7 @@ export async function saveAction(work,id,sceneId,revision,request){
               const previous=c.clips[index-1],previousTake=performer.takes.find(t=>t.id===previous?.take_id);
               assert(performer.timeline.stitch_version===stitchVersion&&previousTake&&take.stitch_blocker===null&&previousTake.stitch_blocker===null&&validHash(take.stitch_channels)&&take.stitch_channels===previousTake.stitch_channels,'These clips need a matching connection inspection or Blender review.',409);
               connection(previous,clip,previousTake,take);
+              if(clip.transition.mode==='generated')assert(performer.timeline.motion_bricks?.status==='CONFIGURED'&&performer.timeline.motion_bricks.profile_sha256===clip.transition.profile_sha256,'Generated rig mapping or provider setup changed; inspect again.',409);
             }
             assert(!(c.clips.some(c=>c.travel)||timing.cycles>1+1e-9)||!take.travel_blocker,take.travel_blocker||'Native travelling cycles need Blender review.',409);
             assert(!clip.travel||!take.travel_blocker,take.travel_blocker||'Travel is unavailable.',409);

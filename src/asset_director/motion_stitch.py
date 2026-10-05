@@ -118,7 +118,7 @@ class Sampler:
         bpy.context.view_layer.update()
 
 
-def prepare(obj, motions):
+def prepare(obj, motions, *, execution=None):
     plans = [{'phase': 0., 'join': None, 'root_offset': [0., 0., 0.], 'travel_before': [0., 0.]} for _ in motions]
     if not any(m[0].get('transition') for m in motions):
         return plans
@@ -141,6 +141,19 @@ def prepare(obj, motions):
             require(channel_spec(obj, action, slot) == channel_spec(obj, previous[2], previous[3]),
                     'STITCH_CHANNEL_REVIEW', 'These clips animate different channels; use an intermediate clip or Blender')
             geometry = connection(previous[0], clip, previous[1], take)
+            if clip['transition'].get('mode') == 'generated':
+                from .motion_bricks_timeline import prepare as generate
+                from .motion_bricks_retarget import load_profile
+                from .core import digest
+                require(digest(load_profile(obj)) == clip['transition']['profile_sha256'],
+                        'MOTION_BRICKS_RETARGET_PROFILE', 'Selected rig mapping changed; inspect again')
+                require(plans[index-1]['phase'] == 0, 'MOTION_BRICKS_PHASE', 'Generated repositioning requires intact outgoing clip phase')
+                join = generate(reader, obj, previous, motion, geometry, execution)
+                keys += len(join['samples']) * len(join['samples'][0][1]) * 10
+                require(keys <= 200000, 'RESOURCE_LIMIT', 'Generated connections exceed the key budget')
+                plans[index]['join'] = join
+                plans[index]['travel_before'] = [x+y for x,y in zip(plans[index]['travel_before'], join['delta_m'])]
+                continue
             dt = min(1/64, (previous[4]['native_end']-previous[0]['start'])/4,
                      (timing['native_end']-clip['start'])/4)
             previous_elapsed = previous[4]['cycles'] * (previous[1]['range'][1]-previous[1]['range'][0])
@@ -225,6 +238,10 @@ def bake(obj, plan, job_id, clip_id):
     from .core import digest
     action = bpy.data.actions.new('Director connection '+clip_id+' '+job_id)
     action[GENERATED] = 1
+    if plan.get('provider') == 'motion-bricks.cpp':
+        action['asset_director_provider'] = plan['provider']
+        action['asset_director_generation_mode'] = plan['generation_mode']
+        action['asset_director_provenance'] = json.dumps(plan['provenance'], sort_keys=True)
     ad = obj.animation_data_create(); ad.action = action
     eulers, quaternions, axis_angles = {}, {}, {}
     for frame, pose in plan['samples']:

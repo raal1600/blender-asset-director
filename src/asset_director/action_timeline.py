@@ -88,6 +88,7 @@ def travel_reason(obj, action, slot, allow_native_root=False):
 
 def describe(obj, takes, gait_budget=None):
     from .action_layer import bindings
+    from .motion_bricks_retarget import describe as generated_provider
     from . import gait_sampling, gait_profile, motion_stitch, motion_heading
     if gait_budget is None: gait_budget = [3120]
     saved, error = None, None
@@ -114,10 +115,11 @@ def describe(obj, takes, gait_budget=None):
             'stitch_version': contract.STITCH_VERSION, 'connections': saved.get('connections', []) if saved else [],
             'edit_version': contract.EDIT_VERSION,
             'origin_m': origin, 'meters_per_unit': scale, 'error': error,
+            'motion_bricks': generated_provider(obj) if obj.type == 'ARMATURE' else None,
             'notice': 'Automatic pace is a bounded support-motion estimate, not contact or performance approval.'}
 
 
-def apply(options, job_id, before):
+def apply(options, job_id, before, *, execution=None):
     from . import action_layer as layer, motion_stitch, motion_stitch_math, motion_heading, native_motion_basis
     scene = bpy.context.scene
     pending = []
@@ -159,7 +161,7 @@ def apply(options, job_id, before):
             require(all(not c.data_path.startswith('delta_') for a, slot in layer.bindings(obj)
                         if not is_generated(a) for c in ops.curves(a, slot)),
                     'TRAVEL_UNSUPPORTED', 'Existing delta animation cannot be replaced by a path')
-        stitches = motion_stitch.prepare(obj, motions)
+        stitches = motion_stitch.prepare(obj, motions, execution=execution)
         pending.append((change, item, obj, saved, motions, stitches))
     interval = options.get('frame_range', before['frame_range'])
     # Count the entire batch, including generated travel, before mutating any
@@ -170,7 +172,7 @@ def apply(options, job_id, before):
             if stitch['join']:
                 samples = stitch['join']['samples']
                 generated_keys += sum(len(pose)*10 for _, pose in samples)
-        if any(c['travel'] for c in change['clips']) or change['performer'] in heading_bases or any(any(s['root_offset']) for s in stitches):
+        if any(c['travel'] for c in change['clips']) or change['performer'] in heading_bases or any(any(s['root_offset']) or s['join'] and s['join']['provider'] == 'motion-bricks.cpp' for s in stitches):
             generated_keys += 14*len(motions) + sum(len(s['join']['samples'])*7 for s in stitches if s['join'])
     existing_keys = sum(len(c.keyframe_points) for a in bpy.data.actions for c in ops.curves(a))
     require(existing_keys+generated_keys <= 500000, 'RESOURCE_LIMIT',
@@ -223,8 +225,8 @@ def apply(options, job_id, before):
                 join = stitch['join']
                 name, signature = motion_stitch.bake(obj, join, job_id, clip['id'])
                 generated[name] = signature
-                connections.append({k: v for k, v in join.items() if k not in {'samples', 'channels', 'boundary_tangents'}} | {
-                    'clip_id': clip['id'], 'phase': stitch['phase'], 'method': contract.STITCH_VERSION,
+                connections.append({k: v for k, v in join.items() if k not in {'samples', 'channels', 'boundary_tangents', 'path_offsets_local'}} | {
+                    'clip_id': clip['id'], 'phase': stitch['phase'], 'method': join['implementation'] if join['provider'] == 'motion-bricks.cpp' else contract.STITCH_VERSION,
                     'contact_acceptance': 'SAMPLED_AUTHORED_CLEANUP' if join.get('contact_cleanup') else 'NOT_EVALUATED', 'performance_acceptance': 'NOT_EVALUATED'})
                 samples = join['samples']
                 connection_checks.extend(samples[i] for i in (0, len(samples)//2, len(samples)-1))
@@ -239,7 +241,7 @@ def apply(options, job_id, before):
                 require(abs(strip.frame_end-cursor) < .02,
                         'ACTION_RESULT_CHANGED', 'Native clip endpoint differs from planned timing')
             require(abs(cursor-plan['native_end']) < .02, 'ACTION_RESULT_CHANGED', 'Phase alignment changed clip duration')
-        if any(c['travel'] for c in change['clips']) or heading_base and motions or any(any(s['root_offset']) for s in stitches):
+        if any(c['travel'] for c in change['clips']) or heading_base and motions or any(any(s['root_offset']) or s['join'] and s['join']['provider'] == 'motion-bricks.cpp' for s in stitches):
             # Parent inverse converts world metres to delta-location coordinates.
             parent = obj.parent.matrix_world @ obj.matrix_parent_inverse if obj.parent else obj.matrix_parent_inverse
             basis = parent.to_3x3()
@@ -260,7 +262,11 @@ def apply(options, job_id, before):
                     for f, _ in join['samples']:
                         u = (f-join['start'])/join['duration_frames']
                         offset = motion_heading.path_at(join, max(0., min(1., u)))
-                        obj.delta_location = Vector(base_delta) + inverse @ (begin+Vector((*offset, 0))/unit+alignment*motion_heading.ease(u))
+                        if join.get('path_offsets_local') is not None:
+                            generated_offset = dict(join['path_offsets_local'])[f]
+                            obj.delta_location = Vector(base_delta) + inverse @ begin + Vector(generated_offset)
+                        else:
+                            obj.delta_location = Vector(base_delta) + inverse @ (begin+Vector((*offset, 0))/unit+alignment*motion_heading.ease(u))
                         obj.keyframe_insert('delta_location', frame=f, group='Director travel')
                         if heading_base:
                             prop, previous_euler = motion_heading.set_heading(obj, heading_base, motion_heading.heading_at(join, u), previous_euler)

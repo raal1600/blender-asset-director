@@ -1,4 +1,4 @@
-﻿"""Pinned G1 boundary inference through an isolated native worker.
+"""Pinned G1 boundary inference through an isolated native worker.
 
 This provider generates candidate motion. It does not promise exact seam pins,
 contact cleanup, arbitrary-rig retargeting, or silently fall back to blending.
@@ -43,12 +43,46 @@ def capabilities(config=None):
             "durations_frames": list(range(24, 65, 4)), "conventions": dict(CONVENTIONS),
             "devices": ["cpu", "vulkan"], "exact_boundary_pins": False,
             "contacts": False, "arbitrary_rig_retargeting": False,
+            "target_placement_modes": ["fixed", "predicted"],
             "state": "CONFIGURED_UNVERIFIED" if config else "NOT_CONFIGURED"}
 
 
 def configured():
     path = os.environ.get("ASSET_DIRECTOR_MOTION_BRICKS_CONFIG")
     return load_json(Path(path), MAX_JSON) if path else None
+
+
+def configuration_identity():
+    """Cheap job-cache identity; execution still verifies every model checksum.
+
+    Settings, binary/receipt content and model file signatures invalidate cache.
+    This function never loads a model or makes an unavailable optional provider
+    prevent ordinary native Action inspection.
+    """
+    path = os.environ.get("ASSET_DIRECTOR_MOTION_BRICKS_CONFIG")
+    if not path:
+        return digest({"provider": None})
+    def signature(filename, content=False):
+        try:
+            file = Path(filename)
+            if not file.is_file():
+                return {"state": "MISSING"}
+            stat = file.stat()
+            return {"bytes": stat.st_size, "mtime_ns": stat.st_mtime_ns,
+                    **({"sha256": file_hash(file)} if content and stat.st_size <= 64*1024*1024 else {})}
+        except (OSError, TypeError, ValueError):
+            return {"state": "UNAVAILABLE"}
+    value = {"config": signature(path, True)}
+    try:
+        config = configured()
+        require(isinstance(config, dict), "MOTION_BRICKS_CONFIG", "Expected provider settings")
+        value.update(settings=config, library=signature(config.get("library"), True),
+                     installation=signature(config.get("installation_manifest"), True))
+        folder = Path(config.get("model_dir", ""))
+        value["models"] = {name: signature(folder/name) for name in MODEL_FILES}
+    except (DirectorError, OSError, TypeError, ValueError) as error:
+        value["unavailable"] = type(error).__name__
+    return digest(value)
 
 
 def _number(value, label, bound=1e4):
@@ -67,11 +101,26 @@ def _array(value, shape, label):
             _array(v, shape[1:], label)
 
 
+def boundary_masks(request):
+    """Public ABI slot masks, applied AFTER the pose helper resets them.
+
+    Predicted placement leaves destination absolute root rows unspecified.
+    Destination pose (including orientation/height) and velocity still condition
+    inference. This is model prediction, not a promise of exact physical pins.
+    """
+    mode = request.get("target_placement", "fixed")
+    require(mode in ("fixed", "predicted"), "MOTION_BRICKS_PLACEMENT",
+            "Choose fixed or predicted target placement explicitly")
+    return {"global_root": [1]*4 + ([0]*4 if mode == "predicted" else [1]*4),
+            "local_root": [1,1,1,0,1,1,1,1], "pose": [1]*8}
+
+
 def validate_request(request):
     require(isinstance(request, dict) and request.get("schema") == REQUEST_SCHEMA,
             "MOTION_BRICKS_INVALID_INPUT", "Expected versioned MotionBricks request")
     require(request.get("conventions") == CONVENTIONS, "MOTION_BRICKS_CONVENTIONS",
             "Convert evaluated poses explicitly to metres, right-handed Y-up/+Z-forward, local XYZW, 30 FPS")
+    boundary_masks(request)
     frames = request.get("frames")
     require(type(frames) is int and frames in range(24, 65, 4), "MOTION_BRICKS_DURATION",
             "MotionBricks requires 24..64 frames in multiples of four, including both four-frame contexts")
@@ -121,6 +170,15 @@ def validate_result(result, request):
             "MOTION_BRICKS_CORRUPT_OUTPUT", "Worker did not return a successful versioned motion result")
     require(result.get("request_hash") == digest(request) and result.get("frames") == request["frames"]
             and result.get("conventions") == CONVENTIONS, "MOTION_BRICKS_CORRUPT_OUTPUT", "Worker result identity/timing mismatch")
+    require(type(result.get("seed")) is int and result["seed"] == request["seed"]
+            and type(result.get("argmax")) is bool and result["argmax"] == request.get("argmax", False),
+            "MOTION_BRICKS_CORRUPT_OUTPUT", "Worker seed or sampling mode differs from the request")
+    mode = request.get("target_placement", "fixed")
+    require(result.get("target_placement", "fixed") == mode,
+            "MOTION_BRICKS_CORRUPT_OUTPUT", "Worker ignored the selected target placement mode")
+    if mode == "predicted" or "constraint_masks" in result:
+        require(result.get("constraint_masks") == boundary_masks(request),
+                "MOTION_BRICKS_CORRUPT_OUTPUT", "Worker conditioning masks differ from the request")
     try:
         _array(result.get("roots"), (request["frames"], 3), "output.roots")
         _array(result.get("local_xyzw"), (request["frames"], 34, 4), "output.local_xyzw")
@@ -167,7 +225,14 @@ def boundary_diagnostics(request, result):
     for side, sample, native_before, native_after, generated, gen_before, gen_after in (
             ("entry", 3, 2, 3, 3, 3, 4), ("exit", 0, 0, 1, request["frames"]-4, request["frames"]-5, request["frames"]-4)):
         source = request["source" if side == "entry" else "target"]
-        expected_positions, expected_q = fk(source["roots"][sample], source["local_xyzw"][sample])
+        expected_root = list(source["roots"][sample])
+        placement = [0., 0., 0.]
+        if side == "exit" and request.get("target_placement") == "predicted":
+            # XY in Blender is XZ in this model. Placement is an output, not a pin.
+            for axis in (0, 2):
+                placement[axis] = result["roots"][generated][axis] - expected_root[axis]
+                expected_root[axis] += placement[axis]
+        expected_positions, expected_q = fk(expected_root, source["local_xyzw"][sample])
         actual_positions, actual_q = fk(result["roots"][generated], result["local_xyzw"][generated])
         _, native_q0 = fk(source["roots"][native_before], source["local_xyzw"][native_before])
         _, native_q1 = fk(source["roots"][native_after], source["local_xyzw"][native_after])
@@ -175,7 +240,7 @@ def boundary_diagnostics(request, result):
         _, actual_q1 = fk(result["roots"][gen_after], result["local_xyzw"][gen_after])
         velocity_expected = sm.mul(sm.sub(source["roots"][native_after], source["roots"][native_before]), 30)
         velocity_actual = sm.mul(sm.sub(result["roots"][gen_after], result["roots"][gen_before]), 30)
-        metrics = {"boundary": side, "root_position_mismatch_m": math.dist(expected_positions[0], actual_positions[0]),
+        metrics = {"boundary": side, "predicted_placement_model_m": placement, "root_position_mismatch_m": math.dist(expected_positions[0], actual_positions[0]),
             "joint_position_mismatch_m": max(math.dist(a,b) for a,b in zip(expected_positions,actual_positions)),
             "joint_orientation_mismatch_degrees": max(math.degrees(sm.norm(sm.qlog(sm.qmul(sm.inverse(a),b)))) for a,b in zip(expected_q,actual_q)),
             "root_velocity_mismatch_m_per_s": sm.norm(sm.sub(velocity_expected,velocity_actual)),
@@ -322,34 +387,9 @@ class _GpuMonitor:
             self.lib.nvmlShutdown(); self.initialized = False
 
 
-@contextlib.contextmanager
 def _job_lock(check):
-    # OS locks release on process exit; retained lock file is not a stale claim.
-    path = Path(tempfile.gettempdir()) / "asset-director-motion-bricks.lock"
-    with path.open("a+b") as stream:
-        stream.seek(0, 2)
-        if not stream.tell():
-            stream.write(b"0"); stream.flush()
-        while True:
-            check(); stream.seek(0)
-            try:
-                if os.name == "nt":
-                    import msvcrt
-                    msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
-                else:
-                    import fcntl
-                    fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except (OSError, BlockingIOError):
-                time.sleep(.05)
-        try:
-            yield
-        finally:
-            stream.seek(0)
-            if os.name == "nt":
-                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+    from .execution_resources import gpu_lease
+    return gpu_lease(check)
 
 
 def execute(config, request=None, *, cancelled=None, progress=None):

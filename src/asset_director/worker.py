@@ -45,6 +45,9 @@ def execute(job_path, *, live=False):
         require(actual == job_path, "INVALID_JOB", "Job must be inside its registered library")
         spec = job["specification"]; op = spec["operation"]; options = spec["options"]
         directory = job_path.parent
+        def resource_queue_check():
+            from asset_director.jobs import _cancelled
+            require(not _cancelled(job_path,job), 'JOB_CANCELLED', 'Job cancelled while waiting for local GPU resources')
         require(not live or op == "inspect", "LIVE_MUTATION_BLOCKED", "This version executes mutations in a separate working-file process; live MCP is read-only here")
         if live:
             expected = spec["inputs"][0]["path"] if spec["inputs"] else None
@@ -114,7 +117,10 @@ def execute(job_path, *, live=False):
                 data = world_prepare.apply(options) if op == 'world-prepare' else world_prepare.audit()
             elif op in {'action-audit', 'action-edit'}:
                 from asset_director import action_layer
-                data = action_layer.apply(options, job['id']) if op == 'action-edit' else action_layer.audit()
+                from asset_director.jobs import _cancelled
+                context = {'directory': directory, 'cancelled': lambda: _cancelled(job_path, job),
+                           'progress': lambda value: atomic_json(directory / 'motion-progress.json', value)}
+                data = action_layer.apply(options, job['id'], execution=context) if op == 'action-edit' else action_layer.audit()
             elif op in {'scene-layer-audit', 'scene-layer-edit'}:
                 from asset_director import scene_layer
                 data = scene_layer.audit(options['layer']) if op == 'scene-layer-audit' else scene_layer.apply(options, job['id'])
@@ -128,14 +134,20 @@ def execute(job_path, *, live=False):
             elif op == "light-rig": data = scene_ops.light_rig(options, job["id"])
             elif op in {"render-readiness", "render-frames"}:
                 from asset_director import render_sequence_blender
-                data = render_sequence_blender.audit() if op == "render-readiness" else render_sequence_blender.render(lib, spec, directory)
+                if op == 'render-readiness': data = render_sequence_blender.audit()
+                else:
+                    from asset_director.execution_resources import gpu_lease
+                    with gpu_lease(resource_queue_check):
+                        data = render_sequence_blender.render(lib,spec,directory)
             elif op == "preview":
                 if options.get("stage"):
                     target = bpy.context.scene.objects.get(options.get("target_object", ""))
                     require(target is not None, "TARGET_REQUIRED", "Explicit staging needs an observed target object")
                     stage(target)
                 from asset_director.preview_camera import render_previews
-                data = render_previews(directory, options)
+                from asset_director.execution_resources import gpu_lease
+                with gpu_lease(resource_queue_check):
+                    data = render_previews(directory,options)
             elif op == "index":
                 data = {"clips": [], "rigs": [], "unassigned_actions": [], "files_indexed": []}
                 candidates = [f for f in files if Path(f["path"]).suffix.lower() in {".glb", ".gltf", ".fbx", ".bvh", ".blend"}]

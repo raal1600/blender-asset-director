@@ -41,6 +41,7 @@ BLENDER_SUITES = {
         ('gait-profile', 'gait_profile_fixture.py', 'RESULTS.json', False, ()),
         ('native-calibration', 'native_calibration_fixture.py', 'RESULTS.json', False, ()),
         ('motion-stitch', 'motion_stitch_fixture.py', 'RESULTS.json', False, ()),
+        ('motion-bricks-retarget', 'motion_bricks_retarget_fixture.py', 'RESULTS.json', False, ()),
         ('stitch-continuity', 'stitch_continuity_fixture.py', 'RESULTS.json', False, ()),
         ('transition-contacts', 'contact_transition_fixture.py', 'RESULTS.json', False, ()),
         ('transition-preview-parity', 'transition_parity_fixture.py', 'RESULTS.json', False, ()),
