@@ -50,6 +50,7 @@ def parser(*, workbench_only=False):
     q=s.add_parser("job-show"); q.add_argument("job_id")
     q=s.add_parser("job-retry"); q.add_argument("job_id")
     q=s.add_parser("job-cancel"); q.add_argument("job_id")
+    q=s.add_parser("job-recover"); q.add_argument("job_id"); q.add_argument("--confirm-stopped",action="store_true",required=True)
     q=s.add_parser("index-collect"); q.add_argument("asset_id"); q.add_argument("job_id")
     from .motion_cli import add_parsers
     add_parsers(s)
@@ -174,6 +175,7 @@ def main(argv=None):
             elif command == "job-show": result=jobs.read_job(lib,args.job_id)[0]
             elif command == "job-retry": result=jobs.retry(lib,args.job_id)
             elif command == "job-cancel": result=jobs.cancel(lib,args.job_id)
+            elif command == "job-recover": result=jobs.recover(lib,args.job_id,confirmed=args.confirm_stopped)
             elif command == "index-collect": result=jobs.index_result(lib,args.asset_id,args.job_id)
             elif command == "report": result=lib.export_report()
             elif command == "rebuild-catalog": result={"records":lib.rebuild()}

@@ -299,3 +299,31 @@ journey or a packaged build. Supply nonempty reviewed stance intervals and real
 client/render evidence separately. The production Adventurer test uses the
 existing legally acquired model and reviewed root-only preparation; its assets
 and local project paths are not distributed with the source repository.
+
+
+## Interrupted saves and recovery
+
+After an interrupted execution, the previous accepted checkpoint and preview stay
+current. Open **Task and job history**, inspect the unfinished Save, and choose
+**I stopped it ? resolve task**. The harness checks both the executor and Blender
+worker identities before marking native execution INTERRUPTED and releasing its
+writer. A live process or unreadable identity refuses recovery. No partial scene
+or model output is adopted. **Reset failed native job for retry** archives the
+entire stopped attempt; generating again is a separate Save.
+
+Native jobs now retain PID and creation identity for their executor and worker,
+use an OS execution lease that releases after process death, and give Blender a
+watchdog for its original executor. MotionBricks retains its separate Blender-owner
+watchdog. Legacy attempts without birth identity recover only when the recorded
+PIDs are absent; missing/unverifiable ownership requires retained-file inspection.
+Recovery can mark an old implementation's stopped attempt, but cannot bypass
+current implementation, source, provider or license validation for retry/execution.
+Direct CLI equivalent: `asset-director --library /absolute/library job-recover
+JOB_ID --confirm-stopped`.
+
+`tools/job_recovery_fixture.py` runs in the real headless Blender CI continuity
+suite. It refuses recovery of a live queued worker, terminates its owned executor,
+requires Blender child release within five seconds, preserves the failed attempt,
+then actually retries and renders in a fresh Blender process. Portable contract
+and process-death tests run in ordinary CI. This fixture creates its own cube;
+it does not substitute for the separate real Adventurer client journey.

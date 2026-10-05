@@ -247,7 +247,15 @@ export class Workbench {
         assert(native.state!=='RUNNING','The isolated preparation worker is still RUNNING or needs native recovery. Inspect its retained attempt before releasing this project.',409);
       }
     }
-    if(r.jobId) {const native=await json(await safe(this.config.library,`jobs/${r.jobId}/job.json`));assert(native.state!=='RUNNING','Native job is still RUNNING. Inspect it before recovery.',409);}
+    if(r.jobId) {
+      let native=await json(await safe(this.config.library,`jobs/${r.jobId}/job.json`));
+      if(native.state==='RUNNING') {
+        native=await this.runtime.harness(['job-recover',r.jobId,'--confirm-stopped']);
+        assert(native.id===r.jobId&&native.state==='INTERRUPTED'&&Array.isArray(native.outputs)&&native.outputs.length===0,
+          'Native interruption was not verified; project writer retained.',409);
+      }
+      assert(native.state!=='RUNNING','Native job is still RUNNING. Inspect it before recovery.',409);
+    }
     assert(r.state!=='SUCCEEDED','Collect the completed task instead of interrupting it.',409);
     // Explicit recovery never rewrites native job history or removes working files.
     r.state='INTERRUPTED';r.recovery='User confirmed process stopped; all files retained';r.finishedAt=now();await writeJson(file,r);

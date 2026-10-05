@@ -56,6 +56,7 @@ BLENDER_SUITES = {
         ('transfer-custom', 'transfer_planning_fixture.py', 'transfer_planning_report.json', True, ('custom',)),
     ),
     'continuity': (
+        ('job-recovery', 'job_recovery_fixture.py', 'RESULTS.json', False, ()),
         ('translation-precision', 'translation_precision_fixture.py', 'translation_precision_report.json', False, ()),
         ('fbx-anchor', 'fbx_anchor_fixture.py', 'fbx_anchor_report.json', False, ()),
         ('action-collision', 'action_collision_fixture.py', 'action_collision_report.json', False, ()),

@@ -33,9 +33,10 @@ class CoverageContractTests(unittest.TestCase):
     def test_exact_partitions_and_original_fixture_inventory(self):
         self.assertEqual(len(partitions()), 23)
         fixtures = [row for suite in BLENDER_SUITES.values() for row in suite]
-        self.assertEqual(len(fixtures), 31)
-        self.assertEqual(len({row[0] for row in fixtures}), 31)
-        self.assertEqual(len([row for row in fixtures if row[0] not in {'gait-profile', 'motion-bricks-retarget', 'motion-stitch', 'stitch-continuity', 'transition-contacts', 'transition-preview-parity', 'retarget-transition', 'native-calibration', 'motion-edits'}]), 22)
+        self.assertEqual(len(fixtures), 32)
+        self.assertEqual(len({row[0] for row in fixtures}), 32)
+        self.assertEqual(len([row for row in fixtures if row[0] not in {'job-recovery', 'gait-profile', 'motion-bricks-retarget', 'motion-stitch', 'stitch-continuity', 'transition-contacts', 'transition-preview-parity', 'retarget-transition', 'native-calibration', 'motion-edits'}]), 22)
+        self.assertIn(('job-recovery', 'job_recovery_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['continuity'])
         self.assertIn(('motion-bricks-retarget', 'motion_bricks_retarget_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['motion'])
         self.assertIn(('gait-profile', 'gait_profile_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['motion'])
         self.assertIn(('motion-stitch', 'motion_stitch_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['motion'])

@@ -301,6 +301,16 @@ if __name__ == "__main__":
     if len(args) != 1: raise SystemExit("Expected one job.json argument")
     path = Path(args[0]).resolve()
     try:
+        owner=__import__('os').environ.get('ASSET_DIRECTOR_JOB_OWNER')
+        if owner:
+            from asset_director.process_state import watch_parent, identity
+            from asset_director.core import load_json
+            spec=load_json(path)
+            ownership={'job_id':spec['id'],'implementation':spec['specification']['implementation'],
+                       **identity(__import__('os').getpid()),'state':'STARTING'}
+            atomic_json(path.parent/'worker-ownership.json',ownership)
+            watch_parent(__import__('json').loads(owner))
+            ownership['state']='WATCHING_EXECUTOR';atomic_json(path.parent/'worker-ownership.json',ownership)
         result = execute(path)
         print(__import__("json").dumps(result))
     except DirectorError as exc:

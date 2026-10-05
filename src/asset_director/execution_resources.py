@@ -12,10 +12,10 @@ from .core import require
 
 
 @contextlib.contextmanager
-def gpu_lease(check=lambda: None, *, timeout=900):
+def process_lease(path, check=lambda: None, *, timeout=900):
     require(type(timeout) in (float,int) and 0 < timeout <= 900,
             'RESOURCE_LIMIT', 'GPU queue timeout must be positive and at most 900 seconds')
-    path = Path(tempfile.gettempdir())/'asset-director-heavy-operation.lock'
+    path = Path(path)
     start = time.monotonic()
     with path.open('a+b') as stream:
         stream.seek(0,2)
@@ -39,3 +39,9 @@ def gpu_lease(check=lambda: None, *, timeout=900):
             stream.seek(0)
             if os.name == 'nt': msvcrt.locking(stream.fileno(),msvcrt.LK_UNLCK,1)
             else: fcntl.flock(stream.fileno(),fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
+def gpu_lease(check=lambda: None, *, timeout=900):
+    with process_lease(Path(tempfile.gettempdir())/'asset-director-heavy-operation.lock',check,timeout=timeout):
+        yield
