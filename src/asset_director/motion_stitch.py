@@ -1,13 +1,14 @@
 """Blender-only native clip bridges; disposable sampling, retained source Actions.
 
-This is bounded interpolation, not generated choreography, retargeting or IK.
-One performer owns the pose; the existing delta path alone owns added travel.
+This is bounded interpolation, with optional explicitly authored contact IK.
+It is not generated choreography or retargeting. Native root motion is retained;
+the separate delta Action owns added placement alignment or reviewed travel.
 """
 import json
 import math
 import re
 import bpy
-from mathutils import Quaternion
+from mathutils import Quaternion, Vector
 from . import blender_ops as ops, motion_stitch_math as sm
 from .action_timeline_contract import connection
 from .core import DirectorError, require
@@ -45,7 +46,7 @@ def reason(obj, action, slot):
     if obj.type == 'ARMATURE':
         if len(obj.data.bones) > 256:
             return 'This rig exceeds the bounded connection sampler'
-        blocker = travel_reason(obj, action, slot)
+        blocker = travel_reason(obj, action, slot, allow_native_root=True)
         if blocker:
             return blocker
     else:
@@ -98,9 +99,10 @@ class Sampler:
         f = sm.source_frame(*take['range'], elapsed, phase, endpoint)
         self.scene.frame_set(math.floor(f), subframe=f-math.floor(f))
         bpy.context.view_layer.update()
+        evaluated = clone.evaluated_get(bpy.context.evaluated_depsgraph_get())
         result = {}
         for name in channel_spec(clone, action, slot):
-            owner = clone.pose.bones[name] if name else clone
+            owner = evaluated.pose.bones[name] if name else evaluated
             from .motion_heading import rotation
             q = rotation(owner)
             require(all(v > 0 and math.isfinite(v) for v in owner.scale),
@@ -117,7 +119,7 @@ class Sampler:
 
 
 def prepare(obj, motions):
-    plans = [{'phase': 0., 'join': None} for _ in motions]
+    plans = [{'phase': 0., 'join': None, 'root_offset': [0., 0., 0.], 'travel_before': [0., 0.]} for _ in motions]
     if not any(m[0].get('transition') for m in motions):
         return plans
     reader = Sampler(obj)
@@ -125,6 +127,11 @@ def prepare(obj, motions):
     try:
         for index, motion in enumerate(motions):
             clip, take, action, slot, timing = motion
+            if index:
+                plans[index]['root_offset'] = list(plans[index-1]['root_offset'])
+                before = plans[index-1]['travel_before']
+                displacement = motions[index-1][0]['travel']['delta_m'] if motions[index-1][0]['travel'] else [0., 0.]
+                plans[index]['travel_before'] = [x+y for x,y in zip(before, displacement)]
             if not clip.get('transition'):
                 continue
             previous = motions[index-1]
@@ -134,7 +141,7 @@ def prepare(obj, motions):
             require(channel_spec(obj, action, slot) == channel_spec(obj, previous[2], previous[3]),
                     'STITCH_CHANNEL_REVIEW', 'These clips animate different channels; use an intermediate clip or Blender')
             geometry = connection(previous[0], clip, previous[1], take)
-            dt = min(.125, (previous[4]['native_end']-previous[0]['start'])/4,
+            dt = min(1/64, (previous[4]['native_end']-previous[0]['start'])/4,
                      (timing['native_end']-clip['start'])/4)
             previous_elapsed = previous[4]['cycles'] * (previous[1]['range'][1]-previous[1]['range'][0])
             phase = plans[index-1]['phase']
@@ -172,11 +179,33 @@ def prepare(obj, motions):
             require(keys <= 200000, 'RESOURCE_LIMIT', 'Connections exceed 200000 generated scalar keys; split the edit')
             samples = [(geometry['start']+duration*i/subdivisions,
                         sm.bridge(a, b, ap, bn, dt, duration, i/subdivisions)) for i in range(subdivisions+1)]
-            # Constant object placements cannot be blended back to another origin.
+            # Object location is a verified native root owner. Keep both source
+            # Actions unchanged and align incoming placement with a separate
+            # delta channel, whose endpoint velocity is zero. The sum of the
+            # pose bridge and alignment is the same Hermite bridge between the
+            # aligned endpoints, preserving native root velocities exactly.
+            alignment = [0., 0., 0.]
             if '' in a:
-                require(math.dist(a['']['location'], b['']['location']) < 1e-5,
+                require(obj.type == 'ARMATURE' or math.dist(a['']['location'], b['']['location']) < 1e-5,
                         'STITCH_ROOT_REVIEW', 'Object placements differ; align this motion explicitly in Blender')
-            plans[index]['join'] = {**geometry, 'samples': samples, 'pose_cost_before': cost_before,
+                if obj.type == 'ARMATURE':
+                    require(not previous[0]['travel'] and not clip['travel']
+                            or math.dist(a['']['location'], b['']['location']) < 1e-5,
+                            'STITCH_ROOT_REVIEW', 'Native root alignment cannot also own an added travel path')
+                    derivatives = sm.tangents(a, b, ap, bn, dt)
+                    alignment = [x-y+(v+w)*duration*.5 for x,y,v,w in zip(
+                        a['']['location'], b['']['location'], derivatives[0]['']['location'], derivatives[1]['']['location'])]
+                    plans[index]['root_offset'] = [x+y for x,y in zip(plans[index-1]['root_offset'], alignment)]
+            from .motion_contacts import cleanup
+            samples, contact = cleanup(reader, obj, previous, motion, geometry, samples,
+                                       plans[index-1]['root_offset'], alignment, plans[index]['travel_before'],
+                                       ap, bn, dt, (plans[index-1]['phase'], plans[index]['phase']))
+            plans[index]['travel_before'] = [x+y for x,y in zip(plans[index]['travel_before'], geometry['delta_m'])]
+            plans[index]['join'] = {**geometry, 'contact_cleanup': contact, 'samples': samples, 'pose_cost_before': cost_before,
+                                    'provider': 'native', 'implementation': 'native-stitch-c1-v2',
+                                    'generation_mode': 'deterministic', 'root_owner': 'native-object-location-plus-alignment' if any(alignment) else 'native-pose-plus-optional-path',
+                                    'root_alignment_local': alignment,
+                                    'boundary_tangents': sm.tangents(a, b, ap, bn, dt),
                                     'channels': {n: [list(pair) for pair in sorted(v)] for n, v in channel_spec(obj, action, slot).items()},
                                     'pose_cost_after': pose_after, 'phase_note': phase_note,
                                     'matched_phase': matched_phase,
@@ -197,7 +226,7 @@ def bake(obj, plan, job_id, clip_id):
     action = bpy.data.actions.new('Director connection '+clip_id+' '+job_id)
     action[GENERATED] = 1
     ad = obj.animation_data_create(); ad.action = action
-    eulers, quaternions = {}, {}
+    eulers, quaternions, axis_angles = {}, {}, {}
     for frame, pose in plan['samples']:
         for name, state in pose.items():
             owner = obj.pose.bones[name] if name else obj
@@ -208,7 +237,19 @@ def bake(obj, plan, job_id, clip_id):
             if owner.rotation_mode == 'QUATERNION':
                 prop = 'rotation_quaternion'; values = list(q)
             elif owner.rotation_mode == 'AXIS_ANGLE':
-                axis, angle = q.to_axis_angle(); prop = 'rotation_axis_angle'; values = [angle, *axis]
+                axis, angle = q.to_axis_angle(); prop = 'rotation_axis_angle'
+                if abs(math.sin(angle/2)) < 1e-5:
+                    endpoint = 0 if frame == plan['start'] else 1 if frame == plan['end'] else None
+                    angular = Vector(plan['boundary_tangents'][endpoint][name]['angular']) if endpoint is not None else None
+                    if angular is not None and angular.length > 1e-8:
+                        axis = angular.normalized()
+                    elif name in axis_angles:
+                        axis = Vector(axis_angles[name][1:])
+                if name in axis_angles and axis.dot(Vector(axis_angles[name][1:])) < 0:
+                    axis.negate(); angle = -angle
+                if name in axis_angles:
+                    angle += round((axis_angles[name][0]-angle)/(2*math.pi))*2*math.pi
+                values = [angle, *axis]; axis_angles[name] = values
             else:
                 converted = q.to_euler(owner.rotation_mode, eulers.get(name, owner.rotation_euler.copy()))
                 eulers[name] = converted.copy(); prop = 'rotation_euler'; values = list(converted)
@@ -220,10 +261,59 @@ def bake(obj, plan, job_id, clip_id):
                 target = getattr(owner, channel)
                 target[index] = expected[channel][index]
                 owner.keyframe_insert(channel, index=index, frame=frame)
+    from . import sequence_math as qm
     for curve in ops.curves(action):
-        for key in curve.keyframe_points:
-            key.interpolation = 'LINEAR'
+        match = PATH.fullmatch(curve.data_path)
+        name = json.loads(match[2]) if match[2] else ''
+        prop, component = match[3], curve.array_index
+        slopes = []
+        for index in (0, 1):
+            tangent = plan['boundary_tangents'][index][name]
+            if prop in {'location', 'scale'}:
+                slope = tangent[prop][component]
+            else:
+                # Convert the exact body angular tangent into the retained native
+                # rotation coordinates. Anchor Euler conversion to this key's
+                # representation so a 2*pi-equivalent orientation cannot spin.
+                state = plan['samples'][0 if index == 0 else -1][1][name]
+                q = state['q']; h = 1/128
+                forward = Quaternion(qm.qmul(q, qm.qexp(qm.mul(tangent['angular'], h))))
+                backward = Quaternion(qm.qmul(q, qm.qexp(qm.mul(tangent['angular'], -h))))
+                owner = obj.pose.bones[name] if name else obj
+                if prop == 'rotation_quaternion':
+                    if forward.dot(Quaternion(q)) < 0: forward.negate()
+                    if backward.dot(Quaternion(q)) < 0: backward.negate()
+                    # The key may use the opposite quaternion sign for continuity.
+                    keyed = {c.array_index: c.keyframe_points[0 if index == 0 else -1].co[1]
+                             for c in ops.curves(action) if c.data_path == curve.data_path}
+                    sign = -1 if sum(q[j]*value for j,value in keyed.items()) < 0 else 1
+                    slope = sign*(forward[component]-backward[component])/(2*h)
+                elif prop == 'rotation_euler':
+                    reference = Quaternion(q).to_euler(owner.rotation_mode)
+                    a = backward.to_euler(owner.rotation_mode, reference)
+                    b = forward.to_euler(owner.rotation_mode, reference)
+                    slope = (b[component]-a[component])/(2*h)
+                else:
+                    keyed = {c.array_index: c.keyframe_points[0 if index == 0 else -1].co[1]
+                             for c in ops.curves(action) if c.data_path == curve.data_path}
+                    reference = [keyed.get(j, owner.rotation_axis_angle[j]) for j in range(4)]
+                    axis = Vector(reference[1:]).normalized()
+                    def coordinates(value):
+                        candidate, angle = value.to_axis_angle()
+                        if candidate.dot(axis) < 0: candidate.negate(); angle = -angle
+                        angle += round((reference[0]-angle)/(2*math.pi))*2*math.pi
+                        return [angle, *candidate]
+                    if abs(math.sin(reference[0]/2)) < 1e-5:
+                        slope = 0. if component else Vector(tangent['angular']).dot(axis)
+                    else:
+                        av, bv = coordinates(backward), coordinates(forward)
+                        slope = (bv[component]-av[component])/(2*h)
+            slopes.append(slope)
+        sm.smooth_keys(curve, slopes)
     slot = getattr(ad, 'action_slot', None); ad.action = None
     track = add_strip(obj, action, slot, action.name, plan['start'], [plan['start'], plan['end']], 1)
     track.strips[0].extrapolation = 'NOTHING'
+    require(abs(track.strips[0].frame_start-plan['start']) < 1e-4
+            and abs(track.strips[0].frame_end-plan['end']) < 1e-4,
+            'STITCH_RESULT_CHANGED', 'Connection strip does not cover its complete planned interval')
     return action.name, digest(channels(action))

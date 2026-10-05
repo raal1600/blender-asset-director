@@ -38,6 +38,40 @@ def match_cost(ap, a, b, bn, dt, duration):
     return cost
 
 
+def tangents(a, b, ap, bn, dt):
+    """Native endpoint derivatives, in scene-frame time and body angular space."""
+    result = []
+    for before, after in ((ap, a), (b, bn)):
+        result.append({name: {
+            'location': sm.mul(sm.sub(after[name]['location'], before[name]['location']), 1/dt),
+            'angular': sm.angular_velocity(before[name]['q'], after[name]['q'], dt),
+            'scale': sm.mul(sm.sub(after[name]['scale'], before[name]['scale']), 1/dt)} for name in a})
+    return result
+
+
+def smooth_keys(curve, endpoint_slopes=None, interval=None):
+    """Cubic Hermite segments; explicit slopes avoid Blender auto-handle overshoot.
+
+    Interior central differences approximate the densely sampled trajectory.
+    Endpoint slopes come from native motion, never the first baked secant.
+    Source curves are never passed here.
+    """
+    keys = [k for k in curve.keyframe_points if interval is None or interval[0]-1e-5 <= k.co[0] <= interval[1]+1e-5]
+    if len(keys) < 2:
+        return
+    for i, key in enumerate(keys):
+        previous, following = keys[max(0, i-1)], keys[min(len(keys)-1, i+1)]
+        slope = (following.co[1]-previous.co[1])/(following.co[0]-previous.co[0])
+        if endpoint_slopes is not None and i in (0, len(keys)-1):
+            slope = endpoint_slopes[0 if i == 0 else 1]
+        left = (key.co[0]-previous.co[0])/3 if i else (following.co[0]-key.co[0])/3
+        right = (following.co[0]-key.co[0])/3 if i < len(keys)-1 else left
+        key.interpolation = 'BEZIER'
+        key.handle_left_type = key.handle_right_type = 'FREE'
+        key.handle_left = (key.co[0]-left, key.co[1]-slope*left)
+        key.handle_right = (key.co[0]+right, key.co[1]+slope*right)
+
+
 def bridge(a, b, ap, bn, dt, duration, u):
     result = {}
     for name in a:

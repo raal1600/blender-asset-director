@@ -7,7 +7,8 @@ import {approveCheckpoint} from './workbench-model.mjs';
 import {checkpointScenePath} from './checkpoint-paths.mjs';
 
 export async function checkpointJob(work,id,sceneId,revision,request,policy) {
-  const {stage,operation,options,readOnly=false,candidateOnly=false}=policy;
+  const {stage,operation,options,readOnly=false,candidateOnly=false,cancellation}=policy;
+  const checkCancelled=()=>assert(!cancellation?.cancelled,'Action Save cancelled; prior scene and local draft retained.',499);
   assert(!(readOnly&&candidateOnly),'Read-only inspection cannot publish a candidate.');
   const p=await work.project(id),scene=work.scene(p,sceneId),runId=request.requestId;
   const identity=digest({projectId:id,sceneId,revision,request});
@@ -39,12 +40,13 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
     startedAt:now(),authorization:readOnly?'explicit-launcher-inspection':candidateOnly?'explicit-launcher-preparation':'explicit-launcher-save',options,
     ...(candidateOnly?{publication:'SEPARATE_CANDIDATE_ONLY'}:{}),
     ...(policy.context?{context:policy.context}:{})};
+  if(cancellation?.cancelled){record.state='CANCELLED';record.finishedAt=now();record.error='Action Save cancelled before native execution; prior scene and local draft retained.';await writeJson(receipt,record);return {run:record,reused:false};}
   await work.lock(p,runId);
   try {
-    await writeJson(receipt,record);
+    await writeJson(receipt,record);checkCancelled();
     const optionsFile=await safe(p.directory,`Docs/Workbench/${runId}-options.json`);await writeJson(optionsFile,options);
     const job=await work.runtime.harness(['job-prepare',operation,'--input',await safe(p.directory,cp.path),'--options',optionsFile]);
-    record.jobId=job.id;
+    record.jobId=job.id;if(cancellation)cancellation.jobId=job.id;
     if(implementation)assert(job.specification?.implementation===implementation,'Native inspection runtime changed before execution.',409);
     assert(['PLANNED','SUCCEEDED'].includes(job.state),'Native Save needs explicit retry/recovery before execution.',409);
     await work.store.bindJob(id,job,q=>{
@@ -54,7 +56,9 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
     record.state='RUNNING';await writeJson(receipt,record);work.running.add(runId);
     const complete=async()=>{
       try {
+        if(cancellation?.cancelled)await work.runtime.harness(['job-cancel',job.id]);
         const output=await work.runtime.harness(['job-run',job.id,'--blender',work.config.blender,'--timeout','180'],195000);
+        checkCancelled();
         if(implementation)assert(output.specification?.implementation===implementation,'Native inspection runtime identity changed.',409);
         const data=await work.result(output);await policy.verify(data);
         let source,actual;
@@ -64,6 +68,7 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
           assert(actual.sha256===member.sha256&&actual.size===member.size,'Native saved output changed.',409);
         }
         await work.serialize(async()=>{
+          checkCancelled();if(cancellation)cancellation.committing=true;
           const q=await work.project(id),s=work.scene(q,sceneId);
           assert(s.run===runId&&s.current===savedBase&&s.candidate===draftBase&&s.stage===stage,'Scene changed during Save.',409);
           await work.verify(q,s,cp.id);
@@ -82,17 +87,17 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
           await work.store.save(q,q.revision);record.resultCheckpointId=cpId;
         });
         record.state='SUCCEEDED';
-      }catch(error){record.state='FAILED';record.error=error.message;}
+      }catch(error){record.state=cancellation?.cancelled?'CANCELLED':'FAILED';record.error=cancellation?.cancelled?'Action Save cancelled; prior scene and local draft retained.':error.message;}
       finally{
         record.finishedAt=now();await writeJson(receipt,record);
         await work.serialize(async()=>{const q=await work.project(id),s=work.scene(q,sceneId);if(s.run===runId){s.run=null;await work.store.save(q,q.revision);}});
-        await work.unlock(p,runId);work.running.delete(runId);
+        await work.unlock(p,runId);work.running.delete(runId);if(cancellation)work.actionSaves.delete(runId);
       }
     };
     void complete().catch(error=>console.error(operation+' needs recovery: '+error.message));
     return {run:record,reused:false};
   }catch(error){
-    record.state='FAILED';record.error=error.message;record.finishedAt=now();await writeJson(receipt,record);
+    record.state=cancellation?.cancelled?'CANCELLED':'FAILED';record.error=error.message;record.finishedAt=now();await writeJson(receipt,record);
     const q=await work.project(id),s=work.scene(q,sceneId);if(s.run===runId){s.run=null;await work.store.save(q,q.revision);}
     await work.unlock(p,runId);throw error;
   }

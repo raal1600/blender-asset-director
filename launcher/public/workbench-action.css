@@ -29,3 +29,6 @@
 @media(max-width:1000px){.action-motion-layout{grid-template-columns:minmax(0,1fr) 270px;gap:12px}.motion-inspector{padding:12px}}
 @media(max-width:760px){.layered-action{padding:12px}.action-heading{align-items:flex-start;flex-direction:column}.action-heading h1{font-size:24px}.action-controls{grid-template-columns:1fr 1fr;padding:12px}.action-controls label:first-child,.action-controls label:nth-child(2){grid-column:1/-1}.action-savebar>div{gap:5px;flex-wrap:wrap}.action-workspace .viewer-animation{flex-wrap:wrap}.action-workspace .viewer-animation input{min-width:120px;flex:1}.action-workspace .viewer-canvas{height:350px}.action-workspace .world-next{flex-wrap:wrap}}
 @media(max-width:760px){.action-motion-layout{grid-template-columns:minmax(0,1fr)}.motion-controls .motion-next{grid-column:1/-1}.motion-timeline header{flex-wrap:wrap;gap:6px}.motion-inspector{padding:16px}.action-motion-stage .viewer-animation output{min-width:0}.action-savebar>span{overflow-wrap:anywhere}}
+
+/* The one safe interruption remains available while a native Save owns the UI. */
+.busy [data-action="action-cancel"]{pointer-events:auto;opacity:1}

@@ -33,11 +33,15 @@ class CoverageContractTests(unittest.TestCase):
     def test_exact_partitions_and_original_fixture_inventory(self):
         self.assertEqual(len(partitions()), 23)
         fixtures = [row for suite in BLENDER_SUITES.values() for row in suite]
-        self.assertEqual(len(fixtures), 26)
-        self.assertEqual(len({row[0] for row in fixtures}), 26)
-        self.assertEqual(len([row for row in fixtures if row[0] not in {'gait-profile', 'motion-stitch', 'native-calibration', 'motion-edits'}]), 22)
+        self.assertEqual(len(fixtures), 30)
+        self.assertEqual(len({row[0] for row in fixtures}), 30)
+        self.assertEqual(len([row for row in fixtures if row[0] not in {'gait-profile', 'motion-stitch', 'stitch-continuity', 'transition-contacts', 'transition-preview-parity', 'retarget-transition', 'native-calibration', 'motion-edits'}]), 22)
         self.assertIn(('gait-profile', 'gait_profile_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['motion'])
         self.assertIn(('motion-stitch', 'motion_stitch_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['motion'])
+        self.assertIn(('stitch-continuity', 'stitch_continuity_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['motion'])
+        self.assertIn(('transition-contacts', 'contact_transition_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['motion'])
+        self.assertIn(('transition-preview-parity', 'transition_parity_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['motion'])
+        self.assertIn(('retarget-transition', 'retarget_transition_fixture.py', 'RESULTS.json', True, ()), BLENDER_SUITES['motion'])
         self.assertIn(('native-calibration', 'native_calibration_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['motion'])
         self.assertIn(('motion-edits', 'motion_edits_fixture.py', 'RESULTS.json', False, ()), BLENDER_SUITES['motion'])
         self.assertIn('asset-preview', {row[0] for row in fixtures})

@@ -44,6 +44,19 @@ class WorkbenchCLICase(unittest.TestCase):
         self.assertTrue(result['explicit_save_handoff'] and result['gpu_render'])
         self.assertEqual(list(self.root.iterdir()), [])
 
+    def test_transition_capabilities_disclose_native_and_unaccepted_candidate(self):
+        with patch.dict(os.environ, {'ASSET_DIRECTOR_MOTION_BRICKS_CONFIG':''}):
+            providers = cli.workbench_capabilities()['transition_providers']
+        self.assertEqual(providers[0], {'provider':'native', 'mode':'deterministic', 'available':True, 'implementation':'native-stitch-c1-v2'})
+        self.assertEqual(providers[1]['provider'], 'motion-bricks.cpp')
+        self.assertFalse(providers[1]['accepted_transition'])
+        self.assertEqual(providers[1]['state'], 'NOT_CONFIGURED')
+        with patch.dict(os.environ, {'ASSET_DIRECTOR_MOTION_BRICKS_CONFIG':str(self.root/'missing-config.json')}):
+            result = cli.workbench_capabilities()
+        self.assertTrue(result['transition_providers'][0]['available'])
+        self.assertEqual(result['transition_providers'][1]['state'], 'CONFIGURATION_ERROR')
+        self.assertTrue(result['action_save_cancellation'])
+
     def test_capabilities_do_not_open_or_modify_existing_catalog(self):
         library = self.root / 'library'
         library.mkdir()

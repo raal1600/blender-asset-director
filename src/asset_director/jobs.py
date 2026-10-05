@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import copy
+import contextlib
 from pathlib import Path
 import subprocess
 import threading
@@ -292,6 +293,45 @@ def child_environment() -> dict:
     return {k:v for k,v in os.environ.items() if k.upper() in allowed}
 
 
+@contextlib.contextmanager
+def _cancellation_lock(lib: Library, jid: str):
+    """Serialize cancellation acknowledgement with final native acceptance."""
+    deadline = time.monotonic() + 2
+    while True:
+        lease = lib.lock("cancel-" + jid)
+        try:
+            lease.__enter__(); break
+        except DirectorError as error:
+            if error.code != "BUSY" or time.monotonic() >= deadline:
+                raise
+            time.sleep(.01)
+    try:
+        yield
+    finally:
+        lease.__exit__(None, None, None)
+
+
+def cancel(lib: Library, jid: str) -> dict:
+    """Request cancellation of an owned Action writer; its executor reaps Blender."""
+    job, path = read_job(lib, jid)
+    require(job["specification"]["operation"] == "action-edit", "CANCEL_UNSUPPORTED", "Only native Action saves support cancellation")
+    with _cancellation_lock(lib, jid):
+        current = load_json(path)
+        require(current["state"] in {"PLANNED", "RUNNING"}, "INVALID_STATE", "Only a queued or running Action save can be cancelled")
+        atomic_json(path.parent / "cancel-request.json", {"job_id": jid, "implementation": job["specification"]["implementation"], "requested_at": time.time()})
+    return {"job_id": jid, "state": "CANCEL_REQUESTED"}
+
+
+def _cancelled(path: Path, job: dict) -> bool:
+    marker = path.parent / "cancel-request.json"
+    if not marker.exists():
+        return False
+    request = load_json(marker)
+    require(request.get("job_id") == job["id"] and request.get("implementation") == job["specification"]["implementation"],
+            "INVALID_CANCELLATION", "Cancellation identity does not match this native job")
+    return True
+
+
 def run(lib: Library, jid: str, blender: str, timeout=360) -> dict:
     require(5 <= timeout <= 900, "RESOURCE_LIMIT", "Timeout must be 5..900 seconds")
     executable = Path(blender).expanduser().resolve()
@@ -307,8 +347,16 @@ def run(lib: Library, jid: str, blender: str, timeout=360) -> dict:
         args = [str(executable), "--background", "--factory-startup", "--disable-autoexec", "--threads", "2", "--python-exit-code", "11", "--python", str(runner), "--", str(path)]
         log = path.parent / "worker.log"
         try:
+            require(not _cancelled(path, job), "JOB_CANCELLED", "Action save cancelled before Blender started; previous checkpoint retained")
             with log.open("wb") as out:
                 process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=child_environment(), cwd=path.parent, shell=False)
+                job["worker_pid"] = process.pid
+                # Blender reads job.json immediately. Replacing that file here
+                # races its Windows read handle; publish a separate fresh marker.
+                try:
+                    atomic_json(path.parent / "worker-process.json", {"job_id":jid, "implementation":job["specification"]["implementation"], "pid":process.pid, "started_at":time.time()})
+                except BaseException:
+                    process.kill(); process.wait(timeout=10); process.stdout.close(); raise
                 overflow = threading.Event()
                 def drain():
                     count = 0
@@ -320,15 +368,27 @@ def run(lib: Library, jid: str, blender: str, timeout=360) -> dict:
                         else:
                             overflow.set(); process.kill(); break
                 reader = threading.Thread(target=drain, daemon=True); reader.start()
-                try: code = process.wait(timeout=timeout)
-                except subprocess.TimeoutExpired:
-                    process.kill(); process.wait(); raise DirectorError("BLENDER_TIMEOUT", "Blender worker deadline exceeded")
+                try:
+                    deadline = time.monotonic() + timeout
+                    while True:
+                        if _cancelled(path, job):
+                            process.kill(); process.wait(timeout=10)
+                            raise DirectorError("JOB_CANCELLED", "Action save cancelled; Blender stopped and previous checkpoint retained")
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            process.kill(); process.wait(timeout=10)
+                            raise DirectorError("BLENDER_TIMEOUT", "Blender worker deadline exceeded")
+                        try:
+                            code = process.wait(timeout=min(.1, remaining)); break
+                        except subprocess.TimeoutExpired:
+                            pass
                 except BaseException:
                     process.kill(); process.wait(timeout=10); raise
                 finally:
                     reader.join(timeout=10)
                     process.stdout.close()
                 require(not overflow.is_set(), "LOG_LIMIT", "Blender output exceeded the log limit")
+            require(not _cancelled(path, job), "JOB_CANCELLED", "Action save cancelled before result acceptance; previous checkpoint retained")
             result_path = path.parent / "result.json"
             result = load_json(result_path) if result_path.exists() else None
             require(code == 0 and result and result.get("status") == "OK", (result or {}).get("code", "BLENDER_FAILED"), (result or {}).get("message", "Blender worker failed; inspect its local log"))
@@ -338,9 +398,13 @@ def run(lib: Library, jid: str, blender: str, timeout=360) -> dict:
             for p in sorted(path.parent.iterdir()):
                 if p.name in {"job.json", "worker.log"} or not p.is_file(): continue
                 outputs.append({"path": p.relative_to(lib.root).as_posix(), "size": p.stat().st_size, "sha256": file_hash(p)})
-            job.update(state="SUCCEEDED", outputs=outputs, summary=result.get("summary", {}), finished_at=time.time())
+            with _cancellation_lock(lib, jid):
+                require(not _cancelled(path, job), "JOB_CANCELLED", "Action save cancelled before final acceptance; previous checkpoint retained")
+                job.update(state="SUCCEEDED", outputs=outputs, summary=result.get("summary", {}), finished_at=time.time())
+                atomic_json(path, job)
+                return job
         except DirectorError as exc:
-            job.update(state="FAILED", last_error=exc.as_dict(), finished_at=time.time())
+            job.update(state="CANCELLED" if exc.code == "JOB_CANCELLED" else "FAILED", last_error=exc.as_dict(), finished_at=time.time())
             atomic_json(path, job); raise
         except BaseException:
             job.update(state="INTERRUPTED", finished_at=time.time()); atomic_json(path, job); raise
@@ -350,12 +414,14 @@ def run(lib: Library, jid: str, blender: str, timeout=360) -> dict:
 
 def retry(lib: Library, jid: str) -> dict:
     job, path = read_job(lib, jid)
-    require(job["state"] in {"FAILED", "INTERRUPTED"}, "INVALID_STATE", "Only failed/interrupted jobs may be retried")
+    require(job["state"] in {"FAILED", "INTERRUPTED", "CANCELLED"}, "INVALID_STATE", "Only failed/interrupted/cancelled jobs may be retried")
     # Preserve failure evidence; never erase existing source or final projects.
     history = path.parent / f"attempt-{int(time.time()*1000)}"
     history.mkdir()
     for p in list(path.parent.iterdir()):
         if p.is_file(): p.replace(history / p.name)
+    for key in ("worker_pid", "started_at", "finished_at"):
+        job.pop(key, None)
     job.update(state="PLANNED", outputs=[], last_error=None)
     atomic_json(path, job); return job
 

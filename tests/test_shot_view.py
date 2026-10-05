@@ -49,5 +49,20 @@ class ShotViewTests(unittest.TestCase):
             with self.assertRaises(DirectorError):viewer_timebase.normalize(target, 1, 9, 30, 1.001)
             self.assertEqual(target.read_bytes(), raw)
 
+    def test_quarter_frame_samples_preserve_fractional_fps_and_duration(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target=Path(folder)/'preview.glb'
+            for rate in [30/1.001,30,30*1.001]:
+                target.write_bytes(self.glb([i/(4*rate) for i in range(33)]))
+                result=viewer_timebase.normalize(target,1,9,30,1.001,subdivisions=4)
+                self.assertEqual(result['sampling'],'VERIFIED_QUARTER_FRAMES')
+                raw=target.read_bytes();length=struct.unpack_from('<I',raw,12)[0]
+                times=struct.unpack_from('<33f',raw,28+length)
+                for i,value in enumerate(times):self.assertAlmostEqual(value,i/(4*(30/1.001)),places=6)
+                self.assertEqual(len(set(times)),33)
+            raw=self.glb([0,.003,8/30]);target.write_bytes(raw)
+            with self.assertRaises(DirectorError):viewer_timebase.normalize(target,1,9,30,1,subdivisions=4)
+            self.assertEqual(target.read_bytes(),raw)
+
 
 if __name__ == '__main__':unittest.main()

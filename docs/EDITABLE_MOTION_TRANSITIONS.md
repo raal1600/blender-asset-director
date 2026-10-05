@@ -87,6 +87,43 @@ The orientation-only target is not an unsaved native-motion preview pipeline.
 Saving, playback and a successful numerical test are not human motion/contact
 approval.
 
+## Provider, contacts and cancelling Save
+
+Connection controls identify **Blender native: deterministic pose blend** or
+**deterministic turn blend**. These modes do not invoke a model. Runtime
+capability discovery also describes the optional pinned motion-bricks.cpp G1
+candidate provider; `accepted_transition: false` means its generated seams and
+contacts have not passed acceptance. It is not offered as a finished transition.
+
+Contact text follows the actual annotation and result receipt. Unannotated takes
+have no contact cleanup guarantee. Authored intervals are evaluated by Save;
+`SAMPLED_AUTHORED_CLEANUP` means the saved result received and passed the bounded
+sampled cleanup. It does not certify arbitrary terrain or every intervening
+instant. An invalid annotation reports its blocker instead of inventing contacts.
+
+**Cancel Save** stays available while an Action save is queued or Blender is
+running. It keeps the previous checkpoint and local draft. A queued request does
+not start Blender. During native execution the owning executor polls its scoped
+cancellation request, stops and waits for its Blender child, then records
+`CANCELLED` and releases the project writer lease. A result is never published as
+a checkpoint after cancellation has been accepted. If atomic publication has
+already begun, cancellation is explicitly refused and the final receipt decides
+the result. Cancelling the browser preview or closing a tab is a different action.
+
+Cancelled native attempts and partial files stay in the isolated job directory
+for diagnosis. To repeat exactly the same cancelled job, open its operation
+record and use **Reset failed native job for retry**; this archives the old
+attempt before making it runnable. It does not run automatically. Saving a
+revised draft creates its own job identity. Do not delete locks or edit receipts
+to make a cancelled or interrupted job look successful.
+
+If a Save remains pending after an application crash, use the existing task
+recovery path only after the owned native worker has stopped. An optional
+motion-bricks configuration error is reported through capability discovery and
+does not disable the deterministic provider. Native editing supports verified
+same-rig bindings; it does not infer compatibility from matching bone names or
+perform generic retargeting.
+
 ## Stable native calibration
 
 The former bridge could acquire unkeyed location/scale channels. Imported rigs
@@ -128,9 +165,9 @@ object axis-angle heading is also refused without changing its rotation mode;
 the existing axis-angle bone-pose bridges remain supported.
 
 The incoming native clip replaces the preceding pose bridge at its own start;
-the preceding gait is not left blended throughout the new clip. Contact locking,
-terrain adaptation, arbitrary choreography and generic rig retargeting are not
-implemented by this change.
+the preceding gait is not left blended throughout the new clip. Authored contact cleanup is limited to the annotated intervals and supported
+rig channels. Unannotated foot locking, terrain adaptation, arbitrary choreography
+and generic rig retargeting are not implemented by these controls.
 
 Repeated edits also preserve tracks with duplicate legacy display names. New
 track labels retain a bounded digest before Blender's byte-length truncation.

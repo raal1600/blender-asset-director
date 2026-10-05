@@ -72,6 +72,10 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         let data = ''; for await (const part of req) { data += part; assert(data.length <= 65536,'Request too large.',413); }
         body = data ? JSON.parse(data) : {};
       }
+      // Cancellation must not wait behind the operation it is cancelling.
+      // Registry entries are bound to the authenticated exact Action request.
+      if(req.method==='POST'&&url.pathname==='/api/workbench/action-save')workbench.registerActionSave(body.projectId,body.sceneId,body.revision,body.request);
+      if(req.method==='POST'&&url.pathname==='/api/workbench/action-cancel')return send(200,await workbench.cancelActionSave(body.projectId,body.sceneId,body.runId));
       let previewSignal;
       if(req.method==='POST'&&url.pathname==='/api/workbench/viewer-prepare'){
         const cancellation=new AbortController();previewSignal=cancellation.signal;
