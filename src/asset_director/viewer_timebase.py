@@ -11,7 +11,7 @@ from .core import require
 
 
 def normalize(destination, start, end, fps, fps_base, subdivisions=1):
-    require(type(subdivisions) is int and subdivisions in {1,4}, 'VIEWER_EXPORT_FAILED', 'Unsupported preview subdivision count')
+    require(type(subdivisions) is int and subdivisions in {1,4,16,32}, 'VIEWER_EXPORT_FAILED', 'Unsupported preview subdivision count')
     original = destination.read_bytes()
     require(original[:4] == b'glTF' and len(original) >= 28, 'VIEWER_EXPORT_FAILED', 'Invalid GLB timing envelope')
     size, kind = struct.unpack_from('<II', original, 12)
@@ -59,4 +59,4 @@ def normalize(destination, start, end, fps, fps_base, subdivisions=1):
         destination.write_bytes(raw)
     return {'scope': 'PREVIEW_ONLY', 'effective_fps': effective, 'corrected_accessors': changes,
             'original_scene_changed': False, 'subdivisions': subdivisions,
-            'sampling': 'VERIFIED_INTEGER_FRAMES' if subdivisions==1 else 'VERIFIED_QUARTER_FRAMES'}
+            'sampling': {1:'VERIFIED_INTEGER_FRAMES',4:'VERIFIED_QUARTER_FRAMES',16:'VERIFIED_SIXTEENTH_FRAMES',32:'VERIFIED_1_32_FRAMES'}[subdivisions]}

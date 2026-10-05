@@ -327,3 +327,17 @@ requires Blender child release within five seconds, preserves the failed attempt
 then actually retries and renders in a fresh Blender process. Portable contract
 and process-death tests run in ordinary CI. This fixture creates its own cube;
 it does not substitute for the separate real Adventurer client journey.
+
+
+## Preview interpolation accuracy
+
+Saved timelines with connections use evaluated 1/32-frame samples in the
+isolated GLB preview worker. Native Actions, scene FPS and saved frame ranges
+are unchanged; the temporary sampling timebase is restored even after export
+failure. Quarter-frame sampling reproduced up to 1.12 mm of interpolation error
+near the Adventurer's fractional boundaries despite matching rendered integer
+frames. The stricter regression retains a 0.1 mm positional limit at all tested
+boundary subframes; it does not relax the limit between exporter samples.
+Ordinary Blender CI checks actual GLTFLoader playback of the exported data and
+requires the denser timebase. GLB remains a bounded 128 MiB inspection derivative;
+materials and lighting are approximations, while rendering uses the saved blend.

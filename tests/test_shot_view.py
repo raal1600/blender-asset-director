@@ -65,4 +65,23 @@ class ShotViewTests(unittest.TestCase):
             self.assertEqual(target.read_bytes(),raw)
 
 
+
+    def test_dense_samples_preserve_fractional_clock_and_reject_off_grid(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target=Path(folder)/'preview.glb'
+            for factor,label in [(16,'VERIFIED_SIXTEENTH_FRAMES'),(32,'VERIFIED_1_32_FRAMES')]:
+                count=8*factor+1
+                for rate in [30/1.001,30,30*1.001]:
+                    target.write_bytes(self.glb([i/(factor*rate) for i in range(count)]))
+                    result=viewer_timebase.normalize(target,1,9,30,1.001,subdivisions=factor)
+                    self.assertEqual(result['sampling'],label)
+                    raw=target.read_bytes();length=struct.unpack_from('<I',raw,12)[0]
+                    times=struct.unpack_from('<'+str(count)+'f',raw,28+length)
+                    for i,value in enumerate(times):self.assertAlmostEqual(value,i/(factor*(30/1.001)),places=6)
+                    self.assertEqual(len(set(times)),count)
+                raw=self.glb([0,.003,8/30]);target.write_bytes(raw)
+                with self.assertRaises(DirectorError):viewer_timebase.normalize(target,1,9,30,1,subdivisions=factor)
+                self.assertEqual(target.read_bytes(),raw)
+
+
 if __name__ == '__main__':unittest.main()
