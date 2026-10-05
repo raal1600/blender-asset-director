@@ -63,3 +63,16 @@ test('forged automatic profile, heading or pace refuses; legacy manual travel st
  for(const patch of [{gait_id:'d'.repeat(64)},{meters_per_cycle:5},{delta_m:[2,0]}])assert.throws(()=>timelineTiming({...c,travel:{...c.travel,...patch}},t));
  const d=timelineDraft(cp,run);d.add(take,'clip_manual');d.edit('travel',true);d.edit('pace','1');assert(!d.invalid);
 });
+
+test('generated repositioning binds the rig and seed and keeps original clip boundaries',()=>{
+ const inspected=structuredClone(run),p=inspected.inspection.performers[0];
+ Object.assign(p.timeline,{stitch_version:'native-stitch-v1',edit_version:'native-motion-edit-v1',motion_bricks:{status:'CONFIGURED',profile_sha256:'c'.repeat(64)}});
+ Object.assign(p.takes[0],{stitch_blocker:null,stitch_channels:'d'.repeat(64),heading_blocker:null});
+ const d=timelineDraft(cp,inspected);d.add(take,'clip_first');const first=d.selectedClip;d.add(take,'clip_second');d.edit('transition_mode','generated');
+ assert(!d.invalid,d.errors.map(x=>x.message).join(' '));assert.deepEqual(d.clips('One')[0],first);assert.equal(d.selectedClip.transition.match_phase,false);assert.equal(d.selectedClip.speed,1);assert.equal(d.selectedClip.transition.seed,1234);assert.equal(d.selectedClip.transition.profile_sha256,'c'.repeat(64));assert(d.connection.placement_pending);
+ assert.throws(()=>d.edit('match_phase',true),/native opening/);
+ const generated=d.request('run_generated');validateTimeline(generated.changes[0]);
+ const saved=structuredClone(inspected);saved.inspection.performers[0].timeline.clips=d.clips('One');const reopened=timelineDraft(cp,saved);reopened.select('One','clip_second');assert.deepEqual(reopened.selectedClip.transition,d.selectedClip.transition);
+ d.edit('transition_mode','blend');assert.equal(d.selectedClip.transition.seed,undefined);assert.equal(d.selectedClip.transition.profile_sha256,undefined);
+ const bad=structuredClone(generated.changes[0]);bad.clips[1].transition.seed=NaN;assert.throws(()=>validateTimeline(bad));
+});

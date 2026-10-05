@@ -1,6 +1,6 @@
-"""Evaluated quarter-frame preview sampling without changing native Actions.
+"""Evaluated 1/32-frame preview sampling without changing native Actions.
 
-Blender's time remapping evaluates frame 4*f at native frame f. Raising export
+Blender's time remapping evaluates frame 32*f at native frame f. Raising export
 FPS by the same factor preserves seconds. Only the disposable preview worker's
 scene settings change, and all settings are restored on every exit path.
 """
@@ -12,7 +12,7 @@ from .core import require
 
 def subdivisions(scene):
     from .action_timeline import PROPERTY, load
-    return 4 if any(obj.get(PROPERTY) and load(obj).get('connections') for obj in scene.objects) else 1
+    return 32 if any(obj.get(PROPERTY) and load(obj).get('connections') for obj in scene.objects) else 1
 
 
 @contextmanager

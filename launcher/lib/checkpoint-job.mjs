@@ -72,7 +72,16 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
           const q=await work.project(id),s=work.scene(q,sceneId);
           assert(s.run===runId&&s.current===savedBase&&s.candidate===draftBase&&s.stage===stage,'Scene changed during Save.',409);
           await work.verify(q,s,cp.id);
-          if(readOnly){record.inspection=data;return;}
+          if(readOnly){
+            record.inspection=data;
+            // A verified layer inspection also supplies the saved scene inventory
+            // used by named shots. Imported checkpoints may have no prior audit.
+            if(policy.sceneAudit){
+              s.checkpoints.find(checkpoint=>checkpoint.id===cp.id).audit=policy.sceneAudit(data);
+              await work.store.save(q,q.revision);
+            }
+            return;
+          }
           assert((await work.interactions(id).sourceStatus()).ready,'Source-use scope changed during Save.',409);
           const destination=await safe(q.directory,relative);
           await fs.copyFile(source,destination,constants.COPYFILE_EXCL);

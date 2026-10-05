@@ -68,7 +68,18 @@ def atomic_json(path: Path, data: Any) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text); f.flush(); os.fsync(f.fileno())
-        os.replace(name, path)
+        # Windows readers may temporarily omit FILE_SHARE_DELETE. Keep the old
+        # complete record and the already-flushed replacement while they close.
+        # A persistent sharing/permission failure still raises after at most
+        # 0.5 seconds of bounded retry delay; never remove the destination first.
+        for attempt in range(21):
+            try:
+                os.replace(name, path)
+                break
+            except PermissionError as exc:
+                if getattr(exc, "winerror", None) not in {5, 32, 33} or attempt == 20:
+                    raise
+                time.sleep(.025)
     finally:
         Path(name).unlink(missing_ok=True)
 

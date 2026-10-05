@@ -42,6 +42,8 @@ try:
         native=json.loads((fresh/'RESULTS.json').read_text(encoding='utf-8'))
         playback=json.loads((fresh/'GLB-RESULTS.json').read_text(encoding='utf-8'))
         assert native['status']==playback['status']=='PASS'
+        assert native['export']['timebase']['subdivisions']==32
+        assert max(r['position_m'] for r in playback['samples'])<=1e-4, 'Subframe preview exceeds original 0.1mm parity limit'
         report['cases'].append({'kind':kind,'native':{k:native[k] for k in ('status','checks','source_sha256','frame_range','fps','render_range','rendered')},'playback':playback})
         report['checks'].append(kind+' fresh process persistence, actual GLTFLoader integer/eighth-frame parity and rendered boundaries')
     report['status']='PASS'

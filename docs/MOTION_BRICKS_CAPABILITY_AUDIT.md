@@ -1,9 +1,14 @@
-﻿# MotionBricks capability audit (2026-10-05)
+# MotionBricks capability audit (2026-10-05)
 
 This is source evidence and a completed isolated CPU/Vulkan capability proof,
 not full neural-transition application acceptance. The user explicitly authorized local provider
 inference for this task. No installed runtime, user project, or original asset
 was changed.
+
+The subsequent [generated repositioning integration](MOTION_BRICKS_REPOSITIONING.md)
+uses verified sparse masks to predict destination placement, with real native-client
+Save/restart/render evidence. Contact quality is still not fully accepted. The
+fixed-destination proof below is historical, not the only available C ABI mode.
 
 ## Exact identities and reproducibility
 
@@ -47,7 +52,7 @@ Same-backend repeatability is supported; equal seeds do not promise identical
 PyTorch draws or cross-device floating-point decisions.
 
 Constraints are conditioning, not exact pose pins. The stateless operation
-performs no seam correction, overlap removal, root placement, contact cleanup,
+performs no seam correction, overlap removal, contact cleanup,
 or animation scheduling. Four source/target context frames cannot be treated
 as exact guaranteed boundary output. The host application must validate and
 stitch any accepted result and preserve source animation outside that interval.

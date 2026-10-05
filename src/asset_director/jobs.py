@@ -8,6 +8,8 @@ import subprocess
 import threading
 import time
 from .core import Asset, DirectorError, Library, SCHEMA, atomic_json, canonical, digest, fields, file_hash, implementation_hash, load_json, require, rights, tokens, within
+from .execution_resources import process_lease
+from .process_state import identity as process_identity, stopped
 from . import camera_plan
 from . import look_contract
 from . import motion_contract
@@ -245,6 +247,12 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     specification = {"schema_version": SCHEMA, "operation": operation, "inputs": inputs, "asset_id": asset_id,
                      "source_files": source_files, "source_file": asset.metadata.get("file") if asset else None, "options": options, "implementation": implementation_hash(),
                      "license_grants": grant_ids, "license_files": license_files}
+    uses_provider = operation == 'action-audit' or (operation == 'action-edit' and any(
+        clip.get('transition', {}).get('mode') == 'generated'
+        for change in options.get('changes', []) for clip in change.get('clips', [])))
+    if uses_provider:
+        from .motion_bricks_provider import configuration_identity
+        specification['motion_provider'] = configuration_identity()
     if asset and asset.metadata.get('local_use_confirmation'):
         from .local_use import job_binding
         specification['local_use'] = job_binding(asset)
@@ -260,14 +268,23 @@ def prepare(lib: Library, operation: str, input_file: str | None = None, asset_i
     return job
 
 
-def read_job(lib: Library, jid: str) -> tuple[dict, Path]:
+def _job_identity(lib: Library, jid: str) -> tuple[dict, Path]:
     require(jid.startswith("j_") and len(jid) == 26 and all(c in "0123456789abcdef" for c in jid[2:]), "INVALID_JOB", "Invalid job ID")
     path = lib.root / "jobs" / jid / "job.json"
     require(path.is_file(), "JOB_NOT_FOUND", "Unknown job")
     job = load_json(path)
     require(job["id"] == jid and "j_" + digest(job["specification"])[:24] == jid and Path(job["library"]).resolve() == lib.root,
             "INVALID_JOB", "Job identity/library mismatch")
+    return job, path
+
+
+def read_job(lib: Library, jid: str) -> tuple[dict, Path]:
+    job, path = _job_identity(lib, jid)
     require(job["specification"]["implementation"] == implementation_hash(), "STALE_IMPLEMENTATION", "Code changed; prepare a new job")
+    if 'motion_provider' in job['specification']:
+        from .motion_bricks_provider import configuration_identity
+        require(job['specification']['motion_provider'] == configuration_identity(),
+                'STALE_MOTION_PROVIDER', 'MotionBricks settings or installation changed; inspect and prepare a new job')
     fields(job["specification"]["options"], OPS[job["specification"]["operation"]])
     for f in job["specification"]["inputs"]:
         p = Path(f["path"])
@@ -289,7 +306,7 @@ def read_job(lib: Library, jid: str) -> tuple[dict, Path]:
 
 
 def child_environment() -> dict:
-    allowed = {"PATH", "SYSTEMROOT", "WINDIR", "HOME", "USERPROFILE", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "LD_LIBRARY_PATH"}
+    allowed = {"PATH", "SYSTEMROOT", "WINDIR", "HOME", "USERPROFILE", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "LD_LIBRARY_PATH", "ASSET_DIRECTOR_MOTION_BRICKS_CONFIG"}
     return {k:v for k,v in os.environ.items() if k.upper() in allowed}
 
 
@@ -341,7 +358,14 @@ def run(lib: Library, jid: str, blender: str, timeout=360) -> dict:
         for output in job["outputs"]: lib.verify_file(output)
         return job
     require(job["state"] == "PLANNED", "JOB_NOT_RUNNABLE", "Failed/interrupted jobs retain evidence; use job-retry explicitly")
-    with lib.lock("run-" + jid):
+    with process_lease(lib.root / (".execution-" + jid + ".lock"), timeout=2), lib.lock("run-" + jid):
+        job, path = read_job(lib, jid)
+        if job["state"] == "SUCCEEDED":
+            for output in job["outputs"]: lib.verify_file(output)
+            return job
+        require(job["state"] == "PLANNED", "JOB_NOT_RUNNABLE", "Job changed before execution; inspect the retained attempt")
+        owner = process_identity(os.getpid())
+        atomic_json(path.parent / "executor-process.json", {"job_id":jid, "implementation":job["specification"]["implementation"], **owner})
         job["state"] = "RUNNING"; job["started_at"] = time.time(); atomic_json(path, job)
         runner = Path(__file__).parent / "worker.py"
         args = [str(executable), "--background", "--factory-startup", "--disable-autoexec", "--threads", "2", "--python-exit-code", "11", "--python", str(runner), "--", str(path)]
@@ -349,12 +373,12 @@ def run(lib: Library, jid: str, blender: str, timeout=360) -> dict:
         try:
             require(not _cancelled(path, job), "JOB_CANCELLED", "Action save cancelled before Blender started; previous checkpoint retained")
             with log.open("wb") as out:
-                process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=child_environment(), cwd=path.parent, shell=False)
+                process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env={**child_environment(), "ASSET_DIRECTOR_JOB_OWNER":canonical(owner)}, cwd=path.parent, shell=False)
                 job["worker_pid"] = process.pid
                 # Blender reads job.json immediately. Replacing that file here
                 # races its Windows read handle; publish a separate fresh marker.
                 try:
-                    atomic_json(path.parent / "worker-process.json", {"job_id":jid, "implementation":job["specification"]["implementation"], "pid":process.pid, "started_at":time.time()})
+                    atomic_json(path.parent / "worker-process.json", {"job_id":jid, "implementation":job["specification"]["implementation"], "pid":process.pid, "birth":(process_identity(process.pid) or {}).get("birth"), "started_at":time.time()})
                 except BaseException:
                     process.kill(); process.wait(timeout=10); process.stdout.close(); raise
                 overflow = threading.Event()
@@ -409,6 +433,49 @@ def run(lib: Library, jid: str, blender: str, timeout=360) -> dict:
         except BaseException:
             job.update(state="INTERRUPTED", finished_at=time.time()); atomic_json(path, job); raise
         atomic_json(path, job)
+        return job
+
+
+def recover(lib: Library, jid: str, *, confirmed=False) -> dict:
+    """Record an interrupted attempt only after executor AND worker have stopped.
+
+    Recovery never executes or adopts output. Its identity validation intentionally
+    permits old implementation/input versions; ordinary retry/execution remains strict.
+    """
+    require(confirmed is True, "RECOVERY_CONFIRMATION", "Confirm the external process has stopped")
+    job, path = _job_identity(lib, jid)
+    with process_lease(lib.root / (".execution-" + jid + ".lock"), timeout=.2):
+        job, path = _job_identity(lib, jid)
+        require(job["state"] in {"RUNNING", "INTERRUPTED"}, "INVALID_STATE", "Only interrupted native execution can be recovered")
+        runlock=lib.root / (".run-"+jid+".lock")
+        if job["state"] == "INTERRUPTED" and not runlock.exists():return job
+        worker=path.parent/"worker-ownership.json"
+        if not worker.is_file():worker=path.parent/"worker-process.json"
+        require(worker.is_file(), "RECOVERY_IDENTITY_MISSING", "No worker identity was retained; inspect the stopped attempt before manual recovery")
+        markers=[load_json(worker)];executor=path.parent/"executor-process.json"
+        if executor.is_file():markers.append(load_json(executor))
+        require(executor.is_file() or runlock.is_file(), "RECOVERY_IDENTITY_MISSING", "No executor identity was retained")
+        for marker in markers:
+            require(marker.get("job_id")==jid and marker.get("implementation")==job["specification"]["implementation"],
+                    "RECOVERY_IDENTITY_MISMATCH", "Retained process identity belongs to another attempt")
+        locks={}
+        for name in ("run-", "cancel-"):
+            lock=lib.root/("."+name+jid+".lock")
+            if lock.exists():
+                raw=lock.read_bytes();require(raw.strip().isdigit(), "RECOVERY_IDENTITY_MISSING", "Retained executor lock is unreadable")
+                pid=int(raw);locks[lock]=raw
+                if not any(m.get("pid")==pid for m in markers):markers.append({"pid":pid})
+        for marker in markers:
+            require(stopped(marker), "JOB_STILL_RUNNING", "Native executor or Blender worker is still running; no recovery was performed")
+        receipt=path.parent/"recovery.json"
+        if not receipt.exists():atomic_json(receipt,{"job_id":jid,"original_state":job["state"],"confirmed_at":time.time(),
+            "method":"explicit-confirmation-and-stopped-process-identities","processes":markers,
+            "retained_locks":{p.name:v.decode() for p,v in locks.items()},"accepted_outputs":False})
+        job.update(state="INTERRUPTED",outputs=[],finished_at=time.time(),last_error={"code":"JOB_INTERRUPTED","message":"Executor stopped; files retained, no output adopted"})
+        atomic_json(path,job)
+        for lock,raw in locks.items():
+            require(lock.read_bytes()==raw,"RECOVERY_LOCK_CHANGED","Executor lock changed; retained for inspection")
+            lock.unlink()
         return job
 
 

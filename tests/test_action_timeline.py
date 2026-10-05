@@ -41,3 +41,17 @@ class TimelineTests(unittest.TestCase):
             validate_batch({'version': 'action-layer-v1', 'audit_sha256': 'b'*64, 'changes': [
                 {'performer': 'Rig', 'mode': 'timeline', 'clips': []},
                 {'performer': 'Other', 'mode': 'hold', 'frame': 1}]})
+
+class GeneratedTimelineTests(unittest.TestCase):
+    def test_generated_mode_requires_mapping_seed_and_intact_boundary(self):
+        from asset_director.action_timeline_contract import connection
+        a=clip()|{'travel':None,'frames':25,'repeat_reviewed':False}
+        join={'mode':'generated','frames':25,'match_phase':False,'seed':1234,'profile_sha256':'c'*64}
+        b=a|{'id':'clip_two','start':51,'transition':join}
+        change={'performer':'Rig','mode':'timeline','clips':[a,b]}
+        self.assertIs(validate(change),change)
+        geometry=connection(a,b,{'range':[1,25]},{'range':[1,25]})
+        self.assertTrue(geometry['placement_pending'])
+        for patch in [{'seed':True},{'seed':-1},{'seed':2**32},{'match_phase':True},{'profile_sha256':'changed'}]:
+            with self.subTest(patch=patch),self.assertRaises(DirectorError):
+                validate(change|{'clips':[a,b|{'transition':join|patch}]})

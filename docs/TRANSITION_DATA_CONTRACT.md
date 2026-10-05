@@ -1,5 +1,10 @@
 # Native transition data contract
 
+The separate [MotionBricks repositioning mode](MOTION_BRICKS_REPOSITIONING.md)
+preserves both native clips and generates only the connecting interval. Its
+provider, rig and quality limitations are explicit; the native modes below remain
+deterministic.
+
 The existing Action layer creates versioned Blender checkpoints. `native-stitch-c1-v2`
 is deterministic interpolation of observed native Actions, not model-generated
 motion. The client must identify that provider/mode explicitly. Model inference

@@ -60,3 +60,12 @@ test('contact disclosure distinguishes authored sampled cleanup from unannotated
  const saved={selected:d.selected,selectedClip:d.selectedClip,audit:d.audit,dirty:false};performer.timeline.connections=[{clip_id:d.selectedClip.id,contact_acceptance:'SAMPLED_AUTHORED_CLEANUP',contact_cleanup:{}}];
  assert.match(transitionContactLabel(saved),/corrected and sampled/);assert.doesNotMatch(transitionContactLabel(saved),/cleanup is unavailable/);
 });
+
+
+test('generated transition discloses inferred foot retargeting without claiming authored contacts',()=>{
+ const d=fixture();d.add(take,'clip_a');d.add(take,'clip_b');
+ const value={selected:d.selected,selectedClip:{...d.selectedClip,transition:{...d.selectedClip.transition,mode:'generated'}},audit:d.audit,dirty:true};
+ assert.match(transitionContactLabel(value),/model foot positions.*evaluated sole geometry/);
+ assert.match(transitionContactLabel(value),/not authored contacts/);
+ assert.doesNotMatch(transitionContactLabel(value),/cleanup is unavailable|corrected and sampled/);
+});

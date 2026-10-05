@@ -27,7 +27,7 @@ function verifyAudit(data,layer){
 }
 export async function inspectSceneLayer(work,id,sceneId,revision,request){
  validateSceneLayerRequest(request,true);
- return checkpointJob(work,id,sceneId,revision,request,{stage:request.layer,operation:'scene-layer-audit',options:{layer:request.layer},readOnly:true,verify:data=>verifyAudit(data,request.layer)});
+ return checkpointJob(work,id,sceneId,revision,request,{stage:request.layer,operation:'scene-layer-audit',options:{layer:request.layer},readOnly:true,verify:data=>verifyAudit(data,request.layer),sceneAudit:data=>data.scene});
 }
 export async function saveSceneLayer(work,id,sceneId,revision,request){
  validateSceneLayerRequest(request);

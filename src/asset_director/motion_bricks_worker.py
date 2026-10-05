@@ -1,4 +1,4 @@
-﻿"""Private process entry point for the pinned MotionBricks C ABI.
+"""Private process entry point for the pinned MotionBricks C ABI.
 
 Native code is imported only in this child, never in Blender or the launcher.
 The result is atomically written only after validation. It is still a candidate
@@ -13,7 +13,7 @@ import sys
 import time
 from .core import DirectorError, atomic_json, digest, load_json, require
 from .motion_bricks_provider import (CONVENTIONS, GGML_REVISION, MAX_JSON, MODEL_REVISION, RESULT_SCHEMA,
-    SOURCE_REVISION, validate_config, validate_request, validate_result, validate_skeleton)
+    SOURCE_REVISION, boundary_masks, validate_config, validate_request, validate_result, validate_skeleton)
 
 P = c.c_void_p
 U = c.c_uint64
@@ -119,6 +119,9 @@ class Native:
                 roots = (F * 12)(*list(_flat(request[side]["roots"])))
                 rotations = (F * 544)(*list(_flat(request[side]["local_xyzw"])))
                 self.call("mb_inference_request_set_boundary_poses", handle, self.model, i, roots, 12, rotations, 544)
+            masks = boundary_masks(request)
+            for field, name in enumerate(("global_root", "local_root", "pose")):
+                self.call("mb_inference_request_set_mask", handle, field, (I * 8)(*masks[name]), 8)
             durations = (I * 11)(*[int(24 + 4*i == request["frames"]) for i in range(11)])
             self.call("mb_inference_request_set_mask", handle, 3, durations, 11)
             self.call("mb_inference_request_set_seed", handle, request["seed"])
@@ -141,7 +144,8 @@ class Native:
                 "ggml_revision": GGML_REVISION,
                 "model_revision": MODEL_REVISION, "device": self.config.get("device", "cpu"),
                 "request_hash": digest(request), "frames": frames.value, "conventions": dict(CONVENTIONS),
-                "roots": roots, "local_xyzw": rotations, "seed": request["seed"],
+                "target_placement": request.get("target_placement", "fixed"), "constraint_masks": masks,
+                "roots": roots, "local_xyzw": rotations, "seed": request["seed"], "argmax": request.get("argmax", False),
                 "timings": {"inference_seconds": time.monotonic() - started},
                 "acceptance": "CANDIDATE_REQUIRES_SEAM_AND_CONTACT_VALIDATION", "exact_boundary_pins": False}
             return validate_result(result, request)

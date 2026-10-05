@@ -31,6 +31,7 @@ export function timelineDraft(checkpoint,run){
    const priorTake=p.takes.find(t=>t.id===previous.take_id);if(!priorTake)return null;
    try{timelineTiming(previous,priorTake);}catch{return null;}
   }
+  if(c.transition?.mode==='generated'){const provider=p.timeline?.motion_bricks;if(provider?.status!=='CONFIGURED'||provider.profile_sha256!==c.transition.profile_sha256)throw Error(provider?.blocker||'Generated rig mapping changed; inspect again.');if(c.heading_deg||previous?.heading_deg)throw Error('This generated adapter preserves the saved facing; use clips with their native heading.');const duration=c.start-timelineTiming(previous,p.takes.find(t=>t.id===previous.take_id)).nativeEnd;if(duration/audit.fps<.48||duration/audit.fps>2.18)throw Error('Choose a generated interval between about 0.6 and 1.9 seconds.');}
   join(name,c);return null;
  }catch(e){return {field:'clip',message:e.message};}};
  const changed=()=>[...tracks].filter(([name,clips])=>JSON.stringify(clips)!==JSON.stringify(baseline.get(name)));
@@ -44,7 +45,7 @@ export function timelineDraft(checkpoint,run){
   get changes(){return changed().map(([performer])=>({performer,mode:'timeline',clips:copy(sorted(performer))}));},
   get gait(){const c=this.selectedClip;return performer(selected).takes.find(t=>t.id===c?.take_id)?.gait;},
   get canConnect(){const c=this.selectedClip,order=sorted(selected),previous=order[order.findIndex(x=>x.id===c?.id)-1],p=performer(selected);return !!c&&canConnect(p,previous,p.takes.find(t=>t.id===c.take_id));},
-  get connection(){try{return this.selectedClip?join(selected,this.selectedClip):null;}catch{return null;}},
+  get connection(){try{const c=this.selectedClip;if(c?.transition?.mode==='generated'&&!this.dirty){const saved=performer(selected).timeline.connections?.find(j=>j.clip_id===c.id);if(saved)return saved;}return c?join(selected,c):null;}catch{return null;}},
   get playbackRange(){const range=[...audit.frame_range];for(const clips of tracks.values())for(const c of clips){range[0]=Math.min(range[0],c.start);range[1]=Math.max(range[1],clipEnd(c));}return range;},
   clips:name=>copy(sorted(name)),value:name=>({performer:name,mode:changed().some(([n])=>n===name)?'timeline':'keep'}),
   select(name,id=null,part='clip'){performer(name);if(id&&!tracks.get(name).some(c=>c.id===id))throw Error('Select an existing clip.');selected=name;clipId=id;selectedPart=part==='transition'&&this.selectedClip?.transition?'transition':'clip';gesture=null;},
@@ -69,8 +70,8 @@ export function timelineDraft(checkpoint,run){
    if(field==='smooth'){
     if(text){if(!this.canConnect)throw Error('These clips need Blender review before connecting.');c.transition={frames:Math.max(2,Math.min(120,Math.round(audit.fps*.25))),match_phase:true};}
     else{const previous=order[order.findIndex(x=>x.id===c.id)-1];if(c.transition&&previous)c.start=clipEnd(previous)+1;delete c.transition;raw.delete(c.id+':transition_frames');}
-   }else if(field==='transition_mode'){extended(selected);if(!c.transition)throw Error('Enable a connection first.');if(!['blend','turn'].includes(text))throw Error('Choose Smooth join or Turn and connect.');c.transition.mode=text;c.transition.match_phase=false;
-   }else if(field==='match_phase'){if(!c.transition)throw Error('Enable a smooth connection first.');c.transition.match_phase=!!text;
+   }else if(field==='transition_mode'){extended(selected);if(!c.transition)throw Error('Enable a connection first.');if(!['blend','turn','generated'].includes(text))throw Error('Choose a supported connection mode.');if(text==='generated'){const provider=performer(selected).timeline?.motion_bricks;if(provider?.status!=='CONFIGURED')throw Error(provider?.blocker||'Prepare a rig mapping and configure MotionBricks first.');c.transition.seed=1234;c.transition.profile_sha256=provider.profile_sha256;c.transition.frames=Math.max(2,Math.round(audit.fps*.5));}else{delete c.transition.seed;delete c.transition.profile_sha256;}c.transition.mode=text;c.transition.match_phase=false;
+   }else if(field==='match_phase'){if(c.transition?.mode==='generated'&&text)throw Error('Generated repositioning keeps the native opening pose.');if(!c.transition)throw Error('Enable a smooth connection first.');c.transition.match_phase=!!text;
    }else if(field==='travel'){
     if(text){const take=performer(selected).takes.find(t=>t.id===c.take_id);if(take.travel_blocker)throw Error(take.travel_blocker);if(c.source_range?.some((v,i)=>v!==take.range[i]))throw Error('Restore the full native take before adding a calibrated travel path.');if(!c.travel)stationaryFrames.set(c.id,c.frames);const calibrated=[...tracks.get(selected)].reverse().find(x=>x.id!==c.id&&x.take_id===c.take_id&&x.travel?.meters_per_cycle>0&&!x.travel.gait_id);c.travel=take.gait?.status==='estimated'?automaticTravel(take,undefined,c.heading_deg||0):{delta_m:suggestedPath(take.action),meters_per_cycle:calibrated?.travel.meters_per_cycle||0};}
     else{if(c.travel){const take=performer(selected).takes.find(t=>t.id===c.take_id);c.frames=stationaryFrames.get(c.id)??Math.ceil((take.range[1]-take.range[0])/c.speed)+1;}c.travel=null;for(const [k,v] of raw)if(v.clip===c.id&&['pace','direction','distance'].includes(v.field))raw.delete(k);}
@@ -122,7 +123,7 @@ export function timelineDraft(checkpoint,run){
    // Geometry stays editable while timing or a connection needs correction.
    // Include known displacements, but never invent an unresolved bridge's travel.
    for(const old of sorted(selected)){
-    try{const delta=join(selected,old)?.delta_m;if(delta){origin[0]+=delta[0];origin[1]+=delta[1];}}
+    try{const connection=join(selected,old);if(connection?.placement_pending)pendingConnection=true;const saved=!this.dirty&&p.timeline.connections?.find(j=>j.clip_id===old.id);const delta=saved?.delta_m||connection?.delta_m;if(delta){origin[0]+=delta[0];origin[1]+=delta[1];}}
     catch{pendingConnection=true;}
     if(old.id===c.id)break;
     if(old.travel){origin[0]+=old.travel.delta_m[0];origin[1]+=old.travel.delta_m[1];}

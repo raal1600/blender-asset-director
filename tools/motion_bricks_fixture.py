@@ -1,4 +1,4 @@
-﻿"""Real optional-provider acceptance, separate from ordinary offline checks.
+"""Real optional-provider acceptance, separate from ordinary offline checks.
 
 Creates clearly synthetic G1 Actions, samples them through Blender, runs the
 actual pinned model, bakes candidate motion, saves/reopens and renders/exports.
@@ -154,6 +154,30 @@ def main(argv=None):
     influenced=execute(config,altered);atomic_json(output/"altered-target-result.json",influenced)
     require(influenced["roots"]!=result["roots"] or influenced["local_xyzw"]!=result["local_xyzw"],
             "FIXTURE_UNUSED_TARGET","Target boundary did not influence real inference")
+    # Actual sparse-mask capability, not a canned file or a mocked executable.
+    # Destination absolute placement is an output; incoming pose still conditions it.
+    predicted_request = copy.deepcopy(request)
+    predicted_request.update(target_placement="predicted", argmax=True)
+    predicted = execute(config, predicted_request)
+    shifted_request = copy.deepcopy(predicted_request)
+    for root in shifted_request["target"]["roots"]:
+        root[0] += 3.; root[2] -= 2.
+    shifted = execute(config, shifted_request)
+    displacement_error = max(abs(x-y) for a,b in zip(predicted["roots"], shifted["roots"]) for x,y in zip(a,b))
+    rotation_error = max(abs(x-y) for a,b in zip(predicted["local_xyzw"], shifted["local_xyzw"])
+                         for c,d in zip(a,b) for x,y in zip(c,d))
+    require(max(displacement_error, rotation_error) < 1e-5, "FIXTURE_FIXED_PLACEMENT",
+            "Unconstrained destination placeholder still determines generated placement")
+    changed_request = copy.deepcopy(predicted_request)
+    from asset_director import sequence_math as qm
+    for frame in changed_request["target"]["local_xyzw"]:
+        raw = frame[1]; q = qm.qmul(qm.qexp([.18, 0., 0.]), [raw[3], *raw[:3]])
+        frame[1] = [*q[1:], q[0]]
+    changed = execute(config, changed_request)
+    require(changed["roots"] != predicted["roots"] or changed["local_xyzw"] != predicted["local_xyzw"],
+            "FIXTURE_UNUSED_TARGET", "Predicted placement ignored incoming pose")
+    atomic_json(output/"predicted-placement.json", {"request": predicted_request, "result": predicted,
+        "shifted_result": shifted, "changed_pose_result": changed, "placeholder_max_error": max(displacement_error, rotation_error)})
     stage("bake");stage("reopen")
     failures={}
     for name,changed,cancel in (("host_budget",{**config,"host_memory_budget_mib":64},None),
@@ -191,7 +215,8 @@ def main(argv=None):
     atomic_json(output/"recovered-result.json",recovered)
     summary={"status":"PASS_PROVIDER_AND_BLENDER_PARITY", "full_application_journey":"NOT_TESTED_BY_THIS_FIXTURE",
              "seam_contact_quality":"NOT_ACCEPTED_BY_THIS_FIXTURE", "repeatability":"EXACT_SAME_BACKEND",
-             "target_influence":"CONFIRMED", "failure_cases":failures,
+             "target_influence":"CONFIRMED", "predicted_placement":"PASS_REAL_SPARSE_CONDITIONING",
+             "placeholder_max_error":max(displacement_error, rotation_error), "failure_cases":failures,
              "resources":[r["resource_measurements"] for r in (discovery,result,repeated,influenced,recovered)],
              "blender_bake":load_json(output/"bake-metrics.json"),"blender_reopen":load_json(output/"reopen-metrics.json")}
     atomic_json(output/"summary.json",summary);print(json.dumps(summary));return 0

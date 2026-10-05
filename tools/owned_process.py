@@ -163,6 +163,12 @@ def main():
         try:
             with args.report.open('x', encoding='utf-8') as stream:
                 json.dump(result, stream, indent=2, allow_nan=False); stream.write('\n'); stream.flush(); os.fsync(stream.fileno())
+        except BaseException as error:
+            result.update(state='FAILED', exit_code=125)
+            try:
+                print('GUARDIAN_REPORT_FAILED: '+repr(error), file=sys.stderr, flush=True)
+            except BaseException:
+                pass # Even an unusable log cannot prevent owned-tree cleanup.
         finally:
             if child is not None and os.name != 'nt':
                 # The still-live guardian reserves this PGID. A receipt-write
@@ -170,9 +176,10 @@ def main():
                 # report carries the command result on successful publication;
                 # a missing/invalid report remains an error for OwnedCommand.
                 os.killpg(os.getpid(),signal.SIGKILL)
-    # Windows kernel closes the sole job handle here, including descendants if
-    # the main command already exited. It also works if this guardian crashes.
-    os._exit(result['exit_code'] if 0 <= result['exit_code'] <= 255 else 1)
+            # Always avoid interpreter finalization: the daemon owner watcher
+            # can still hold stdin's buffered lock. Windows closes the sole Job
+            # handle here even if publishing the receipt or diagnostic failed.
+            os._exit(result['exit_code'] if 0 <= result['exit_code'] <= 255 else 1)
 
 
 if __name__ == '__main__':
