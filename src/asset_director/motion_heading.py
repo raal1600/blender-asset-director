@@ -24,10 +24,12 @@ def state(obj, saved=None):
     from .native_motion_basis import seed
     clone = obj.copy()
     try:
-        seed(clone, obj)
+        basis = seed(clone, obj)
         return {'base_rotation': list(rotation(clone)), 'base_rotation_mode': clone.rotation_mode,
-                'base_delta_rotation': list(clone.delta_rotation_quaternion if clone.rotation_mode == 'QUATERNION'
-                                            else clone.delta_rotation_euler.to_quaternion())}
+                # Re-converting the restored Euler delta changes float bits on
+                # some poses/platforms and invalidates the next saved edit.
+                # Retain the exact verified baseline; do not loosen identity.
+                'base_delta_rotation': list(basis['defaults']['']['delta_rotation_quaternion'])}
     finally:
         bpy.data.objects.remove(clone, do_unlink=True)
 

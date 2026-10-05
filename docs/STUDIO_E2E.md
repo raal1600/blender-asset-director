@@ -89,3 +89,37 @@ manifest, checkpoint and failure evidence preserved. It installs only into its
 new test directory, downloads nothing, renders no movie and claims no native GUI
 or human acceptance. The existing embedded-viewer suite invokes it without adding
 a workflow identity or uploading the generated whole studio.
+
+## Transition and cancellation acceptance
+
+`tools/motion_stitch_browser_check.mjs` takes absolute paths for output, a PASS
+`motion_stitch_fixture.py` directory, Python, Blender, Playwright's Node
+`index.mjs`, Chrome (empty for the installed Chrome channel), and optionally a
+fresh isolated studio root created by `tools/create_workbench_studio.py`.
+The installed mode starts that studio's normal `SystemRuntime/Launcher/server.mjs`
+entrypoint in a subprocess, restarts it, and repeats saved playback. With existing
+FFmpeg/FFprobe configured it also uses the visible shot, lighting-preview and
+render controls to render both connection boundaries. It retains browser video,
+frame screenshots, failed-request records, immutable checkpoint identities and
+actual rendered-movie evidence. This is the installed browser client, not the
+native Windows desktop host or a live Blender add-on session.
+
+Recording requires the pinned Playwright helper as well as Chrome:
+
+```sh
+python -m pip install playwright==1.55.0
+python -m playwright install --with-deps chrome ffmpeg
+python tools/action_cancel_suite.py --blender /absolute/path/to/blender \
+  --evidence /new/temporary/cancellation-evidence
+```
+
+The cancellation suite creates another isolated installation and uses real UI
+controls to cancel before Blender starts and after its child PID is observed
+running. The queue fixture delays preparation only; it supplies no fake native
+result. Both cases require a cancelled application/native receipt, no accepted
+checkpoint, unchanged source bytes, released writer leases and an editable draft.
+The running case also requires the owned child to be reaped. Full studio CI runs
+this suite on Windows and Linux; a run must actually pass to count as evidence.
+The temporary studio uses Python as an explicit unused Codex-path sentinel;
+Codex and model calls are not exercised. Raw studios and session files are not
+published by the summary-artifact step.

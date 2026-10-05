@@ -80,6 +80,41 @@ class LibraryCase(LibraryFixture,unittest.TestCase):
         j=jobs.prepare(self.lib,'inspect'); p=self.lib.root/'jobs'/j['id']/'job.json'
         j['state']='FAILED'; atomic_json(p,j); (p.parent/'worker.log').write_text('failure')
         r=jobs.retry(self.lib,j['id']); self.assertEqual(r['state'],'PLANNED'); self.assertTrue(list(p.parent.glob('attempt-*/worker.log')))
+    def test_cancelled_action_never_starts_blender_and_retry_archives_marker(self):
+        import sys
+        source = self.root / 'cancel-source.blend'; source.write_bytes(b'generated contract fixture')
+        options = {'version':'action-layer-v1', 'audit_sha256':'a'*64, 'changes':[{'performer':'Generated', 'mode':'hold', 'frame':1}]}
+        job = jobs.prepare(self.lib, 'action-edit', str(source), options=options)
+        self.assertEqual(jobs.cancel(self.lib, job['id'])['state'], 'CANCEL_REQUESTED')
+        with patch('asset_director.jobs.subprocess.Popen', side_effect=AssertionError('Cancelled before native launch')):
+            with self.assertRaises(DirectorError) as error:
+                jobs.run(self.lib, job['id'], sys.executable)
+        self.assertEqual(error.exception.code, 'JOB_CANCELLED')
+        saved, path = jobs.read_job(self.lib, job['id']); self.assertEqual(saved['state'], 'CANCELLED'); self.assertEqual(saved['outputs'], [])
+        self.assertEqual(jobs.retry(self.lib, job['id'])['state'], 'PLANNED')
+        self.assertFalse((path.parent/'cancel-request.json').exists()); self.assertTrue(list(path.parent.glob('attempt-*/cancel-request.json')))
+    def test_worker_marker_failure_kills_and_waits_for_only_the_spawned_child(self):
+        import sys
+        from unittest.mock import Mock
+        source = self.root/'marker-source.blend'; source.write_bytes(b'generated contract fixture')
+        options = {'version':'action-layer-v1', 'audit_sha256':'a'*64, 'changes':[{'performer':'Generated','mode':'hold','frame':1}]}
+        job = jobs.prepare(self.lib,'action-edit',str(source),options=options)
+        child = Mock(); child.pid=123456; child.wait.return_value=-1
+        write = atomic_json
+        def fail_marker(path, data):
+            if path.name == 'worker-process.json':
+                raise PermissionError('Injected marker publication failure')
+            return write(path, data)
+        with patch('asset_director.jobs.subprocess.Popen',return_value=child), patch('asset_director.jobs.atomic_json',side_effect=fail_marker):
+            with self.assertRaises(PermissionError):
+                jobs.run(self.lib,job['id'],sys.executable)
+        child.kill.assert_called_once_with();child.wait.assert_called_once_with(timeout=10);child.stdout.close.assert_called_once_with()
+        saved,_=jobs.read_job(self.lib,job['id']);self.assertEqual(saved['state'],'INTERRUPTED');self.assertEqual(saved['outputs'],[])
+    def test_cancel_refuses_unrelated_job_and_invalid_identity(self):
+        job = jobs.prepare(self.lib, 'inspect')
+        with self.assertRaises(DirectorError) as error: jobs.cancel(self.lib, job['id'])
+        self.assertEqual(error.exception.code, 'CANCEL_UNSUPPORTED')
+        with self.assertRaises(DirectorError): jobs.cancel(self.lib, 'j_invalid')
     def test_original_intake_evidence_stays_unverified(self):
         p=self.root/'source.fbx';p.write_bytes(b'local')
         e=self.root/'evidence.json';atomic_json(e,{'title':'Original','kind':'model','source_url':'user supplied'})

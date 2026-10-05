@@ -2,6 +2,7 @@
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
@@ -57,12 +58,12 @@ class CandidateTests(unittest.TestCase):
         import shutil
         repository=Path(__file__).resolve().parents[1]
         with TemporaryDirectory() as d:
-            root=Path(d)/'bundle';root.mkdir()
+            root=Path(d)/'bundle with spaces';root.mkdir()
             for name in ('tools','src','skills','launcher'):
                 shutil.copytree(repository/name,root/name,ignore=shutil.ignore_patterns('__pycache__','.deps','*.pyc','node_modules','*.exe','*.dll'))
             for name in ('pyproject.toml','LICENSE','THIRD_PARTY_NOTICES.md'):shutil.copy2(repository/name,root/name)
             for name in HOST_FILES:(root/'launcher'/name).write_text('SYNTHETIC HOST NEVER EXECUTED')
-            (root/'Setup.ps1').write_text('# synthetic bootstrap')
+            shutil.copy2(repository/'tools/setup_workbench_candidate.ps1',root/'Setup.ps1')
             (root/'Setup.cmd').write_text('rem synthetic bootstrap')
             build={'commit':SHA,'files':{n:hashlib.sha256((root/'launcher'/n).read_bytes()).hexdigest() for n in HOST_FILES}}
             (root/'launcher/windows-build.json').write_text(json.dumps(build))
@@ -81,3 +82,36 @@ class CandidateTests(unittest.TestCase):
             again=subprocess.run(args,capture_output=True,text=True,timeout=60)
             self.assertNotEqual(again.returncode,0);self.assertEqual((target/'candidate-install.json').read_bytes(),original)
             verify_bundle(root)
+            if os.name == 'nt':
+                # Exercise the actual shipped PowerShell wrapper, including
+                # spaces in script, destination and configured tool paths.
+                # Native host/tool payloads are not executed by this installer.
+                powershell=shutil.which('powershell.exe')
+                self.assertIsNotNone(powershell, 'Windows candidate setup requires Windows PowerShell')
+                other_tool=Path(d)/'existing tools'/'tool with spaces.exe'
+                other_tool.parent.mkdir();shutil.copy2(sys.executable,other_tool)
+                shells=[powershell]
+                if pwsh:=shutil.which('pwsh.exe'):shells.append(pwsh)
+                for shell in shells:
+                    with self.subTest(setup_shell=shell):
+                        destination=Path(d)/('new studio '+Path(shell).stem)
+                        setup=[shell,'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass',
+                               '-File',str(root/'Setup.ps1'),'-StudioPath',str(destination),
+                               '-PythonPath',sys.executable]
+                        for name in ('Blender','Codex','FFmpeg','FFprobe'):
+                            setup+=['-'+name+'Path',str(other_tool)]
+                        result=subprocess.run(setup,capture_output=True,text=True,timeout=60)
+                        self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
+                        receipt_file=destination/'candidate-install.json'
+                        installed=json.loads(receipt_file.read_text())
+                        self.assertEqual(installed['status'],'CANDIDATE_INSTALLED')
+                        self.assertEqual(installed['source_commit'],SHA)
+                        configured=json.loads((destination/'SystemRuntime/UserData/Launcher/config.json').read_text())
+                        self.assertTrue(Path(configured['python']).samefile(sys.executable))
+                        for name in ('blender','codex','ffmpeg','ffprobe'):
+                            self.assertTrue(Path(configured[name]).samefile(other_tool))
+                        original_receipt=receipt_file.read_bytes()
+                        again=subprocess.run(setup,capture_output=True,text=True,timeout=60)
+                        self.assertNotEqual(again.returncode,0)
+                        self.assertEqual(receipt_file.read_bytes(),original_receipt)
+                        verify_bundle(root)

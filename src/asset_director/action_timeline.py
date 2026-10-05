@@ -42,7 +42,7 @@ def load(obj):
         raise DirectorError('TIMELINE_CHANGED', 'Saved timeline needs Blender review') from exc
 
 
-def travel_reason(obj, action, slot):
+def travel_reason(obj, action, slot, allow_native_root=False):
     """Conservative eligibility, not a gait/contact or semantic classifier."""
     from .action_layer import ancestors
     if obj.type != 'ARMATURE':
@@ -67,6 +67,8 @@ def travel_reason(obj, action, slot):
             except (ValueError, AttributeError): return 'Unresolved bone channels need Blender review'
             basis = world @ bone.bone.matrix_local.to_3x3()
         elif path == 'location':
+            if allow_native_root:
+                continue
             basis = (obj.parent.matrix_world @ obj.matrix_parent_inverse).to_3x3() if obj.parent else obj.matrix_parent_inverse.to_3x3()
         elif path in {'rotation_euler', 'rotation_quaternion', 'rotation_axis_angle', 'scale'}:
             values = [float(k.co[1]) for k in curve.keyframe_points]
@@ -94,6 +96,8 @@ def describe(obj, takes, gait_budget=None):
     pairs = {(a.name, getattr(slot, 'identifier', None)): (a, slot) for a, slot in bindings(obj)}
     for take in takes:
         a, slot = pairs[(take['action'], take['slot'])]
+        from .motion_contacts import describe as describe_contacts
+        take['contacts'] = describe_contacts(obj, a, slot, take)
         take['travel_blocker'] = travel_reason(obj, a, slot)
         take['stitch_blocker'] = motion_stitch.reason(obj, a, slot)
         take['stitch_channels'] = (digest({n: sorted(v) for n, v in motion_stitch.channel_spec(obj, a, slot).items()})
@@ -149,7 +153,7 @@ def apply(options, job_id, before):
                 blocker = motion_heading.reason(obj, action, slot)
                 require(not blocker, 'HEADING_UNSUPPORTED', blocker or '')
             motions.append((clip, dict(take, range=contract.source_range(clip, take)), action, slot, plan))
-        if any(c['travel'] for c in change['clips']) or saved or heading_active:
+        if any(c['travel'] for c in change['clips']) or saved or heading_active or any(c.get('transition') for c in change['clips']):
             parent = obj.parent.matrix_world @ obj.matrix_parent_inverse if obj.parent else obj.matrix_parent_inverse
             require(abs(parent.to_3x3().determinant()) > 1e-10, 'TRAVEL_UNSUPPORTED', 'Singular parent transform')
             require(all(not c.data_path.startswith('delta_') for a, slot in layer.bindings(obj)
@@ -166,7 +170,7 @@ def apply(options, job_id, before):
             if stitch['join']:
                 samples = stitch['join']['samples']
                 generated_keys += sum(len(pose)*10 for _, pose in samples)
-        if any(c['travel'] for c in change['clips']) or change['performer'] in heading_bases:
+        if any(c['travel'] for c in change['clips']) or change['performer'] in heading_bases or any(any(s['root_offset']) for s in stitches):
             generated_keys += 14*len(motions) + sum(len(s['join']['samples'])*7 for s in stitches if s['join'])
     existing_keys = sum(len(c.keyframe_points) for a in bpy.data.actions for c in ops.curves(a))
     require(existing_keys+generated_keys <= 500000, 'RESOURCE_LIMIT',
@@ -219,9 +223,9 @@ def apply(options, job_id, before):
                 join = stitch['join']
                 name, signature = motion_stitch.bake(obj, join, job_id, clip['id'])
                 generated[name] = signature
-                connections.append({k: v for k, v in join.items() if k not in {'samples', 'channels'}} | {
+                connections.append({k: v for k, v in join.items() if k not in {'samples', 'channels', 'boundary_tangents'}} | {
                     'clip_id': clip['id'], 'phase': stitch['phase'], 'method': contract.STITCH_VERSION,
-                    'contact_acceptance': 'NOT_EVALUATED', 'performance_acceptance': 'NOT_EVALUATED'})
+                    'contact_acceptance': 'SAMPLED_AUTHORED_CLEANUP' if join.get('contact_cleanup') else 'NOT_EVALUATED', 'performance_acceptance': 'NOT_EVALUATED'})
                 samples = join['samples']
                 connection_checks.extend(samples[i] for i in (0, len(samples)//2, len(samples)-1))
             span = take['range'][1]-take['range'][0]
@@ -235,7 +239,7 @@ def apply(options, job_id, before):
                 require(abs(strip.frame_end-cursor) < .02,
                         'ACTION_RESULT_CHANGED', 'Native clip endpoint differs from planned timing')
             require(abs(cursor-plan['native_end']) < .02, 'ACTION_RESULT_CHANGED', 'Phase alignment changed clip duration')
-        if any(c['travel'] for c in change['clips']) or heading_base and motions:
+        if any(c['travel'] for c in change['clips']) or heading_base and motions or any(any(s['root_offset']) for s in stitches):
             # Parent inverse converts world metres to delta-location coordinates.
             parent = obj.parent.matrix_world @ obj.matrix_parent_inverse if obj.parent else obj.matrix_parent_inverse
             basis = parent.to_3x3()
@@ -251,11 +255,12 @@ def apply(options, job_id, before):
                 join = stitches[index]['join']
                 if join:
                     begin = displacement.copy()
-                    finish = displacement + Vector((*join['delta_m'], 0))/unit
+                    alignment = basis @ Vector(join.get('root_alignment_local', (0., 0., 0.)))
+                    finish = displacement + Vector((*join['delta_m'], 0))/unit + alignment
                     for f, _ in join['samples']:
                         u = (f-join['start'])/join['duration_frames']
                         offset = motion_heading.path_at(join, max(0., min(1., u)))
-                        obj.delta_location = Vector(base_delta) + inverse @ (begin+Vector((*offset, 0))/unit)
+                        obj.delta_location = Vector(base_delta) + inverse @ (begin+Vector((*offset, 0))/unit+alignment*motion_heading.ease(u))
                         obj.keyframe_insert('delta_location', frame=f, group='Director travel')
                         if heading_base:
                             prop, previous_euler = motion_heading.set_heading(obj, heading_base, motion_heading.heading_at(join, u), previous_euler)
@@ -274,6 +279,20 @@ def apply(options, job_id, before):
             for curve in ops.curves(path):
                 for key in curve.keyframe_points:key.interpolation = 'LINEAR'
                 curve.extrapolation = 'CONSTANT'
+                for stitch in stitches:
+                    join = stitch['join']
+                    if not join:
+                        continue
+                    slopes = [0., 0.]
+                    if curve.data_path == 'delta_location':
+                        slopes = [(inverse @ Vector((*join[key], 0)) / unit)[curve.array_index]
+                                  for key in ('velocity_in', 'velocity_out')]
+                    motion_stitch_math.smooth_keys(curve, slopes, (join['start'], join['end']))
+                    # Only the bridge owns interpolation. The incoming native
+                    # path remains exactly linear with its authored velocity.
+                    for key in curve.keyframe_points:
+                        if abs(key.co[0]-join['end']) < 1e-5:
+                            key.interpolation = 'LINEAR'
             slot = getattr(ad, 'action_slot', None)
             ad.action = None
             source_range = [change['clips'][0]['start'], change['clips'][-1]['start'] + change['clips'][-1]['frames'] - 1]

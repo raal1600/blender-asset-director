@@ -89,7 +89,7 @@ def incompatibility_cases(source):
     check(motion_stitch.reason(obj,action_copy,getattr(ad,'action_slot',None)) is not None,'procedural channels request Blender review')
     curve.modifiers.remove(modifier)
     obj.location.x=0;obj.keyframe_insert('location',index=0,frame=1);obj.location.x=1;obj.keyframe_insert('location',index=0,frame=25)
-    check('native planar travel' in motion_stitch.reason(obj,action_copy,getattr(ad,'action_slot',None)),'native root travel cannot acquire a second movement owner')
+    check('native planar travel' in timeline.travel_reason(obj,action_copy,getattr(ad,'action_slot',None)),'native root travel cannot acquire a second movement owner')
 
 
 try:
@@ -118,6 +118,20 @@ try:
         if hasattr(rig.animation_data,'action_slot'):rig.animation_data.action_slot=rig.animation_data.nla_tracks[0].strips[0].action_slot
         bpy.ops.mesh.primitive_cube_add(size=.3,location=(0,0,.6));skin=bpy.context.object;skin.name='VisibleSkin'+str(index);skin.parent=rig
         group=skin.vertex_groups.new(name='ArbitraryJoint');group.add(list(range(8)),1,'REPLACE');skin.modifiers.new('Skin','ARMATURE').object=rig
+    # The same saved transition is also exercised through the application's
+    # normal shot-render flow. These generated presentation assets are retained
+    # in the source checkpoint, not injected into an unrelated rendering demo.
+    camera_data=bpy.data.cameras.new('Synthetic transition camera')
+    camera=bpy.data.objects.new(camera_data.name,camera_data);scene.collection.objects.link(camera)
+    camera.location=(5,-8,5)
+    camera.rotation_euler=(Vector((1,-1,1))-camera.location).to_track_quat('-Z','Y').to_euler()
+    camera_data.type='ORTHO';camera_data.ortho_scale=7;scene.camera=camera
+    light_data=bpy.data.lights.new('Synthetic transition key','AREA');light_data.energy=700;light_data.size=5
+    light=bpy.data.objects.new(light_data.name,light_data);scene.collection.objects.link(light)
+    light.location=(1,-4,6);light.rotation_euler=(Vector((1,-1,1))-light.location).to_track_quat('-Z','Y').to_euler()
+    scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=1
+    scene.render.use_compositing=False;scene.render.use_sequencer=False
+    scene.render.resolution_x=320;scene.render.resolution_y=240;scene.render.resolution_percentage=100
     frame(1)
     source=out/'source.blend';bpy.ops.wm.save_as_mainfile(filepath=str(source));original=file_hash(source)
     before=layer.preserved(set());inspection=layer.audit()

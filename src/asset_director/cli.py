@@ -49,6 +49,7 @@ def parser(*, workbench_only=False):
     q=s.add_parser("job-run"); q.add_argument("job_id"); q.add_argument("--blender",default=settings.blender_path()); q.add_argument("--timeout",type=int,default=360)
     q=s.add_parser("job-show"); q.add_argument("job_id")
     q=s.add_parser("job-retry"); q.add_argument("job_id")
+    q=s.add_parser("job-cancel"); q.add_argument("job_id")
     q=s.add_parser("index-collect"); q.add_argument("asset_id"); q.add_argument("job_id")
     from .motion_cli import add_parsers
     add_parsers(s)
@@ -74,9 +75,16 @@ def _workbench_only(argv):
 
 def workbench_capabilities():
     """Runtime metadata is independent of any catalog and does not open SQLite."""
+    from .motion_bricks_provider import capabilities, configured
+    try:
+        candidate = capabilities(configured())
+    except (DirectorError, OSError) as error:
+        candidate = {**capabilities(), 'state':'CONFIGURATION_ERROR', 'configuration_error':str(error)}
+    candidate.update(accepted_transition=False, reason='Exact G1 candidate generation only; seam/contact acceptance pending')
+    providers = [{'provider':'native', 'mode':'deterministic', 'available':True, 'implementation':'native-stitch-c1-v2'}, candidate]
     return {"schema":1,"render_frames":True,"gpu_render":True,"film_assemble":True,"task_workspace":True,"explicit_save_handoff":True,"preview_camera":True,"catalog":True,"asset_preview":True,"asset_contents":True,"runtime":__version__,"implementation":implementation_hash(),"limits":{"frames_per_shot":360,"frames_per_film":3600,"render_seconds":900},"audio":False,
             'action_layer':'action-layer-v1', 'action_task':'action-task-v1', 'action_timeline':'action-timeline-v1', 'action_stitch':'native-stitch-v1',
-            'action_motion_edit':'native-motion-edit-v1',
+            'action_motion_edit':'native-motion-edit-v1', 'action_save_cancellation':True, 'transition_providers':providers,
             'scene_layer':'scene-layer-v1', 'world_prepare':'world-prepare-v1',
             'shot_preview':'shot-camera-samples-v1'}
 
@@ -165,6 +173,7 @@ def main(argv=None):
                 result=jobs.run(lib,args.job_id,args.blender,args.timeout)
             elif command == "job-show": result=jobs.read_job(lib,args.job_id)[0]
             elif command == "job-retry": result=jobs.retry(lib,args.job_id)
+            elif command == "job-cancel": result=jobs.cancel(lib,args.job_id)
             elif command == "index-collect": result=jobs.index_result(lib,args.asset_id,args.job_id)
             elif command == "report": result=lib.export_report()
             elif command == "rebuild-catalog": result={"records":lib.rebuild()}

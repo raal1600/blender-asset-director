@@ -10,7 +10,8 @@ import struct
 from .core import require
 
 
-def normalize(destination, start, end, fps, fps_base):
+def normalize(destination, start, end, fps, fps_base, subdivisions=1):
+    require(type(subdivisions) is int and subdivisions in {1,4}, 'VIEWER_EXPORT_FAILED', 'Unsupported preview subdivision count')
     original = destination.read_bytes()
     require(original[:4] == b'glTF' and len(original) >= 28, 'VIEWER_EXPORT_FAILED', 'Invalid GLB timing envelope')
     size, kind = struct.unpack_from('<II', original, 12)
@@ -30,7 +31,7 @@ def normalize(destination, start, end, fps, fps_base):
         accessor = data['accessors'][index];view = data['bufferViews'][accessor['bufferView']]
         require(accessor.get('componentType') == 5126 and accessor.get('type') == 'SCALAR'
                 and 'sparse' not in accessor and view.get('buffer', 0) == 0 and view.get('byteStride', 4) == 4
-                and 1 <= accessor['count'] <= span+1, 'VIEWER_EXPORT_FAILED', 'Unsupported sampled time accessor')
+                and 1 <= accessor['count'] <= span*subdivisions+1, 'VIEWER_EXPORT_FAILED', 'Unsupported sampled time accessor')
         begin = view.get('byteOffset', 0)+accessor.get('byteOffset', 0);length = accessor['count']
         require(begin >= 0 and begin+length*4 <= len(binary), 'VIEWER_EXPORT_FAILED', 'Invalid animation time storage')
         times = list(struct.unpack_from('<'+'f'*length, binary, begin))
@@ -41,9 +42,9 @@ def normalize(destination, start, end, fps, fps_base):
             continue
         candidates = [rate for rate in {effective, fps, fps*fps_base}
                       if abs(times[-1]*rate-span) < 1e-3 and
-                      all(abs(t*rate-round(t*rate)) < 1e-3 for t in times)]
+                      all(abs(t*rate*subdivisions-round(t*rate*subdivisions)) < 1e-3 for t in times)]
         require(candidates, 'VIEWER_EXPORT_FAILED', 'Unrecognized sampled GLB timebase; no approximation made')
-        frames = [round(t*candidates[0]) for t in times]
+        frames = [round(t*candidates[0]*subdivisions)/subdivisions for t in times]
         require(all(0 <= f <= span for f in frames), 'VIEWER_EXPORT_FAILED', 'Sample lies outside scene timing')
         values = [f/effective for f in frames]
         if any(abs(a-b) > 1e-7 for a,b in zip(times,values)):
@@ -57,4 +58,5 @@ def normalize(destination, start, end, fps, fps_base):
         raw += struct.pack('<II', len(encoded), 0x4e4f534a)+encoded+struct.pack('<II', len(binary), 0x004e4942)+binary
         destination.write_bytes(raw)
     return {'scope': 'PREVIEW_ONLY', 'effective_fps': effective, 'corrected_accessors': changes,
-            'original_scene_changed': False, 'sampling': 'VERIFIED_INTEGER_FRAMES'}
+            'original_scene_changed': False, 'subdivisions': subdivisions,
+            'sampling': 'VERIFIED_INTEGER_FRAMES' if subdivisions==1 else 'VERIFIED_QUARTER_FRAMES'}

@@ -180,6 +180,10 @@ def add_strip(obj, action, slot, name, start, source_range, speed):
     fps = bpy.context.scene.render.fps / bpy.context.scene.render.fps_base
     strip.scale = strip_scale(fps, fps, speed); strip.repeat = 1
     strip.frame_start = start
+    # NlaStrip.frame_start moves only the left edge for fractional starts.
+    # strips.new accepts an integer, so explicitly restore the intended right
+    # edge instead of leaving a gap/rest pose before the next native clip.
+    strip.frame_end = start + (source_range[1]-source_range[0])*strip_scale(fps, fps, speed)
     strip.blend_type = 'REPLACE'; strip.extrapolation = 'HOLD'; strip.use_auto_blend = False
     strip.blend_in = strip.blend_out = 0
     return track

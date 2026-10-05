@@ -4,6 +4,7 @@ No licensed inputs, user scene, render, inferred anatomy or artistic approval.
 """
 from pathlib import Path
 import math
+import json
 import sys
 import bpy
 from mathutils import Vector, Quaternion, Euler
@@ -32,6 +33,18 @@ def quat_distance(a, b):
 
 try:
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    from asset_director import native_motion_basis
+    probe=bpy.data.objects.new('Exact heading basis probe',None);bpy.context.scene.collection.objects.link(probe)
+    for angle in ((.1,.2,.3),(.25,-.4,.8),(.1,-.2,.15),(.3,.7,1.1)):
+        probe.delta_rotation_euler=angle
+        basis=native_motion_basis.capture(probe)
+        heading=motion_heading.state(probe)
+        check(heading['base_delta_rotation']==basis['defaults']['']['delta_rotation_quaternion'],
+              'heading retains exact captured quaternion without another Euler round trip '+str(angle))
+        probe['bad_action_timeline_v1']=json.dumps({'native_basis':basis,**heading})
+        check(native_motion_basis.capture(probe)==basis,'saved heading basis remains exactly editable '+str(angle))
+        del probe['bad_action_timeline_v1']
+    bpy.data.objects.remove(probe,do_unlink=True)
     scene = bpy.context.scene; scene.frame_end = 100; scene.unit_settings.scale_length = .5
     parent = bpy.data.objects.new('Static World placement', None); scene.collection.objects.link(parent)
     parent.rotation_euler.z = .4; parent.scale = (2., 2., 2.)

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {timelineDraft} from '../public/action-timeline-draft.mjs';
-import {timelineControls,timelinePicker} from '../public/action-timeline-view.mjs';
+import {timelineControls,timelinePicker,transitionProviderLabel,transitionContactLabel} from '../public/action-timeline-view.mjs';
 import {actionView} from '../public/workbench-action.mjs';
 
 const cp={id:'cp_saved',sha256:'a'.repeat(64)},take='take_'+'b'.repeat(64);
@@ -40,4 +40,23 @@ test('timeline presentation puts viewer and tracks before the compact inspector'
  assert.match(html,/Playback shows the saved scene/);
  assert.match(html,/Set metres per cycle to calibrate this path/);
  assert.match(html,/Saving and playback are not approval/);
+});
+
+test('transition controls disclose the deterministic provider and do not label unknown results as native',()=>{
+ const d=fixture();d.add(take,'clip_a');d.add(take,'clip_b');
+ assert.equal(transitionProviderLabel(d),'Blender native: deterministic pose blend');
+ assert.match(timelineControls(d,String),/data-motion-provider>Provider: Blender native: deterministic pose blend/);
+ d.select('Observed','clip_b','transition');
+ assert.match(timelineControls(d,String),/data-motion-provider>Provider: Blender native: deterministic pose blend/);
+ d.audit.performers[0].timeline.stitch_version='unknown-provider';
+ assert.match(transitionProviderLabel(d),/Provider unavailable/);
+ assert.doesNotMatch(transitionProviderLabel(d),/Blender native/);
+});
+
+test('contact disclosure distinguishes authored sampled cleanup from unannotated and invalid takes',()=>{
+ const d=fixture();d.add(take,'clip_a');d.add(take,'clip_b');assert.match(transitionContactLabel(d),/unannotated/);
+ const performer=d.audit.performers[0];performer.takes[0].contacts={status:'AUTHORED'};assert.match(transitionContactLabel(d),/available.*Save/);
+ performer.takes[0].contacts={status:'INVALID',blocker:'Contact interval belongs to another rig.'};assert.equal(transitionContactLabel(d),'Contact interval belongs to another rig.');
+ const saved={selected:d.selected,selectedClip:d.selectedClip,audit:d.audit,dirty:false};performer.timeline.connections=[{clip_id:d.selectedClip.id,contact_acceptance:'SAMPLED_AUTHORED_CLEANUP',contact_cleanup:{}}];
+ assert.match(transitionContactLabel(saved),/corrected and sampled/);assert.doesNotMatch(transitionContactLabel(saved),/cleanup is unavailable/);
 });

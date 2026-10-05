@@ -109,8 +109,10 @@ def export(destination, observed):
         from .world_transform import audit as placement_audit
         placement = placement_audit()
     from .action_preview import hide_helpers, playback
+    from .viewer_sampling import evaluated_sampling, subdivisions
+    sample_factor = subdivisions(bpy.context.scene) if combined else 1
     try:
-        with frozen_meshes(static) as static_objects, preview_textures() as textures, hide_helpers(combined):
+        with frozen_meshes(static) as static_objects, preview_textures() as textures, hide_helpers(combined), evaluated_sampling(bpy.context.scene, sample_factor):
             result = bpy.ops.export_scene.gltf(**args)
     finally:
         # The exporter restores only frame_current, dropping saved subframes.
@@ -121,7 +123,7 @@ def export(destination, observed):
     if combined:
         from .viewer_timebase import normalize
         scene = bpy.context.scene
-        timebase = normalize(destination, scene.frame_start, scene.frame_end, scene.render.fps, scene.render.fps_base)
+        timebase = normalize(destination, scene.frame_start, scene.frame_end, scene.render.fps, scene.render.fps_base, subdivisions=sample_factor)
         require(destination.stat().st_size <= 128 * 1024**2, 'VIEWER_EXPORT_FAILED', 'Corrected preview exceeds 128 MiB')
     return {'kind': 'READ_ONLY_3D_INSPECTION', 'vertices': vertices, 'source_objects': len(objects),
             'preview_profile': profile, 'reference_frame': reference_frame,

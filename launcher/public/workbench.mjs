@@ -168,7 +168,7 @@ const b=(text,action,data={},cls='',disabled=false)=>`<button class="${cls}" dat
 const next=(name,args={})=>api('workbench/'+name,{projectId,sceneId,revision:p().revision,...args});
 function notice(message,kind='error'){$('notice').hidden=!message;$('notice').textContent=message||'';$('notice').dataset.kind=kind;$('notice').setAttribute('role',kind==='success'?'status':'alert');const local=$('browser-notice');if(local){local.hidden=!message;local.textContent=message||'';}}
 async function perform(fn){if(busy)return;busy=true;syncWorldDraftUI();syncActionDraftUI();document.body.classList.add('working');$('app').classList.add('busy');notice('');try{await fn();}catch(e){try{if(projectId)await load();}catch{}notice(e.message);}finally{busy=false;document.body.classList.remove('working');$('app').classList.remove('busy');syncConsentButtons();syncWorldDraftUI();syncActionDraftUI();syncLayerDraftUI();syncOutputUI();scheduleActionInspection();scheduleLayerInspection();scheduleWorldPreparation();}}
-function acceptSnapshot(value){if(currentLayerDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!==currentLayerDraft().layer)throw Error('Activity changed elsewhere. Your camera/light draft is retained; discard it before reloading.');if(currentActionDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='action')throw Error('Activity changed elsewhere. Your Action draft is retained; discard it before reloading.');if(sceneViewer?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='world')throw Error('This scene or activity changed elsewhere. Your local placement draft remains open. Discard it before reloading the changed activity.');state=value;reconcileWorldSave();reconcileLayerSave();if(actionSave){const run=state.runs.find(r=>r.id===actionSave.body.request.requestId);if(run?.state==='SUCCEEDED'){if(!s().checkpoints.some(c=>c.id===run.resultCheckpointId))throw Error('Action Save receipt has no matching checkpoint.');const checkpoint=s().checkpoints.find(c=>c.id===run.resultCheckpointId);if(actionSave.draft.timeline)motionReturnFrames.set(projectId+':'+sceneId,{checkpointId:checkpoint.id,sha256:checkpoint.sha256,performer:actionSave.draft.selected,frame:actionSave.draft.nextFrame(),applied:false});actionSave.draft.discard();actionDrafts.delete(projectId+':'+sceneId);actionSave=null;}else if(run&&['FAILED','INTERRUPTED'].includes(run.state)){actionSave=null;notice(run.error||'Action Save failed. Your draft is preserved.');}}}
+function acceptSnapshot(value){if(currentLayerDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!==currentLayerDraft().layer)throw Error('Activity changed elsewhere. Your camera/light draft is retained; discard it before reloading.');if(currentActionDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='action')throw Error('Activity changed elsewhere. Your Action draft is retained; discard it before reloading.');if(sceneViewer?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='world')throw Error('This scene or activity changed elsewhere. Your local placement draft remains open. Discard it before reloading the changed activity.');state=value;reconcileWorldSave();reconcileLayerSave();if(actionSave){const run=state.runs.find(r=>r.id===actionSave.body.request.requestId);if(run?.state==='SUCCEEDED'){if(!s().checkpoints.some(c=>c.id===run.resultCheckpointId))throw Error('Action Save receipt has no matching checkpoint.');const checkpoint=s().checkpoints.find(c=>c.id===run.resultCheckpointId);if(actionSave.draft.timeline)motionReturnFrames.set(projectId+':'+sceneId,{checkpointId:checkpoint.id,sha256:checkpoint.sha256,performer:actionSave.draft.selected,frame:actionSave.draft.nextFrame(),applied:false});actionSave.draft.discard();actionDrafts.delete(projectId+':'+sceneId);actionSave=null;}else if(run&&['FAILED','INTERRUPTED','CANCELLED'].includes(run.state)){actionSave=null;notice(run.error||'Action Save failed. Your draft is preserved.');}}}
 async function load(){overview=await api('state?compact=true');if(projectId&&!overview.projects.some(x=>x.id===projectId)){if(sceneViewer?.dirty||currentActionDraft()?.dirty||actionSave||currentLayerDraft()?.dirty||layerSave)throw Error('This production is no longer available. Your local draft remains open; restore the production before saving.');projectId=null;}if(projectId){acceptSnapshot(await api('workbench/state?'+new URLSearchParams({projectId,compact:true})));if(!p().workbench.scenes.some(x=>x.id===sceneId))sceneId=p().workbench.scenes[0]?.id;sessionStorage.setItem('wb-project',projectId);sessionStorage.setItem('wb-scene',sceneId||'');}else state=null;render();if(browser.isOpen)await browser.refresh();}
 function reconcileWorldSave(){
  if(!worldSave)return;const run=state?.runs.find(r=>r.id===worldSave.body.request.requestId);
@@ -208,10 +208,19 @@ async function saveActionDraft(){
  const deadline=Date.now()+205000;
  while(Date.now()<deadline){await load();const run=state.runs.find(r=>r.id===attempt.body.request.requestId);
   if(run?.state==='SUCCEEDED'){notice('Performance saved. Review playback before marking Action ready.','success');return;}
+  if(run?.state==='CANCELLED'){notice('Save cancelled. Your previous scene and local draft are retained.');return;}
   if(run&&['FAILED','INTERRUPTED'].includes(run.state))throw Error(run.error||'Save failed; prior scene and draft retained.');
   await new Promise(r=>setTimeout(r,500));
  }
  throw Error('Action Save is awaiting its receipt. Refresh status; do not start a second Save.');
+}
+async function cancelActionDraft(){
+ const attempt=actionSave,runId=attempt?.body.request.requestId||s()?.run;
+ if(!runId||attempt?.cancelRequested)return;
+ if(attempt)attempt.cancelRequested=true;syncActionDraftUI();
+ try{const result=await api('workbench/action-cancel',{projectId,sceneId,runId});notice(result.message);await load();}
+ catch(error){if(attempt)attempt.cancelRequested=false;notice(error.message);}
+ finally{syncActionDraftUI();}
 }
 function editActionField(field,value){
  if(busy||state.locked)return;const draft=currentActionDraft();
@@ -244,7 +253,8 @@ function syncActionDraftUI(){
  if(undo)undo.disabled=blocked||stale||!draft?.canUndo;
  if(discard)discard.disabled=blocked||!draft?.dirty;
  const run=state?.runs.find(r=>r.id===s()?.run);
- bar.querySelector('[role="status"]').textContent=actionSave?'Saving performance in Blender':stale?'Preview out of date — discard the local draft to reload':run?progressLabel(run):actionDraftStatus(draft);
+ const cancel=bar.querySelector('[data-action="action-cancel"]');if(cancel){cancel.hidden=!(actionSave||run?.action==='action-edit'&&['PREPARING','RUNNING'].includes(run.state));cancel.disabled=!!actionSave?.cancelRequested;cancel.textContent=actionSave?.cancelRequested?'Cancelling...':'Cancel Save';}
+ bar.querySelector('[role="status"]').textContent=actionSave?.cancelRequested?'Cancelling Save; previous scene retained':actionSave?'Saving performance in Blender':stale?'Preview out of date — discard the local draft to reload':run?progressLabel(run):actionDraftStatus(draft);
  const scope=document.querySelector('.action-preview-scope');if(scope)scope.textContent=actionPreviewScope(draft,stale);
  const unsupported=!!draft?.audit.performers.find(p=>p.name===draft.selected)?.unsupported;
  for(const control of document.querySelectorAll('[data-action-field]'))control.disabled=blocked||(control.dataset.actionField!=='performer'&&(stale||!draft||unsupported));
@@ -569,7 +579,7 @@ if(a==='scan'){if(!confirm('Rescan the original database packages? This updates 
  }
  if(a==='settings'){modal('Local studio',`<p>This is the Asset Director workbench. No Vercel server, private asset upload, remote-control port or model service is required.</p><p>Executable paths remain in <code>SystemRuntime/UserData/Launcher/config.json</code>. Add absolute <code>ffmpeg</code> and <code>ffprobe</code> paths for silent movie encoding. Runtime updates use verified staging and reversible replacement; project data stays separate.</p>${p()?'<label>Production intent<textarea id="production-intent" rows="3" maxlength="10000">'+esc(p().brief)+'</textarea></label>':''}${b('Preview storage','preview-storage',{},'ghost')}${p()?b('Production diagnostics','diagnostics',{},'',state.locked)+b('Archive production','archive-production',{},'ghost',state.locked):''}<details><summary>Capability response</summary><pre>${esc(JSON.stringify(cap,null,2))}</pre></details>`,p()?b('Save intent','save-intent',{},'',state.locked):'');return;}
  if(a==='save-intent'){await api('projects/update',{projectId,revision:p().revision,brief:$('production-intent').value});close();await load();return;}
- if(a==='recover'){const run=state.runs.find(r=>r.id===d.run);modal('Task evidence and recovery',`<pre>${esc(JSON.stringify(run||{id:d.run,message:'Refresh or inspect the Runs folder for this record.'},null,2))}</pre><p>Do not resolve a task while Blender or the native worker is still using it. Recovery records your confirmation and retains every file; it does not kill a process or repair native job evidence.</p>`,`${run?.jobId&&['FAILED','INTERRUPTED'].includes(run.state)?b('Reset failed native job for retry','retry',{job:run.jobId}):''}${b('I stopped it · resolve task','resolve',{run:d.run,scene:run?.sceneId||''},'',run?.state==='SUCCEEDED')}`);return;}
+ if(a==='recover'){const run=state.runs.find(r=>r.id===d.run);modal('Task evidence and recovery',`<pre>${esc(JSON.stringify(run||{id:d.run,message:'Refresh or inspect the Runs folder for this record.'},null,2))}</pre><p>Do not resolve a task while Blender or the native worker is still using it. Recovery records your confirmation and retains every file; it does not kill a process or repair native job evidence.</p>`,`${run?.jobId&&['FAILED','INTERRUPTED','CANCELLED'].includes(run.state)?b('Reset failed native job for retry','retry',{job:run.jobId}):''}${b('I stopped it · resolve task','resolve',{run:d.run,scene:run?.sceneId||''},'',run?.state==='SUCCEEDED')}`);return;}
  if(a==='retry'){if(!confirm('Archive the failed native attempt using job-retry? Starting it again is a separate action.'))return;await next('retry',{jobId:d.job,confirmed:true});close();await load();return;}
  if(a==='resolve'){if(!confirm('Confirm you stopped the external Blender task or encoder. The launcher does not terminate it for you.'))return;await next('resolve',{sceneId:d.scene||null,runId:d.run,confirmStopped:true});close();await load();return;}
 }
@@ -600,6 +610,7 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('click',e=>{
  const button=e.target.closest('button[data-action]');if(!button||button.disabled)return;
+ if(button.dataset.action==='action-cancel'){void cancelActionDraft();return;}
  const menu=button.closest('.world-more');
  // Return modal focus to the visible disclosure, not its now-hidden item.
  if(menu){menu.open=false;menu.querySelector('summary').focus();}

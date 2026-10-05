@@ -75,3 +75,40 @@ class MotionStitchTests(unittest.TestCase):
         self.assertAlmostEqual((near-1)/(eps*6),.1,places=4)
         b['arbitrary-owner']['scale']=[-1,1,1]
         with self.assertRaises(DirectorError):bridge(a,b,ap,bn,.1,6,1)
+
+
+class StitchTangentTests(unittest.TestCase):
+    def test_signed_quaternions_have_identical_native_tangents(self):
+        from asset_director.motion_stitch_math import tangents
+        a, b, ap, bn = pose(.2, 1), pose(.8, 2), pose(.19, .99), pose(.82, 2.02)
+        expected = tangents(a, b, ap, bn, .1)
+        for item in (a, bn):
+            item['arbitrary-owner']['q'] = [-x for x in item['arbitrary-owner']['q']]
+        actual = tangents(a, b, ap, bn, .1)
+        for side in (0, 1):
+            for key in ('location', 'angular', 'scale'):
+                for x,y in zip(actual[side]['arbitrary-owner'][key],expected[side]['arbitrary-owner'][key]):
+                    self.assertAlmostEqual(x,y,places=12)
+
+    def test_baked_endpoint_derivative_uses_native_tangent(self):
+        from types import SimpleNamespace
+        from asset_director.motion_stitch_math import smooth_keys
+        keys = [SimpleNamespace(co=(x,x*x),interpolation='LINEAR') for x in (0.,.25,.5,1.)]
+        curve = SimpleNamespace(keyframe_points=keys)
+        smooth_keys(curve,(0.,2.))
+        self.assertTrue(all(k.interpolation=='BEZIER' for k in keys))
+        self.assertAlmostEqual((keys[0].handle_right[1]-keys[0].co[1]) /
+                               (keys[0].handle_right[0]-keys[0].co[0]),0.)
+        self.assertAlmostEqual((keys[-1].co[1]-keys[-1].handle_left[1]) /
+                               (keys[-1].co[0]-keys[-1].handle_left[0]),2.)
+        # The previously used baked secant is 0.25, not the native zero tangent.
+        self.assertEqual((keys[1].co[1]-keys[0].co[1])/(keys[1].co[0]-keys[0].co[0]),.25)
+
+    def test_smoothing_interval_preserves_outside_keys(self):
+        from types import SimpleNamespace
+        from asset_director.motion_stitch_math import smooth_keys
+        keys = [SimpleNamespace(co=(x,2*x),interpolation='LINEAR') for x in (0.,1.,2.,3.,4.)]
+        smooth_keys(SimpleNamespace(keyframe_points=keys),(2.,2.),(1.,3.))
+        self.assertEqual(keys[0].interpolation,'LINEAR')
+        self.assertEqual(keys[-1].interpolation,'LINEAR')
+        self.assertTrue(all(k.interpolation=='BEZIER' for k in keys[1:-1]))

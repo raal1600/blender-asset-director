@@ -1,6 +1,6 @@
 /** Performer-native Action requests. Retargeting stays in the reviewed workflow. */
 import {isDeepStrictEqual} from 'node:util';
-import {assert,json,safe} from './storage.mjs';
+import {assert,digest,json,safe} from './storage.mjs';
 import {validHash,validId} from './workbench-model.mjs';
 import {checkpointJob} from './checkpoint-job.mjs';
 import {assertCurrentActionInspection} from './action-inspection.mjs';
@@ -44,11 +44,28 @@ export async function inspectAction(work,id,sceneId,revision,request){
     implementation:async()=>{const cap=await work.available();assert(validHash(cap.implementation)&&cap.action_layer===version,'Matching Action runtime identity is unavailable.',409);return cap.implementation;}});
 }
 
-export async function saveAction(work,id,sceneId,revision,request){
+export function registerActionSave(work,id,sceneId,revision,request){
   validateActionRequest(request);
+  assert(validId(id,'prj_')&&validId(sceneId,'sc_')&&Number.isInteger(revision),'Invalid Action save scope.');
+  work.actionSaves ||= new Map();const identity=digest({id,sceneId,revision,request}),prior=work.actionSaves.get(request.requestId);
+  if(prior){assert(prior.identity===identity,'Action request conflicts with an active Save.',409);return prior;}
+  assert(work.actionSaves.size<64,'Too many pending Action saves.',429);
+  const entry={id,sceneId,runId:request.requestId,identity,cancelled:false,committing:false,jobId:null};work.actionSaves.set(request.requestId,entry);return entry;
+}
+export async function cancelActionSave(work,id,sceneId,runId){
+  assert(validId(runId,'run_'),'Invalid Action save identity.');
+  const entry=work.actionSaves?.get(runId);
+  assert(entry&&entry.id===id&&entry.sceneId===sceneId,'No active Action save belongs to this request and scene.',409);
+  assert(!entry.committing,'This Save is already publishing its verified checkpoint. Wait for its receipt.',409);
+  entry.cancelled=true;
+  if(entry.jobId){try{await work.runtime.harness(['job-cancel',entry.jobId]);}catch(error){entry.nativeCancelError=error.message;}}
+  return {runId,state:'CANCEL_REQUESTED',...(entry.nativeCancelError?{detail:entry.nativeCancelError}:{}),message:'Cancellation requested. Waiting for the native worker to stop; the previous scene and local draft are retained.'};
+}
+export async function saveAction(work,id,sceneId,revision,request){
+  const cancellation=registerActionSave(work,id,sceneId,revision,request);
   const options={version,audit_sha256:request.audit_sha256,changes:request.changes,...(request.frame_range?{frame_range:request.frame_range}:{})};
-  return checkpointJob(work,id,sceneId,revision,request,{
-    stage:'action',operation:'action-edit',options,
+  try{return await checkpointJob(work,id,sceneId,revision,request,{
+    stage:'action',operation:'action-edit',options,cancellation,
     check:async({p,cp})=>{
       const run=await json(await safe(p.directory,`Runs/${request.inspectionId}.json`));
       assert(run.projectId===id&&run.sceneId===sceneId&&run.action==='action-audit'&&run.state==='SUCCEEDED'&&run.checkpointId===cp.id&&run.checkpointSha256===cp.sha256&&run.inspection?.sha256===request.audit_sha256,'Action inspection is stale or belongs to another scene.',409);
@@ -87,5 +104,5 @@ export async function saveAction(work,id,sceneId,revision,request){
         isDeepStrictEqual(data.request,options),'Native Save did not verify the exact Action request.');
       verifyAudit(data.action_audit);
     }
-  });
+  });}finally{if(!work.running.has(request.requestId))work.actionSaves.delete(request.requestId);}
 }

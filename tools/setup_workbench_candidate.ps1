@@ -28,7 +28,7 @@ if(-not (Get-Command node.exe -ErrorAction SilentlyContinue)){throw 'Node.js is 
 if(-not $StudioPath){$StudioPath=Read-Host 'New studio folder (must not already exist)'}
 if(-not [IO.Path]::IsPathRooted($StudioPath) -or (Test-Path -LiteralPath $StudioPath)){throw 'Choose a new absolute directory. Existing studios are never overwritten.'}
 $arguments=@((Join-Path $root 'tools\install_workbench_candidate.py'),'--root',$StudioPath)
-foreach($key in @('python','blender','codex','ffmpeg','ffprobe')){$arguments+=@('--'+$key,$config[$key])}
+foreach($key in @('python','blender','codex','ffmpeg','ffprobe')){$arguments+=@(('--'+$key),$config[$key])}
 & $config.python @arguments
 if($LASTEXITCODE -ne 0){throw 'Candidate setup failed. Preserve its diagnostic directory; the previous studio was not changed.'}
 Write-Host "Created candidate. Open: $StudioPath\Open Workbench.cmd"

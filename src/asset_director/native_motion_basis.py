@@ -67,8 +67,11 @@ def _observed(obj):
         # procedural channel is not silently interpreted as a stable default.
         for owner, fields in channel_spec(obj, action, slot).items():
             masks.setdefault(owner, set()).update(fields)
-        sources.append({'action': action.name, 'slot': slot_id(slot),
-                        'channels': digest(channels(action, slot)), 'range': list(ops.action_range(action, slot))})
+        source = {'action': action.name, 'slot': slot_id(slot),
+                  'channels': digest(channels(action, slot)), 'range': list(ops.action_range(action, slot))}
+        if action.get('bad_contact_intervals_v1') is not None:
+            source['contact_annotations_sha256'] = digest(action['bad_contact_intervals_v1'])
+        sources.append(source)
     parent = obj.parent.matrix_world @ obj.matrix_parent_inverse if obj.parent else obj.matrix_parent_inverse
     inputs = {'unit': bpy.context.scene.unit_settings.scale_length,
               'parent': obj.parent.name if obj.parent else None,
@@ -81,6 +84,8 @@ def _observed(obj):
                             'inherit_scale', 'use_inherit_rotation', 'use_local_location', 'use_connect',
                             'use_relative_parent')}}
                        for b in obj.data.bones] if obj.type == 'ARMATURE' else []}
+    if obj.get('bad_contact_rig_v1') is not None:
+        inputs['contact_rig_sha256'] = digest(obj['bad_contact_rig_v1'])
     return inputs, masks
 
 

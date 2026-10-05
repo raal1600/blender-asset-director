@@ -23,7 +23,8 @@ async function fixture(t,observed=inspection){
     calls.push(args);if(args[0]==='job-prepare'){
       const job={id:'j_'+randomUUID().replaceAll('-','').slice(0,24),state:'PLANNED',outputs:[],specification:{implementation:control.jobImplementation||control.implementation,operation:args[1],options:await json(args[args.indexOf('--options')+1]),inputs:[]}};jobs.set(job.id,job);return job;
     }
-    assert.equal(args[0],'job-run');const job=jobs.get(args[1]);if(control.pause)await control.pause;
+    if(args[0]==='job-cancel'){control.cancelled=true;return {state:'CANCEL_REQUESTED'};}
+    assert.equal(args[0],'job-run');const job=jobs.get(args[1]);if(control.pause)await control.pause;if(control.cancelled){job.state='CANCELLED';throw Error('Synthetic worker cancellation');}
     if(control.fail)throw Error('Synthetic native failure');
     const folder=path.join(config.library,'jobs',job.id);await fs.mkdir(folder,{recursive:true});
     let data=observed;
@@ -172,4 +173,27 @@ test('new motion-edit runtime requires fresh capability-bound inspection without
  await assert.rejects(f.work.saveAction(project.id,f.scene.id,project.revision,f.request),/predates this runtime/);
  assert.equal(f.calls.length,count);assert.deepEqual(await fileHash(filename),before);
  assert.equal((await f.store.get(project.id)).workbench.scenes[0].current,f.cp.id);
+});
+
+test('queued Action cancellation executes no native job and leaves the project unchanged',async t=>{
+ const f=await fixture(t),p=await f.inspect(),before=await fileHash(path.join(p.directory,'project.json')),calls=f.calls.length;
+ f.work.registerActionSave(p.id,f.scene.id,p.revision,f.request);
+ await f.work.cancelActionSave(p.id,f.scene.id,f.request.requestId);
+ const response=await f.work.saveAction(p.id,f.scene.id,p.revision,f.request);
+ assert.equal(response.run.state,'CANCELLED');assert.equal(f.calls.length,calls);assert.deepEqual(await fileHash(path.join(p.directory,'project.json')),before);
+ assert.equal(f.work.actionSaves.size,0);assert.equal(await exists(path.join(p.directory,'Runs/.workbench-writer.lock')),false);
+});
+test('running Action cancellation stops acceptance and releases the owned lease after worker cleanup',async t=>{
+ const f=await fixture(t),p=await f.inspect();let release;f.control.pause=new Promise(resolve=>release=resolve);
+ await f.work.saveAction(p.id,f.scene.id,p.revision,f.request);
+ await assert.rejects(f.work.cancelActionSave(p.id,'sc_'+randomUUID(),f.request.requestId),/belongs/);
+ assert.equal((await f.work.cancelActionSave(p.id,f.scene.id,f.request.requestId)).state,'CANCEL_REQUESTED');
+ assert.equal(await exists(path.join(p.directory,'Runs/.workbench-writer.lock')),true,'Keep lease while child has not stopped');release();const after=await f.wait();
+ assert.equal(after.workbench.scenes[0].current,f.cp.id);assert.equal(after.workbench.scenes[0].checkpoints.length,1);assert.deepEqual(after.workbench.scenes[0].completed,f.scene.completed);
+ assert.equal((await json(path.join(p.directory,`Runs/${f.request.requestId}.json`))).state,'CANCELLED');assert.equal(await exists(path.join(p.directory,'Runs/.workbench-writer.lock')),false);
+ assert.equal(f.work.actionSaves.size,0);assert.deepEqual(await fileHash(f.source),{sha256:f.cp.sha256,size:f.cp.size});
+});
+test('Action cancellation refuses once atomic checkpoint publication has begun',async t=>{
+ const f=await fixture(t),p=await f.inspect(),entry=f.work.registerActionSave(p.id,f.scene.id,p.revision,f.request);entry.committing=true;
+ await assert.rejects(f.work.cancelActionSave(p.id,f.scene.id,f.request.requestId),/already publishing/);assert.equal(entry.cancelled,false);
 });

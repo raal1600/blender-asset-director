@@ -12,7 +12,7 @@ assert([out,generated,python,blender,playwright].every(x=>x&&path.isAbsolute(x))
 assert.equal((await json(path.join(generated,'world_layers_report.json'))).status,'PASS');
 const source=path.join(generated,'placed.blend'),before=await fileHash(source),repo=fileURLToPath(new URL('../',import.meta.url));
 await fs.mkdir(out,{recursive:true});
-const report={kind:'REAL_SYNTHETIC_PREVIEW_CLEANUP',checks:[],native_conversions:0,human_review:'NOT_TESTED',decisions:'Scripted synthetic decline and confirmation only'};
+const report={kind:'REAL_SYNTHETIC_PREVIEW_CLEANUP',checks:[],reviews:[],releases:[],native_conversions:0,human_review:'NOT_TESTED',decisions:'Scripted synthetic decline and confirmation only'};
 let app,browser,page,other;
 const errors=[],config={python,blender,skill:path.join(repo,'skills/blender-asset-director'),library:path.join(out,'Studio/Database/AssetDirector')};
 try{
@@ -42,11 +42,11 @@ try{
   await page.getByRole('button',{name:'Studio',exact:true}).click();
   const pending=page.waitForResponse(r=>r.url().endsWith('/api/viewer-cache/plan')&&r.request().method()==='POST');
   await page.getByRole('button',{name:'Preview storage',exact:true}).click();const response=await pending;assert.equal(response.status(),200);
-  const result=await response.json();await page.locator('#dialog [data-action=preview-storage-apply]').waitFor();return result;
+  const result=await response.json();report.reviews.push(result);await page.locator('#dialog [data-action=preview-storage-apply]').waitFor();return result;
  };
  const leave=async target=>{
   const pending=target.waitForResponse(r=>r.url().endsWith('/api/workbench/viewer-release'));
-  await target.getByRole('button',{name:'Final film',exact:true}).click();assert.equal((await pending).status(),200);
+  await target.getByRole('button',{name:'Final film',exact:true}).click();const response=await pending;assert.equal(response.status(),200);report.releases.push({status:response.status(),viewerId:response.request().postDataJSON().viewerId});
  };
  const keep=()=>page.getByRole('button',{name:'Keep everything',exact:true}).click();
  page=await open();const previewId=await ready(page);other=await open();assert.equal(await ready(other),previewId);assert.equal(report.native_conversions,1);
@@ -54,7 +54,7 @@ try{
  assert(await page.locator('[data-action=preview-storage-apply]').isDisabled());await keep();
  await leave(page);review=await plan();assert.equal(review.eligible.length,0);await keep();
  report.checks.push('Two actual WebGL views share one Blender conversion; closing one does not allow cleanup of the other');
- await leave(other);review=await plan();assert.equal(review.eligible.length,1);assert.equal(review.eligible[0].previewId,previewId);assert(review.eligible[0].files.includes('PREVIEW_COPY.blend'));
+ await leave(other);review=await plan();assert.equal(review.eligible.length,1,JSON.stringify({protected:review.protected,releases:report.releases}));assert.equal(review.eligible[0].previewId,previewId);assert(review.eligible[0].files.includes('PREVIEW_COPY.blend'));
  await page.screenshot({path:path.join(out,'cleanup-review.png'),fullPage:true});
  const base=path.join(out,'Studio/SystemRuntime/UserData/ViewerPreviews'),directory=path.join(base,previewId),members=await walk(directory,10000);
  const identities=Object.fromEntries(await Promise.all(members.map(async name=>[name,await fileHash(path.join(directory,name))])));
