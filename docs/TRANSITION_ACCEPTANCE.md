@@ -161,3 +161,24 @@ artifact meanings and known restrictions are in
   overlapped the run. `SOURCE-NOTE.json` labels it diagnostic evidence. A final
   immutable checkout is required. The acceptance runner now also rejects a
   source fingerprint, commit or dirty-state change during execution.
+
+## Normal candidate ZIP setup regression
+
+- Exact candidate `6b39e1789b950b3f829ce4f1669b82bf3d777f26` passed all
+  31 hosted harness jobs and all five workflow conclusions (harness
+  `37252474268`). Its immutable local runner passed all 77 checks with clean
+  start/end source identity. These are retained as candidate evidence.
+- The requested clean ZIP test then found a pre-existing `Setup.ps1` argument
+  bug also present at baseline `f2b39f2`: PowerShell concatenation/array operator
+  precedence joined each option and configured path into one argument. Normal
+  installation failed before creating the studio, despite valid ZIP hashes.
+- Parenthesizing option concatenation preserves separate option/value arguments.
+  The existing candidate installer regression now executes the actual packaged
+  PowerShell entry point on Windows using spaced script, destination and tool
+  paths. It verifies all stored paths, repeat-install refusal and unchanged
+  bundle integrity. The synthetic host is explicitly never executed; the final
+  real ZIP/native-client journey is a separate acceptance gate.
+- `candidate-6b39e17/setup-regression-before.log` reproduces the failure;
+  `setup-regression-after.log` passes. Final-candidate CI, immutable regression
+  and normal ZIP installation must be rerun after this fix. Earlier green CI
+  is not evidence that the previously untested setup entry point worked.
