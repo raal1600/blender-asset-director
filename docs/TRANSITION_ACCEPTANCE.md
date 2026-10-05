@@ -23,12 +23,13 @@ This is a live engineering record, not a completion claim. Evidence remains outs
 - [x] Inspect local/remote branches, instructions, installed runtime and hardware.
 - [x] Isolate work without changing existing checkouts or installation.
 - [x] Run portable, launcher and initial real Blender baseline.
-- [x] Reproduce representative defect through visible client controls and numerical boundary metrics.
+- [x] Reproduce representative defects with evaluated Blender metrics; record the baseline visible client journey separately (it passes its original 24 FPS case).
 - [x] Pin and prove motion-bricks capability using real source/model/output.
 - [x] Document and enforce motion data/provider contracts.
-- [x] Implement smooth deterministic/provider transitions, persistence and preview parity.
+- [x] Implement smooth deterministic transitions, persistence and preview parity; keep raw neural candidates explicitly unaccepted.
 - [x] Run generated motion scenario, contact and failure/recovery matrix.
-- [x] Verify clean installed client journey, fresh Blender reopen, render/export and playback.
+- [x] Verify a clean copied-runtime client journey, fresh Blender reopen, render/export and playback.
+- [ ] Verify the final CI-gated candidate ZIP in a new installation through the complete client journey.
 - [x] Measure repeated jobs, GPU/host memory, cancellation and resource release.
 - [ ] Run final candidate regression and inspect exact-commit hosted CI.
 
@@ -84,7 +85,9 @@ NOT VERIFIED means no qualifying evidence yet. A numerical pass never implies vi
   requests. This is generated data, not the unavailable original project.
 - The Windows EXE built with the pinned WebView2 dependency and loaded, but
   `native-desktop-1` refused input because Windows denied foreground access.
-  The native packaging gate remains BLOCKED; no acceptance guard was removed.
+  This local gate remains BLOCKED; hosted Windows native-desktop validation at
+  `dc3d10aac32c23ae08f2cd9636ffabb830f6f3a6` passed. Final candidate
+  packaging still requires matching exact-commit evidence; no guard was removed.
 - `acceptance-1` uses an immutable candidate snapshot and records actual process
   tree RAM and device-wide VRAM. One portable inventory-count assertion failed
   when the new mandatory Blender fixture was added; the expectation was updated
@@ -135,3 +138,26 @@ source identity. Earlier proofs are retained with their candidate versions;
 final-commit regression and hosted CI must be recorded independently. Commands,
 artifact meanings and known restrictions are in
 [Transition validation](TRANSITION_VALIDATION.md).
+
+## Hosted candidate feedback and final freeze
+
+- Candidate `dc3d10aac32c23ae08f2cd9636ffabb830f6f3a6` passed all nine
+  Blender version/subsystem partitions, Linux portable tests and Windows native
+  desktop validation. Harness run `37251328504` failed on two distinct families:
+  cross-platform guardian compatibility and derived-preview cleanup.
+- macOS Python 3.11 lacks the original `waitid` API. The process guardian now
+  owns its POSIX session/group, writes its command result, and terminates that
+  reserved group on owner exit, timeout, command completion or receipt failure.
+  Windows tests inspect OS wait handles instead of Python 3.11's inconsistent
+  `os.kill(dead_pid, 0)` behavior. Six real Windows containment tests pass;
+  the final exact-commit hosted run must verify macOS/Linux.
+- The new worker identity record was correctly preserved by successful jobs but
+  absent from the preview-cleanup allowlist. Cleanup now preserves only the
+  exact hashed, job-bound record and rejects missing, altered or unknown files.
+  Sixteen focused contracts and the real visible cleanup/rebuild journey pass
+  (`cleanup-diagnosis.json`, `cleanup-corrected/RESULTS.json`).
+- `final-acceptance-dc3d10a` completed all scoped checks, including installed
+  playback/render and both cancellation paths, but validation-tool edits
+  overlapped the run. `SOURCE-NOTE.json` labels it diagnostic evidence. A final
+  immutable checkout is required. The acceptance runner now also rejects a
+  source fingerprint, commit or dirty-state change during execution.

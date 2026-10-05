@@ -171,3 +171,38 @@ test('cancellation during source verification refuses before conversion allocati
  const refused=assert.rejects(preparing,e=>e.status===499);await started;controller.abort();resume();await refused;
  assert.equal(f.viewers.owned.size,0);assert.equal(await fs.access(f.base).then(()=>true,()=>false),false);
 });
+/** Contract regression: actual native browser evidence is in preview_cleanup_check. */
+test('native cleanup retains only the exact successful worker identity marker',async t=>{
+ const f=await fixture(t),direct=await f.prepare(),directory=path.join(f.base,direct.previewId),source=await json(path.join(directory,'request.json'));
+ const jobId='j_'+'1'.repeat(24),assetId='a_'+'2'.repeat(24),implementation='3'.repeat(64),jobBase=`library/jobs/${jobId}`;
+ const converter={implementation,blender:{sha256:'4'.repeat(64),size:123}},record={...direct,adapter:'isolated-blender-gltf',nativeJob:jobId,nativeImplementation:implementation,converter};
+ const native=[];
+ for(const member of source.files){const relative='incoming/package/'+member.path,filename=path.join(directory,'library',relative);await fs.mkdir(path.dirname(filename),{recursive:true});await fs.copyFile(path.join(source.root,member.path),filename);native.push({...member,path:relative});}
+ for(const relative of ['PREVIEW_COPY.blend',`${jobBase}/result.blend`,'library/catalog.sqlite',`library/manifests/${assetId}.json`,`${jobBase}/worker.log`]){const file=path.join(directory,relative);await fs.mkdir(path.dirname(file),{recursive:true});await fs.writeFile(file,'synthetic contract bytes');}
+ await fs.copyFile(path.join(directory,'model.glb'),path.join(directory,jobBase,'preview.glb'));
+ const marker={job_id:jobId,implementation,pid:123,started_at:1001},markerName=`${jobBase}/worker-process.json`,markerFile=path.join(directory,markerName);
+ await writeJson(markerFile,marker);
+ const markerHash=await fileHash(markerFile),job={id:jobId,state:'SUCCEEDED',worker_pid:123,started_at:1000,finished_at:1002,specification:{implementation,operation:'asset-preview',options:{embedded:true},inputs:[],asset_id:assetId,source_files:native},outputs:[{path:`jobs/${jobId}/preview.glb`,sha256:record.sha256,size:record.size},{path:`jobs/${jobId}/worker-process.json`,...markerHash}]};
+ const member=async relative=>({path:relative,...await fileHash(path.join(directory,relative))});
+ const receipt={state:'READY',job_id:jobId,source_id:source.id,source_version:source.version,blend:await member('PREVIEW_COPY.blend'),job_blend:await member(`${jobBase}/result.blend`),model:await member(`${jobBase}/preview.glb`)};
+ await writeJson(path.join(directory,'viewer.json'),record);await writeJson(path.join(directory,'receipt.json'),receipt);
+ await writeJson(path.join(directory,jobBase,'job.json'),job);await writeJson(path.join(directory,jobBase,'result.json'),{status:'OK',job_id:jobId});
+ const indexName=(await fs.readdir(path.join(f.base,'Index')))[0],key=indexName.slice(0,-5),cache=new PreviewCache(f.base);
+ await cache.publish(key,source,record);
+ const cleanup=new PreviewCleanup(new EmbeddedPreviews(f.work),async()=>[]);
+ let plan=await cleanup.plan();assert.equal(plan.eligible.length,1,JSON.stringify(plan.protected));assert(!plan.eligible[0].files.includes(markerName));
+ await writeJson(markerFile,{...marker,pid:124});
+ await assert.rejects(cleanup.apply({...plan,confirmed:true,closedNativePreviews:true}),/worker|changed/i);
+ assert.equal((await cleanup.plan()).eligible.length,0,'Altered process marker stays protected');
+ await writeJson(markerFile,marker);
+ await fs.unlink(markerFile);assert.equal((await cleanup.plan()).eligible.length,0,'Missing recorded marker stays protected');await writeJson(markerFile,marker);
+ for(const changed of [{...marker,job_id:'j_'+'9'.repeat(24)},{...marker,pid:124},{...marker,started_at:999},{...marker,unexpected:true}]){
+  await writeJson(markerFile,changed);const changedJob=structuredClone(job);
+  changedJob.outputs[1]={...changedJob.outputs[1],...await fileHash(markerFile)};await writeJson(path.join(directory,jobBase,'job.json'),changedJob);await cache.publish(key,source,record);
+  assert.equal((await cleanup.plan()).eligible.length,0,'Rehashed but incorrectly bound worker marker stays protected');
+ }
+ await writeJson(markerFile,marker);await writeJson(path.join(directory,jobBase,'job.json'),job);await cache.publish(key,source,record);
+ await fs.writeFile(path.join(directory,jobBase,'unknown.json'),'{}');assert.equal((await cleanup.plan()).eligible.length,0,'Unknown sibling stays protected');await fs.unlink(path.join(directory,jobBase,'unknown.json'));
+ plan=await cleanup.plan();assert.equal(plan.eligible.length,1);assert.equal((await cleanup.apply({...plan,confirmed:true,closedNativePreviews:true})).state,'SUCCEEDED');
+ assert.deepEqual(await fileHash(markerFile),markerHash,'Successful cleanup preserves worker identity evidence byte-for-byte');
+});

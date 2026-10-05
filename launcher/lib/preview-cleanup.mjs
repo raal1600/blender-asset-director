@@ -46,6 +46,16 @@ export class PreviewCleanup {
     assert(member?.path===relative,'Unknown derived output path.',409);targets.push({path:relative,sha256:member.sha256,size:member.size});
    }
    kept.push('receipt.json','library/catalog.sqlite',`library/manifests/${job.specification.asset_id}.json`,...['job.json','result.json','worker.log'].map(n=>`library/jobs/${record.nativeJob}/${n}`));
+   const markerPath=`library/jobs/${record.nativeJob}/worker-process.json`,outputs=job.outputs?.filter(f=>f.path===`jobs/${record.nativeJob}/worker-process.json`)||[];
+   if(names.includes(markerPath)||outputs.length){
+    // New workers retain their identity as evidence. Accept only the successful
+    // job's exact recorded marker; it is preserved, never a disposable payload.
+    const marker=await readSmall(await safe(directory,markerPath));
+    assert(outputs.length===1&&hash(outputs[0].sha256)&&Number.isSafeInteger(outputs[0].size)&&outputs[0].size>0&&outputs[0].size<=4096,'Unknown worker identity evidence is protected.',409);
+    await exactFile(directory,markerPath,outputs[0]);
+    assert(digest(Object.keys(marker).sort())===digest(['implementation','job_id','pid','started_at'])&&marker.job_id===record.nativeJob&&marker.implementation===record.nativeImplementation&&Number.isSafeInteger(marker.pid)&&marker.pid>0&&marker.pid===job.worker_pid&&Number.isFinite(marker.started_at)&&Number.isFinite(job.started_at)&&Number.isFinite(job.finished_at)&&marker.started_at>=job.started_at&&marker.started_at<=job.finished_at,'Changed worker identity evidence is protected.',409);
+    kept.push(markerPath);
+   }
   }
   const allowed=[...kept,...targets.map(f=>f.path)].sort();
   assert(new Set(allowed).size===allowed.length&&digest(names)===digest(allowed),'Unknown, failed, interrupted or changed preview files are protected.',409);

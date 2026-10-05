@@ -1,4 +1,5 @@
 """Real subprocess containment tests; no Blender or mocked executables."""
+import ctypes
 import json
 import os
 from pathlib import Path
@@ -42,6 +43,8 @@ else:
             if process.poll() is None:process.kill()
             process.wait(timeout=10)
         for guard in self.guards:guard.close()
+        owner_metadata=self.root/'owner.json'
+        if owner_metadata.is_file():self.gone(json.loads(owner_metadata.read_text())['guardian'])
         for stream in self.streams:stream.close()
         self.tmp.cleanup()
 
@@ -50,13 +53,35 @@ else:
         while time.monotonic()<deadline:
             try:return json.loads(path.read_text())
             except (OSError, ValueError):time.sleep(.025)
-        self.fail('Expected real subprocess evidence: '+str(path))
+        self.fail('Expected real subprocess evidence: '+str(path)+'; guardian='+((self.root/'guardian.json').read_text() if (self.root/'guardian.json').exists() else 'no report'))
 
     def gone(self, pid, timeout=10):
         deadline = time.monotonic()+timeout
         while time.monotonic()<deadline:
-            try:os.kill(pid, 0)
-            except (ProcessLookupError, OSError):return
+            if os.name == 'nt':
+                # Python 3.11's os.kill(dead_pid, 0) can raise SystemError
+                # chained from WinError 87. Inspect the OS waitable process
+                # handle directly; access errors must still fail the test.
+                from ctypes import wintypes as w
+                kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+                kernel.OpenProcess.argtypes=[w.DWORD,w.BOOL,w.DWORD]
+                kernel.OpenProcess.restype=w.HANDLE
+                kernel.WaitForSingleObject.argtypes=[w.HANDLE,w.DWORD]
+                kernel.WaitForSingleObject.restype=w.DWORD
+                kernel.CloseHandle.argtypes=[w.HANDLE]
+                handle=kernel.OpenProcess(0x100000,False,pid)
+                if not handle:
+                    error=ctypes.get_last_error()
+                    if error==87:return  # ERROR_INVALID_PARAMETER: PID absent
+                    raise ctypes.WinError(error)
+                try:
+                    state=kernel.WaitForSingleObject(handle,0)
+                    if state==0:return
+                    if state!=258:raise ctypes.WinError(ctypes.get_last_error())
+                finally:kernel.CloseHandle(handle)
+            else:
+                try:os.kill(pid,0)
+                except ProcessLookupError:return
             # An exited Unix orphan can remain a zombie until the host init
             # reaps it. It executes nothing and holds no live worker resources.
             stat = Path('/proc')/str(pid)/'stat'
@@ -110,6 +135,16 @@ with (root/'worker.log').open('w') as stream:
         child = self.ready(self.root/'child.json')
         result = guard.wait(10)
         self.assertEqual((result['state'],result['exit_code']),('EXITED',7))
+        self.gone(child['pid']);self.gone(child['grandchild'])
+
+    def test_real_receipt_write_failure_still_terminates_owned_tree(self):
+        guard=self.guard(timeout=2)
+        child=self.ready(self.root/'child.json');self.ready(self.root/'grandchild.json')
+        # The worker is already running. Make only its new report path unusable,
+        # exercising real filesystem failure instead of a mocked writer.
+        (self.root/'guardian.json').mkdir()
+        with self.assertRaises(OSError):guard.wait(10)
+        self.assertNotEqual(guard.process.returncode,0)
         self.gone(child['pid']);self.gone(child['grandchild'])
 
     def test_exited_process_with_retained_handle_is_not_observed_live(self):

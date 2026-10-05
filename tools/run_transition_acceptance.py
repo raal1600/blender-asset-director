@@ -19,6 +19,16 @@ def write(path,value):
     Path(path).write_text(json.dumps(value,indent=2,allow_nan=False)+'\n',encoding='utf-8')
 
 
+def source_fingerprint():
+    signature=hashlib.sha256()
+    for directory in ('src','launcher','tools','tests'):
+        for file in sorted((ROOT/directory).rglob('*')):
+            if file.is_file() and file.suffix in {'.py','.mjs','.js','.json','.html','.css'} and not any(
+                    part in {'node_modules','__pycache__','.deps'} for part in file.parts):
+                signature.update(file.relative_to(ROOT).as_posix().encode());signature.update(file.read_bytes())
+    return signature.hexdigest()
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--blender',required=True,type=Path)
@@ -39,14 +49,9 @@ def main():
     env=dict(os.environ,PYTHONPATH=str(ROOT/'src'),PYTHONIOENCODING='utf-8',BAD_CONFIG=str(out/'runtime.json'))
     commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     dirty=bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT))
-    source_hash=hashlib.sha256()
-    for directory in ('src','launcher','tools'):
-        for file in sorted((ROOT/directory).rglob('*')):
-            if file.is_file() and file.suffix in {'.py','.mjs','.js','.json','.html','.css'} and not any(
-                    part in {'node_modules','__pycache__','.deps'} for part in file.parts):
-                source_hash.update(file.relative_to(ROOT).as_posix().encode());source_hash.update(file.read_bytes())
+    source_hash=source_fingerprint()
     report={'schema':'asset-director.transition-acceptance/1','commit':commit,'dirty':dirty,
-            'source_sha256':source_hash.hexdigest(),'status':'RUNNING','checks':[],
+            'source_sha256':source_hash,'status':'RUNNING','checks':[],
             'device_memory_budget_mib':args.device_memory_budget_mib,
             'scope':{'deterministic':'NOT_VERIFIED','installed_client':'NOT_VERIFIED',
                      'native_windows_package':'NOT_VERIFIED','provider':'NOT_VERIFIED',
@@ -159,6 +164,13 @@ def main():
     except Exception as exc:
         report['status']='FAIL';report['error']=repr(exc)
     finally:
+        report['source_sha256_after']=source_fingerprint()
+        report['commit_after']=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+        report['dirty_after']=bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT))
+        stable=(report['source_sha256_after']==source_hash and report['commit_after']==commit and report['dirty_after']==dirty)
+        report['source_stability']='PASS' if stable else 'FAIL'
+        if not stable:
+            report['status']='FAIL';report['source_error']='Source changed during acceptance; rerun from an immutable worktree'
         write(out/'ACCEPTANCE.json',report)
     return 1 if report['status']=='FAIL' else 0
 

@@ -2,12 +2,15 @@
 
 An anonymous stdin pipe is the owner lease: EOF means the launching process
 closed it or died. Windows containment uses a non-inherited kill-on-close Job
-Object before spawning; POSIX keeps the session leader unreaped with WNOWAIT
-until its owned process group is killed. This is for trusted test commands,
+Object before spawning; POSIX keeps this guardian alive as the session/group
+leader until it kills its own group after writing the result. No child PID is
+used to discover or kill a possibly reused group. This is for trusted commands,
 not a sandbox against a child deliberately escaping its POSIX process group.
+Abruptly SIGKILLing only the POSIX guardian is outside this containment; owner
+exit through pipe EOF, child failures and deadlines are covered.
 
 References: learn.microsoft.com/windows/win32/procthread/job-objects and
-https://docs.python.org/3/library/os.html#os.waitid.
+https://docs.python.org/3/library/os.html#os.killpg.
 """
 import argparse
 import ctypes
@@ -132,50 +135,41 @@ def main():
     try:
         if os.name == 'nt':
             job = _windows_job()
-        elif not all(hasattr(os, name) for name in ('waitid', 'WNOWAIT', 'WEXITED', 'WNOHANG')):
-            raise RuntimeError('This POSIX platform lacks safe unreaped process-group ownership')
         else:
-            # An inherited ignored SIGCHLD would auto-reap the group leader and
-            # invalidate the WNOWAIT reservation before cleanup.
+            if os.getpgrp()!=os.getpid() or os.getsid(0)!=os.getpid():
+                raise RuntimeError('POSIX guardian must own its new session and process group')
             signal.signal(signal.SIGCHLD, signal.SIG_DFL)
         if owner_lost.is_set():
             result.update(state='OWNER_EXITED', exit_code=125)
         else:
             child = subprocess.Popen(command, stdin=subprocess.DEVNULL, close_fds=True,
                 creationflags=0x08000000 if os.name == 'nt' else 0,
-                start_new_session=os.name != 'nt')
+                start_new_session=False)
             result['child_pid'] = child.pid
             while True:
                 if owner_lost.is_set():
                     result.update(state='OWNER_EXITED', exit_code=125); break
                 if time.monotonic()-started >= args.timeout:
                     result.update(state='TIMED_OUT', exit_code=124); break
-                if os.name == 'nt':
-                    exited = child.poll() is not None
-                else:
-                    # Keep the zombie/group leader reserved until group cleanup;
-                    # no unrelated process can acquire this PID/PGID meanwhile.
-                    exited = os.waitid(os.P_PID, child.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is not None
-                if exited:
-                    result['state'] = 'EXITED'
-                    if os.name == 'nt':result['exit_code'] = child.returncode
+                if child.poll() is not None:
+                    result.update(state='EXITED',exit_code=child.returncode)
                     break
                 owner_lost.wait(.025)
     except BaseException as error:
         result.update(state='FAILED', exit_code=125, error=repr(error))
     finally:
-        if child is not None and os.name != 'nt':
-            try:
-                try:os.killpg(child.pid, signal.SIGKILL)
-                except ProcessLookupError:pass  # already-exited group; leader still reserved
-                code = child.wait(timeout=10)
-                if result['state'] == 'EXITED':result['exit_code'] = code
-            except BaseException as error:
-                result.update(state='FAILED', exit_code=125, cleanup_error=repr(error))
         result['seconds'] = time.monotonic()-started
-        result['cleanup'] = 'KILL_ON_GUARDIAN_EXIT' if job else 'OWNED_GROUP_REAPED' if child else 'NO_CHILD'
-        with args.report.open('x', encoding='utf-8') as stream:
-            json.dump(result, stream, indent=2, allow_nan=False); stream.write('\n'); stream.flush(); os.fsync(stream.fileno())
+        result['cleanup'] = 'KILL_ON_GUARDIAN_EXIT' if job else 'OWNED_GROUP_KILL_AFTER_REPORT' if child else 'NO_CHILD'
+        try:
+            with args.report.open('x', encoding='utf-8') as stream:
+                json.dump(result, stream, indent=2, allow_nan=False); stream.write('\n'); stream.flush(); os.fsync(stream.fileno())
+        finally:
+            if child is not None and os.name != 'nt':
+                # The still-live guardian reserves this PGID. A receipt-write
+                # failure must also terminate the whole group. The separate
+                # report carries the command result on successful publication;
+                # a missing/invalid report remains an error for OwnedCommand.
+                os.killpg(os.getpid(),signal.SIGKILL)
     # Windows kernel closes the sole job handle here, including descendants if
     # the main command already exited. It also works if this guardian crashes.
     os._exit(result['exit_code'] if 0 <= result['exit_code'] <= 255 else 1)
