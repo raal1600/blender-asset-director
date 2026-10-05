@@ -7,14 +7,22 @@ crossfaded, phase shifted, shortened, or retimed by this mode. Root placement is
 separate from the original pose Actions. Save creates a new checkpoint and new
 bridge/path Actions; the original Actions and prior checkpoints remain intact.
 
-This is implemented experimental integration, **not complete contact or visual
-acceptance**. In the real layered-production Adventurer test, native-client
-Save, model execution, preview, restart, fresh Blender replay, numerical seams,
-and client render/encode/playback worked. Foot-contact quality remains open:
-source clips penetrate the staged floor by approximately 34 mm, and rotation-only
-G1-to-humanoid conversion can leave feet above the ground. Do not treat numerical
-seams, a green job, or a generated movie as artistic approval. Private licensed
-assets and their rendered evidence are retained outside this repository.
+The layered-production Adventurer `walk_back` to `walk_left` reference has run
+through a clean candidate installation, real Vulkan generation, preview, native
+restart, fresh Blender evaluation, and a 72-frame OptiX render with client movie
+playback. The same accepted checkpoint supplies preview and render. Native bone
+poses and original Action hashes are preserved. Its approximately 0.55-second
+generated interval is separate from both full native clips.
+
+That reference uses explicitly reviewed root-only copies of the original
+in-place takes. A constant path previously caused roughly 34 mm of source floor
+penetration. Positional foot retargeting and the documented source preparation
+reduce the measured full-sequence penetration to 0.6 mm; reviewed generated
+stance markers drift at most 18.0 mm for a 1.85 m character. Those are specific
+fixture measurements, not a promise for arbitrary clips, terrain or rigs.
+Unprepared source motion can still slide or penetrate. Numerical seams and
+scripted workflow checks do not constitute artistic approval. Private assets
+and their rendered evidence remain outside this repository.
 
 ## Verified upstream operation
 
@@ -176,7 +184,7 @@ rest geometry, placement and unkeyed defaults still match.
 
 This is an offline Blender preparation step, not an automatic contact classifier.
 Supply a JSON object with `schema: "root-contact-preparation-v1"`, the prepared
-`profile_sha256`, and 1?8 `clips`. Each clip specifies:
+`profile_sha256`, and 1 to 8 `clips`. Each clip specifies:
 
 - `action`: an observed unambiguous source Action name.
 - `source_sha256`: the source channel digest from its review.
@@ -230,3 +238,59 @@ retain its verified binary/model paths and standalone `python_executable` in
 these settings. Missing or changed files produce setup/stale-provider errors,
 not an undisclosed deterministic fallback. Models are never packaged into the
 application or this repository.
+
+
+Mapped pelvis translation is native motion, including ordinary idle sway. A
+connection may retain it only when the saved anatomical profile still verifies
+that pelvis against hierarchy and rest geometry. The separate added-travel
+control continues to refuse a second path, and translations on other unreviewed
+joints remain unsupported. Imported object coordinates may not be world XY;
+source-offset fixtures convert declared world offsets through the parent matrix.
+
+
+## Real rig sequence acceptance runner
+
+`tools/run_motion_bricks_sequences.py` runs each case through the real pinned
+provider, native Action/NLA application, save, and a separate Blender reopen.
+It measures resources, preserves every failure, and uses the original continuity
+tolerances. It is explicit GPU/provider acceptance, not a skipped ordinary CI
+job. The portable tests and headless mapping fixture remain in ordinary CI.
+
+Use a locally authorized, already profiled `.blend` and a manifest such as:
+
+```json
+{
+  "schema": "motion-bricks-sequence-fixture-v1",
+  "blend": "/absolute/profiled-fixture.blend",
+  "provider_config": "/absolute/provider.json",
+  "rig": "Observed rig name",
+  "height_m": 1.85,
+  "source_fps": 24,
+  "cases": [
+    {"name":"back-left", "clips":["Observed back take","Observed left take"], "fps":24, "extra":12},
+    {"name":"mixed-fps", "clips":["Observed back take","Observed left take"], "source_fps":[30,60], "fps":60, "extra":32},
+    {"name":"offset", "clips":["Observed back take","Observed left take"], "offset":[3,-2], "fps":24, "extra":12},
+    {"name":"multi", "clips":["Observed back take","Observed left take","Observed back take"], "fps":24, "extra":12}
+  ]
+}
+```
+
+```sh
+python tools/run_motion_bricks_sequences.py --manifest /absolute/fixture.json \
+  --blender /absolute/blender --output /absolute/new-evidence
+```
+
+`--case NAME` can be repeated. Each case has a finite 300-second process limit
+(configurable up to 900); later cases still run after a failure. A fresh process
+checks every recorded frame and original Action hashes. Source-FPS variants are
+new copies with explicitly rescaled key/handle times and source/scene clock
+normalization. Offsets are declared in world XY. Existing source bytes, original
+Actions, and the production project are not changed. A new test timeline is
+constructed only inside the disposable fixture worker.
+
+PASS from this runner covers continuity, source preservation, clocks and
+persistence. It **does not** accept contact quality, visual quality, the client
+journey or a packaged build. Supply nonempty reviewed stance intervals and real
+client/render evidence separately. The production Adventurer test uses the
+existing legally acquired model and reviewed root-only preparation; its assets
+and local project paths are not distributed with the source repository.

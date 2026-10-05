@@ -15,6 +15,7 @@ export function transitionContactLabel(d){
  const c=d.selectedClip,p=d.audit.performers.find(p=>p.name===d.selected);
  const saved=!d.dirty&&p?.timeline?.connections?.find(join=>join.clip_id===c?.id);
  if(saved?.contact_acceptance==='SAMPLED_AUTHORED_CLEANUP')return 'Authored planted contacts corrected and sampled. Review the saved playback; terrain adaptation is unavailable.';
+ if(c?.transition?.mode==='generated')return 'MotionBricks uses model foot positions and evaluated sole geometry to fit the generated step. These are not authored contacts; review the saved motion for sliding.';
  const take=p?.takes.find(t=>t.id===c?.take_id);
  if(take?.contacts?.status==='INVALID')return take.contacts.blocker||'Contact annotations are invalid. Correct them in Blender before saving.';
  if(take?.contacts?.status==='AUTHORED')return 'Authored contacts are available. Save to evaluate cleanup, then review the saved playback.';

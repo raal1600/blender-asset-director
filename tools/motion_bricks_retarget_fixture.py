@@ -84,6 +84,25 @@ try: feet.solve(rig,roles,'left',Vector((20,0,0)))
 except DirectorError as error: assert error.code=='MOTION_BRICKS_FOOT_REACH'
 else: raise AssertionError('Unreachable generated foot accepted')
 checks.extend(['anatomical child-head IK ignores imported display tails', 'unreachable generated step rejected'])
+# Native pelvis sway/travel belongs to the explicitly mapped skeleton. It must
+# not be mistaken for an optional second travel path. Unmapped translations and
+# an absent/replaced profile remain outside the supported contract.
+from asset_director import motion_stitch, action_timeline
+sway=bpy.data.actions.new('Mapped native pelvis sway contract');ad=rig.animation_data_create();ad.action=sway
+pelvis=rig.pose.bones[roles['pelvis']]
+for frame,value in [(0.,0.),(12.,.1)]:
+    pelvis.location.x=value;pelvis.keyframe_insert('location',frame=frame)
+assert motion_stitch.reason(rig,sway,ad.action_slot) is None, 'Mapped native pelvis sway was rejected as a second travel path'
+assert action_timeline.travel_reason(rig,sway,ad.action_slot), 'A second added travel path must still be refused'
+saved_profile=rig[ret.PROPERTY];del rig[ret.PROPERTY]
+assert motion_stitch.reason(rig,sway,ad.action_slot), 'Unmapped native pelvis travel must not be inferred from its name'
+rig[ret.PROPERTY]=saved_profile
+hand=rig.pose.bones[roles['left_hand']]
+for frame,value in [(0.,0.),(12.,.2)]:
+    hand.location.x=value;hand.keyframe_insert('location',frame=frame)
+assert motion_stitch.reason(rig,sway,ad.action_slot), 'Mapped pelvis must not allow arbitrary joint translations'
+ad.action=None;bpy.data.actions.remove(sway);pelvis.location=(0,0,0);hand.location=(0,0,0);bpy.context.view_layer.update()
+checks.append('reviewed native pelvis translation allowed; added travel, absent mapping and other joint translations refused')
 clone=rig.copy(); clone.data=rig.data.copy(); bpy.context.scene.collection.objects.link(clone)
 original_objects=len(bpy.data.objects)
 try: feet.Soles(rig,clone,roles)

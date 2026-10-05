@@ -55,6 +55,14 @@ def travel_reason(obj, action, slot, allow_native_root=False):
         return 'Animated or constrained parents need reviewed travel in Blender'
     scale = bpy.context.scene.unit_settings.scale_length
     world = obj.matrix_world.to_3x3()
+    # Only a reviewed anatomical profile can identify a native pelvis owner.
+    # This exemption is for connections, never for adding a second travel path.
+    native_pelvis = None
+    if allow_native_root:
+        from .motion_bricks_retarget import PROPERTY as PROFILE, load_profile
+        if obj.get(PROFILE):
+            try: native_pelvis = load_profile(obj)['roles']['pelvis']
+            except DirectorError: pass  # Invalid mappings retain conservative refusal.
     for curve in ops.curves(action, slot):
         path = curve.data_path
         if curve.modifiers or curve.sampled_points:
@@ -65,6 +73,8 @@ def travel_reason(obj, action, slot, allow_native_root=False):
             owner_path = path[:-len('.location')]
             try: bone = obj.path_resolve(owner_path)
             except (ValueError, AttributeError): return 'Unresolved bone channels need Blender review'
+            if bone.name == native_pelvis:
+                continue
             basis = world @ bone.bone.matrix_local.to_3x3()
         elif path == 'location':
             if allow_native_root:
