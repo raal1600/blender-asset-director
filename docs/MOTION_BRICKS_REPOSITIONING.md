@@ -348,3 +348,11 @@ records remain intact; cleanup still removes only reviewed derivative payloads.
 Windows process birth tokens are compared without JavaScript integer rounding.
 Legacy completed previews remain compatible; missing, modified or unrecognized
 ownership evidence protects the entire preview from cleanup.
+
+
+On Windows, a brief reader can deny atomic replacement of a worker ownership or
+job record. JSON publication retains the complete old record and retries only
+Windows access/sharing/lock errors for at most 0.5 seconds of retry delay. A
+persistent denial still fails and removes the temporary replacement; it never
+removes the accepted record to force publication. Regression coverage includes
+an actual Windows read handle, alongside portable permanent-failure checks.
