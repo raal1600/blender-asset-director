@@ -22,6 +22,23 @@ async function exactFile(base,relative,expected){
  if(expected)assert(actual.sha256===expected.sha256,'Preview changed after review; nothing further was removed.',409);
  return {path:relative,...actual};
 }
+const exactKeys=(value,keys)=>digest(Object.keys(value).sort())===digest([...keys].sort());
+async function retainedMarker(directory,record,job,name){
+ const relative=`library/jobs/${record.nativeJob}/${name}`,outputs=job.outputs?.filter(f=>f.path===`jobs/${record.nativeJob}/${name}`)||[];
+ assert(outputs.length===1&&hash(outputs[0].sha256)&&Number.isSafeInteger(outputs[0].size)&&outputs[0].size>0&&outputs[0].size<=4096,'Unknown process identity evidence is protected.',409);
+ await exactFile(directory,relative,outputs[0]);
+ const filename=await safe(directory,relative),marker=await readSmall(filename);
+ assert(marker.job_id===record.nativeJob&&marker.implementation===record.nativeImplementation&&Number.isSafeInteger(marker.pid)&&marker.pid>0,'Changed process identity evidence is protected.',409);
+ let birth;
+ if(Object.hasOwn(marker,'birth')){
+  // Windows FILETIME exceeds JavaScript's safe integer range. Compare the
+  // original decimal token, never a rounded Number or a live PID identity.
+  const tokens=[...(await fs.readFile(filename,'utf8')).matchAll(/"birth"\s*:\s*(null|[1-9][0-9]*)\s*(?=[,}])/g)];
+  assert(tokens.length===1,'Unknown process birth evidence is protected.',409);birth=tokens[0][1];
+  assert(birth==='null'?marker.birth===null:typeof marker.birth==='number'&&Number.isInteger(marker.birth)&&BigInt(birth)<2n**64n,'Unknown process birth evidence is protected.',409);
+ }
+ return {relative,marker,birth};
+}
 export class PreviewCleanup {
  constructor(viewers,findUsers=previewUsers){this.viewers=viewers;this.work=viewers.work;this.review=null;this.findUsers=findUsers;}
  async base(){return safe(this.work.store.root,'SystemRuntime/UserData/ViewerPreviews');}
@@ -50,11 +67,18 @@ export class PreviewCleanup {
    if(names.includes(markerPath)||outputs.length){
     // New workers retain their identity as evidence. Accept only the successful
     // job's exact recorded marker; it is preserved, never a disposable payload.
-    const marker=await readSmall(await safe(directory,markerPath));
-    assert(outputs.length===1&&hash(outputs[0].sha256)&&Number.isSafeInteger(outputs[0].size)&&outputs[0].size>0&&outputs[0].size<=4096,'Unknown worker identity evidence is protected.',409);
-    await exactFile(directory,markerPath,outputs[0]);
-    assert(digest(Object.keys(marker).sort())===digest(['implementation','job_id','pid','started_at'])&&marker.job_id===record.nativeJob&&marker.implementation===record.nativeImplementation&&Number.isSafeInteger(marker.pid)&&marker.pid>0&&marker.pid===job.worker_pid&&Number.isFinite(marker.started_at)&&Number.isFinite(job.started_at)&&Number.isFinite(job.finished_at)&&marker.started_at>=job.started_at&&marker.started_at<=job.finished_at,'Changed worker identity evidence is protected.',409);
+    const worker=await retainedMarker(directory,record,job,'worker-process.json'),{marker}=worker;
+    const owned=Object.hasOwn(marker,'birth');
+    assert(exactKeys(marker,['implementation','job_id','pid','started_at',...(owned?['birth']:[])])&&marker.pid===job.worker_pid&&Number.isFinite(marker.started_at)&&Number.isFinite(job.started_at)&&Number.isFinite(job.finished_at)&&marker.started_at>=job.started_at&&marker.started_at<=job.finished_at,'Changed worker identity evidence is protected.',409);
     kept.push(markerPath);
+    if(owned){
+     const executor=await retainedMarker(directory,record,job,'executor-process.json'),ownership=await retainedMarker(directory,record,job,'worker-ownership.json');
+     assert(exactKeys(executor.marker,['birth','implementation','job_id','pid'])&&executor.marker.pid!==marker.pid,'Changed executor identity evidence is protected.',409);
+     assert(exactKeys(ownership.marker,['birth','implementation','job_id','pid','state'])&&ownership.marker.state==='WATCHING_EXECUTOR'&&ownership.marker.pid===marker.pid&&ownership.birth===worker.birth,'Changed worker ownership evidence is protected.',409);
+     const lease=`library/.execution-${record.nativeJob}.lock`;
+     await exactFile(directory,lease,{size:1,sha256:'5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9'});
+     kept.push(executor.relative,ownership.relative,lease);
+    }
    }
   }
   const allowed=[...kept,...targets.map(f=>f.path)].sort();

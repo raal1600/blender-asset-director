@@ -341,3 +341,10 @@ boundary subframes; it does not relax the limit between exporter samples.
 Ordinary Blender CI checks actual GLTFLoader playback of the exported data and
 requires the denser timebase. GLB remains a bounded 128 MiB inspection derivative;
 materials and lighting are approximations, while rendering uses the saved blend.
+
+Completed native preview cleanup recognizes the recovery ownership records and
+execution-lock file only when they match the successful conversion. These
+records remain intact; cleanup still removes only reviewed derivative payloads.
+Windows process birth tokens are compared without JavaScript integer rounding.
+Legacy completed previews remain compatible; missing, modified or unrecognized
+ownership evidence protects the entire preview from cleanup.

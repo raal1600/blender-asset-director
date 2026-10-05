@@ -172,7 +172,7 @@ test('cancellation during source verification refuses before conversion allocati
  assert.equal(f.viewers.owned.size,0);assert.equal(await fs.access(f.base).then(()=>true,()=>false),false);
 });
 /** Contract regression: actual native browser evidence is in preview_cleanup_check. */
-test('native cleanup retains only the exact successful worker identity marker',async t=>{
+for(const birth of [undefined,134357067070859500,123456,null])test('native cleanup retains exact successful process evidence: '+String(birth),async t=>{
  const f=await fixture(t),direct=await f.prepare(),directory=path.join(f.base,direct.previewId),source=await json(path.join(directory,'request.json'));
  const jobId='j_'+'1'.repeat(24),assetId='a_'+'2'.repeat(24),implementation='3'.repeat(64),jobBase=`library/jobs/${jobId}`;
  const converter={implementation,blender:{sha256:'4'.repeat(64),size:123}},record={...direct,adapter:'isolated-blender-gltf',nativeJob:jobId,nativeImplementation:implementation,converter};
@@ -181,8 +181,21 @@ test('native cleanup retains only the exact successful worker identity marker',a
  for(const relative of ['PREVIEW_COPY.blend',`${jobBase}/result.blend`,'library/catalog.sqlite',`library/manifests/${assetId}.json`,`${jobBase}/worker.log`]){const file=path.join(directory,relative);await fs.mkdir(path.dirname(file),{recursive:true});await fs.writeFile(file,'synthetic contract bytes');}
  await fs.copyFile(path.join(directory,'model.glb'),path.join(directory,jobBase,'preview.glb'));
  const marker={job_id:jobId,implementation,pid:123,started_at:1001},markerName=`${jobBase}/worker-process.json`,markerFile=path.join(directory,markerName);
+ if(birth!==undefined)marker.birth=birth;
  await writeJson(markerFile,marker);
  const markerHash=await fileHash(markerFile),job={id:jobId,state:'SUCCEEDED',worker_pid:123,started_at:1000,finished_at:1002,specification:{implementation,operation:'asset-preview',options:{embedded:true},inputs:[],asset_id:assetId,source_files:native},outputs:[{path:`jobs/${jobId}/preview.glb`,sha256:record.sha256,size:record.size},{path:`jobs/${jobId}/worker-process.json`,...markerHash}]};
+ const ownershipFiles={};
+ if(birth!==undefined){
+  for(const [name,value] of Object.entries({
+   'executor-process.json':{job_id:jobId,implementation,pid:456,birth},
+   'worker-ownership.json':{job_id:jobId,implementation,pid:123,birth,state:'WATCHING_EXECUTOR'}
+  })){
+   const filename=path.join(directory,jobBase,name);await writeJson(filename,value);
+   ownershipFiles[name]={value,filename,hash:await fileHash(filename)};
+   job.outputs.push({path:`jobs/${jobId}/${name}`,...ownershipFiles[name].hash});
+  }
+  await fs.writeFile(path.join(directory,`library/.execution-${jobId}.lock`),'0');
+ }
  const member=async relative=>({path:relative,...await fileHash(path.join(directory,relative))});
  const receipt={state:'READY',job_id:jobId,source_id:source.id,source_version:source.version,blend:await member('PREVIEW_COPY.blend'),job_blend:await member(`${jobBase}/result.blend`),model:await member(`${jobBase}/preview.glb`)};
  await writeJson(path.join(directory,'viewer.json'),record);await writeJson(path.join(directory,'receipt.json'),receipt);
@@ -196,13 +209,40 @@ test('native cleanup retains only the exact successful worker identity marker',a
  assert.equal((await cleanup.plan()).eligible.length,0,'Altered process marker stays protected');
  await writeJson(markerFile,marker);
  await fs.unlink(markerFile);assert.equal((await cleanup.plan()).eligible.length,0,'Missing recorded marker stays protected');await writeJson(markerFile,marker);
- for(const changed of [{...marker,job_id:'j_'+'9'.repeat(24)},{...marker,pid:124},{...marker,started_at:999},{...marker,unexpected:true}]){
+ for(const changed of [{...marker,job_id:'j_'+'9'.repeat(24)},{...marker,pid:124},{...marker,started_at:999},{...marker,unexpected:true},...(birth!==undefined?[{...marker,birth:'123'},{...marker,birth:-1},{...marker,birth:1.5},{...marker,birth:1e30}]:[])]){
   await writeJson(markerFile,changed);const changedJob=structuredClone(job);
   changedJob.outputs[1]={...changedJob.outputs[1],...await fileHash(markerFile)};await writeJson(path.join(directory,jobBase,'job.json'),changedJob);await cache.publish(key,source,record);
   assert.equal((await cleanup.plan()).eligible.length,0,'Rehashed but incorrectly bound worker marker stays protected');
  }
  await writeJson(markerFile,marker);await writeJson(path.join(directory,jobBase,'job.json'),job);await cache.publish(key,source,record);
  await fs.writeFile(path.join(directory,jobBase,'unknown.json'),'{}');assert.equal((await cleanup.plan()).eligible.length,0,'Unknown sibling stays protected');await fs.unlink(path.join(directory,jobBase,'unknown.json'));
- plan=await cleanup.plan();assert.equal(plan.eligible.length,1);assert.equal((await cleanup.apply({...plan,confirmed:true,closedNativePreviews:true})).state,'SUCCEEDED');
+ for(const [name,evidence] of Object.entries(ownershipFiles)){
+  await fs.unlink(evidence.filename);assert.equal((await cleanup.plan()).eligible.length,0,'Missing ownership marker stays protected');
+  await writeJson(evidence.filename,evidence.value);
+  if(name==='worker-ownership.json'&&typeof birth==='number'&&birth>Number.MAX_SAFE_INTEGER){
+   const raw=JSON.stringify(evidence.value).replace(/"birth":[0-9]+/,'"birth":'+String(BigInt(String(birth))+1n));
+   assert.equal(JSON.parse(raw).birth,birth,'The deliberately changed FILETIME rounds to the same JavaScript Number');
+   await fs.writeFile(evidence.filename,raw);const changedJob=structuredClone(job);
+   Object.assign(changedJob.outputs.find(x=>x.path===`jobs/${jobId}/${name}`),await fileHash(evidence.filename));
+   await writeJson(path.join(directory,jobBase,'job.json'),changedJob);await cache.publish(key,source,record);
+   assert.equal((await cleanup.plan()).eligible.length,0,'A one-tick mismatched Windows birth is protected despite Number rounding');
+  }
+  const mutations=[{...evidence.value,job_id:'j_'+'9'.repeat(24)},{...evidence.value,implementation:'8'.repeat(64)},{...evidence.value,pid:name==='worker-ownership.json'?124:123},{...evidence.value,birth:'not a birth identity'},{...evidence.value,unexpected:true}];
+  if(name==='worker-ownership.json')mutations.push({...evidence.value,state:'STARTING'},{...evidence.value,birth:birth===null?123:99});
+  for(const changed of mutations){
+   await writeJson(evidence.filename,changed);const changedJob=structuredClone(job);
+   Object.assign(changedJob.outputs.find(x=>x.path===`jobs/${jobId}/${name}`),await fileHash(evidence.filename));
+   await writeJson(path.join(directory,jobBase,'job.json'),changedJob);await cache.publish(key,source,record);
+   assert.equal((await cleanup.plan()).eligible.length,0,'Rehashed but mismatched ownership evidence stays protected');
+  }
+  await writeJson(evidence.filename,evidence.value);await writeJson(path.join(directory,jobBase,'job.json'),job);await cache.publish(key,source,record);
+ }
+ if(birth!==undefined){
+  const lock=path.join(directory,`library/.execution-${jobId}.lock`);
+  await fs.writeFile(lock,'unknown');assert.equal((await cleanup.plan()).eligible.length,0,'Unrecognized execution lock stays protected');await fs.writeFile(lock,'0');
+ }
+ plan=await cleanup.plan();assert.equal(plan.eligible.length,1,JSON.stringify(plan.protected));assert.equal((await cleanup.apply({...plan,confirmed:true,closedNativePreviews:true})).state,'SUCCEEDED');
  assert.deepEqual(await fileHash(markerFile),markerHash,'Successful cleanup preserves worker identity evidence byte-for-byte');
+ for(const evidence of Object.values(ownershipFiles))assert.deepEqual(await fileHash(evidence.filename),evidence.hash,'Ownership evidence stays byte-for-byte intact');
+ if(birth!==undefined)assert.equal(await fs.readFile(path.join(directory,`library/.execution-${jobId}.lock`),'utf8'),'0');
 });
