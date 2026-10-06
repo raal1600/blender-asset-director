@@ -16,6 +16,7 @@ import tempfile
 import time
 
 from .core import DirectorError, atomic_json, digest, file_hash, load_json, require
+from .motion_bricks_contract import MODEL_FPS, CONTEXT_FRAMES, OUTPUT_LENGTHS, RETIME_LIMITS
 
 SOURCE_REVISION = "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463"
 GGML_REVISION = "8c63e70982c95ceb862e3a1073a2c1beef75d60a"
@@ -39,8 +40,11 @@ def capabilities(config=None):
     """Discovery does not load native code or claim runtime availability."""
     return {"provider": "motion-bricks.cpp", "mode": "generated_boundary_conditioned",
             "source_revision": SOURCE_REVISION, "ggml_revision": GGML_REVISION,
-            "model_revision": MODEL_REVISION, "skeleton": "g1skel34", "context_frames": 4,
-            "durations_frames": list(range(24, 65, 4)), "conventions": dict(CONVENTIONS),
+            "model_revision": MODEL_REVISION, "skeleton": "g1skel34", "context_frames": CONTEXT_FRAMES,
+            "durations_frames": list(OUTPUT_LENGTHS), "conventions": dict(CONVENTIONS),
+            "bridge_duration_seconds": [(n-7)/MODEL_FPS for n in OUTPUT_LENGTHS],
+            "generated_retime_limits": list(RETIME_LIMITS),
+            "sampling_modes": ["argmax", "gumbel-temperature-1"], "argmax_uses_seed": False,
             "devices": ["cpu", "vulkan"], "exact_boundary_pins": False,
             "contacts": False, "arbitrary_rig_retargeting": False,
             "target_placement_modes": ["fixed", "predicted"],
@@ -122,21 +126,12 @@ def validate_request(request):
             "Convert evaluated poses explicitly to metres, right-handed Y-up/+Z-forward, local XYZW, 30 FPS")
     boundary_masks(request)
     frames = request.get("frames")
-    require(type(frames) is int and frames in range(24, 65, 4), "MOTION_BRICKS_DURATION",
+    require(type(frames) is int and frames in OUTPUT_LENGTHS, "MOTION_BRICKS_DURATION",
             "MotionBricks requires 24..64 frames in multiples of four, including both four-frame contexts")
     require(type(request.get("seed")) is int and 0 <= request["seed"] < 2**64,
             "MOTION_BRICKS_INVALID_INPUT", "Seed must be an unsigned 64-bit integer")
     require(type(request.get("argmax", False)) is bool, "MOTION_BRICKS_INVALID_INPUT", "argmax must be boolean")
-    skeleton = request.get("skeleton", {})
-    require(isinstance(skeleton, dict) and skeleton.get("id") == "g1skel34",
-            "MOTION_BRICKS_UNSUPPORTED_RIG", "Only the verified G1Skeleton34 rest geometry is supported")
-    names, parents = skeleton.get("joint_names"), skeleton.get("parents")
-    require(isinstance(names, list) and len(names) == 34 and all(isinstance(n, str) for n in names)
-            and len(set(names)) == 34, "MOTION_BRICKS_UNSUPPORTED_RIG", "Provide all 34 ordered G1 joint names")
-    require(isinstance(parents, list) and len(parents) == 34 and parents[0] == -1
-            and all(type(p) is int and 0 <= p < i for i, p in enumerate(parents) if i),
-            "MOTION_BRICKS_UNSUPPORTED_RIG", "Provide the complete ordered G1 parent topology")
-    _array(skeleton.get("neutral_joints"), (34, 3), "neutral_joints")
+    validate_skeleton_shape(request.get("skeleton", {}))
     for side in ("source", "target"):
         boundary = request.get(side)
         require(isinstance(boundary, dict), "MOTION_BRICKS_INVALID_INPUT", f"Missing {side} context")
@@ -154,7 +149,23 @@ def validate_request(request):
     return request
 
 
+def validate_skeleton_shape(skeleton):
+    """Shape validation only; identity still requires the actual loaded model."""
+    require(isinstance(skeleton, dict) and skeleton.get("id") == "g1skel34",
+            "MOTION_BRICKS_UNSUPPORTED_RIG", "Only the verified G1Skeleton34 rest geometry is supported")
+    names, parents = skeleton.get("joint_names"), skeleton.get("parents")
+    require(isinstance(names, list) and len(names) == 34 and all(isinstance(n, str) for n in names)
+            and len(set(names)) == 34, "MOTION_BRICKS_UNSUPPORTED_RIG", "Provide all 34 ordered G1 joint names")
+    require(isinstance(parents, list) and len(parents) == 34 and parents[0] == -1
+            and all(type(p) is int and 0 <= p < i for i, p in enumerate(parents) if i),
+            "MOTION_BRICKS_UNSUPPORTED_RIG", "Provide the complete ordered G1 parent topology")
+    _array(skeleton.get("neutral_joints"), (34, 3), "neutral_joints")
+    return skeleton
+
+
 def validate_skeleton(supplied, actual):
+    validate_skeleton_shape(supplied)
+    validate_skeleton_shape(actual)
     require(supplied.get("id") == actual.get("id") == "g1skel34"
             and supplied.get("joint_names") == actual.get("joint_names")
             and supplied.get("parents") == actual.get("parents"),
@@ -404,17 +415,20 @@ def execute(config, request=None, *, cancelled=None, progress=None):
     if request is not None:
         validate_request(request)
     start = time.monotonic()
+    trace = []
     def check():
         require(not (cancelled and cancelled()), "MOTION_BRICKS_CANCELLED", "MotionBricks job cancelled")
         require(time.monotonic() - start <= config.get("timeout_seconds", 120),
                 "MOTION_BRICKS_TIMEOUT", "MotionBricks job exceeded its timeout")
     def emit(stage, **values):
+        trace.append({"stage": stage, "seconds_from_provider_start": time.monotonic()-start})
         if progress:
             progress({"provider": "motion-bricks.cpp", "stage": stage, **values})
     check(); emit("queued")
     with _job_lock(check), contextlib.ExitStack() as resources:
         emit("verifying_model")
         install = verify_installation(config, check)
+        emit("model_verified")
         gpu = resources.enter_context(_GpuMonitor()) if config.get("device", "cpu") == "vulkan" else None
         baseline_gpu = gpu.sample() if gpu else None
         if baseline_gpu:
@@ -487,6 +501,10 @@ def execute(config, request=None, *, cancelled=None, progress=None):
             require(peak_host > 0, "MOTION_BRICKS_RESOURCE_MONITOR", "Could not measure worker memory; budget acceptance is unverified")
             released_gpu = gpu.sample()[1] if gpu else None
             result["library_sha256"] = install["library_sha256"]
+            require(result.get("loaded_library", {}).get("sha256") == install["library_sha256"],
+                    "MOTION_BRICKS_INSTALL_IDENTITY", "Loaded worker DLL differs from the verified installation")
+            result["model_files"] = {name: {"bytes": size, "sha256": checksum}
+                                     for name, (size, checksum) in MODEL_FILES.items()}
             result["native_log_tail"] = native_log
             result["resource_measurements"] = {"elapsed_seconds": time.monotonic() - start,
                 "sampled_peak_host_mib": peak_host, "whole_gpu_baseline_mib": baseline_gpu[1] if baseline_gpu else None,
@@ -496,6 +514,7 @@ def execute(config, request=None, *, cancelled=None, progress=None):
                 "host_budget_mib": config.get("host_memory_budget_mib", 2048),
                 "gpu_total_limit_mib": config.get("gpu_total_limit_mib", 9216),
                 "gpu_budget_mib": config.get("gpu_memory_budget_mib", 8192), "device": config.get("device", "cpu")}
-            result["artifact_hash"] = digest({k: v for k, v in result.items() if k not in {"resource_measurements", "timings", "native_log_tail"}})
             emit("validated_candidate")
+            result["provider_trace"] = trace
+            result["artifact_hash"] = digest({k: v for k, v in result.items() if k not in {"resource_measurements", "timings", "native_log_tail", "provider_trace"}})
             return result

@@ -6,10 +6,13 @@ only. Neither native clip is phase shifted or blended through that interval.
 """
 import copy
 import math
+from time import monotonic
+import uuid
 import bpy
 from mathutils import Quaternion, Vector
-from .core import require, digest, atomic_json
+from .core import require, digest, atomic_json, implementation_hash
 from . import motion_bricks_provider as provider, motion_bricks_retarget as ret
+from . import motion_bricks_contract as contract
 from . import motion_stitch_math as sm, sequence_math as qm, motion_bricks_stitch_math as seam
 
 
@@ -33,9 +36,8 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
     require(not any(m[0].get('heading_deg',0) for m in (previous,motion)),
             'MOTION_BRICKS_HEADING','Explicit humanoid generation currently preserves the saved heading; use native clips with their observed facing')
     require(not motion[0]['transition']['match_phase'],'MOTION_BRICKS_PHASE','Generated repositioning preserves both native boundaries; disable phase matching')
-    clone=reader.clone;duration=geometry['duration_frames'];model_frames=min(range(24,65,4),key=lambda n:abs((n-7)*fps/30-duration))
-    model_duration=(model_frames-7)*fps/30;retime=duration/model_duration
-    require(.85<=retime<=1.15,'MOTION_BRICKS_DURATION','Choose a generated interval between about 0.6 and 1.9 seconds')
+    clone=reader.clone;duration=geometry['duration_frames'];timing=contract.duration_plan(duration/fps)
+    model_frames=timing['model_frames'];retime=timing['generated_retime_ratio']
     spec=channel_spec(obj,motion[2],motion[3])
     for role in ret.GROUPS:
         name=profile['roles'][role];bone=obj.pose.bones[name]
@@ -44,15 +46,18 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
                 'MOTION_BRICKS_CHANNELS','Every mapped body joint needs complete native rotation channels')
     config=provider.configured();require(config is not None,'MOTION_BRICKS_NOT_CONFIGURED','Set up the pinned local MotionBricks provider first')
     execution=execution or {};cancelled=execution.get('cancelled');progress=execution.get('progress')
+    started=monotonic();trace=[];request_id='transition_'+uuid.uuid4().hex
     def check():require(not (cancelled and cancelled()),'MOTION_BRICKS_CANCELLED','Generated connection cancelled')
     def emit(stage):
         check()
+        trace.append({'stage':stage,'seconds_from_transition_start':monotonic()-started})
         if progress:progress({'provider':'motion-bricks.cpp','stage':stage,'clip_id':motion[0]['id']})
     def pose(m,elapsed,endpoint=False):return reader.read(m,elapsed,0.,endpoint)
     elapsed=previous[4]['cycles']*(previous[1]['range'][1]-previous[1]['range'][0])
     h=min(1/64,(previous[4]['native_end']-previous[0]['start'])/8,(motion[4]['native_end']-motion[0]['start'])/8)
-    require(elapsed>=3*fps/30*previous[0]['speed'] and motion[4]['native_end']-motion[0]['start']>=3*fps/30,
-            'MOTION_BRICKS_CONTEXT','Each clip needs at least four native context samples at 30 FPS')
+    schedules={side:contract.context_schedule(m[1]['range'],fps*m[0]['speed'],side,
+        elapsed=m[4]['cycles']*(m[1]['range'][1]-m[1]['range'][0]))
+        for side,m in (('source',previous),('target',motion))}
     a=pose(previous,elapsed,True);ap=pose(previous,elapsed-h*previous[0]['speed']);app=pose(previous,elapsed-2*h*previous[0]['speed'])
     b=pose(motion,0);bn=pose(motion,h*motion[0]['speed']);bnn=pose(motion,2*h*motion[0]['speed'])
     tangents=native_tangents(a,b,ap,app,bn,bnn,h)
@@ -68,16 +73,17 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
     # error in its first quarter-frame segment, producing a sharp acceleration.
     root_velocities=[(3*hip_a-4*hip_ap+hip_app)/(2*h)+Vector((*geometry['velocity_in'],0)),
                      (-3*hip_b+4*hip_bn-hip_bnn)/(2*h)+Vector((*geometry['velocity_out'],0))]
+    sampling=contract.sampling_settings(motion[0]['transition'].get('sampling','argmax'),motion[0]['transition']['seed'])
     request={'schema':provider.REQUEST_SCHEMA,'conventions':dict(provider.CONVENTIONS),'skeleton':profile['skeleton'],
-             'frames':model_frames,'seed':motion[0]['transition']['seed'],'target_placement':'predicted','argmax':True}
+             'frames':model_frames,'seed':sampling['seed'],'target_placement':'predicted','argmax':sampling['argmax']}
     emit('sampling_native_contexts')
     roundtrip=[]
     for side,m in (('source',previous),('target',motion)):
         roots=[];rotations=[]
         velocity=Vector((*geometry['velocity_in' if side=='source' else 'velocity_out'],0))
-        for i in range(4):
-            relative=(i-3 if side=='source' else i)*fps/30
-            p=pose(m,elapsed+relative*m[0]['speed'] if side=='source' else relative*m[0]['speed'],side=='source' and i==3)
+        for i,source_frame in enumerate(schedules[side]['source_frames']):
+            relative=schedules[side]['seconds_from_stitch'][i]*fps
+            p=pose(m,source_frame-m[1]['range'][0],abs(source_frame-m[1]['range'][1])<1e-7)
             state(p);before={n:clone.pose.bones[n].matrix.copy() for n in spec if n}
             root,q=ret.encode_pose(clone,profile,world_origin=origin,placement=velocity*relative)
             ret.apply_rotations(clone,ret.decode_rotations(clone,profile,q))
@@ -87,7 +93,40 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
             roundtrip.append({'position_rig_units':maximum,'orientation_degrees':math.degrees(angle)})
             roots.append(root);rotations.append(q)
         request[side]={'roots':roots,'local_xyzw':rotations}
+    from . import action_layer as layer, blender_ops as ops
+    dependencies={'schema':contract.INPUT_SCHEMA,'domain':contract.DOMAIN_VERSION,
+        'implementation_sha256':implementation_hash(),
+        'character':{'asset_id':obj.get('bad_asset'),'rig_label':obj.name,'rest_identity':profile['rest_identity'],
+                     'profile_sha256':digest(profile),'profile':profile},
+        'scene':{'fps_numerator':scene.render.fps,'fps_denominator':scene.render.fps_base,
+                 'unit_scale':scene.unit_settings.scale_length,
+                 'parent_matrix':ops.flatten(obj.parent.matrix_world@obj.matrix_parent_inverse if obj.parent else obj.matrix_parent_inverse),
+                 'object_linear':[list(row) for row in obj.matrix_world.to_3x3()],
+                 'native_basis_sha256':digest(reader.native_basis),
+                 'evaluation_policy':'unconstrained native transform channels; stable parents; no drivers'},
+        'inputs':{side:{'take_id':m[1]['id'],'action_label':m[2].name,'slot':layer.slot_id(m[3]),
+                        'channel_sha256':digest(layer.channels(m[2],m[3])), 'clip':m[0],
+                        'context_schedule':schedules[side],
+                        'root_preparation':m[2].get('bad_root_contact_preparation_v1'),
+                        'contact_metadata':m[2].get('bad_contact_intervals_v1')}
+                  for side,m in (('source',previous),('target',motion))},
+        'evaluated_model_request':request,'timing':timing,'sampling':sampling,
+        'root':{'owner':'native object/pelvis plus one composed delta path',
+                'model_origin_blender_m':list(origin),'model_to_blender':'Y-up/+Z-forward to Z-up/-Y-forward',
+                'native_world_velocity_m_s':[list(v*fps) for v in root_velocities]},
+        'placement':{'target_xy':'predicted','target_heading':'native-context','target_height':'native',
+                     'heading_override':False,'hard_model_pins':False},
+        'provider':{'source_revision':provider.SOURCE_REVISION,'ggml_revision':provider.GGML_REVISION,
+                    'model_revision':provider.MODEL_REVISION,'configuration_sha256':provider.configuration_identity()}}
+    input_contract={'schema':contract.INPUT_SCHEMA,'request_id':request_id,
+                    'dependency_fingerprint':digest(dependencies),'dependencies':dependencies}
+    directory=execution.get('directory')
+    prefix='motion-bricks-'+motion[0]['id']
+    if directory:atomic_json(directory/(prefix+'-input.json'),input_contract)
+    emit('provider_start')
     result=provider.execute(config,request,cancelled=cancelled,progress=progress)
+    # Retain raw predictions even when later retargeting or quality checks fail.
+    if directory:atomic_json(directory/(prefix+'-raw.json'),{'request_id':request_id,'request':request,'result':result})
     emit('retargeting_generated_interval')
     first,last=3,model_frames-4;raw=[]
     def capture():
@@ -97,6 +136,8 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
     for i in range(first,last+1):
         p=sm.bridge(a,b,ap,bn,h,duration,(i-first)/(last-first));state(p)
         ret.apply_rotations(clone,ret.decode_rotations(clone,profile,result['local_xyzw'][i]));raw.append(capture())
+    if directory:atomic_json(directory/(prefix+'-retargeted.json'),{'request_id':request_id,'poses':raw,'first_model_index':first})
+    emit('seam_processing')
     step=duration/(last-first);window=min(6.,(last-first)/4)*step
     residuals={n:[seam.rotation_residual(raw[k][n]['q'],p[n]['q'],qm.angular_velocity(raw[j][n]['q'],raw[l][n]['q'],step),tangents[edge][n]['angular'])
                   for edge,(k,j,l,p) in enumerate(((0,0,1,a),(-1,-2,-1,b)))] for n in spec}
@@ -120,22 +161,27 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
         for edge,(value,velocity) in enumerate(root_errors):desired+=Vector(seam.edge_residual(list(value),list(velocity),time,duration,window,edge))
         f=geometry['start']+time;samples.append((f,p));path.append((f,list(inverse@(desired-hip()))))
     from .motion_bricks_feet import cleanup
+    emit('contact_processing')
     samples,foot_retarget=cleanup(reader,obj,profile,request,result,samples,path,origin,geometry,(a,b,ap,app,bn,bnn,h),tangents,check)
     delta=expected_b-hip_b
     provenance={'request_sha256':digest(request),'result_sha256':digest(result),'profile_sha256':digest(profile),
                 'source_revision':result['source_revision'],'model_revision':result['model_revision'],'library_sha256':result['library_sha256'],
-                'seed':request['seed'],'sampling':'argmax','device':result['device'],'target_placement':'predicted','model_frames':model_frames,
+                'seed':request['seed'],'sampling':sampling['mode'],'sampling_settings':sampling,'device':result['device'],'target_placement':'predicted','model_frames':model_frames,
+                'request_id':request_id,'dependency_fingerprint':input_contract['dependency_fingerprint'],
+                'input_schema':contract.INPUT_SCHEMA,'output_timing':timing,
                 'model_fps':30,'generated_retime_ratio':retime,'native_clips_retimed':False,'roundtrip':roundtrip,
                 'resource_measurements':result['resource_measurements'],'raw_boundary_diagnostics':result['boundary_diagnostics'],
                 'seam_residual_free_model_indices':[first+window/step,last-window/step],
                 'root_seam_correction':{'method':'evaluated-world-velocity-compact-residual-v1','window_frames':window,
                                         'native_velocities_m_per_frame':[list(v) for v in root_velocities]},
                 'foot_retarget':foot_retarget,'contact_quality':'NOT_VERIFIED','visual_quality':'REQUIRES_REVIEW'}
-    if execution.get('directory'):
-        filename='motion-bricks-'+motion[0]['id']+'.json'
-        atomic_json(execution['directory']/filename,{'request':request,'result':result,'provenance':provenance})
-        provenance['evidence_file']=filename
     emit('baking_generated_connection')
+    provenance['transition_trace']=trace
+    if directory:
+        filename=prefix+'.json'
+        atomic_json(directory/filename,{'input_contract':input_contract,'request':request,'result':result,'provenance':provenance})
+        atomic_json(directory/(prefix+'-corrected.json'),{'request_id':request_id,'samples':samples,'path_offsets_local':path})
+        provenance['evidence_file']=filename
     return {**geometry,'placement_pending':False,'delta_m':[delta.x,delta.y],'provider':'motion-bricks.cpp','implementation':'motion-bricks-predicted-placement-v1',
             'generation_mode':'generated','phase_note':'Both native clips retained from original boundaries; no phase shift',
             'root_owner':'native-pose-plus-model-selected-placement','root_alignment_local':[0.,0.,0.],

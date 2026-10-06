@@ -1,0 +1,663 @@
+{
+  "schema": "motion-bricks.acceptance-matrix.v1",
+  "date": "2026-10-07",
+  "phase": "IN_PROGRESS",
+  "completion": "NOT_ACCEPTED",
+  "evidence_root": "local:AssetDirector-MotionBricks-Authoring-20261006",
+  "rows": [
+    {
+      "id": "baseline-python",
+      "requirement": "Portable baseline regression",
+      "fixture": "cea64d0",
+      "expected_behavior": "Portable baseline regression",
+      "threshold_or_invariant": "782 tests / 779 passed / 3 disclosed environment skips; installer checks passed",
+      "command_or_journey": "python tools/run_checks.py --offline",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-offline-python.log",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "baseline-node",
+      "requirement": "Launcher baseline regression",
+      "fixture": "cea64d0",
+      "expected_behavior": "Launcher baseline regression",
+      "threshold_or_invariant": "375/375 passed",
+      "command_or_journey": "node --test (launcher)",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-node.log",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "runtime-pins",
+      "requirement": "Actual loaded DLL, model hashes and build settings",
+      "fixture": "Windows Vulkan",
+      "expected_behavior": "Actual loaded DLL, model hashes and build settings",
+      "threshold_or_invariant": "exact source/GGML/weights; loaded DLL path and content; recorded build settings",
+      "command_or_journey": "motion_bricks_fixture.py",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "argmax-repeat",
+      "requirement": "Fixed-setting reproducibility",
+      "fixture": "canonical evaluated G1 contexts",
+      "expected_behavior": "Fixed-setting reproducibility",
+      "threshold_or_invariant": "exact raw arrays on this device",
+      "command_or_journey": "early_sampling.py argmax-1234-a/b",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-sampling/report.json",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "argmax-seeds",
+      "requirement": "Argmax seed has no effect",
+      "fixture": "canonical contexts seeds 1234/7",
+      "expected_behavior": "Argmax seed has no effect",
+      "threshold_or_invariant": "identical arrays; no misleading seed control",
+      "command_or_journey": "early_sampling.py argmax-*",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-sampling/report.json",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "stochastic-raw",
+      "requirement": "Stochastic variation and repetition",
+      "fixture": "Gumbel seeds 1234/7/42",
+      "expected_behavior": "Stochastic variation and repetition",
+      "threshold_or_invariant": "material interior variation; fixed seed exact",
+      "command_or_journey": "early_sampling.py sample-*",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-sampling/report.json",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "corrected-diversity",
+      "requirement": "Correction-surviving meaningful alternatives",
+      "fixture": "same pair, three seeds",
+      "expected_behavior": "Correction-surviving meaningful alternatives",
+      "threshold_or_invariant": "near duplicates excluded using measured corrected motion",
+      "command_or_journey": "real corrected-candidate comparison",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "reference",
+      "requirement": "Reference native X→bridge→Y",
+      "fixture": "Adventurer back→left baseline",
+      "expected_behavior": "Reference native X→bridge→Y",
+      "threshold_or_invariant": "full native intervals; seam thresholds; source hashes; fresh reopen",
+      "command_or_journey": "run_motion_bricks_sequences.py --manifest baseline-manifest.json",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-sequences/reference-back-left/RESULTS.json",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "unseen-pair",
+      "requirement": "Unseen compatible pair",
+      "fixture": "Adventurer idle→back baseline",
+      "expected_behavior": "Unseen compatible pair",
+      "threshold_or_invariant": "real model, seams, structural preservation, fresh reopen",
+      "command_or_journey": "run_motion_bricks_sequences.py --manifest baseline-manifest.json",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-sequences/unseen-idle-back/RESULTS.json",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "rename",
+      "requirement": "Name independence",
+      "fixture": "identical motion with renamed Actions",
+      "expected_behavior": "Name independence",
+      "threshold_or_invariant": "unchanged raw/corrected motion within repeat tolerance",
+      "command_or_journey": "rename integration fixture",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "independent-influence",
+      "requirement": "Independent source and target influence",
+      "fixture": "canonical contexts changed separately",
+      "expected_behavior": "Independent source and target influence",
+      "threshold_or_invariant": "each boundary changes output materially",
+      "command_or_journey": "early_sampling.py source/target",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-sampling/report.json",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "placeholder",
+      "requirement": "Unconstrained target position invariance",
+      "fixture": "target placeholder shifted metres",
+      "expected_behavior": "Unconstrained target position invariance",
+      "threshold_or_invariant": "root ≤1e-5m and quaternion component ≤1e-5; no target-lock claim",
+      "command_or_journey": "early_sampling.py placeholder",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": "baseline-sampling/report.json",
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "second-rig",
+      "requirement": "Generalization beyond reference rig",
+      "fixture": "second independently calibrated humanoid",
+      "expected_behavior": "Generalization beyond reference rig",
+      "threshold_or_invariant": "successful generation and quality; rejection is not generation coverage",
+      "command_or_journey": "second-rig provider sequence",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "transforms-fps",
+      "requirement": "Supported transforms and FPS",
+      "fixture": "offset/scale/parent/24/30/60",
+      "expected_behavior": "Supported transforms and FPS",
+      "threshold_or_invariant": "fixed seam thresholds; preserved source clocks; no double root motion",
+      "command_or_journey": "broader sequence fixtures",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "trim-context",
+      "requirement": "Trim and context validation",
+      "fixture": "selected intervals and insufficient contexts",
+      "expected_behavior": "Trim and context validation",
+      "threshold_or_invariant": "four actual samples at 30 FPS, no wrap/extrapolation; refuse before inference",
+      "command_or_journey": "contract tests + real Blender trim fixture",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "input-contract",
+      "requirement": "Complete versioned dependency contract",
+      "fixture": "project/rig/actions/contacts/request",
+      "expected_behavior": "Complete versioned dependency contract",
+      "threshold_or_invariant": "stable identities, content and evaluation dependency fingerprint; stale invalidation",
+      "command_or_journey": "contract and production job tests",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "root-intent",
+      "requirement": "In-place intent and derived preparation",
+      "fixture": "unprepared in-place clip",
+      "expected_behavior": "In-place intent and derived preparation",
+      "threshold_or_invariant": "client explains ambiguity, persists reviewed intent, preserves originals",
+      "command_or_journey": "native preparation journey",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "contacts-client",
+      "requirement": "Accessible contact corrections",
+      "fixture": "client editable stance intervals",
+      "expected_behavior": "Accessible contact corrections",
+      "threshold_or_invariant": "persist provenance; demonstrated preparation/correction effect",
+      "command_or_journey": "native journey B",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "boundary-domain",
+      "requirement": "Grounded eligibility",
+      "fixture": "planted/airborne/mixed contexts",
+      "expected_behavior": "Grounded eligibility",
+      "threshold_or_invariant": "genuine nonempty support or actionable pre-inference rejection",
+      "command_or_journey": "real boundary analysis fixtures",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "hard-quality",
+      "requirement": "Hard constraints before ranking",
+      "fixture": "raw and corrected baked candidates",
+      "expected_behavior": "Hard constraints before ranking",
+      "threshold_or_invariant": "position ≤.001H; orientation ≤1deg; root velocity ≤.05H/s; angular velocity ≤5deg/s; drift ≤.01H; penetration ≤.005H",
+      "command_or_journey": "evaluated candidate report",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "correction-limits",
+      "requirement": "Bounded corrections and plausibility",
+      "fixture": "reviewed rig presets",
+      "expected_behavior": "Bounded corrections and plausibility",
+      "threshold_or_invariant": "preset acceleration/joint/excessive correction thresholds; retain failures",
+      "command_or_journey": "quality fixture",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "native-preservation",
+      "requirement": "Structural and evaluated source preservation",
+      "fixture": "entire selected X and Y intervals",
+      "expected_behavior": "Structural and evaluated source preservation",
+      "threshold_or_invariant": "unchanged curves/timing/evaluated poses except explicit rigid placement",
+      "command_or_journey": "native preservation/reopen fixture",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "separation",
+      "requirement": "Accepted and candidate separation",
+      "fixture": "generation/failure/cancellation",
+      "expected_behavior": "Accepted and candidate separation",
+      "threshold_or_invariant": "accepted checkpoint remains usable until explicit acceptance",
+      "command_or_journey": "transaction tests + native journey",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "acceptance",
+      "requirement": "Atomic fingerprint-checked acceptance",
+      "fixture": "valid/stale/corrupt/duplicate",
+      "expected_behavior": "Atomic fingerprint-checked acceptance",
+      "threshold_or_invariant": "verify current dependencies and artifact; idempotency; no stale overwrite",
+      "command_or_journey": "acceptance transaction tests",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "history",
+      "requirement": "History and restore",
+      "fixture": "two accepted revisions",
+      "expected_behavior": "History and restore",
+      "threshold_or_invariant": "restore exact prior artifact without regeneration",
+      "command_or_journey": "native restore/save/reopen",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "comparison",
+      "requirement": "Synchronized A/B",
+      "fixture": "same and different durations",
+      "expected_behavior": "Synchronized A/B",
+      "threshold_or_invariant": "align source stitch, actual speed, labeled target stitches, boundary scrub",
+      "command_or_journey": "native journey A",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "journey-a",
+      "requirement": "Generate compare accept save reopen render",
+      "fixture": "actual Windows WebView2 client",
+      "expected_behavior": "Generate compare accept save reopen render",
+      "threshold_or_invariant": "visible controls and real worker/model/Blender outputs",
+      "command_or_journey": "native journey A",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "journey-b",
+      "requirement": "Sliding correction and regeneration",
+      "fixture": "actual Windows WebView2 client",
+      "expected_behavior": "Sliding correction and regeneration",
+      "threshold_or_invariant": "measured and visually reviewed improvement",
+      "command_or_journey": "native journey B",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "journey-c",
+      "requirement": "Change inputs during generation",
+      "fixture": "actual Windows WebView2 client",
+      "expected_behavior": "Change inputs during generation",
+      "threshold_or_invariant": "old result stale and cannot overwrite",
+      "command_or_journey": "native journey C",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "journey-d",
+      "requirement": "Cancel failure and restart",
+      "fixture": "actual Windows WebView2 client",
+      "expected_behavior": "Cancel failure and restart",
+      "threshold_or_invariant": "owned worker stopped; interrupted outputs quarantined; accepted survives",
+      "command_or_journey": "native journey D",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "journey-e",
+      "requirement": "Downstream reconciliation",
+      "fixture": "early edit in multi-clip sequence",
+      "expected_behavior": "Downstream reconciliation",
+      "threshold_or_invariant": "affected chain explained; old revision usable; explicit acceptance",
+      "command_or_journey": "native journey E",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "four-clips",
+      "requirement": "Complete requested sequence",
+      "fixture": "back→left→idle→walk",
+      "expected_behavior": "Complete requested sequence",
+      "threshold_or_invariant": "three real joins; accumulated placement; full native intervals",
+      "command_or_journey": "four-clip real fixture/render",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "broader-suite",
+      "requirement": "Existing broader scenarios on final code",
+      "fixture": "ten-case manifest",
+      "expected_behavior": "Existing broader scenarios on final code",
+      "threshold_or_invariant": "all cases rerun; no inherited historical passes",
+      "command_or_journey": "run_motion_bricks_sequences.py",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "faults",
+      "requirement": "Bounded failure paths",
+      "fixture": "crash/model/mapping/budget/corruption",
+      "expected_behavior": "Bounded failure paths",
+      "threshold_or_invariant": "actionable refusal; no accepted partial artifact; process release",
+      "command_or_journey": "real provider/lifecycle/native fixtures",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "preview-render",
+      "requirement": "Saved baked identity parity",
+      "fixture": "accepted blend/GLB/movie",
+      "expected_behavior": "Saved baked identity parity",
+      "threshold_or_invariant": "same source hash; ≤0.1mm sampled skin parity; fresh reopen",
+      "command_or_journey": "native render + GLB parity",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "visual",
+      "requirement": "All-frame and full-speed review",
+      "fixture": "short acceptance movies",
+      "expected_behavior": "All-frame and full-speed review",
+      "threshold_or_invariant": "feet and full bridge visible; all frames inspected; human review separate",
+      "command_or_journey": "native playback + frame inspection",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "budgets",
+      "requirement": "Monitored resource limits",
+      "fixture": "RTX4070 Vulkan",
+      "expected_behavior": "Monitored resource limits",
+      "threshold_or_invariant": "whole ≤9216MiB; delta ≤8192; headroom ≥2048; host ≤2048; no silent fallback",
+      "command_or_journey": "real provider/profile/lifecycle",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "performance",
+      "requirement": "Whole-pipeline baseline/final benchmarks",
+      "fixture": "identical inputs, repeats",
+      "expected_behavior": "Whole-pipeline baseline/final benchmarks",
+      "threshold_or_invariant": "n/median/tail/max, stage trace, cancellation/release; inference distinct from review latency",
+      "command_or_journey": "benchmark suite",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "final-regressions",
+      "requirement": "Delivered runnable source regressions",
+      "fixture": "final commit/candidate install",
+      "expected_behavior": "Delivered runnable source regressions",
+      "threshold_or_invariant": "offline/Node/headless/provider/native gates",
+      "command_or_journey": "run_checks + node --test + headless/provider suites",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    },
+    {
+      "id": "handoff",
+      "requirement": "Evidence and licenses research handoff",
+      "fixture": "final build/code/evidence",
+      "expected_behavior": "Evidence and licenses research handoff",
+      "threshold_or_invariant": "exact pins, references, commands, hashes, limitations and hypotheses",
+      "command_or_journey": "handoff review",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "FAIL",
+      "evidence_path": null,
+      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+    }
+  ],
+  "capabilities": {
+    "unsupported": [
+      "arbitrary rigs",
+      "terrain/jumps",
+      "hard endpoint/contact pins",
+      "generated heading overrides",
+      "text prompts/waypoints/precision knobs",
+      "game-engine real-time guarantee"
+    ],
+    "historical": [
+      "2026-10-05 Adventurer client/render evidence; not inherited as final-code acceptance"
+    ],
+    "blocked": []
+  }
+}

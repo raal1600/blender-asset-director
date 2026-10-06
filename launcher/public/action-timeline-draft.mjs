@@ -1,11 +1,10 @@
 /** Local clip edits; no jobs, approvals, native keys or source mutations. */
-import {validateTimeline,timelineTiming,plannedFrames,clipEnd,connection,stitchVersion,motionEditVersion,sourceRange,rotateDirection,turnAngle} from './action-timeline-contract.mjs';
+import {validateTimeline,timelineTiming,plannedFrames,clipEnd,connection,stitchVersion,motionEditVersion,sourceRange,rotateDirection,turnAngle,generatedDurationPlan} from './action-timeline-contract.mjs';
 const copy=v=>structuredClone(v);
 const automaticTravel=(take,distance=take.gait.meters_per_cycle,heading=0)=>{const g=take.gait,direction=rotateDirection(g.direction,heading),n=Math.hypot(...direction);return {delta_m:direction.map(v=>distance*v/n),meters_per_cycle:g.meters_per_cycle,gait_id:g.id};};
 const displayNumber=n=>Number.isFinite(n)?Number(n.toFixed(3)):n;
-// Labels suggest an editable WORLD-axis arrow only; they do not prove facing,
-// gait semantics, root ownership, travel speed, loop quality or approval.
-export function suggestedPath(label){const words=String(label).toLowerCase().split(/[^a-z]+/);return words.some(w=>['back','backward','backwards'].includes(w))?[0,-1]:words.includes('right')?[1,0]:words.includes('left')?[-1,0]:[0,1];}
+// Neutral editable world-axis default only. Labels never determine movement.
+export function suggestedPath(){return [0,1];}
 export function timelineDraft(checkpoint,run){
  const audit=run.inspection,baseline=new Map(audit.performers.map(p=>[p.name,copy(p.timeline?.clips||[])]));
  let tracks=copy(baseline),history=[],raw=new Map(),stationaryFrames=new Map(),gesture=null,selected=audit.performers.find(p=>p.takes.length)?.name||audit.performers[0]?.name||null,clipId=null,selectedPart='clip';
@@ -31,7 +30,7 @@ export function timelineDraft(checkpoint,run){
    const priorTake=p.takes.find(t=>t.id===previous.take_id);if(!priorTake)return null;
    try{timelineTiming(previous,priorTake);}catch{return null;}
   }
-  if(c.transition?.mode==='generated'){const provider=p.timeline?.motion_bricks;if(provider?.status!=='CONFIGURED'||provider.profile_sha256!==c.transition.profile_sha256)throw Error(provider?.blocker||'Generated rig mapping changed; inspect again.');if(c.heading_deg||previous?.heading_deg)throw Error('This generated adapter preserves the saved facing; use clips with their native heading.');const duration=c.start-timelineTiming(previous,p.takes.find(t=>t.id===previous.take_id)).nativeEnd;if(duration/audit.fps<.48||duration/audit.fps>2.18)throw Error('Choose a generated interval between about 0.6 and 1.9 seconds.');}
+  if(c.transition?.mode==='generated'){const provider=p.timeline?.motion_bricks;if(provider?.status!=='CONFIGURED'||provider.profile_sha256!==c.transition.profile_sha256)throw Error(provider?.blocker||'Generated rig mapping changed; inspect again.');if(c.heading_deg||previous?.heading_deg)throw Error('This generated adapter preserves the saved facing; use clips with their native heading.');const duration=c.start-timelineTiming(previous,p.takes.find(t=>t.id===previous.take_id)).nativeEnd;generatedDurationPlan(duration/audit.fps);}
   join(name,c);return null;
  }catch(e){return {field:'clip',message:e.message};}};
  const changed=()=>[...tracks].filter(([name,clips])=>JSON.stringify(clips)!==JSON.stringify(baseline.get(name)));

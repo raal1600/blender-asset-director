@@ -89,7 +89,7 @@ for case in cases:
   for i,(name,source_fps) in enumerate(selected):
    take=next(t for t in performer['takes'] if t['action']==name);speed=source_fps/case['fps'];frames=math.ceil((take['range'][1]-take['range'][0])/speed)+1
    c={'id':'clip_'+str(i),'take_id':take['id'],'start':start,'frames':frames,'speed':speed,'repeat_reviewed':False,'travel':None}
-   if i:c['transition']={'frames':case['extra'],'mode':'generated','match_phase':False,'seed':1234,'profile_sha256':digest(profile)}
+   if i:c['transition']={'frames':case['extra'],'mode':'generated','match_phase':False,'seed':case.get('seed',1234),'sampling':case.get('sampling','argmax'),'profile_sha256':digest(profile)}
    if i and case.get('heading'):c['heading_deg']=case['heading']
    clips.append(c);start+=frames+case['extra']
   options={'version':'action-layer-v1','audit_sha256':audit['sha256'],'frame_range':[1,clips[-1]['start']+clips[-1]['frames']-1],'changes':[{'performer':manifest['rig'],'mode':'timeline','clips':clips}]};atomic_json(folder/'options.json',options)

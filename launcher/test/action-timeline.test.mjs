@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {timelineDraft,suggestedPath} from '../public/action-timeline-draft.mjs';
-import {validateTimeline,timelineTiming} from '../public/action-timeline-contract.mjs';
+import {validateTimeline,timelineTiming,generatedDurationPlan} from '../public/action-timeline-contract.mjs';
 const take='take_'+'a'.repeat(64),other='take_'+'b'.repeat(64);
 const cp={id:'cp_saved',sha256:'a'.repeat(64)},run={id:'run_saved',inspection:{sha256:'b'.repeat(64),frame_range:[1,250],fps:24,reference_frame:1,performers:['One','Two'].map((name,i)=>({name,takes:[{id:i?other:take,action:'Native',range:[1,25],travel_blocker:null}],timeline:{version:'action-timeline-v1',clips:[],origin_m:[0,0,0],meters_per_unit:1}}))}};
+test('generated durations use exact model windows and bounded bridge-only retiming',()=>{
+ for(let n=24;n<=64;n+=4){const p=generatedDurationPlan((n-7)/30);assert.equal(p.model_frames,n);assert.equal(p.generated_retime_ratio,1);}
+ for(const value of [NaN,Infinity,true,0,.4816,2.18501])assert.throws(()=>generatedDurationPlan(value));
+ assert.equal(generatedDurationPlan(2.185).model_frames,64);
+});
 test('travel derives occupancy; append starts after the inclusive last frame',()=>{
  const d=timelineDraft(cp,run);d.add(take,'clip_one');d.edit('travel',true);assert(d.invalid);d.edit('distance','5');d.edit('pace','2.5');assert(d.invalid);d.edit('repeat_reviewed',true);assert(!d.invalid);
  assert.equal(d.selectedClip.frames,49);assert.equal(d.nextFrame(),50);assert.deepEqual(d.arrow().delta_m.map(v=>Math.round(v)),[0,5]);
@@ -25,8 +30,8 @@ test('wire bounds, overlap, cross-take and unreviewed repeat refuse',()=>{
  assert.throws(()=>timelineTiming({...c,frames:60},run.inspection.performers[0].takes[0]),/repeatable/);
  for(const patch of [{frames:NaN},{speed:Infinity},{start:1.2},{repeat_reviewed:1},{travel:{delta_m:[0,0],meters_per_cycle:1}}])assert.throws(()=>validateTimeline({performer:'One',mode:'timeline',clips:[{...c,...patch}]}));
 });
-test('label hints are editable suggestions; drag is one undo group and pace reuses an authored cycle',()=>{
- assert.deepEqual(suggestedPath('walk_back'),[0,-1]);assert.deepEqual(suggestedPath('walk:right'),[1,0]);assert.deepEqual(suggestedPath('walk left'),[-1,0]);
+test('renaming cannot change the manual world-axis default; drag is one undo group',()=>{
+ for(const name of ['walk_back','walk:right','walk left','opaque 8291','idle'])assert.deepEqual(suggestedPath(name),[0,1]);
  const d=timelineDraft(cp,run);d.add(take,'clip_one');d.edit('travel',true);d.edit('pace','2.5');const before=d.selectedClip;d.finishEdit();d.moveEndpoint([2,3]);d.moveEndpoint([3,4]);d.finishEdit();d.undo();assert.deepEqual(d.selectedClip,before);
  d.add(take,'clip_two');d.edit('travel',true);assert.equal(d.selectedClip.travel.meters_per_cycle,2.5);
 });

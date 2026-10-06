@@ -1,0 +1,54 @@
+# Transition input and provenance contract (in development)
+
+`motion_bricks_contract.py` owns `motion-bricks.upright-grounded.v1` numerical
+restrictions and `asset-director.transition-input.v1`. `motion_bricks_timeline`
+emits one request ID with a dependency fingerprint, distinct from its low-level
+`asset-director.motion-bricks.request.v1` C ABI payload. Names label observed
+Action/slot and anatomical bindings; they do not select direction or motion.
+
+Current dependencies include actual source channel content, selected clip and
+interval, source-frame rate, four exact sample timestamps per side, evaluated
+model contexts, native-basis/rest/mapping hashes, object linear and parent
+transforms, unit scale, source preparation/contact properties, requested timing,
+sampling settings, provider configuration and pinned source/GGML/model revisions.
+Project/checkpoint identity is additionally bound by the existing job input hash
+and launcher transaction. Persistent accepted/working revision binding is an
+outstanding implementation gate, not guaranteed by this envelope alone.
+
+Each boundary covers 0.1 seconds (four samples at 30 FPS). Sampling cannot wrap,
+extrapolate or reach outside the selected single native interval. Repeated cycles
+must first be split explicitly for this domain. Output N=24,28,…,64 includes both
+contexts; bridge indices are 3…N−4 and duration is (N−7)/30 seconds. Only this
+bridge may retime within 0.85–1.15. Actual supported duration range is
+0.481666…–2.185 seconds. Source clocks are not altered to satisfy it.
+
+`argmax` is the backward-compatible mode and ignores seed for sampling.
+`gumbel-temperature-1` sets the real ABI argmax flag false. It has no configurable
+temperature. All settings are retained. Availability in the wire contract does
+not yet establish candidate quality or justify an alternatives client control.
+
+Sparse masks remain GLOBAL_ROOT 11110000, LOCAL_ROOT 11101111, POSE 11111111,
+applied after both boundary setters. Destination XY is predicted; heading and
+height remain conditioned by native motion. Target-position placeholders are
+not target locks. All constraints are soft model conditioning.
+
+Per join the existing job folder retains `motion-bricks-<clip>-input.json`,
+`-raw.json`, `-retargeted.json`, `-corrected.json` and the combined provenance
+receipt. Raw output is saved before correction so a failed retarget does not erase
+the prediction. Corrected samples include their original scene-frame timestamps
+and a single composed object delta path. Head/finger/toe endpoint interpolation
+is deterministic bridge processing.
+
+Raw duplicate comparison uses common-time interior root RMS normalized by fixed
+reviewed height and quaternion-geodesic RMS (in degrees), ignoring filenames,
+metadata and quaternion sign. Both ≤0.0001H and ≤0.1° means near duplicate.
+Different durations remain distinct timebases; playback must not time-warp them.
+This is candidate distinction, not a quality or physical-validity test.
+
+The worker refuses to load the model when `bpy` is present. On Windows it queries
+the loaded module path with GetModuleFileNameW and hashes the actual DLL; the
+parent compares it with the verified installation. Each model file is size/hash
+checked before loading. Provider events and separate native inference, request
+conversion, output conversion and loading durations distinguish model compute
+from application latency. This is sampled resource monitoring, not an allocator
+cap or proof against unrelated whole-device interference.

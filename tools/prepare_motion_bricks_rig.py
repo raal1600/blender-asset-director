@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT / 'src'))
 def main():
     import bpy
     from asset_director.core import atomic_json, digest, require
-    from asset_director.motion_bricks_provider import validate_skeleton
+    from asset_director.motion_bricks_provider import validate_skeleton, configured, execute
     from asset_director.motion_bricks_retarget import PROPERTY, build_profile, load_profile
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--rig', required=True)
@@ -32,7 +32,11 @@ def main():
     require(args.rig in bpy.data.objects, 'PROFILE_RIG_MISSING', 'Choose an observed armature')
     skeleton = json.loads(args.skeleton.read_text(encoding='utf-8-sig'))
     mapping = json.loads(args.mapping.read_text(encoding='utf-8-sig'))
-    validate_skeleton(skeleton)
+    config = configured()
+    require(config is not None, 'MOTION_BRICKS_NOT_CONFIGURED',
+            'Configure the pinned standalone provider to verify the supplied skeleton before preparing a rig')
+    actual = execute(config)['skeleton']
+    validate_skeleton(skeleton, actual)
     rig = bpy.data.objects[args.rig]
     profile = build_profile(rig, skeleton, mapping, args.ground_z)
     rig[PROPERTY] = json.dumps(profile)
