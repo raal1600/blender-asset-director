@@ -47,7 +47,7 @@ def rest_identity(rig):
 
 def build_profile(rig, skeleton, roles, ground_z, *, reference_origin_z=None, reference_height_m=None, encoding='g1-anatomical-frames-v2'):
     from mathutils import Vector, Quaternion, Matrix
-    require(encoding in ('g1-serial-axes-v1','g1-anatomical-frames-v2'),
+    require(encoding in ('g1-serial-axes-v1','g1-anatomical-frames-v2','g1-anatomical-frames-v3'),
             'MOTION_BRICKS_RETARGET_PROFILE','Unknown anatomical frame calibration')
     require(rig.type=='ARMATURE' and skeleton['id']=='g1skel34' and len(skeleton['parents'])==34,
             'MOTION_BRICKS_RETARGET_PROFILE','Expected an armature and exact G1 model skeleton')
@@ -97,7 +97,7 @@ def build_profile(rig, skeleton, roles, ground_z, *, reference_origin_z=None, re
         b=canonical[target_end]-canonical[role]
         require(min(a.length,b.length)>.005,'MOTION_BRICKS_RETARGET_GEOMETRY',f'Degenerate {role} segment')
         alignment[role]=a.normalized().rotation_difference(b.normalized())
-    if encoding=='g1-anatomical-frames-v2':
+    if encoding in ('g1-anatomical-frames-v2','g1-anatomical-frames-v3'):
         # A direction alone leaves twist unconstrained. Independent shortest
         # rotations can turn a native elbow into a three-axis model joint even
         # in the rest pose. Calibrate the complete arm plane, using the segment
@@ -116,6 +116,17 @@ def build_profile(rig, skeleton, roles, ground_z, *, reference_origin_z=None, re
             require(nn.length>.02,'MOTION_BRICKS_HINGE_CALIBRATION','Rest elbow bend is too small to determine a stable anatomical plane; use a reviewed rig calibration')
             for role,model_direction,native_direction in ((side+'_upper_arm',model_a,native_a),(side+'_forearm',model_b,native_b)):
                 alignment[role]=(frame(native_direction,nn)@frame(model_direction,mn).transposed()).to_quaternion().normalized()
+        if encoding=='g1-anatomical-frames-v3':
+            for side,upper,knee,ankle in (('left',3,4,5),('right',10,11,12)):
+                model_a=Vector(skeleton['neutral_joints'][knee])-Vector(skeleton['neutral_joints'][upper])
+                model_b=Vector(skeleton['neutral_joints'][ankle])-Vector(skeleton['neutral_joints'][knee])
+                native_a=canonical[side+'_shin']-canonical[side+'_thigh']
+                native_b=canonical[side+'_foot']-canonical[side+'_shin']
+                mn=model_a.normalized().cross(model_b.normalized());nn=native_a.normalized().cross(native_b.normalized())
+                require(min(mn.length,nn.length)>.02,'MOTION_BRICKS_HINGE_CALIBRATION',
+                        'Rest knee bend is too small to determine its anatomical plane; supply reviewed rig calibration')
+                for role,model_direction,native_direction in ((side+'_thigh',model_a,native_a),(side+'_shin',model_b,native_b)):
+                    alignment[role]=(frame(native_direction,nn)@frame(model_direction,mn).transposed()).to_quaternion().normalized()
     require(reference_height_m is None or type(reference_height_m) in (int,float) and math.isfinite(reference_height_m) and .3 <= reference_height_m <= 5.,
             'MOTION_BRICKS_REFERENCE_HEIGHT','Supply a fixed reviewed full-character height in metres (0.3 to 5)')
     return {'schema':'motion-bricks.explicit-humanoid-profile.v1','rig':rig.name,

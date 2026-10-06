@@ -16,11 +16,13 @@ def validate(change):
             'INVALID_TIMELINE', 'Use at most 64 clips per performer')
     seen, end = set(), -100001
     for index, clip in enumerate(clips):
-        fields(clip, {'id', 'take_id', 'start', 'frames', 'speed', 'repeat_reviewed', 'travel', 'transition', 'source_range', 'heading_deg'},
+        fields(clip, {'id', 'take_id', 'start', 'frames', 'speed', 'repeat_reviewed', 'travel', 'transition', 'source_range', 'heading_deg', 'root_intent'},
                {'id', 'take_id', 'start', 'frames', 'speed', 'repeat_reviewed', 'travel'})
         require(isinstance(clip['id'], str) and re.fullmatch(r'clip_[a-zA-Z0-9_-]{1,64}', clip['id'])
                 and clip['id'] not in seen, 'INVALID_TIMELINE', 'Clips need distinct stable identities')
         seen.add(clip['id'])
+        require('root_intent' not in clip or clip['root_intent']=='stationary-reviewed',
+                'MOTION_BRICKS_ROOT_INTENT','Only explicitly reviewed stationary intent is supported; travelling in-place clips need a derived root preparation')
         if 'source_range' in clip:
             interval = clip['source_range']
             require(isinstance(interval, list) and len(interval) == 2
@@ -40,15 +42,16 @@ def validate(change):
             require(join is not None and join.get('mode') == 'turn', 'HEADING_TRANSITION_REQUIRED',
                     'Changing a clip heading needs an explicit turn transition')
         if join is not None:
-            fields(join, {'frames', 'match_phase', 'mode', 'seed', 'profile_sha256', 'sampling'}, {'frames', 'match_phase'})
+            fields(join, {'frames', 'match_phase', 'mode', 'seed', 'profile_sha256', 'sampling', 'contacts'}, {'frames', 'match_phase'})
             if join.get('mode') == 'generated':
                 require(join['match_phase'] is False and type(join.get('seed')) is int and 0 <= join['seed'] < 2**32
                         and isinstance(join.get('profile_sha256'), str) and re.fullmatch(r'[0-9a-f]{64}', join['profile_sha256']),
                         'INVALID_TRANSITION', 'Generated repositioning needs a verified rig profile and seed, with phase matching off')
-                from .motion_bricks_contract import sampling_settings
+                from .motion_bricks_contract import sampling_settings, contact_plan
                 sampling_settings(join.get('sampling','argmax'),join['seed'])
+                contact_plan(join.get('contacts'))
             else:
-                require(not any(k in join for k in ('seed','profile_sha256','sampling')), 'INVALID_TRANSITION', 'Model settings require generated mode')
+                require(not any(k in join for k in ('seed','profile_sha256','sampling','contacts')), 'INVALID_TRANSITION', 'Model settings require generated mode')
             require(join.get('mode', 'blend') in {'blend', 'turn', 'generated'}, 'INVALID_TRANSITION', 'Choose a pose connection or an explicit turn preview')
             require(index > 0 and type(join['frames']) is int and 2 <= join['frames'] <= 120
                     and type(join['match_phase']) is bool,

@@ -2,6 +2,47 @@
 
 ## 2026-10-07 authoring investigation (in progress)
 
+### Later repair-loop evidence, following 91cb591
+
+The actual isolated Windows/WebView2 client generated three immutable model
+candidates in 91.606 seconds (`native-review-91cb591/report.json`, one observation,
+not a latency percentile). The accepted checkpoint remained unchanged. All three
+failed hard quality checks and the visible Accept controls were disabled.
+Comparison loaded its first baked candidate, then failed because initialization
+read the not-yet-selected second candidate. The source repair and a sequential
+viewer regression test pass; native comparison rerun remains outstanding.
+
+The v2 anatomical arm calibration reduced maximum reference correction from
+75.1 to 31.7 degrees. Short 3D support locks fixed the measured floating contact;
+bounded rotation filtering, reach-margin planning, and support/floor projection
+were tested as subsequent independent experiments. `bounded-refinement-v1`
+passes its seam, planted-contact, penetration, speed and correction gates but
+still FAILS acceleration (11,100.6 degrees/s² against 6,000). Longer-duration
+experiments also failed sliding/penetration/acceleration before the latest
+projection repair. These are retained failures, not supported quality coverage.
+No candidate from this repair loop has been accepted as good motion.
+
+`seam-convergence.json` separates an estimator defect from those real quality
+failures. On identical baked motion, the old second-order angular seam estimate
+was 142.27, 35.56, 8.93 and 2.23 degrees/s as h decreased from 1/384 to 1/3072 s.
+The cubic one-sided estimate at h=1/768 and 1/1536 s was below 0.56 degrees/s.
+The implementation now uses four samples on each side and a common rotational
+frame. The 5 degrees/s threshold is unchanged. The acceleration failure is not
+removed by this derivative correction.
+
+A v3 knee-plane calibration was also tested on a separate copied rig. Its real
+inference path refused excessive filtering (`anatomical-v3`,
+`MOTION_BRICKS_EXCESSIVE_FILTER`). V2 remains the default. V3 is an unaccepted
+experimental source capability, not an advertised runtime improvement.
+
+The client now has persisted bridge support intervals and explicit stationary
+root intent, draft undo, stale-request checks, explicit discard, and comparison
+repair. These source changes require the next complete native-client pass.
+Stage-three offline checks passed 792 tests (789 pass, 3 disclosed skips) and
+installer checks; the launcher passed 382 tests before the final additional
+discard/derivative regressions. This chronology does not transfer passes to a
+later source revision automatically.
+
 Isolated branch `feature/motionbricks-authoring-20261006`, foundation commit
 `90db942`, extends the combined #31/#30/visual-turn ancestry. Earlier entries
 remain historical evidence, not current acceptance of all quality gates.

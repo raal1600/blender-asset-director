@@ -158,6 +158,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='action-inspect')return workbench.inspectAction(id,sid,rev,body.request);
             if(command==='action-save')return workbench.saveAction(id,sid,rev,body.request);
             if(command==='transition-request')return workbench.updateTransitionRequest(id,sid,rev,body.request);
+            if(command==='transition-discard')return workbench.discardTransitionRequest(id,sid,rev);
             if(command==='transition-accept')return workbench.acceptTransition(id,sid,rev,body.request);
             if(command==='transition-restore')return workbench.restoreTransition(id,sid,rev,body.request);
             if(command==='scene-layer-inspect')return workbench.inspectSceneLayer(id,sid,rev,body.request);

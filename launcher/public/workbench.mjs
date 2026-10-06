@@ -201,10 +201,13 @@ function scheduleActionInspection(){
  },0);
 }
 let transitionRequestTimer=null,transitionRequestWrite=Promise.resolve();
+const transitionDraftKeys=new Map();
 function reviewRunning(){return state?.runs.some(r=>r.id===s()?.run&&r.publication==='TRANSITION_REVIEW_ONLY')===true;}
 function transitionEditingBlocked(){return busy||!!s()?.task||((state?.locked||s()?.run||actionSave)&&!reviewRunning());}
 async function startTransitionAttempt(draft,template,remaining){
  if(actionSave)throw Error('A generation attempt is still active.');
+ clearTimeout(transitionRequestTimer);
+ transitionDraftKeys.set(projectId+':'+sceneId,draft.dependencyKey);
  const request={...structuredClone(template),requestId:'run_'+crypto.randomUUID()};
  if(!request.working_request_id){
   await transitionRequestWrite.catch(()=>{});
@@ -217,6 +220,9 @@ async function startTransitionAttempt(draft,template,remaining){
  catch(error){actionSave=null;await load();throw error;}
 }
 function scheduleTransitionRequest(){
+ const draft=currentActionDraft(),key=projectId+':'+sceneId;
+ if(!draft?.timeline||transitionDraftKeys.get(key)===draft.dependencyKey)return;
+ transitionDraftKeys.set(key,draft.dependencyKey);
  if(actionSave){actionSave.stale=true;actionSave.remaining=[];}
  clearTimeout(transitionRequestTimer);
  transitionRequestTimer=setTimeout(()=>{void persistTransitionRequest().catch(e=>notice(e.message));},350);
@@ -269,6 +275,7 @@ function editActionField(field,value){
  render();
 }
 function actionViewerChanged({controls=false}={}){
+ scheduleTransitionRequest();
  // A first visual body turn can enable Turn and connect. Refresh only the
  // inspector: keep the canvas, pointer capture, camera and playhead intact.
  const inspector=document.querySelector('[data-motion-inspector]'),draft=currentActionDraft();
@@ -459,11 +466,11 @@ async function dispatch(a,d){
   if(a==='action-draft-save')await saveActionDraft();else{currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);}
   draftDestination=null;close();await dispatch(destination.action,destination.data);return;
  }
- if(a==='action-discard'){if(actionSave)throw Error('Wait for the Save receipt.');currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);clearSceneViewer();await load();return;}
+ if(a==='action-discard'){if(actionSave)throw Error('Cancel or wait for generation before discarding.');clearTimeout(transitionRequestTimer);await transitionRequestWrite.catch(()=>{});if(s().transitionReview?.working)await next('transition-discard');currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);clearSceneViewer();await load();return;}
  if(a==='action-undo'){const draft=currentActionDraft(),selected=actionSelectionStamp(draft);actionSeeking.cancel();draft?.undo();render();if(selected!==actionSelectionStamp(currentActionDraft()))seekSelectedAction();return;}
  if(a==='transition-alternatives'){const draft=currentActionDraft();draft.setSamplingPlan([1234,7,42]);await startTransitionAttempt(draft,draft.request('run_'+crypto.randomUUID()),[7,42]);return;}
  if(a==='transition-review'){const candidates=s().transitionReview?.candidates||[],chosen=candidates.find(c=>c.id===d.id);if(!chosen)throw Error('Candidate changed; refresh.');modal('Compare transition candidates',comparisonMarkup(candidates,chosen,esc),'','Done');$('dialog').classList.add('transition-comparison-dialog');assetViewer=openComparison($('dialog'),candidates,startViewer);return;}
- if(a==='transition-accept'){await persistTransitionRequest();const c=s().transitionReview?.candidates.find(c=>c.id===d.id);if(!c)throw Error('Candidate changed.');await next('transition-accept',{request:{candidateId:c.id,eventId:'run_'+crypto.randomUUID(),fingerprint:c.fingerprint}});currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);clearSceneViewer();await load();notice('Candidate accepted and saved as the complete timeline revision.','success');return;}
+ if(a==='transition-accept'){if(currentActionDraft()?.invalid)throw Error('Correct the working input before accepting a candidate.');await persistTransitionRequest();const c=s().transitionReview?.candidates.find(c=>c.id===d.id);if(!c)throw Error('Candidate changed.');await next('transition-accept',{request:{candidateId:c.id,eventId:'run_'+crypto.randomUUID(),fingerprint:c.fingerprint}});currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);clearSceneViewer();await load();notice('Candidate accepted and saved as the complete timeline revision.','success');return;}
  if(a==='transition-restore'){await next('transition-restore',{request:{checkpointId:d.id,eventId:'run_'+crypto.randomUUID()}});currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);clearSceneViewer();await load();notice('Previous accepted artifact restored without regeneration.','success');return;}
  if(a==='action-save'){await saveActionDraft();return;}
  if(a==='motion-enable'){

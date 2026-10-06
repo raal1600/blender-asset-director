@@ -81,3 +81,18 @@ test('generated repositioning binds the rig and seed and keeps original clip bou
  d.edit('transition_mode','blend');assert.equal(d.selectedClip.transition.seed,undefined);assert.equal(d.selectedClip.transition.profile_sha256,undefined);
  const bad=structuredClone(generated.changes[0]);bad.clips[1].transition.seed=NaN;assert.throws(()=>validateTimeline(bad));
 });
+
+test('reviewed contacts and sampling survive undo/reopen while selection leaves dependencies unchanged',()=>{
+ const inspected=structuredClone(run),p=inspected.inspection.performers[0];
+ Object.assign(p.timeline,{stitch_version:'native-stitch-v1',edit_version:'native-motion-edit-v1',motion_bricks:{status:'CONFIGURED',profile_sha256:'c'.repeat(64)}});
+ Object.assign(p.takes[0],{stitch_blocker:null,stitch_channels:'d'.repeat(64),heading_blocker:null});
+ const d=timelineDraft(cp,inspected);d.add(take,'clip_a');d.add(take,'clip_b');d.edit('transition_mode','generated');d.finishEdit();
+ const key=d.dependencyKey;d.select('One','clip_b','transition');assert.equal(d.dependencyKey,key);
+ d.edit('contact_source_support','right');d.finishEdit();d.edit('contact_source_seconds','.12');d.finishEdit();
+ d.setSamplingPlan([1234,7,42]);const request=d.request('run_review');
+ assert.equal(request.changes[0].clips[1].transition.contacts.source.seconds,.12);validateTimeline(request.changes[0]);
+ const reopened=timelineDraft(cp,inspected);reopened.restoreRequest(request);assert.deepEqual(reopened.request('run_new').sampling_plan,request.sampling_plan);
+ d.undo();assert.equal(d.request('run_no_batch').sampling_plan,undefined);assert.equal(d.input('contact_source_seconds'),.12);
+ d.edit('contact_source_seconds','');assert(d.invalid);assert.throws(()=>d.request('run_invalid'));
+ d.discard();assert(!d.dirty);d.add(take,'clip_new');assert.equal(d.request('run_clean').sampling_plan,undefined);
+});

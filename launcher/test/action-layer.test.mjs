@@ -263,3 +263,12 @@ test('failed and cancelled generation leave accepted checkpoint and reviewable c
  await f.work.saveAction(p.id,f.scene.id,p.revision,request);await f.work.cancelActionSave(p.id,f.scene.id,request.requestId);finish();p=await f.wait();
  assert.equal(p.workbench.scenes[0].current,f.cp.id);assert.deepEqual(p.workbench.scenes[0].transitionReview.candidates,previous);assert.equal(f.control.cancelled,true);
 });
+
+test('discarding a working request preserves candidate history and accepted playback while making old work stale',async t=>{
+ const f=await generatedFixture(t);f.control.validation={status:'PASS'};
+ await f.work.saveAction(f.project.id,f.scene.id,f.project.revision,f.request);let p=await f.wait();
+ const before=structuredClone(p.workbench.scenes[0].transitionReview.candidates);
+ p=await f.work.discardTransitionRequest(p.id,f.scene.id,p.revision);const scene=p.workbench.scenes[0];
+ assert.equal(scene.current,f.cp.id);assert.equal(scene.transitionReview.working,null);
+ assert.deepEqual(scene.transitionReview.candidates,before);assert.equal(candidateStatus(scene,before[0]),'STALE');
+});

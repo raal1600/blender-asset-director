@@ -9,7 +9,7 @@ export function comparisonMarkup(candidates,chosen,esc){
 export function openComparison(host,candidates,startViewer){
  let disposed=false,raf=0,playing=false,origin=0,elapsed=0;
  const views={},current={},records={},time=host.querySelector('[data-compare-time]');
- const edge=c=>c.transitions?.find(j=>j.provider==='motion-bricks.cpp')||null;
+ const edge=c=>c?.transitions?.find(j=>j.provider==='motion-bricks.cpp')||null;
  const duration=side=>{const join=edge(current[side]);return join&&records[side]?(join.end-join.start)/records[side].playback.fps:0;};
  function seek(seconds){elapsed=seconds;time.value=String(seconds);host.querySelector('[data-compare-clock]').textContent=seconds.toFixed(3)+' s';for(const side of ['a','b']){const join=edge(current[side]),r=records[side];if(join&&r)views[side]?.seekFrameExact(join.start+seconds*r.playback.fps);}}
  function stop(){playing=false;cancelAnimationFrame(raf);host.querySelector('[data-compare-play]').textContent='Play both at full speed';}

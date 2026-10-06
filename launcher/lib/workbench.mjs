@@ -4,7 +4,7 @@ import {syncTask} from './task-save.mjs';
 import {saveWorld} from './world-transform.mjs';
 import {inspectWorldPreparation,prepareWorld} from './world-prepare.mjs';
 import {inspectAction,saveAction,registerActionSave,cancelActionSave,validateActionRequest} from './action-layer.mjs';
-import {updateTransitionRequest,acceptTransition,restoreTransition} from './transition-review.mjs';
+import {updateTransitionRequest,discardTransitionRequest,acceptTransition,restoreTransition} from './transition-review.mjs';
 import {resolveActionContext} from './action-context.mjs';
 import {inspectSceneLayer,saveSceneLayer} from './scene-layer.mjs';
 import {previewEvidence,previewEvidenceMedia} from './preview-evidence.mjs';
@@ -36,6 +36,7 @@ export class Workbench extends withCatalog(WorkbenchCore) {
   inspectAction(...args){return inspectAction(this,...args);}
   saveAction(...args){return saveAction(this,...args);}
   updateTransitionRequest(...args){return updateTransitionRequest(this,...args,validateActionRequest);}
+  discardTransitionRequest(...args){return discardTransitionRequest(this,...args);}
   acceptTransition(...args){return acceptTransition(this,...args);}
   restoreTransition(...args){return restoreTransition(this,...args);}
   registerActionSave(...args){return registerActionSave(this,...args);}

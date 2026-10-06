@@ -3,6 +3,7 @@ import math
 import bpy
 from mathutils import Vector
 from . import sequence_math as qm
+from .motion_bricks_stitch_math import boundary_estimate
 from .motion_bricks_retarget import load_profile
 from .motion_bricks_feet import Soles
 from .motion_bricks_quality import PRESET, thresholds, gate, contact_runs
@@ -41,15 +42,13 @@ def evaluate(report):
                     for edge in (join['start'],join['end']):
                         # Both limits are estimated at the same stitch timestamp.
                         # Rotation logs share the left-near orientation as one frame.
-                        h=fps/1536.;left=[at(edge-j*h) for j in (1,2,3)];right=[at(edge+j*h) for j in (1,2,3)]
+                        h=fps/1536.;left=[at(edge-j*h) for j in (1,2,3,4)];right=[at(edge+j*h) for j in (1,2,3,4)]
                         per_bone=[]
                         for name in left[0]:
                             l=[Vector(v[name]['p']) for v in left];r=[Vector(v[name]['p']) for v in right]
-                            lp=3*l[0]-3*l[1]+l[2];rp=3*r[0]-3*r[1]+r[2]
-                            lv=(2.5*l[0]-4*l[1]+1.5*l[2])*fps/h;rv=(-2.5*r[0]+4*r[1]-1.5*r[2])*fps/h
+                            lp,lv=map(Vector,boundary_estimate(l,h/fps,'left'));rp,rv=map(Vector,boundary_estimate(r,h/fps,'right'))
                             reference=left[0][name]['q'];z=[Vector(qm.qlog(qm.qmul(qm.inverse(reference),v[name]['q']))) for v in left+right]
-                            ql=3*z[0]-3*z[1]+z[2];qr=3*z[3]-3*z[4]+z[5]
-                            wl=(2.5*z[0]-4*z[1]+1.5*z[2])*fps/h;wr=(-2.5*z[3]+4*z[4]-1.5*z[5])*fps/h
+                            ql,wl=map(Vector,boundary_estimate(z[:4],h/fps,'left'));qr,wr=map(Vector,boundary_estimate(z[4:],h/fps,'right'))
                             per_bone.append({'bone':name,'position_m':(lp-rp).length,'orientation_deg':math.degrees((ql-qr).length),
                                 'root_velocity_m_s':(lv-rv).length,'angular_velocity_deg_s':math.degrees((wl-wr).length)})
                         edges.append({'frame':edge,'seconds':edge/fps,**{key:(next(b[key] for b in per_bone if b['bone']==roles['pelvis']) if key=='root_velocity_m_s' else max(b[key] for b in per_bone)) for key in ('position_m','orientation_deg','root_velocity_m_s','angular_velocity_deg_s')}})
@@ -69,7 +68,7 @@ def evaluate(report):
                     # Validate a claimed stance at its actual fixed sole vertex.
                     # A rotating heel is not evidence that a planted toe slid.
                     for lock in cleanup.get('support_locks',[]):
-                        core=cleanup['support_lock_core_seconds'];lo,hi=(0.,core) if lock['edge']=='source' else (seconds-core,seconds)
+                        core=lock.get('core_seconds',cleanup.get('support_lock_core_seconds'));lo,hi=(0.,core) if lock['edge']=='source' else (seconds-core,seconds)
                         points=[];distance_from_ground=[]
                         for i in range(7):
                             at(join['start']+(lo+(hi-lo)*i/6)*fps)
@@ -103,7 +102,7 @@ def evaluate(report):
                         'largest_joint_speed':max(({'joint':name,'sample_index':i,'degrees_per_second':math.degrees(v.length)} for name,values in angular.items() for i,v in enumerate(values)),key=lambda r:r['degrees_per_second']),
                         'largest_joint_acceleration':max(({'joint':name,'sample_index':i,'degrees_per_second2':math.degrees((b-a).length*sample_fps)} for name,values in angular.items() for i,(a,b) in enumerate(zip(values,values[1:]))),key=lambda r:r['degrees_per_second2']),
                         'quality_scope':'KINEMATIC_ONLY','physical_feasibility':'NOT_DEMONSTRATED','visual_review':'REQUIRED',
-                        'derivatives':'second-order one-sided estimates at common physical stitch; h=1/1536 s; common rotational frame',
+                        'derivatives':'cubic one-sided value/derivative estimates at common physical stitch; samples at +/-1,2,3,4 times h=1/1536 s; common rotational frame',
                         'rank_score':sum(metrics[k]/limits[k] for k in required) if not failures else None})
             finally:soles.close()
     finally:scene.frame_set(frame,subframe=subframe);bpy.context.view_layer.update()

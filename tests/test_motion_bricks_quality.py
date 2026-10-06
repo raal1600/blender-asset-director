@@ -1,4 +1,5 @@
 import unittest
+import math
 from asset_director.motion_bricks_quality import thresholds,gate,contact_runs,correction_metrics
 
 
@@ -24,3 +25,31 @@ class QualityTests(unittest.TestCase):
         result=correction_metrics(raw,corrected,[[0,0,0]]*3,[[0,.2,0]]*3)
         self.assertEqual(result['rotation_correction_max_deg'],0.)
         self.assertAlmostEqual(result['root_correction_m'],.2)
+
+    def test_generated_filter_preserves_constant_motion_and_rejects_excessive_repair(self):
+        from asset_director.motion_bricks_stitch_math import smooth_rotations
+        from asset_director.sequence_math import qexp, qlog, qmul, inverse, norm
+        samples=[(i,{'hip':{'q':qexp([0,0,i*.01])}}) for i in range(101)]
+        corrected,report=smooth_rotations(samples,1.)
+        self.assertFalse(report['timing_changed'])
+        self.assertLess(norm(qlog(qmul(inverse(samples[50][1]['hip']['q']),corrected[50][1]['hip']['q']))),1e-12)
+        self.assertEqual([s[0] for s in corrected],list(range(101)))
+        samples[50][1]['hip']['q']=qexp([math.radians(150),0,0])
+        with self.assertRaisesRegex(Exception,'more than 15 degrees'):smooth_rotations(samples,1.)
+
+    def test_contact_provenance_and_duration_are_bounded(self):
+        from asset_director.motion_bricks_contract import contact_plan
+        self.assertEqual(contact_plan()['origin'],'evaluated-proposal')
+        valid={'origin':'user-reviewed','source':{'support':'right','seconds':.12},'target':{'support':'auto','seconds':.08}}
+        self.assertEqual(contact_plan(valid),valid)
+        for patch in ({'support':'airborne','seconds':.12},{'support':'right','seconds':True},{'support':'right','seconds':.201}):
+            with self.assertRaises(Exception):contact_plan({**valid,'source':patch})
+        with self.assertRaises(Exception):contact_plan({**valid,'origin':'ground-truth'})
+
+    def test_cubic_boundary_derivatives_use_the_stitch_and_physical_seconds(self):
+        from asset_director.motion_bricks_stitch_math import boundary_estimate
+        h=1/1536
+        for side,sign in (('left',-1),('right',1)):
+            values=[[2+3*t+400*t*t+100000*t*t*t] for t in [sign*i*h for i in (1,2,3,4)]]
+            p,v=boundary_estimate(values,h,side)
+            self.assertAlmostEqual(p[0],2,places=11);self.assertAlmostEqual(v[0],3,places=8)

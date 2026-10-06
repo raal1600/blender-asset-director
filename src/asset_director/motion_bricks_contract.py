@@ -23,6 +23,22 @@ def finite(value):
     return type(value) in (int, float) and math.isfinite(value)
 
 
+def contact_plan(value=None):
+    """User-reviewed bridge support windows; never neural conditioning labels."""
+    if value is None:
+        return {'origin':'evaluated-proposal','source':{'support':'auto','seconds':.08},
+                'target':{'support':'auto','seconds':.08}}
+    require(isinstance(value,dict) and set(value)=={'origin','source','target'}
+            and value['origin']=='user-reviewed','MOTION_BRICKS_CONTACTS','Contact corrections need recorded user-review provenance')
+    for edge in ('source','target'):
+        row=value[edge]
+        require(isinstance(row,dict) and set(row)=={'support','seconds'}
+                and row['support'] in ('auto','left','right','both','none')
+                and finite(row['seconds']) and .04<=row['seconds']<=.2,
+                'MOTION_BRICKS_CONTACTS','Choose a support foot and a bridge-only interval from 0.04 to 0.20 seconds')
+    return value
+
+
 def duration_plan(seconds):
     require(finite(seconds) and seconds > 0, 'MOTION_BRICKS_DURATION',
             'Choose a positive generated duration; native intervals stay unchanged')

@@ -13,6 +13,7 @@ from mathutils import Vector
 repo=Path(__file__).resolve().parents[1];sys.path.insert(0,str(repo/'src'));sys.dont_write_bytecode=True
 from asset_director import action_layer as layer,blender_ops as ops,native_motion_basis as basis,motion_bricks_retarget as ret,sequence_math as qm
 from asset_director.core import atomic_json,digest,file_hash,DirectorError
+from asset_director.motion_bricks_stitch_math import boundary_estimate
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--manifest',type=Path);p.add_argument('--case');p.add_argument('--output',type=Path);p.add_argument('--verify',type=Path)
 a=p.parse_args(sys.argv[sys.argv.index('--')+1:])
@@ -20,10 +21,10 @@ def sample(obj,f):
  bpy.context.scene.frame_set(math.floor(f),subframe=f%1);bpy.context.view_layer.update();e=obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
  return {p.name:{'p':list((e.matrix_world@p.matrix).translation),'q':list((e.matrix_world@p.matrix).to_quaternion())} for p in e.pose.bones}
 def seam_metrics(obj,edge,fps):
- pelvis=ret.load_profile(obj)['roles']['pelvis'];h=fps/(24*64);left=[sample(obj,edge-j*h) for j in (1,2,3)];right=[sample(obj,edge+j*h) for j in (1,2,3)];rows=[]
+ pelvis=ret.load_profile(obj)['roles']['pelvis'];h=fps/(24*64);left=[sample(obj,edge-j*h) for j in (1,2,3,4)];right=[sample(obj,edge+j*h) for j in (1,2,3,4)];rows=[]
  for n in obj.pose.bones.keys():
-  l=[Vector(s[n]['p']) for s in left];r=[Vector(s[n]['p']) for s in right];lp=3*l[0]-3*l[1]+l[2];rp=3*r[0]-3*r[1]+r[2];lv=(2.5*l[0]-4*l[1]+1.5*l[2])*fps/h;rv=(-2.5*r[0]+4*r[1]-1.5*r[2])*fps/h
-  lq=[s[n]['q'] for s in left];rq=[s[n]['q'] for s in right];z=[Vector(qm.qlog(qm.qmul(qm.inverse(lq[0]),q))) for q in lq+rq];ql=3*z[0]-3*z[1]+z[2];qr=3*z[3]-3*z[4]+z[5];wl=(2.5*z[0]-4*z[1]+1.5*z[2])*fps/h;wr=(-2.5*z[3]+4*z[4]-1.5*z[5])*fps/h
+  l=[Vector(s[n]['p']) for s in left];r=[Vector(s[n]['p']) for s in right];lp,lv=map(Vector,boundary_estimate(l,h/fps,'left'));rp,rv=map(Vector,boundary_estimate(r,h/fps,'right'))
+  lq=[s[n]['q'] for s in left];rq=[s[n]['q'] for s in right];z=[Vector(qm.qlog(qm.qmul(qm.inverse(lq[0]),q))) for q in lq+rq];ql,wl=map(Vector,boundary_estimate(z[:4],h/fps,'left'));qr,wr=map(Vector,boundary_estimate(z[4:],h/fps,'right'))
   rows.append({'bone':n,'position_m':(lp-rp).length,'orientation_deg':math.degrees((ql-qr).length),'root_velocity_m_s':(lv-rv).length,'angular_velocity_deg_s':math.degrees((wl-wr).length)})
  return {'frame':edge,**{k:(next(v[k] for v in rows if v['bone']==pelvis) if k=='root_velocity_m_s' else max(v[k] for v in rows)) for k in limits},'bones':rows}
 if a.verify:

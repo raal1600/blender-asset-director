@@ -52,10 +52,12 @@ def analyze(reader,obj,profile,motions,schedules,geometry):
             for foot in SIDES:
                 points=[s['feet'][foot]['point'] for s in samples]
                 drift=max(math.dist(a[:2],b[:2]) for a in points for b in points)
-                maximum_height=max(abs(s['feet'][foot]['low']-profile['ground_z']) for s in samples)
-                feet[foot]={'planted':drift<=.01*height and maximum_height<=.01*height,
+                maximum_height=max(abs(s['feet'][foot]['point'][2]-profile['ground_z']) for s in samples)
+                feet[foot]={'planted':drift<=.01*height and maximum_height<=.005*height,
                     'drift_m':drift,'max_ground_distance_m':maximum_height,'mesh':landmarks[foot][0],'vertex':landmarks[foot][1]}
             root_distance=math.dist(samples[0]['root'][:2],samples[-1]['root'][:2])
+            require(m[0].get('root_intent')!='stationary-reviewed' or root_distance<.002*height,
+                    'MOTION_BRICKS_ROOT_INTENT','Reviewed stationary intent conflicts with evaluated root travel. Use observed native motion; original root curves will not be removed')
             ambiguous=root_distance<.002*height and any(v['drift_m']>.01*height for v in feet.values()) and not raw and not m[0].get('root_intent')
             require(not ambiguous,'MOTION_BRICKS_ROOT_INTENT','Stationary root with moving feet is ambiguous. Choose stationary intent after review, or prepare a derived root path with reviewed contacts; direction is never inferred from its name')
             require(any(v['planted'] for v in feet.values()),'MOTION_BRICKS_BOUNDARY_CONTACT',

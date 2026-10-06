@@ -47,6 +47,14 @@ export async function updateTransitionRequest(work,id,sceneId,revision,request,v
   setWorking(scene,request,cap.implementation);
   return work.store.save(p,p.revision);
 }
+export async function discardTransitionRequest(work,id,sceneId,revision){
+  const p=await work.project(id,revision),scene=work.scene(p,sceneId);
+  assert(scene.stage==='action'&&!scene.task&&!scene.candidate,'Finish the other scene operation before discarding this request.',409);
+  if(scene.run){const run=await json(await safe(p.directory,`Runs/${scene.run}.json`));assert(run.publication==='TRANSITION_REVIEW_ONLY','Another operation owns this scene.',409);}
+  else await work.unlocked(p);
+  reviewState(scene).working=null;
+  return work.store.save(p,p.revision);
+}
 export async function publishCandidate({scene,checkpoint,data,record,output},working){
   const review=reviewState(scene);
   assert(!review.candidates.some(c=>c.id===record.id),'Generation attempt already has an immutable candidate.',409);

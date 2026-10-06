@@ -61,6 +61,15 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
     from .motion_bricks_analysis import analyze
     emit('evaluating_boundary_support')
     support=analyze(reader,obj,profile,{'source':previous,'target':motion},schedules,geometry)
+    contacts=contract.contact_plan(motion[0]['transition'].get('contacts'))
+    require(sum(contacts[e]['seconds'] for e in ('source','target'))<=.6*duration/fps,
+            'MOTION_BRICKS_CONTACTS','Contact windows occupy too much of this bridge; shorten the windows or request a longer generated duration')
+    for edge in ('source','target'):
+        selected=contacts[edge]['support']
+        chosen=('left','right') if selected=='both' else (selected,) if selected in ('left','right') else ()
+        require(all(support.get('boundaries',{}).get(edge,{}).get('feet',{}).get(foot,{}).get('planted') for foot in chosen),
+                'MOTION_BRICKS_CONTACTS',edge.title()+' selected foot is not planted throughout its native context. Correct the annotation, prepare a derived root path, or explicitly choose another trim boundary')
+    support['contact_plan']=contacts
     a=pose(previous,elapsed,True);ap=pose(previous,elapsed-h*previous[0]['speed']);app=pose(previous,elapsed-2*h*previous[0]['speed'])
     b=pose(motion,0);bn=pose(motion,h*motion[0]['speed']);bnn=pose(motion,2*h*motion[0]['speed'])
     tangents=native_tangents(a,b,ap,app,bn,bnn,h)
@@ -141,7 +150,7 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
         ret.apply_rotations(clone,ret.decode_rotations(clone,profile,result['local_xyzw'][i]));raw.append(capture())
     if directory:atomic_json(directory/(prefix+'-retargeted.json'),{'request_id':request_id,'poses':raw,'first_model_index':first})
     emit('seam_processing')
-    step=duration/(last-first);window=min(6.,(last-first)/4)*step
+    step=duration/(last-first);window=min(12.,.4*(last-first))*step
     residuals={n:[seam.rotation_residual(raw[k][n]['q'],p[n]['q'],qm.angular_velocity(raw[j][n]['q'],raw[l][n]['q'],step),tangents[edge][n]['angular'])
                   for edge,(k,j,l,p) in enumerate(((0,0,1,a),(-1,-2,-1,b)))] for n in spec}
     worlds=[ret.axes()@Vector(v)/profile['world_to_model_scale']+origin for v in result['roots']]

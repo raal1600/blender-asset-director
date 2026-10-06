@@ -52,3 +52,24 @@ checked before loading. Provider events and separate native inference, request
 conversion, output conversion and loading durations distinguish model compute
 from application latency. This is sampled resource monitoring, not an allocator
 cap or proof against unrelated whole-device interference.
+
+Generated joins optionally carry `contacts` with `origin: user-reviewed` and
+`source`/`target` records `{support, seconds}`. Support is auto, left, right,
+both, or none; intervals are 0.04–0.20 seconds, additionally bounded by bridge
+duration. Auto means the evaluated proposal, not ground truth. Selected explicit
+feet must pass native-context support checks before model loading. The plan is
+included in the dependency fingerprint and correction provenance. It drives
+bridge-only positional/orientation support processing, not backend conditioning.
+
+Clips optionally carry `root_intent: stationary-reviewed`. This is valid only
+for evaluated stationary root travel and does not remove native root curves.
+Changing the selected Action clears this intent and its contact correction
+metadata. Missing intent on ambiguous in-place motion produces an actionable
+preparation refusal. Direction is never derived from an Action label.
+
+Seam reporting uses cubic one-sided extrapolation from four samples at h,2h,3h,
+4h from the shared boundary, with h=1/1536 second. Derivatives are per second;
+both angular estimates use quaternion logs in the same near-left reference
+frame. The retained convergence experiment documents why the former three-point
+estimate over-reported velocity differences on high-curvature baked segments.
+This does not excuse excessive acceleration or establish physical feasibility.
