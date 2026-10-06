@@ -8,6 +8,7 @@ import {worldActionNeedsSave} from './world-draft.mjs';
 import {actionView,actionDraft,actionInspection,ensureActionInspection,actionDraftStatus,actionPreviewScope} from './workbench-action.mjs';
 import {actionInspectionAttempt,currentActionInspection,actionInspectionRefresh} from './action-inspection.mjs';
 import {timelineDraft} from './action-timeline-draft.mjs';
+import {comparisonMarkup,openComparison} from './transition-comparison.mjs';
 import {actionSelectionFrame,actionSelectionStamp,actionSelectionSeeking} from './action-selection.mjs';
 import {syncTimelineUI,timelineControls} from './action-timeline-view.mjs';
 import {sceneLayerView,sceneLayerDraft,layerInspection,ensureLayerInspection,cameraForm} from './workbench-scene-layer.mjs';
@@ -151,11 +152,11 @@ function clearSceneViewer(){actionSeeking.cancel();sceneViewer?.dispose();sceneV
 const sceneViewKey=()=>cp()?projectId+':'+sceneId+':'+s().stage+':'+cp().id+':'+cp().sha256+':'+JSON.stringify(shotFor(s())):null;
 function actionViewContext(){const key=sceneViewKey();return tab==='scenes'&&s()?.stage==='action'&&sceneViewerKey===key?key:null;}
 function seekSelectedAction(){const draft=currentActionDraft(),current=draft?.checkpointId===cp()?.id&&draft?.sha256===cp()?.sha256;void actionSeeking.seek(sceneViewer,actionViewContext(),current?actionSelectionFrame(draft):null);}
-function renderActionSelection(){render();seekSelectedAction();}
+function renderActionSelection(){render();seekSelectedAction();scheduleTransitionRequest();}
 function showSceneViewer(host){clearSceneViewer();sceneViewer=startViewer(host,{kind:'checkpoint',id:cp().id});sceneViewerKey=sceneViewKey();const saved=motionReturnFrames.get(projectId+':'+sceneId);if(s().stage==='action'&&saved&&!saved.applied&&saved.checkpointId===cp().id&&saved.sha256===cp().sha256)void actionSeeking.seek(sceneViewer,actionViewContext(),saved.frame,()=>{saved.applied=true;});}
-function startViewer(host,request){const context={projectId,sceneId,revision:p().revision},viewerId='viewer_'+crypto.randomUUID();return openViewer({host,
- actionEdit:request.kind==='checkpoint'&&s().stage==='action'?{getDraft:()=>currentActionDraft(),onChange:actionViewerChanged,canEdit:()=>!busy&&!state.locked&&!s()?.task&&!s()?.run&&!actionSave&&currentActionDraft()?.checkpointId===cp()?.id&&currentActionDraft()?.sha256===cp()?.sha256}:undefined,
- worldEdit:request.kind==='checkpoint'&&s().stage==='world'?{labels:Object.fromEntries((p().workbench.catalogPins||[]).map(a=>[a.id,a.title])),changed:()=>syncWorldDraftUI()}:undefined,
+function startViewer(host,request,{editable=true}={}){const context={projectId,sceneId,revision:p().revision},viewerId='viewer_'+crypto.randomUUID();return openViewer({host,
+ actionEdit:editable&&request.kind==='checkpoint'&&s().stage==='action'?{getDraft:()=>currentActionDraft(),onChange:actionViewerChanged,canEdit:()=>!busy&&!state.locked&&!s()?.task&&!s()?.run&&!actionSave&&currentActionDraft()?.checkpointId===cp()?.id&&currentActionDraft()?.sha256===cp()?.sha256}:undefined,
+ worldEdit:editable&&request.kind==='checkpoint'&&s().stage==='world'?{labels:Object.fromEntries((p().workbench.catalogPins||[]).map(a=>[a.id,a.title])),changed:()=>syncWorldDraftUI()}:undefined,
  inspectInBlender:request.kind==='checkpoint'?undefined:()=>perform(async()=>{if(projectId!==context.projectId||sceneId!==context.sceneId||$(request.kind==='catalog'?'catalog-file':'source-file')?.value!==request.file)throw Error('Preview context changed; reopen the asset first.');await dispatch('asset-preview-open',request);}),
  prepare:signal=>api('workbench/viewer-prepare',{...context,request,viewerId},signal),
  release:()=>fetch('/api/workbench/viewer-release',{method:'POST',headers:requestHeaders(),body:JSON.stringify({...context,viewerId}),keepalive:true}),
@@ -168,7 +169,7 @@ const b=(text,action,data={},cls='',disabled=false)=>`<button class="${cls}" dat
 const next=(name,args={})=>api('workbench/'+name,{projectId,sceneId,revision:p().revision,...args});
 function notice(message,kind='error'){$('notice').hidden=!message;$('notice').textContent=message||'';$('notice').dataset.kind=kind;$('notice').setAttribute('role',kind==='success'?'status':'alert');const local=$('browser-notice');if(local){local.hidden=!message;local.textContent=message||'';}}
 async function perform(fn){if(busy)return;busy=true;syncWorldDraftUI();syncActionDraftUI();document.body.classList.add('working');$('app').classList.add('busy');notice('');try{await fn();}catch(e){try{if(projectId)await load();}catch{}notice(e.message);}finally{busy=false;document.body.classList.remove('working');$('app').classList.remove('busy');syncConsentButtons();syncWorldDraftUI();syncActionDraftUI();syncLayerDraftUI();syncOutputUI();scheduleActionInspection();scheduleLayerInspection();scheduleWorldPreparation();}}
-function acceptSnapshot(value){if(currentLayerDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!==currentLayerDraft().layer)throw Error('Activity changed elsewhere. Your camera/light draft is retained; discard it before reloading.');if(currentActionDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='action')throw Error('Activity changed elsewhere. Your Action draft is retained; discard it before reloading.');if(sceneViewer?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='world')throw Error('This scene or activity changed elsewhere. Your local placement draft remains open. Discard it before reloading the changed activity.');state=value;reconcileWorldSave();reconcileLayerSave();if(actionSave){const run=state.runs.find(r=>r.id===actionSave.body.request.requestId);if(run?.state==='SUCCEEDED'){if(!s().checkpoints.some(c=>c.id===run.resultCheckpointId))throw Error('Action Save receipt has no matching checkpoint.');const checkpoint=s().checkpoints.find(c=>c.id===run.resultCheckpointId);if(actionSave.draft.timeline)motionReturnFrames.set(projectId+':'+sceneId,{checkpointId:checkpoint.id,sha256:checkpoint.sha256,performer:actionSave.draft.selected,frame:actionSave.draft.nextFrame(),applied:false});actionSave.draft.discard();actionDrafts.delete(projectId+':'+sceneId);actionSave=null;}else if(run&&['FAILED','INTERRUPTED','CANCELLED'].includes(run.state)){actionSave=null;notice(run.error||'Action Save failed. Your draft is preserved.');}}}
+function acceptSnapshot(value){if(currentLayerDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!==currentLayerDraft().layer)throw Error('Activity changed elsewhere. Your camera/light draft is retained; discard it before reloading.');if(currentActionDraft()?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='action')throw Error('Activity changed elsewhere. Your Action draft is retained; discard it before reloading.');if(sceneViewer?.dirty&&value.project.workbench.scenes.find(x=>x.id===sceneId)?.stage!=='world')throw Error('This scene or activity changed elsewhere. Your local placement draft remains open. Discard it before reloading the changed activity.');state=value;reconcileWorldSave();reconcileLayerSave();if(actionSave){const run=state.runs.find(r=>r.id===actionSave.body.request.requestId);if(run?.state==='SUCCEEDED'){if(!s().checkpoints.some(c=>c.id===run.resultCheckpointId))throw Error('Action Save receipt has no matching checkpoint.');const checkpoint=s().checkpoints.find(c=>c.id===run.resultCheckpointId);if(run.publication==='TRANSITION_REVIEW_ONLY'){const finished=actionSave;actionSave=null;if(finished.remaining?.length&&!finished.stale){const candidate=s().transitionReview?.candidates.find(c=>c.id===run.id);if(candidate?.fingerprint===s().transitionReview?.working?.fingerprint){const request=structuredClone(finished.body.request),remaining=[...finished.remaining],seed=remaining.shift();for(const change of request.changes)for(const clip of change.clips||[])if(clip.transition?.mode==='generated')clip.transition.seed=seed;setTimeout(()=>{if(!busy&&!actionSave)void perform(()=>startTransitionAttempt(finished.draft,request,remaining));},0);}}return;}if(actionSave.draft.timeline)motionReturnFrames.set(projectId+':'+sceneId,{checkpointId:checkpoint.id,sha256:checkpoint.sha256,performer:actionSave.draft.selected,frame:actionSave.draft.nextFrame(),applied:false});actionSave.draft.discard();actionDrafts.delete(projectId+':'+sceneId);actionSave=null;}else if(run&&['FAILED','INTERRUPTED','CANCELLED'].includes(run.state)){actionSave=null;notice(run.error||'Action Save failed. Your draft is preserved.');}}}
 async function load(){overview=await api('state?compact=true');if(projectId&&!overview.projects.some(x=>x.id===projectId)){if(sceneViewer?.dirty||currentActionDraft()?.dirty||actionSave||currentLayerDraft()?.dirty||layerSave)throw Error('This production is no longer available. Your local draft remains open; restore the production before saving.');projectId=null;}if(projectId){acceptSnapshot(await api('workbench/state?'+new URLSearchParams({projectId,compact:true})));if(!p().workbench.scenes.some(x=>x.id===sceneId))sceneId=p().workbench.scenes[0]?.id;sessionStorage.setItem('wb-project',projectId);sessionStorage.setItem('wb-scene',sceneId||'');}else state=null;render();if(browser.isOpen)await browser.refresh();}
 function reconcileWorldSave(){
  if(!worldSave)return;const run=state?.runs.find(r=>r.id===worldSave.body.request.requestId);
@@ -185,6 +186,7 @@ function currentActionDraft(){
  const useTimeline=cap?.action_timeline==='action-timeline-v1'&&run.inspection.performers.every(p=>p.timeline?.version==='action-timeline-v1')&&(motionEnabled.has(key)||run.inspection.performers.some(p=>p.timeline.managed));
  const draft=useTimeline?timelineDraft(checkpoint,run):actionDraft(checkpoint,run),saved=motionReturnFrames.get(key);
  if(draft.timeline&&saved?.checkpointId===checkpoint.id&&saved.sha256===checkpoint.sha256&&draft.audit.performers.some(p=>p.name===saved.performer))draft.select(saved.performer);
+ const working=s()?.transitionReview?.working;if(draft.timeline&&working?.baseCheckpointId===checkpoint.id&&working.baseSha256===checkpoint.sha256&&working.request.audit_sha256===draft.audit.sha256)draft.restoreRequest(working.request);
  actionDrafts.set(key,draft);return draft;
 }
 function scheduleActionInspection(){
@@ -198,10 +200,43 @@ function scheduleActionInspection(){
   });}
  },0);
 }
+let transitionRequestTimer=null,transitionRequestWrite=Promise.resolve();
+function reviewRunning(){return state?.runs.some(r=>r.id===s()?.run&&r.publication==='TRANSITION_REVIEW_ONLY')===true;}
+function transitionEditingBlocked(){return busy||!!s()?.task||((state?.locked||s()?.run||actionSave)&&!reviewRunning());}
+async function startTransitionAttempt(draft,template,remaining){
+ if(actionSave)throw Error('A generation attempt is still active.');
+ const request={...structuredClone(template),requestId:'run_'+crypto.randomUUID()};
+ if(!request.working_request_id){
+  await transitionRequestWrite.catch(()=>{});
+  const staged=await next('transition-request',{request});
+  request.working_request_id=staged.workbench.scenes.find(scene=>scene.id===sceneId).transitionReview.working.id;
+  state=await api('workbench/state?'+new URLSearchParams({projectId,compact:true}));
+ }
+ actionSave={draft,remaining,body:{projectId,sceneId,revision:p().revision,request}};
+ try{await api('workbench/action-save',actionSave.body);await load();}
+ catch(error){actionSave=null;await load();throw error;}
+}
+function scheduleTransitionRequest(){
+ if(actionSave){actionSave.stale=true;actionSave.remaining=[];}
+ clearTimeout(transitionRequestTimer);
+ transitionRequestTimer=setTimeout(()=>{void persistTransitionRequest().catch(e=>notice(e.message));},350);
+}
+async function persistTransitionRequest(){
+ clearTimeout(transitionRequestTimer);
+ const draft=currentActionDraft();if(!draft?.timeline||!draft.dirty||draft.invalid||!draft.changes.some(c=>c.clips.some(x=>x.transition?.mode==='generated')))return;
+ const request=draft.request('run_'+crypto.randomUUID()),context={projectId,sceneId};
+ transitionRequestWrite=transitionRequestWrite.catch(()=>{}).then(async()=>{
+  const current=await api('workbench/state?'+new URLSearchParams({projectId:context.projectId,compact:true}));
+  await api('workbench/transition-request',{...context,revision:current.project.revision,request});
+  if(projectId===context.projectId&&sceneId===context.sceneId){state=await api('workbench/state?'+new URLSearchParams({projectId,compact:true}));syncActionDraftUI();}
+ });
+ return transitionRequestWrite;
+}
 async function saveActionDraft(){
  const draft=currentActionDraft();if(!draft?.dirty)return;
  if(!currentActionInspection(draft.run,cap))throw Error(actionInspectionRefresh+' Your local choices are retained; discard them explicitly to refresh.');
  if((draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256))throw Error('Action draft is stale. Discard it and reload the saved scene.');
+ if(draft.timeline&&draft.changes.some(c=>c.clips.some(x=>x.transition?.mode==='generated'))){await startTransitionAttempt(draft,draft.request('run_'+crypto.randomUUID()),[]);return;}
  if(!actionSave)actionSave={draft,body:{projectId,sceneId,revision:p().revision,request:draft.request('run_'+crypto.randomUUID())}};
  const attempt=actionSave;syncActionDraftUI();
  try{await api('workbench/action-save',attempt.body);}catch(error){await load();if(!state.runs.some(r=>r.id===attempt.body.request.requestId)){actionSave=null;throw error;}}
@@ -264,7 +299,8 @@ function syncActionDraftUI(){
   const error=$('action-'+input.dataset.actionField+'-error');if(error){error.textContent=message;error.hidden=!message;}
  }
  const ready=document.querySelector('[data-action="action-ready"]');if(ready)ready.disabled=blocked||!cp()||!draft||draft.dirty||stale;
- syncTimelineUI(draft,esc,blocked||stale||unsupported);sceneViewer?.updateActionPath();
+ if(save&&draft?.timeline&&draft.changes.some(c=>c.clips.some(x=>x.transition?.mode==='generated')))save.textContent='Generate candidate';
+ syncTimelineUI(draft,esc,transitionEditingBlocked()||stale||unsupported);sceneViewer?.updateActionPath();
  if(draft?.timeline){const legacy=document.querySelector('[data-action="action-hold-all"]');if(legacy)legacy.hidden=true;const text=document.querySelector('.action-details>p');if(text)text.textContent='Timeline clips retain native source keys and World placement. Repeats require explicit review. Travel is authored, with contacts and joins still needing playback review.';const heading=document.querySelector('.action-heading p');if(heading)heading.textContent='Choose an animation, shape its path, then save it as an editable clip.';}
 }
 function syncWorldDraftUI(){
@@ -425,6 +461,10 @@ async function dispatch(a,d){
  }
  if(a==='action-discard'){if(actionSave)throw Error('Wait for the Save receipt.');currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);clearSceneViewer();await load();return;}
  if(a==='action-undo'){const draft=currentActionDraft(),selected=actionSelectionStamp(draft);actionSeeking.cancel();draft?.undo();render();if(selected!==actionSelectionStamp(currentActionDraft()))seekSelectedAction();return;}
+ if(a==='transition-alternatives'){const draft=currentActionDraft();draft.setSamplingPlan([1234,7,42]);await startTransitionAttempt(draft,draft.request('run_'+crypto.randomUUID()),[7,42]);return;}
+ if(a==='transition-review'){const candidates=s().transitionReview?.candidates||[],chosen=candidates.find(c=>c.id===d.id);if(!chosen)throw Error('Candidate changed; refresh.');modal('Compare transition candidates',comparisonMarkup(candidates,chosen,esc),'','Done');$('dialog').classList.add('transition-comparison-dialog');assetViewer=openComparison($('dialog'),candidates,startViewer);return;}
+ if(a==='transition-accept'){await persistTransitionRequest();const c=s().transitionReview?.candidates.find(c=>c.id===d.id);if(!c)throw Error('Candidate changed.');await next('transition-accept',{request:{candidateId:c.id,eventId:'run_'+crypto.randomUUID(),fingerprint:c.fingerprint}});currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);clearSceneViewer();await load();notice('Candidate accepted and saved as the complete timeline revision.','success');return;}
+ if(a==='transition-restore'){await next('transition-restore',{request:{checkpointId:d.id,eventId:'run_'+crypto.randomUUID()}});currentActionDraft()?.discard();actionDrafts.delete(projectId+':'+sceneId);clearSceneViewer();await load();notice('Previous accepted artifact restored without regeneration.','success');return;}
  if(a==='action-save'){await saveActionDraft();return;}
  if(a==='motion-enable'){
   if(currentActionDraft()?.dirty)throw Error('Save or discard existing choices first.');
@@ -584,9 +624,9 @@ if(a==='scan'){if(!confirm('Rescan the original database packages? This updates 
  if(a==='resolve'){if(!confirm('Confirm you stopped the external Blender task or encoder. The launcher does not terminate it for you.'))return;await next('resolve',{sceneId:d.scene||null,runId:d.run,confirmStopped:true});close();await load();return;}
 }
 function editMotion(node){
- if(busy||state.locked||s()?.task||s()?.run||actionSave)return;
+ if(transitionEditingBlocked())return;
  const draft=currentActionDraft();if(!draft?.timeline||draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale; reload before editing.');
- draft.edit(node.dataset.motionField,node.type==='checkbox'?node.checked:node.value);syncActionDraftUI();
+ draft.edit(node.dataset.motionField,node.type==='checkbox'?node.checked:node.value);scheduleTransitionRequest();syncActionDraftUI();
 }
 document.addEventListener('input',e=>{if(!e.target.dataset.motionField||e.target.type==='checkbox')return;try{editMotion(e.target);notice('');}catch(error){notice(error.message);}});
 // A newer direct playback gesture must not be overwritten by a delayed seek.
@@ -596,8 +636,8 @@ document.addEventListener('input',e=>{if(e.target.matches('[data-view="time"]')&
 document.addEventListener('click',e=>{if(e.target.closest('[data-view="play"]')?.closest('[data-scene-viewer]'))actionSeeking.cancel();});
 document.addEventListener('change',e=>{
  try{
-  if(e.target.hasAttribute('data-motion-add')){if(busy||state.locked)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){draft.add(e.target.value);const take=draft.audit.performers.find(p=>p.name===draft.selected).takes.find(t=>t.id===e.target.value);if(!take.travel_blocker&&take.gait?.status==='estimated')draft.edit('travel',true);renderActionSelection();}}
-  else if(e.target.hasAttribute('data-motion-replace')||e.target.hasAttribute('data-motion-insert')){if(busy||state.locked||s()?.task||s()?.run||actionSave)return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){if(e.target.hasAttribute('data-motion-insert'))draft.insertBefore(e.target.value);else draft.replace(e.target.value);renderActionSelection();}}
+  if(e.target.hasAttribute('data-motion-add')){if(transitionEditingBlocked())return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){draft.add(e.target.value);const take=draft.audit.performers.find(p=>p.name===draft.selected).takes.find(t=>t.id===e.target.value);if(!take.travel_blocker&&take.gait?.status==='estimated')draft.edit('travel',true);renderActionSelection();}}
+  else if(e.target.hasAttribute('data-motion-replace')||e.target.hasAttribute('data-motion-insert')){if(transitionEditingBlocked())return;const draft=currentActionDraft();if(draft.checkpointId!==cp()?.id||draft.sha256!==cp()?.sha256)throw Error('Timeline is stale.');if(e.target.value){if(e.target.hasAttribute('data-motion-insert'))draft.insertBefore(e.target.value);else draft.replace(e.target.value);renderActionSelection();}}
   else if(e.target.dataset.motionField){if(e.target.type==='checkbox'||e.target.tagName==='SELECT'){const field=e.target.dataset.motionField,detailsOpen=!!document.querySelector('[data-motion-details]')?.open;editMotion(e.target);render();const details=document.querySelector('[data-motion-details]');if(detailsOpen&&details)details.open=true;document.querySelector(`[data-motion-field="${field}"]`)?.focus({preventScroll:true});}currentActionDraft()?.finishEdit();}
  }catch(error){notice(error.message);}
 });

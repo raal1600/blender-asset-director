@@ -1,5 +1,49 @@
 # MotionBricks capability audit (2026-10-05)
 
+## 2026-10-07 authoring investigation (in progress)
+
+Isolated branch `feature/motionbricks-authoring-20261006`, foundation commit
+`90db942`, extends the combined #31/#30/visual-turn ancestry. Earlier entries
+remain historical evidence, not current acceptance of all quality gates.
+Private evidence root: `AssetDirector-MotionBricks-Authoring-20261006` under the
+operator's Documents directory. No private assets or model binaries are tracked.
+
+Verified in the current Windows Vulkan runtime: the configured DLL is the file
+actually loaded; SHA-256
+`e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7`.
+The pinned backend/GGML/weights remain unchanged. Same-setting raw repetitions
+were exact on this device. Changing the seed under argmax had no effect.
+Gumbel temperature 1 produced material differences, including after correction:
+two seed comparisons measured 7.14 and 7.24 degrees RMS interior local joint
+rotation difference. This demonstrates variation for the reference rig/pair,
+not naturalness, physical feasibility, or cross-device reproducibility.
+
+The expanded fixed quality preset falsified the older reference's overall
+acceptability despite passing endpoint seams: no qualifying measured stance in
+some outputs, excessive joint speed/acceleration, and about 75 degrees of maximum
+deterministic correction. Seeds 1234/7/42 and longer 1/1.5/2-second requests did
+not remove the large arm correction. These are mandatory quality FAILs.
+
+Investigation found a rest-calibration defect: independent shortest-arc segment
+alignments encoded a 76.24-degree, multi-axis elbow offset at rest, whereas G1
+has a hinge elbow. The new `g1-anatomical-frames-v2` uses the complete reviewed
+rest arm plane and the segment controlled by the final shoulder axis. A real
+reference run reduced maximum correction from 75.11 to 31.75 degrees and maximum
+joint speed from 1094 to 679 degrees/second while preserving round-trip, native
+channels, stitches and fresh reopening. Contact and acceleration gates STILL
+FAIL; the repair is not full acceptance. Straight/degenerate rest arms need
+explicit calibration rather than an invented bend plane. Legacy profiles remain
+readable for existing artifacts. New calibration changes the dependency hash.
+
+Implemented but not yet native-client-verified: separate immutable review
+checkpoints, stale-checked atomic acceptance, exact restore, persisted working
+requests, bounded three-seed alternatives, physical-time A/B viewing and restart
+reconciliation. Synthetic transport tests cover separation, failure, cancellation,
+corruption and acceptance idempotence; they do not substitute for visible native
+WebView2 journeys. See `motion-bricks-acceptance.json` for outstanding gates.
+
+## Earlier capability proof (2026-10-05)
+
 This is source evidence and a completed isolated CPU/Vulkan capability proof,
 not full neural-transition application acceptance. The user explicitly authorized local provider
 inference for this task. No installed runtime, user project, or original asset

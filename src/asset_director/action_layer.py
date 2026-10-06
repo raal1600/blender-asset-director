@@ -290,5 +290,8 @@ def verify(report):
 def verify_saved(report, filename):
     bpy.ops.wm.open_mainfile(filepath=str(filename), load_ui=False, use_scripts=False)
     verify(report)
+    if any(j.get('provider')=='motion-bricks.cpp' for c in report.get('changes',[]) for j in c.get('timeline',{}).get('connections',[])):
+        from .motion_bricks_validation import evaluate
+        report['transition_validation']=evaluate(report)
     from .scene_ops import scene_audit
     report.update(reopened=True, scene_audit=scene_audit(), action_audit=audit())

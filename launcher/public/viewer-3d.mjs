@@ -118,10 +118,10 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,a
       const select=()=>{mixer.stopAllAction();playing=false;node('play').textContent='Play';const clip=takes[Number(node('take').value)],staticPose=clip.duration===0;action=mixer.clipAction(clip);action.reset().setLoop(staticPose||shotRig?THREE.LoopOnce:THREE.LoopRepeat,Infinity);action.clampWhenFinished=staticPose||!!shotRig;action.play();mixer.update(0);node('time').max=String(clip.duration);node('play').disabled=staticPose;node('time').disabled=staticPose;clock();reset();dirty=true;};
       if(takes.length)select();else{host.querySelector('.viewer-animation').hidden=true;}
       const seekNote=document.createElement('p');seekNote.className='viewer-seek-note';seekNote.dataset.viewSeekNote='';seekNote.hidden=true;surface.after(seekNote);
-      seekActionFrame=(value,turnTarget=false)=>{
+      seekActionFrame=(value,turnTarget=false,exact=false)=>{
         if(!playback||shotView||(!action&&!playback.static)||!Number.isFinite(value))return;
         if(!turnTarget)actionRotation?.clear();playing=false;node('play').textContent='Play';
-        const requested=Math.round(value),actual=Math.max(playback.start,Math.min(playback.end,requested));
+        const requested=exact?value:Math.round(value),actual=Math.max(playback.start,Math.min(playback.end,requested));
         if(action){action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.paused=false;action.enabled=true;action.time=(actual-playback.start)/playback.fps;mixer.update(0);}else staticFrame=actual;
         clock();seekNote.hidden=requested===actual&&!playback.static;
         seekNote.textContent=playback.static?'Static saved pose at frame '+actual+'. Save changes to preview this animation.':'Draft starts at frame '+requested+'; saved playback covers '+playback.start+'–'+playback.end+'. Showing saved frame '+actual+'. Save changes to preview the new timing.';
@@ -181,7 +181,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,a
       const details=document.createElement('details'),summary=document.createElement('summary'),reason=document.createElement('p');summary.textContent='Technical details';reason.textContent=failure.detail;details.append(summary,reason);box.append(details);host.append(box);host.dataset.viewerState='failed';
     }
   })();
-  return {dispose,ready,seekFrame:value=>seekActionFrame?.(value),updateActionPath:()=>{actionPath?.update();actionRotation?.update();},get dirty(){return !!editor?.dirty;},get draft(){return editor?.state;},
+  return {dispose,ready,seekFrame:value=>seekActionFrame?.(value),seekFrameExact:value=>seekActionFrame?.(value,false,true),updateActionPath:()=>{actionPath?.update();actionRotation?.update();},get dirty(){return !!editor?.dirty;},get draft(){return editor?.state;},
     get currentFrame(){return shotView?shotFrame(shotView,shotTime):playback?.static?staticFrame:playback?Math.min(playback.end,Math.round(playback.start+(action?.time||0)*playback.fps)):null;},
     request:id=>{if(!editor)throw Error('This saved scene needs placement preparation in Blender.');return editor.request(id);},
     targets:()=>editor?.targets()||[],undo:()=>editor?.undo(),discard:()=>editor?.discard(),setEnabled:value=>editor?.setEnabled(value)};

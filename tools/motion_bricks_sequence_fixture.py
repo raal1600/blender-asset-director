@@ -96,6 +96,8 @@ for case in cases:
   report=layer.apply(options,case['name'],execution={'directory':folder,'progress':lambda event:print(json.dumps({'seconds':time.monotonic(),'progress':event}),flush=True)});atomic_json(folder/'report.json',report)
   assert not case.get('expected'),'Expected incompatible input rejection'
   path=folder/'result.blend';bpy.ops.wm.save_as_mainfile(filepath=str(path));layer.verify_saved(report,path);scene=bpy.context.scene;rig=bpy.data.objects[manifest['rig']];timeline=json.loads(rig['bad_action_timeline_v1']);assert len(timeline['connections'])==len(clips)-1
+  atomic_json(folder/'report.json',report)
+  row['transition_validation']=report.get('transition_validation')
   metrics=[seam_metrics(rig,edge,case['fps']) for join in timeline['connections'] for edge in (join['start'],join['end'])];failures=[(s['frame'],k,s[k],limit) for s in metrics for k,limit in limits.items() if s[k]>limit]
   preserved=all(digest(layer.channels(bpy.data.actions[n]))==value for n,value in original.items());assert preserved
   row.update(status='FAIL' if failures else 'PASS',failures=failures,boundaries=metrics,source_actions_preserved=preserved,rig=rig.name,original_source_channels=original,result=str(path),result_sha256=file_hash(path),native_time_normalization=[sf/case['fps'] for _,sf in selected],providers=[j['provider'] for j in timeline['connections']],samples=[{'frame':f,'joints':sample(rig,f)} for f in range(1,scene.frame_end+1)])

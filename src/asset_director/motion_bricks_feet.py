@@ -114,7 +114,7 @@ def solve(rig, roles, side, target):
     require((world @ end.head-target).length < 2e-5, 'MOTION_BRICKS_FOOT_SOLVE', 'Positional foot retarget did not converge')
 
 
-def cleanup(reader, source, profile, request, result, samples, path, origin, geometry, natives, tangents, check):
+def cleanup(reader, source, profile, request, result, samples, path, origin, geometry, natives, tangents, check, *, support=None):
     clone = reader.clone; roles = profile['roles']; ground = profile['ground_z']
     height = -min(p[1] for p in profile['skeleton']['neutral_joints'])/profile['world_to_model_scale']
     a, b, ap, app, bn, bnn, h = natives
@@ -130,6 +130,22 @@ def cleanup(reader, source, profile, request, result, samples, path, origin, geo
         return u*u*u*(10+u*(-15+6*u))
     soles = Soles(source, clone, roles)
     try:
+        # Extend only measured native support into a short bridge-only core.
+        # The model receives no contact labels; this is disclosed positional IK.
+        locks=[]
+        for edge,label in ((0,'source'),(-1,'target')):
+            boundary=(support or {}).get('boundaries',{}).get(label,{})
+            for side,contact in boundary.get('feet',{}).items():
+                if not contact['planted']:continue
+                state(samples[edge][1],path[edge][1]);anchor=soles.landmark(contact['mesh'],contact['vertex'])
+                locks.append({'edge':edge,'side':side,'mesh':contact['mesh'],'vertex':contact['vertex'],'anchor':anchor.copy()})
+        fps=bpy.context.scene.render.fps/bpy.context.scene.render.fps_base
+        core=min(.08*fps,duration*.2);release=min(.08*fps,duration*.2)
+        def lock_weight(index,lock):
+            elapsed=duration*(index/count if lock['edge']==0 else 1-index/count)
+            if elapsed<=core:return 1.
+            u=min(1.,(elapsed-core)/release)
+            return 1-u*u*u*(10+u*(-15+6*u))
         rows = []
         for (_, pose), (_, delta) in zip(samples, path):
             check(); state(pose, delta); rows.append({'feet': feet(), 'low': soles.heights()})
@@ -191,12 +207,28 @@ def cleanup(reader, source, profile, request, result, samples, path, origin, geo
         for index, (_, pose) in enumerate(corrected):
             for n, values in pose.items():
                 values['q'] = seam.correct_rotation(values['q'], residuals[n], duration*index/count, duration, window)
+            # Reconcile positional support after rotational seam processing.
+            # Every anchor and measured correction is retained for review.
+            state(pose,path[index][1])
+            for lock in locks:
+                weight=lock_weight(index,lock)
+                if weight<=0:continue
+                point=soles.landmark(lock['mesh'],lock['vertex']);delta=lock['anchor']-point
+                delta.z=0.
+                foot=clone.matrix_world@clone.pose.bones[roles[lock['side']+'_foot']].head
+                maximum=max(maximum,(delta*weight).length)
+                if (delta*weight).length>1e-7:solve(clone,roles,lock['side'],foot+delta*weight)
+            for n in pose:
+                owner=clone.pose.bones[n] if n else clone
+                pose[n]={'q':list(rotation(owner)),'location':list(owner.location),'scale':list(owner.scale)}
         # Exact source endpoints are authoritative. Tangents are retained by the baker.
         corrected[0] = (samples[0][0], a); corrected[-1] = (samples[-1][0], b)
         return corrected, {'method': 'g1-positional-feet-v1', 'ground_z_m': ground,
             'ground_clearance_heuristic': {'zero_below_m':.02*height,'full_lift_above_m':.05*height,'interpolation':'C2 quintic release; inferred geometry, not contact annotations'},
             'model_feet_sha256': digest({s: [list(p) for p in v] for s,v in points.items()}),
             'max_pelvis_lowering_m': amplitude, 'max_foot_position_correction_m': maximum,
+            'support_locks':[{'edge':'source' if lock['edge']==0 else 'target','side':lock['side'],'mesh':lock['mesh'],'vertex':lock['vertex'],'anchor_world_m':list(lock['anchor'])} for lock in locks],
+            'support_lock_core_seconds':core/fps,'support_lock_release_seconds':release/fps,
             'sole_geometry': 'evaluated skin vertices with >0.8 mapped foot/toe weight',
             'contact_annotations': 'NONE; model foot positions are not authored contacts',
             'acceptance': 'REQUIRES_EVALUATED_CONTACT_AND_VISUAL_REVIEW'}

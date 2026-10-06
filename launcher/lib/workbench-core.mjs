@@ -1,4 +1,5 @@
 import {validateRenderDevice} from './render-device.mjs';
+import {recoverTransitionJobs} from './transition-review.mjs';
 import {taskScenePaths} from './task-paths.mjs';
 /** Real local scene work. No prototype fixtures, fake progress, or model calls. */
 import fs from 'node:fs/promises';
@@ -54,6 +55,7 @@ export class Workbench {
     assert(source,'Source not found.',404);return {...source,subcategory:sourceCategory(source),prepared:await preparedSource(this,source)};
   }
   async state(id,{compact=false}={}) {
+    await recoverTransitionJobs(this,id);
     const p=await this.project(id);
     const locked=await exists(await safe(p.directory,lockName))||await exists(await safe(p.directory,sharedLock));
     const taskStatuses={};

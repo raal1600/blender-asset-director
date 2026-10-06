@@ -58,6 +58,9 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
     schedules={side:contract.context_schedule(m[1]['range'],fps*m[0]['speed'],side,
         elapsed=m[4]['cycles']*(m[1]['range'][1]-m[1]['range'][0]))
         for side,m in (('source',previous),('target',motion))}
+    from .motion_bricks_analysis import analyze
+    emit('evaluating_boundary_support')
+    support=analyze(reader,obj,profile,{'source':previous,'target':motion},schedules,geometry)
     a=pose(previous,elapsed,True);ap=pose(previous,elapsed-h*previous[0]['speed']);app=pose(previous,elapsed-2*h*previous[0]['speed'])
     b=pose(motion,0);bn=pose(motion,h*motion[0]['speed']);bnn=pose(motion,2*h*motion[0]['speed'])
     tangents=native_tangents(a,b,ap,app,bn,bnn,h)
@@ -110,7 +113,7 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
                         'root_preparation':m[2].get('bad_root_contact_preparation_v1'),
                         'contact_metadata':m[2].get('bad_contact_intervals_v1')}
                   for side,m in (('source',previous),('target',motion))},
-        'evaluated_model_request':request,'timing':timing,'sampling':sampling,
+        'evaluated_model_request':request,'timing':timing,'sampling':sampling,'support_analysis':support,
         'root':{'owner':'native object/pelvis plus one composed delta path',
                 'model_origin_blender_m':list(origin),'model_to_blender':'Y-up/+Z-forward to Z-up/-Y-forward',
                 'native_world_velocity_m_s':[list(v*fps) for v in root_velocities]},
@@ -147,22 +150,32 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
                  (expected_b-worlds[last],root_velocities[1]-(worlds[last]-worlds[last-1])/step)]
     # Both source Actions own their native vertical motion. Placement is predicted XY.
     parent=obj.parent.matrix_world@obj.matrix_parent_inverse if obj.parent else obj.matrix_parent_inverse
-    inverse=parent.to_3x3().inverted();samples=[];path=[];count=math.ceil(duration*4)
+    inverse=parent.to_3x3().inverted();samples=[];path=[];uncorrected=[];raw_roots=[];count=math.ceil(duration*4)
     for index in range(count+1):
         check();time=duration*index/count;x=(last-first)*index/count;k=min(last-first-1,math.floor(x));t=x-k;p={}
+        before={}
         for n in spec:
             q=Quaternion(raw[k][n]['q']).slerp(Quaternion(raw[k+1][n]['q']),t)
+            before[n]={'q':list(q),'location':list(Vector(raw[k][n]['location']).lerp(Vector(raw[k+1][n]['location']),t)),
+                       'scale':list(Vector(raw[k][n]['scale']).lerp(Vector(raw[k+1][n]['scale']),t))}
             p[n]={'q':seam.correct_rotation(list(q),residuals[n],time,duration,window),
                   'location':list(Vector(raw[k][n]['location']).lerp(Vector(raw[k+1][n]['location']),t)),
                   'scale':list(Vector(raw[k][n]['scale']).lerp(Vector(raw[k+1][n]['scale']),t))}
         if index==0:p=copy.deepcopy(a)
         elif index==count:p=copy.deepcopy(b)
         state(p);desired=worlds[first+k].lerp(worlds[first+k+1],t)
+        uncorrected.append(before);raw_roots.append(list(desired))
         for edge,(value,velocity) in enumerate(root_errors):desired+=Vector(seam.edge_residual(list(value),list(velocity),time,duration,window,edge))
         f=geometry['start']+time;samples.append((f,p));path.append((f,list(inverse@(desired-hip()))))
     from .motion_bricks_feet import cleanup
     emit('contact_processing')
-    samples,foot_retarget=cleanup(reader,obj,profile,request,result,samples,path,origin,geometry,(a,b,ap,app,bn,bnn,h),tangents,check)
+    samples,foot_retarget=cleanup(reader,obj,profile,request,result,samples,path,origin,geometry,(a,b,ap,app,bn,bnn,h),tangents,check,support=support)
+    from .motion_bricks_quality import correction_metrics
+    corrected_roots=[]
+    for (_,pose_values),(_,offset) in zip(samples,path):
+        set_pose(reader,pose_values,offset,0.);corrected_roots.append(list(hip()))
+    corrections=correction_metrics(uncorrected,[row[1] for row in samples],raw_roots,corrected_roots)
+    corrections['foot_correction_m']=foot_retarget['max_foot_position_correction_m']
     delta=expected_b-hip_b
     provenance={'request_sha256':digest(request),'result_sha256':digest(result),'profile_sha256':digest(profile),
                 'source_revision':result['source_revision'],'model_revision':result['model_revision'],'library_sha256':result['library_sha256'],
@@ -174,7 +187,7 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
                 'seam_residual_free_model_indices':[first+window/step,last-window/step],
                 'root_seam_correction':{'method':'evaluated-world-velocity-compact-residual-v1','window_frames':window,
                                         'native_velocities_m_per_frame':[list(v) for v in root_velocities]},
-                'foot_retarget':foot_retarget,'contact_quality':'NOT_VERIFIED','visual_quality':'REQUIRES_REVIEW'}
+                'support_analysis':support,'correction_metrics':corrections,'foot_retarget':foot_retarget,'contact_quality':'NOT_VERIFIED','visual_quality':'REQUIRES_REVIEW'}
     emit('baking_generated_connection')
     provenance['transition_trace']=trace
     if directory:

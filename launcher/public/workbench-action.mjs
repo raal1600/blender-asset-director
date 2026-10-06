@@ -2,6 +2,7 @@
 import {taskBanner} from './workbench-task.mjs';
 import {progressLabel} from './workbench-progress.mjs';
 import {timelineControls,timelinePicker,timelineTracks} from './action-timeline-view.mjs';
+import {transitionReviewView} from './transition-review-view.mjs';
 import {actionInspectionAttempt,currentActionInspection} from './action-inspection.mjs';
 
 // Automatic read-only inspection can race a reload/second tab. Refresh once,
@@ -94,5 +95,6 @@ export function actionView({project,scene,stages,checkpoint,runs,locked,taskStat
   ${!cap?.action_layer?'<p class="note warn">Install the matching Action runtime before using native motion controls.</p>':''}
   ${draft?.timeline?`${timelinePicker(draft,esc,disabled)}<div class="action-motion-layout"><div class="action-motion-stage">${viewer}${previewScope}<section class="motion-timeline" data-motion-tracks aria-label="Character action timelines">${timelineTracks(draft,esc)}</section></div><aside class="motion-inspector" data-motion-inspector aria-label="Animation clip">${timelineControls(draft,esc,disabled)}</aside></div>`:`${controls}${cap?.action_timeline?button('Build a motion timeline','motion-enable','ghost',!!draft?.dirty):''}${viewer}${previewScope}`}
   ${draft?`${p?.unsupported?`<p class="note warn">${esc(p.unsupported)}. Use Blender or the reviewed specialist.</p>`:''}<details class="action-details"><summary>Timing and motion details</summary><p>${esc(draft.audit.fps)} fps · scene frames ${esc(draft.audit.frame_range.join('–'))}. Native source keys and World placement stay intact. Timing changes use the complete take; no loop, retarget or inferred mapping.</p>${button('Hold whole scene at current frame','action-hold-all','ghost',disabled)}${p?.type==='ARMATURE'?button('Edit rig controls in Blender','action-rig','ghost',!cap?.action_task||!!draft.dirty):''}${button('Inspect performers again','action-inspect','ghost',!!draft.dirty)}${draft.audit.unassigned.length?`<p>${draft.audit.unassigned.length} unbound action slot(s) need reviewed binding in Blender; they are not assigned by name.</p>`:''}</details>`:checkpoint?`<p role="status">${attempt?.state==='FAILED'?esc(attempt.error):'Inspecting saved performers and their native motion…'}</p>${!active?button(attempt?'Retry performer inspection':'Inspect performers','action-inspect'):''}`:''}
+  ${transitionReviewView(scene,draft,runs,esc,b,active)}
   <section class="world-next"><div class="grow"><h2>Review the motion, then continue</h2><p>Check timing, deformation and contacts. A still scene is valid too. Saving and playback are not approval.</p></div>${button('Action ready · continue to Shots','action-ready','primary',!checkpoint||!!draft?.dirty||stale||!draft)}</section></section>`;
 }

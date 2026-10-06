@@ -7,9 +7,10 @@ import {approveCheckpoint} from './workbench-model.mjs';
 import {checkpointScenePath} from './checkpoint-paths.mjs';
 
 export async function checkpointJob(work,id,sceneId,revision,request,policy) {
-  const {stage,operation,options,readOnly=false,candidateOnly=false,cancellation}=policy;
+  const {stage,operation,options,readOnly=false,candidateOnly=false,reviewOnly=false,cancellation}=policy;
   const checkCancelled=()=>assert(!cancellation?.cancelled,'Action Save cancelled; prior scene and local draft retained.',499);
   assert(!(readOnly&&candidateOnly),'Read-only inspection cannot publish a candidate.');
+  assert(!reviewOnly||!readOnly&&!candidateOnly,'Review-only publication must be a separate immutable checkpoint.');
   const p=await work.project(id),scene=work.scene(p,sceneId),runId=request.requestId;
   const identity=digest({projectId:id,sceneId,revision,request});
   const receipt=await safe(p.directory,`Runs/${runId}.json`);
@@ -35,10 +36,12 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
   const implementation=policy.implementation?await policy.implementation():null;
   const savedBase=scene.current,draftBase=scene.candidate;
   const record={schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',
+    launcherPid:process.pid,
     requestIdentity:identity,checkpointId:cp.id,checkpointSha256:cp.sha256,requestedRevision:revision,
     ...(implementation?{implementation}:{}),
     startedAt:now(),authorization:readOnly?'explicit-launcher-inspection':candidateOnly?'explicit-launcher-preparation':'explicit-launcher-save',options,
     ...(candidateOnly?{publication:'SEPARATE_CANDIDATE_ONLY'}:{}),
+    ...(reviewOnly?{publication:'TRANSITION_REVIEW_ONLY'}:{}),
     ...(policy.context?{context:policy.context}:{})};
   if(cancellation?.cancelled){record.state='CANCELLED';record.finishedAt=now();record.error='Action Save cancelled before native execution; prior scene and local draft retained.';await writeJson(receipt,record);return {run:record,reused:false};}
   await work.lock(p,runId);
@@ -91,7 +94,8 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
             source:operation+'-job',jobId:job.id,audit:data.scene_audit};
           await writeJson(await safe(q.directory,`Docs/Workbench/${cpId}.json`),checkpoint);
           s.checkpoints.push(checkpoint);
-          if(candidateOnly)s.candidate=cpId;else approveCheckpoint(s,stage,cpId,false);
+          if(reviewOnly)await policy.publish({p:q,scene:s,checkpoint,data,record,output});
+          else if(candidateOnly)s.candidate=cpId;else approveCheckpoint(s,stage,cpId,false);
           s.run=null;
           await work.store.save(q,q.revision);record.resultCheckpointId=cpId;
         });
