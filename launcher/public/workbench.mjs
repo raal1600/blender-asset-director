@@ -304,7 +304,7 @@ function syncActionDraftUI(){
  const run=state?.runs.find(r=>r.id===s()?.run);
  const cancel=bar.querySelector('[data-action="action-cancel"]');if(cancel){cancel.hidden=!(actionSave||run?.action==='action-edit'&&['PREPARING','RUNNING'].includes(run.state));cancel.disabled=!!actionSave?.cancelRequested;cancel.textContent=actionSave?.cancelRequested?'Cancelling...':'Cancel Save';}
  bar.querySelector('[role="status"]').textContent=actionSave?.cancelRequested?'Cancelling Save; previous scene retained':actionSave?'Saving performance in Blender':stale?'Preview out of date — discard the local draft to reload':run?progressLabel(run):actionDraftStatus(draft);
- const scope=document.querySelector('.action-preview-scope');if(scope)scope.textContent=actionPreviewScope(draft,stale);
+ const scope=document.querySelector('.action-preview-scope');if(scope)scope.textContent=actionPreviewScope(draft,stale,!!s()?.candidate);
  const unsupported=!!draft?.audit.performers.find(p=>p.name===draft.selected)?.unsupported;
  for(const control of document.querySelectorAll('[data-action-field]'))control.disabled=blocked||(control.dataset.actionField!=='performer'&&(stale||!draft||unsupported));
  for(const input of document.querySelectorAll('input[data-action-field]')){

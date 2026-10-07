@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {actionDraft,actionInspection,actionView,ensureActionInspection} from '../public/workbench-action.mjs';
+import {actionDraft,actionInspection,actionView,actionPreviewScope,ensureActionInspection} from '../public/workbench-action.mjs';
 const cap={implementation:'e'.repeat(64),action_layer:'action-layer-v1'};
 const cp={id:'cp_saved',sha256:'hash'},run={id:'run_inspect',implementation:cap.implementation,inspection:{version:'action-layer-v1',sha256:'audit',fps:24,reference_frame:5,frame_range:[1,9],unassigned:[],performers:[{name:'One',takes:[{id:'take_one',action:'Observed',range:[1,9]}]},{name:'Two',takes:[{id:'take_two',action:'Other',range:[1,9]}]}]}};
 test('automatic inspection refreshes stale read context once and reuses another tab receipt without duplicate execution',async()=>{
@@ -50,6 +50,17 @@ test('Action presentation stays performer-first and labels unsaved playback hone
  const scene={id:'scene',stage:'action',name:'Generated',completed:{world:cp.id},checkpoints:[cp]};
  const html=actionView({project:{workbench:{scenes:[scene]}},scene,stages:[{id:'world',short:'World'},{id:'action',short:'Action'}],checkpoint:cp,runs:[],locked:false,cap:{...cap,task_workspace:true},draft:d,esc:v=>String(v??''),b:(t,a)=>'<button data-action="'+a+'">'+t+'</button>'});
  assert.match(html,/Performer<select/);assert.match(html,/Playback shows the saved scene/);assert.match(html,/Save changes to preview the new motion/);assert.match(html,/Hold a pose/);assert.doesNotMatch(html,/Inspect saved candidate|Keep checkpoint/);
+});
+test('imported preparation exposes explicit keep/reject without approving the saved Action',()=>{
+ const candidate={...cp,id:'cp_prepared',path:'Scenes/prepared.blend'},d=actionDraft(candidate,run);
+ const scene={id:'scene',stage:'action',name:'Prepared',current:cp.id,candidate:candidate.id,completed:{world:cp.id},checkpoints:[cp,candidate]},before=structuredClone(scene);
+ const args={project:{workbench:{scenes:[scene]}},scene,stages:[],checkpoint:candidate,runs:[],locked:false,cap,draft:d,esc:v=>String(v??''),b:(t,a,data,cls,off)=>`<button data-action="${a}" ${off?'disabled':''}>${t}</button>`};
+ const html=actionView(args);
+ assert.match(html,/aria-label="Prepared checkpoint review"/);assert.match(html,/data-action="keep-building" >Keep/);assert.match(html,/data-action="discard" >Reject prepared checkpoint/);
+ assert.match(html,/Previewing an unaccepted prepared checkpoint/);assert.match(html,/previous accepted scene remains preserved/);assert.deepEqual(scene,before);
+ d.change('One',{mode:'hold',frame:5});assert.match(actionView(args),/data-action="keep-building" disabled/);assert.match(actionView(args),/data-action="discard" disabled/);
+ d.discard();assert.match(actionView({...args,locked:true}),/data-action="keep-building" disabled/);
+ assert.match(actionPreviewScope(d,false,true),/unaccepted/);assert.doesNotMatch(actionPreviewScope(d),/unaccepted/);
 });
 test('Action timing rejects invalid direct changes before draft or history mutation',()=>{
  const d=actionDraft(cp,run),valid={mode:'clip',take_id:'take_one',start:1,speed:1};

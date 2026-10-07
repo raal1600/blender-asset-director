@@ -16,6 +16,15 @@ and synchronized playback is disabled; the UI never substitutes the first join.
 These later multi-join controls have automated tests; their native journey is
 still pending at this point in the record.
 
+The first native multi-join attempt exposed a missing review route for imported
+preparation: the specialized Action screen hid the generic checkpoint Keep and
+Reject controls. The Action screen now presents an explicit prepared-checkpoint
+review panel, identifies the preview as unaccepted, and uses the existing
+hash-verified Keep & continue building / discard operations. Keeping stays in
+Action; it does not approve the activity or accept a generated transition.
+The failed native attempts are retained in `native-multi-abfbf61-v1` and `v2`;
+the repaired native journey must be rerun.
+
 Earlier reference acceptance evidence identifies application
 `95234c3528bfd1c288f6670ca701c4789b0a1aff`, host SHA-256
 `36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872`.
