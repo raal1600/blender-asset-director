@@ -56,8 +56,12 @@ class Soles:
             for obj, indices in groups:
                 if obj.name not in evaluated:
                     e = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
-                    evaluated[obj.name] = [e.matrix_world @ v.co for v in e.data.vertices]
-                values.extend(evaluated[obj.name][i].z for i in indices)
+                    # Keep the same evaluated geometry and world transform, but
+                    # transform only the observed sole vertices. No pose cache
+                    # survives this call, and sampling density is unchanged.
+                    evaluated[obj.name] = (e.matrix_world, e.data.vertices)
+                world, vertices = evaluated[obj.name]
+                values.extend((world @ vertices[i].co).z for i in indices)
             result[side] = min(values)
         return result
 
