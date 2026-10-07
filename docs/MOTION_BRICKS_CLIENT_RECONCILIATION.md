@@ -1,5 +1,14 @@
 # Offline transition review — implementation in progress
 
+The review panel now shows a quality review order for current, verified,
+nonduplicate candidates after every join passes every hard gate. It averages
+the existing normalized per-join errors for the complete request; equal scores
+share a rank. Missing scores, incomplete joins, unknown presets, failures and
+stale results are unranked. The chronological history and explicit acceptance
+controls are unchanged. This order is a kinematic review aid, not a naturalness
+or physical-feasibility judgment. Native verification of this presentation is
+recorded separately from the already verified motion and acceptance pipeline.
+
 The later native `f30b389890b6bc11f62efce56e355d3a981d5431` build (host SHA-256
 `68de34b1a648eeeeecbe7085b9b98fc0dae81575e406e16fcce37f88e023e3a3`) verifies
 contact editing, two real three-candidate batches, comparison, explicit refined
