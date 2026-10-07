@@ -19,7 +19,7 @@ export function transitionReviewView(scene,draft,runs,esc,b,active){
  if(!review&&!generated)return '';
  const candidates=review?.candidates||[],run=runs.find(r=>r.id===scene.run);
  const failures=runs.filter(r=>r.sceneId===scene.id&&r.publication==='TRANSITION_REVIEW_ONLY'&&['FAILED','CANCELLED','INTERRUPTED'].includes(r.state)).slice(-5).reverse();
- const state=run?run.state==='RUNNING'?'Generating':'Queued':candidates.length?'Review candidates':draft?.invalid?'Needs preparation':'Ready';
+ const state=run?transitionPhase(run):candidates.length?'Review candidates':draft?.invalid?'Needs preparation':'Ready';
  return '<section class="transition-review" aria-label="Transition review"><h2>Review generated movement</h2><p role="status">'+esc(state)+'. The accepted scene remains available during generation and review.</p>'+
  (generated?b('Generate alternatives (3)','transition-alternatives',{},'primary',active||draft.invalid):'')+
  '<p>Each candidate contains the complete working timeline. Changing an earlier join can move or retime every later join. Accept a complete consistent revision after review.</p>'+
@@ -27,3 +27,4 @@ export function transitionReviewView(scene,draft,runs,esc,b,active){
  failures.map(r=>'<p class="warn">'+esc(r.state==='FAILED'?'Failed execution':r.state==='CANCELLED'?'Cancelled':'Interrupted')+': '+esc(r.error||'Inspect the retained attempt. Previous accepted scene retained.')+'</p>').join('')+
  (review?.acceptances.length?'<details><summary>Accepted history / restore</summary>'+[...new Set(review.acceptances.flatMap(e=>[e.previousCheckpointId,e.checkpointId]))].map(id=>b('Restore '+id.slice(0,11),'transition-restore',{id},'ghost',active||id===scene.current)).join('')+'</details>':'')+'</section>';
 }
+import {transitionPhase} from './workbench-progress.mjs';

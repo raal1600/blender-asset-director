@@ -14,7 +14,20 @@ check. `native_basis_contract.py` now compares a multiset of content bindings,
 retaining slots, intervals, annotations and duplicate counts. Saved integrity,
 rest, parent, units and unkeyed defaults remain checked; request/audit identities
 still invalidate an old selection after rename. This permits defaults reuse,
-not stale-candidate acceptance. Real renamed generation is pending.
+not stale-candidate acceptance. `rename-generation-v1` subsequently passed both
+real baseline and opaque-renamed generation at `3a95251c253af4ae1dbe09c985913c24d29ac919`:
+quality, continuity, preservation and fresh reopening passed. C ABI requests,
+raw arrays, corrected arrays and composition paths are exactly equal on this
+device. This is label invariance for one reference pair, not unseen-motion coverage.
+
+`native-contact-3a95251-v1` then exposed a restored-working-request startup issue:
+an empty scene-viewer placeholder could be retained solely because the restored
+draft was dirty. No new generation ran and the accepted hash remained intact.
+Source now retains only an owned initialized viewer, ignores navigation to the
+already active stage, labels accepted/history/candidate A/B views separately,
+and exposes job-bound native progress including actual fresh-reopen validation.
+Malformed or unrelated progress cannot change job state or acceptance. Native
+rerun remains required; these source changes are not yet runtime claims.
 
 The subsequent `95234c3528bfd1c288f6670ca701c4789b0a1aff` native build repaired
 the accepted-preview refresh failure documented below. Two of three real

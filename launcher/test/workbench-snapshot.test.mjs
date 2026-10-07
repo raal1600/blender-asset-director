@@ -29,3 +29,15 @@ test('ordinary same-activity refresh preserves cached unsaved choices',()=>{
  const c=context(snapshot('action')),draft={dirty:true};c.actionDrafts.set('project:scene',draft);
  assert.equal(apply(c),c.next);assert.equal(c.actionDrafts.get('project:scene'),draft);
 });
+
+test('a restored working draft cannot retain an empty viewer placeholder',()=>{
+ const body=source.slice(source.indexOf('function retainedSceneHost(){'),source.indexOf('\nconst sceneViewKey='));
+ const host={},c={sceneViewer:null,tab:'scenes',s:()=>({stage:'action'}),sceneViewerKey:null,sceneViewKey:()=> 'accepted',
+  currentActionDraft:()=>({dirty:true}),currentLayerDraft:()=>null,document:{querySelector:()=>host}};
+ const retained=()=>vm.runInNewContext(body+'\nretainedSceneHost();',c);
+ assert.equal(retained(),null);
+ c.sceneViewer={dirty:false};assert.equal(retained(),host);
+ c.currentActionDraft=()=>({dirty:false});assert.equal(retained(),null);
+ c.sceneViewerKey='accepted';assert.equal(retained(),host);
+ c.tab='film';assert.equal(retained(),null);
+});

@@ -119,9 +119,9 @@
     },
     {
       "id": "reference",
-      "requirement": "Reference native Xâ†’bridgeâ†’Y",
+      "requirement": "Reference native X\u00e2\u2020\u2019bridge\u00e2\u2020\u2019Y",
       "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
-      "expected_behavior": "Real X → bridge → Y with preserved native intervals, fresh reopening and every fixed kinematic gate passing",
+      "expected_behavior": "Real X \u2192 bridge \u2192 Y with preserved native intervals, fresh reopening and every fixed kinematic gate passing",
       "threshold_or_invariant": "Continuity thresholds plus upright-grounded-kinematic-v2; quality failure cannot be counted as generation coverage",
       "command_or_journey": "node <private-evidence>/native_accept_95234c3.mjs; node <private-evidence>/native_playback_95234c3_r2.mjs; python <private-evidence>/run_accepted_parity.py; python <private-evidence>/record_accepted_visual_review.py",
       "identities": {
@@ -136,8 +136,8 @@
     {
       "id": "unseen-pair",
       "requirement": "Unseen compatible pair",
-      "fixture": "Adventurer idleâ†’back baseline",
-      "expected_behavior": "Real X → bridge → Y with preserved native intervals, fresh reopening and every fixed kinematic gate passing",
+      "fixture": "Adventurer idle\u00e2\u2020\u2019back baseline",
+      "expected_behavior": "Real X \u2192 bridge \u2192 Y with preserved native intervals, fresh reopening and every fixed kinematic gate passing",
       "threshold_or_invariant": "Continuity thresholds plus upright-grounded-kinematic-v2; quality failure cannot be counted as generation coverage",
       "command_or_journey": "run_motion_bricks_sequences.py --manifest baseline-manifest.json",
       "identities": {
@@ -152,18 +152,18 @@
     {
       "id": "rename",
       "requirement": "Name independence",
-      "fixture": "identical motion with renamed Actions",
+      "fixture": "Full reference native intervals, baseline labels versus opaque 8291 / opaque 3512",
       "expected_behavior": "Name independence",
-      "threshold_or_invariant": "unchanged raw/corrected motion within repeat tolerance",
-      "command_or_journey": "rename integration fixture",
+      "threshold_or_invariant": "Exactly equal C ABI request, raw and corrected numeric arrays and composition paths; hard quality, continuity, structural/evaluated preservation and fresh reopen pass",
+      "command_or_journey": "python tools/run_motion_bricks_sequences.py --manifest <evidence>/rename-manifest-v1.json --blender <Blender 5.2.1> --output <new-directory>",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "3a95251c253af4ae1dbe09c985913c24d29ac919",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "Clean isolated source; real Blender 5.2.1 and pinned Vulkan DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
       },
-      "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "status": "PASS",
+      "evidence_path": "rename-generation-v1/report.json; rename-generation-v1/rename-invariance.json",
+      "known_limitations": "One unchanged reference pair on the verified Windows/Vulkan device. No unseen-motion or cross-device claim. Renaming invalidates prior selection fingerprints and requires a fresh inspection."
     },
     {
       "id": "independent-influence",
@@ -186,7 +186,7 @@
       "requirement": "Unconstrained target position invariance",
       "fixture": "target placeholder shifted metres",
       "expected_behavior": "Unconstrained target position invariance",
-      "threshold_or_invariant": "root â‰¤1e-5m and quaternion component â‰¤1e-5; no target-lock claim",
+      "threshold_or_invariant": "root \u00e2\u2030\u00a41e-5m and quaternion component \u00e2\u2030\u00a41e-5; no target-lock claim",
       "command_or_journey": "early_sampling.py placeholder",
       "identities": {
         "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
@@ -314,7 +314,7 @@
       "requirement": "Hard constraints before ranking",
       "fixture": "raw and corrected baked candidates",
       "expected_behavior": "Hard constraints before ranking",
-      "threshold_or_invariant": "position â‰¤.001H; orientation â‰¤1deg; root velocity â‰¤.05H/s; angular velocity â‰¤5deg/s; drift â‰¤.01H; penetration â‰¤.005H",
+      "threshold_or_invariant": "position \u00e2\u2030\u00a4.001H; orientation \u00e2\u2030\u00a41deg; root velocity \u00e2\u2030\u00a4.05H/s; angular velocity \u00e2\u2030\u00a45deg/s; drift \u00e2\u2030\u00a4.01H; penetration \u00e2\u2030\u00a4.005H",
       "command_or_journey": "evaluated candidate report",
       "identities": {
         "application": "9474ccaec164e91ae444f36db45f641732570a7d; later dirty experiments identified by their input implementation hashes",
@@ -504,7 +504,7 @@
     {
       "id": "four-clips",
       "requirement": "Complete requested sequence",
-      "fixture": "backâ†’leftâ†’idleâ†’walk",
+      "fixture": "back\u00e2\u2020\u2019left\u00e2\u2020\u2019idle\u00e2\u2020\u2019walk",
       "expected_behavior": "Complete requested sequence",
       "threshold_or_invariant": "three real joins; accumulated placement; full native intervals",
       "command_or_journey": "four-clip real fixture/render",
@@ -586,7 +586,7 @@
       "requirement": "Monitored resource limits",
       "fixture": "RTX4070 Vulkan",
       "expected_behavior": "Monitored resource limits",
-      "threshold_or_invariant": "whole â‰¤9216MiB; delta â‰¤8192; headroom â‰¥2048; host â‰¤2048; no silent fallback",
+      "threshold_or_invariant": "whole \u00e2\u2030\u00a49216MiB; delta \u00e2\u2030\u00a48192; headroom \u00e2\u2030\u00a52048; host \u00e2\u2030\u00a42048; no silent fallback",
       "command_or_journey": "real provider/profile/lifecycle",
       "identities": {
         "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
@@ -661,8 +661,8 @@
     "blocked": []
   },
   "counts": {
-    "PASS": 19,
-    "FAIL": 21,
+    "PASS": 20,
+    "FAIL": 20,
     "BLOCKED": 0
   },
   "counts_scope": "Current progress rows; not final delivery acceptance"

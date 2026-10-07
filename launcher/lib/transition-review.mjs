@@ -1,10 +1,26 @@
 /** Immutable transition attempts over the existing checkpoint/job transaction. */
 import {randomUUID} from 'node:crypto';
+import fs from 'node:fs/promises';
 import {assert,digest,json,safe,now,fileHash,writeJson,exists} from './storage.mjs';
 import {approveCheckpoint,validId,validHash} from './workbench-model.mjs';
 import {compareCandidates} from './transition-diversity.mjs';
 
 export const reviewVersion='transition-review-v1';
+// Presentation only: never promotes an attempt or substitutes for its receipt.
+export async function nativeTransitionProgress(library,run){
+  if(!library||run.state!=='RUNNING'||run.publication!=='TRANSITION_REVIEW_ONLY'||!/^j_[a-f0-9]{24}$/.test(run.jobId||''))return null;
+  let handle;
+  try{
+    handle=await fs.open(await safe(library,`jobs/${run.jobId}/motion-progress.json`),'r');
+    const stat=await handle.stat();if(!stat.isFile()||stat.size>8192)return null;
+    const bytes=Buffer.alloc(8193),{bytesRead}=await handle.read(bytes,0,8193,0);if(bytesRead>8192)return null;
+    const value=JSON.parse(bytes.subarray(0,bytesRead).toString('utf8'));
+    if(value.schema!=='motion-job-progress-v1'||value.native_job_id!==run.jobId
+      ||typeof value.stage!=='string'||!/^[a-z_]{1,64}$/.test(value.stage)
+      ||!Number.isFinite(value.observed_at)||value.observed_at<=0)return null;
+    return {stage:value.stage,observedAt:value.observed_at,nativeJobId:run.jobId};
+  }catch{return null;}finally{await handle?.close();}
+}
 export const generatedRequest=request=>request.changes?.some(c=>c.mode==='timeline'&&c.clips.some(x=>x.transition?.mode==='generated'))===true;
 export function requestFingerprint(request,implementation){
   const {requestId,inspectionId,working_request_id,...dependencies}=structuredClone(request);

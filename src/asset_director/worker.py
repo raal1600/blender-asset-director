@@ -130,7 +130,8 @@ def execute(job_path, *, live=False):
                 from asset_director import action_layer
                 from asset_director.jobs import _cancelled
                 def progress(value):
-                    atomic_json(directory/'motion-progress.json',value)
+                    atomic_json(directory/'motion-progress.json',dict(value,
+                        schema='motion-job-progress-v1',native_job_id=job['id'],observed_at=time()))
                     mark('transition_progress',provider_stage=value.get('stage'),clip_id=value.get('clip_id'))
                 context = {'directory': directory, 'cancelled': lambda: _cancelled(job_path, job),
                            'progress': progress}
@@ -281,7 +282,9 @@ def execute(job_path, *, live=False):
                 if op == 'world-prepare':
                     world_prepare.verify_saved(data, dest)
                 if op == 'action-edit':
+                    progress({'stage':'fresh_reopen_quality_validation'})
                     action_layer.verify_saved(data, dest)
+                    progress({'stage':'quality_validation_complete'})
                     mark('fresh_reopen_quality_validation_complete')
                 if op == 'scene-layer-edit':
                     scene_layer.verify_saved(data, dest)
