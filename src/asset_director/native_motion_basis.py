@@ -10,6 +10,7 @@ import bpy
 from mathutils import Quaternion
 from . import blender_ops as ops
 from .core import digest, require
+from .native_basis_contract import equivalent_inputs, source_content
 
 VERSION = 'native-motion-basis-v1'
 MAX_TIMELINE_JSON_BYTES = 2 * 1024 * 1024
@@ -108,8 +109,9 @@ def capture(obj):
     saved = timeline.get('native_basis')
     if saved is not None:
         require(isinstance(saved, dict) and set(saved) == {'version', 'identity', 'inputs', 'defaults', 'static'}
-                and saved['version'] == VERSION and saved['inputs'] == inputs and saved['static'] == static
-                and saved['identity'] == identity and _static(saved['defaults'], masks) == static,
+                and saved['version'] == VERSION and equivalent_inputs(saved['inputs'], inputs) and saved['static'] == static
+                and saved['identity'] == digest({'version': VERSION, 'inputs': saved['inputs'], 'static': static})
+                and _static(saved['defaults'], masks) == static,
                 'NATIVE_BASIS_CHANGED', 'Native source, rest, placement, units or unkeyed pose changed; inspect this motion in Blender')
         return copy.deepcopy(saved)
     return {'version': VERSION, 'identity': identity, 'inputs': inputs, 'defaults': defaults, 'static': static}
@@ -157,9 +159,11 @@ def extend_prepared_sources(obj, verified, added):
     require({k:v for k,v in inputs.items() if k!='sources'} == {k:v for k,v in old.items() if k!='sources'},
             'NATIVE_BASIS_CHANGED', 'Rig, placement or units changed during source preparation')
     key = lambda row:(row['action'],row['slot'])
-    before = {key(row):row for row in old['sources']}; after = {key(row):row for row in inputs['sources']}
+    after = {key(row):row for row in inputs['sources']}
     expected = {(a.name,slot_id(s)) for a,s in added}
-    require(all(after.get(k)==v for k,v in before.items()) and set(after)-set(before)==expected,
+    require(len(expected) == len(added) and expected <= set(after)
+            and len(after) == len(inputs['sources'])
+            and source_content(old['sources']) == source_content([v for k,v in after.items() if k not in expected]),
             'NATIVE_BASIS_CHANGED', 'Preparation changed an existing source or added an unexpected binding')
     static = _static(_defaults(obj,timeline),masks)
     require(_static(verified['defaults'],masks)==static, 'NATIVE_BASIS_CHANGED', 'Preparation changed an unkeyed native default')

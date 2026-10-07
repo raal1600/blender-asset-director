@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {candidateState,qualityAdvice} from '../public/transition-review-view.mjs';
+import {candidateState,qualityAdvice,transitionReviewView} from '../public/transition-review-view.mjs';
+
+test('saved generated motion offers explicit regeneration before any clip edit',()=>{
+ const scene={transitionReview:{candidates:[],acceptances:[]}},draft={changes:[],hasGeneratedTransitions:true};
+ const html=transitionReviewView(scene,draft,[],String,label=>label,false);
+ assert.match(html,/Generate alternatives \(3\)/);
+ draft.hasGeneratedTransitions=false;
+ assert.doesNotMatch(transitionReviewView(scene,draft,[],String,label=>label,false),/Generate alternatives/);
+});
 
 test('missing quality evidence is a failure, while an unverified build requires preparation',()=>{
  const scene={current:'base',transitionReview:{working:{fingerprint:'f'},acceptances:[]}},candidate={baseCheckpointId:'base',fingerprint:'f'};

@@ -2,6 +2,20 @@
 
 ## 2026-10-07 — continued repair and native falsification
 
+The subsequent contact-refinement journey on `95234c3` stopped before inference:
+after acceptance, the alternatives button disappeared because its view examined
+only changed clips. Evidence `native-contact-95234c3-v1` retains that failure and
+the unchanged accepted artifact. Source now exposes regeneration for saved
+generated tracks, includes explicitly resampled tracks even with unchanged
+settings, and refreshes review controls after local edits. Native rerun is pending.
+
+Source inspection also found Action labels in the saved native-defaults equality
+check. `native_basis_contract.py` now compares a multiset of content bindings,
+retaining slots, intervals, annotations and duplicate counts. Saved integrity,
+rest, parent, units and unkeyed defaults remain checked; request/audit identities
+still invalidate an old selection after rename. This permits defaults reuse,
+not stale-candidate acceptance. Real renamed generation is pending.
+
 The subsequent `95234c3528bfd1c288f6670ca701c4789b0a1aff` native build repaired
 the accepted-preview refresh failure documented below. Two of three real
 stochastic candidates pass the unchanged quality gates. Explicit acceptance,

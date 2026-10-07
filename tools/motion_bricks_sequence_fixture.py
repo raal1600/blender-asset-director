@@ -61,19 +61,30 @@ assert 'source_ranges' not in case or (isinstance(case['source_ranges'],list) an
  and all(isinstance(v,list) and len(v)==2 and all(type(f) in (int,float) and math.isfinite(f) for f in v) and v[0]<v[1] for v in case['source_ranges']))
 assert not case.get('expected') or isinstance(case['expected'],str) and len(case['expected'])>0
 assert 'offset' not in case or len(case['offset'])==2 and all(isinstance(v,(int,float)) and math.isfinite(v) and abs(v)<=100 for v in case['offset'])
+assert 'action_labels' not in case or (isinstance(case['action_labels'],dict)
+ and all(isinstance(k,str) and isinstance(v,str) and 0<len(v.encode('utf-8'))<=63 for k,v in case['action_labels'].items())
+ and len(set(case['action_labels'].values()))==len(case['action_labels']))
 assert not a.output.exists(),'Preserve earlier evidence; use a fresh output directory'
 a.output.mkdir(parents=True);out=a.output;results=[];chosen=a.case
 for case in cases:
  folder=out;row={'case':case,'status':'FAIL','thresholds':limits,'character_height_m':H,'contact_quality':'PENDING evaluated fixed-landmark validation','visual_quality':'NOT VERIFIED','derivatives':'Cubic one-sided at same timestamp; h=1/1536 second at all FPS'};results.append(row)
  try:
-  bpy.ops.wm.open_mainfile(filepath=str(source),load_ui=False,use_scripts=False);scene=bpy.context.scene;rig=bpy.data.objects[manifest['rig']];scene.frame_set(1);baseline=basis.capture(rig);original={a.name:digest(layer.channels(a)) for a in bpy.data.actions};profile=ret.load_profile(rig)
+  bpy.ops.wm.open_mainfile(filepath=str(source),load_ui=False,use_scripts=False);scene=bpy.context.scene;rig=bpy.data.objects[manifest['rig']];scene.frame_set(1)
+  source_actions={action.name:action for action in bpy.data.actions};renamed=[]
+  for old,label in case.get('action_labels',{}).items():
+   assert old in source_actions and (label==old or label not in bpy.data.actions),'Use distinct explicit fixture labels'
+   action=source_actions[old];before=digest(layer.channels(action));action.name=label
+   assert action.name==label and digest(layer.channels(action))==before
+   renamed.append({'original_label':old,'new_label':label,'channels_sha256':before})
+  row['action_label_changes']=renamed
+  baseline=basis.capture(rig);original={a.name:digest(layer.channels(a)) for a in bpy.data.actions};profile=ret.load_profile(rig)
   for track in rig.animation_data.nla_tracks:track.mute=True
   rig.animation_data.action=None;basis.restore(rig,baseline)
   if 'bad_action_timeline_v1' in rig:del rig['bad_action_timeline_v1']
   scene.render.fps=case['fps'];scene.render.fps_base=1.;bpy.context.view_layer.update()
   selected=[]
   for i,name in enumerate(case['clips']):
-   action=bpy.data.actions[name];bound_slots=[slot for bound,slot in layer.bindings(rig) if bound==action];assert len(bound_slots)==1,'Select an unambiguous rig/Action/slot binding';slot=bound_slots[0];source_fps=case.get('source_fps',[manifest['source_fps']]*len(case['clips']))[i];offset=case.get('offset') if i==1 else None
+   action=source_actions[name];bound_slots=[slot for bound,slot in layer.bindings(rig) if bound==action];assert len(bound_slots)==1,'Select an unambiguous rig/Action/slot binding';slot=bound_slots[0];source_fps=case.get('source_fps',[manifest['source_fps']]*len(case['clips']))[i];offset=case.get('offset') if i==1 else None
    if offset:
     parent=rig.parent.matrix_world@rig.matrix_parent_inverse if rig.parent else rig.matrix_parent_inverse;offset=list(parent.to_3x3().inverted()@Vector((*offset,0.)))
    if source_fps!=manifest['source_fps'] or offset:

@@ -78,6 +78,13 @@ test('generated repositioning binds the rig and seed and keeps original clip bou
  assert.throws(()=>d.edit('match_phase',true),/native opening/);
  const generated=d.request('run_generated');validateTimeline(generated.changes[0]);
  const saved=structuredClone(inspected);saved.inspection.performers[0].timeline.clips=d.clips('One');const reopened=timelineDraft(cp,saved);reopened.select('One','clip_second');assert.deepEqual(reopened.selectedClip.transition,d.selectedClip.transition);
+ assert(reopened.hasGeneratedTransitions);assert(!reopened.dirty);
+ reopened.setSamplingPlan([1234,7,42]);const repeated=reopened.request('run_repeated');
+ assert.equal(repeated.changes.length,1);assert.equal(repeated.changes[0].clips.length,2);
+ const sampled=structuredClone(saved);sampled.inspection.performers[0].timeline.clips=repeated.changes[0].clips;
+ const same=timelineDraft(cp,sampled);assert(!same.dirty);same.setSamplingPlan([1234,7,42]);
+ assert.deepEqual(same.request('run_identical').changes[0].clips,sampled.inspection.performers[0].timeline.clips);
+ same.undo();assert(!same.dirty);assert(same.hasGeneratedTransitions);
  d.edit('transition_mode','blend');assert.equal(d.selectedClip.transition.seed,undefined);assert.equal(d.selectedClip.transition.profile_sha256,undefined);
  const bad=structuredClone(generated.changes[0]);bad.clips[1].transition.seed=NaN;assert.throws(()=>validateTimeline(bad));
 });

@@ -9,6 +9,7 @@ import {actionView,actionDraft,actionInspection,ensureActionInspection,actionDra
 import {actionInspectionAttempt,currentActionInspection,actionInspectionRefresh} from './action-inspection.mjs';
 import {timelineDraft} from './action-timeline-draft.mjs';
 import {comparisonMarkup,openComparison} from './transition-comparison.mjs';
+import {transitionReviewView} from './transition-review-view.mjs';
 import {actionSelectionFrame,actionSelectionStamp,actionSelectionSeeking} from './action-selection.mjs';
 import {syncTimelineUI,timelineControls} from './action-timeline-view.mjs';
 import {sceneLayerView,sceneLayerDraft,layerInspection,ensureLayerInspection,cameraForm} from './workbench-scene-layer.mjs';
@@ -309,6 +310,8 @@ function syncActionDraftUI(){
  }
  const ready=document.querySelector('[data-action="action-ready"]');if(ready)ready.disabled=blocked||!cp()||!draft||draft.dirty||stale;
  if(save&&draft?.timeline&&draft.changes.some(c=>c.clips.some(x=>x.transition?.mode==='generated')))save.textContent='Generate candidate';
+ const review=document.querySelector('[data-transition-review]');
+ if(review){const opened=[...review.querySelectorAll('details')].map(n=>n.open);review.innerHTML=transitionReviewView(s(),draft,state.runs,esc,b,blocked||stale);review.querySelectorAll('details').forEach((n,i)=>{n.open=!!opened[i];});}
  syncTimelineUI(draft,esc,transitionEditingBlocked()||stale||unsupported);sceneViewer?.updateActionPath();
  if(draft?.timeline){const legacy=document.querySelector('[data-action="action-hold-all"]');if(legacy)legacy.hidden=true;const text=document.querySelector('.action-details>p');if(text)text.textContent='Timeline clips retain native source keys and World placement. Repeats require explicit review. Travel is authored, with contacts and joins still needing playback review.';const heading=document.querySelector('.action-heading p');if(heading)heading.textContent='Choose an animation, shape its path, then save it as an editable clip.';}
 }

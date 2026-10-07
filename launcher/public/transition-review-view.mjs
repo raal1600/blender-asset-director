@@ -15,7 +15,7 @@ export function qualityAdvice(validation){
  return advice;
 }
 export function transitionReviewView(scene,draft,runs,esc,b,active){
- const review=scene.transitionReview,generated=draft?.changes?.some(c=>c.clips?.some(x=>x.transition?.mode==='generated'));
+ const review=scene.transitionReview,generated=draft?.hasGeneratedTransitions||draft?.changes?.some(c=>c.clips?.some(x=>x.transition?.mode==='generated'));
  if(!review&&!generated)return '';
  const candidates=review?.candidates||[],run=runs.find(r=>r.id===scene.run);
  const failures=runs.filter(r=>r.sceneId===scene.id&&r.publication==='TRANSITION_REVIEW_ONLY'&&['FAILED','CANCELLED','INTERRUPTED'].includes(r.state)).slice(-5).reverse();

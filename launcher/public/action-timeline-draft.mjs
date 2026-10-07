@@ -33,7 +33,7 @@ export function timelineDraft(checkpoint,run){
   if(c.transition?.mode==='generated'){const provider=p.timeline?.motion_bricks;if(provider?.status!=='CONFIGURED'||provider.profile_sha256!==c.transition.profile_sha256)throw Error(provider?.blocker||'Generated rig mapping changed; inspect again.');if(c.heading_deg||previous?.heading_deg)throw Error('This generated adapter preserves the saved facing; use clips with their native heading.');const duration=c.start-timelineTiming(previous,p.takes.find(t=>t.id===previous.take_id)).nativeEnd;generatedDurationPlan(duration/audit.fps);}
   join(name,c);return null;
  }catch(e){return {field:'clip',message:e.message};}};
- const changed=()=>[...tracks].filter(([name,clips])=>JSON.stringify(clips)!==JSON.stringify(baseline.get(name)));
+ const changed=()=>[...tracks].filter(([name,clips])=>JSON.stringify(clips)!==JSON.stringify(baseline.get(name))||samplingPlan&&clips.some(c=>c.transition?.mode==='generated'));
  const errors=()=>{const list=[...raw.values()].filter(x=>x.message).map(copy);for(const [name,clips] of tracks){for(const c of clips){const problem=issue(name,c);if(problem&&!raw.has(c.id+':'+problem.field))list.push({performer:name,clip:c.id,...problem});}try{validateTimeline({performer:name,mode:'timeline',clips:sorted(name)});}catch(e){list.push({performer:name,field:'track',message:e.message});}}return list;};
  return {timeline:true,checkpointId:checkpoint.id,sha256:checkpoint.sha256,run,audit,
   restoreRequest(request){if(request.checkpointId!==checkpoint.id||request.sha256!==checkpoint.sha256||request.audit_sha256!==audit.sha256)throw Error('Saved working request needs its original input inspection.');for(const change of request.changes){editable(change.performer);validateTimeline(change);tracks.set(change.performer,copy(change.clips));}samplingPlan=copy(request.sampling_plan||null);},
@@ -44,6 +44,7 @@ export function timelineDraft(checkpoint,run){
   get needsPaceRefresh(){const c=this.selectedClip,t=performer(selected).takes.find(t=>t.id===c?.take_id);return !!c?.travel?.gait_id&&c.travel.gait_id!==t?.gait?.id;},
   get dependencyKey(){return JSON.stringify({changes:this.changes,errors:this.errors,samplingPlan});},get dirty(){return changed().length>0||raw.size>0;},get count(){return changed().length;},get canUndo(){return history.length>0;},get errors(){return errors();},get invalid(){return errors().length>0;},
   get changes(){return changed().map(([performer])=>({performer,mode:'timeline',clips:copy(sorted(performer))}));},
+  get hasGeneratedTransitions(){return [...tracks.values()].some(clips=>clips.some(c=>c.transition?.mode==='generated'));},
   get gait(){const c=this.selectedClip;return performer(selected).takes.find(t=>t.id===c?.take_id)?.gait;},
   get canConnect(){const c=this.selectedClip,order=sorted(selected),previous=order[order.findIndex(x=>x.id===c?.id)-1],p=performer(selected);return !!c&&canConnect(p,previous,p.takes.find(t=>t.id===c.take_id));},
   get connection(){try{const c=this.selectedClip;if(c?.transition?.mode==='generated'&&!this.dirty){const saved=performer(selected).timeline.connections?.find(j=>j.clip_id===c.id);if(saved)return saved;}return c?join(selected,c):null;}catch{return null;}},
