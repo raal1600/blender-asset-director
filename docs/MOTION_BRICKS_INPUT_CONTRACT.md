@@ -132,3 +132,15 @@ native-frame interval per clip. Omission means the complete native interval.
 Selections are checked against the observed Action ranges and recorded in
 `RESULTS.json`; the runner never searches for a different boundary. An explicit
 short-context case must be refused rather than sampling beyond its selection.
+
+Generated correction now uses continuous clamped cubic smoothing. Its objective
+integrates squared cubic curvature, fixes native endpoint values/velocities, and
+retains the existing per-pass and total correction limits. A final world-rotation
+pass bounds the norm of rotation-log curvature at 80% of the preset angular
+acceleration limit; this margin accounts for chart/hierarchy/baking differences.
+It is not a physical acceleration guarantee. The actual baked world-motion gate
+still measures 240 Hz motion and can refuse any result. Solver nonconvergence is
+a failure, never an acceptable partial solution. Iterations are bounded and
+cancellation is checked during optimization. Matrix storage grows linearly with
+sample count. Generated curves use clamped C2 interpolation; native curves are
+never supplied to that baker. Head/finger/toe processing remains deterministic.

@@ -192,7 +192,7 @@ def cleanup(reader, source, profile, request, result, samples, path, origin, geo
                 values[name]={'angular':qm.mul(qm.sub(qm.mul(near,4),far),sign/(2*h))}
             world_tangents.append(values)
         from .motion_bricks_refinement import smooth_rotations
-        world_orientations,orientation_filter=smooth_rotations(world_orientations,duration/fps,world_endpoints,world_tangents,fps)
+        world_orientations,orientation_filter=smooth_rotations(world_orientations,duration/fps,world_endpoints,world_tangents,fps,check=check)
         orientation_targets=[]
         for index,(_,pose) in enumerate(world_orientations):
             goals={name:Quaternion(value['q']) for name,value in pose.items()}
@@ -258,7 +258,7 @@ def cleanup(reader, source, profile, request, result, samples, path, origin, geo
         for iteration in range(3):
             from .motion_bricks_refinement import smooth_rotations
             corrected,filter_report=smooth_rotations(corrected,duration/fps,(a,b),tangents,fps,
-                                                     sigma_seconds=.04 if iteration==0 else .025)
+                                                     sigma_seconds=.04 if iteration==0 else .025,check=check)
             filter_reports.append(filter_report)
             residuals = {n: [seam.rotation_residual(corrected[k][1][n]['q'], endpoint[n]['q'],
                            qm.angular_velocity(corrected[j][1][n]['q'], corrected[l][1][n]['q'], duration/count), tangents[edge][n]['angular'])
@@ -297,7 +297,8 @@ def cleanup(reader, source, profile, request, result, samples, path, origin, geo
         # The final projection can change the endpoint tangent. Reconcile it
         # over the generated trajectory, not in one quarter-frame bake segment.
         # Contact quality is measured again on the bake; no pass is inferred.
-        corrected,final_filter=smooth_rotations(corrected,duration/fps,(a,b),tangents,fps,sigma_seconds=.05)
+        from .motion_bricks_world_refinement import refine
+        corrected,final_filter=refine(reader,profile,corrected,path,natives,duration/fps,fps,check)
         filter_reports.append(final_filter)
         # Exact source endpoints are authoritative. Tangents are retained by the baker.
         corrected[0] = (samples[0][0], a); corrected[-1] = (samples[-1][0], b)

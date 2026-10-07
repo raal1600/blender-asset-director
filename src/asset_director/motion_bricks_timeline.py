@@ -195,7 +195,7 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
     for (_,pose_values),(_,offset) in zip(samples,path):
         set_pose(reader,pose_values,offset,0.);corrected_roots.append(list(hip()));corrected_rotations.append(world_rotations())
     from .motion_bricks_refinement import smooth_positions
-    filtered_roots,root_filter=smooth_positions(corrected_roots,duration/fps,[list(v*fps) for v in root_velocities],maximum_distance=.01*profile['reference_height_m'])
+    filtered_roots,root_filter=smooth_positions(corrected_roots,duration/fps,[list(v*fps) for v in root_velocities],maximum_distance=.01*profile['reference_height_m'],check=check)
     for index,((frame,offset),before,after) in enumerate(zip(path,corrected_roots,filtered_roots)):
         path[index]=(frame,list(Vector(offset)+inverse@(Vector(after)-Vector(before))))
     corrected_roots=filtered_roots

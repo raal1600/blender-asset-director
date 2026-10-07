@@ -47,6 +47,18 @@ Its 72-frame diagnostic render was inspected as three complete contact sheets;
 full-speed temporal review, broader rigs/seeds and native acceptance are pending.
 Evidence: `continuous-bounded-v1`, including the retained failed precursors.
 
+The bounded continuous refinement was subsequently implemented in the application
+(`motion_bricks_spline.py`, `motion_bricks_world_refinement.py`, and the existing
+refinement/baking path). `application-continuous-v1` passes the real reference
+generation, unchanged hard quality gates, source preservation and fresh reopen.
+`application-continuous-seeds-v1` passes seeds 7 and 42; seed 1234 remains rejected.
+These are application-path results, not yet an accepted native-client revision.
+The independent Beta request fails the optimizer's convergence limit under this
+implementation; its mandatory generalization gate remains unfulfilled.
+The complete portable/installer run records 805 tests (802 passed, three
+disclosed skips). Broader coverage, final native acceptance and benchmarks remain
+pending. No preset quality threshold or backend pin was relaxed.
+
 The local `c401b33a77eb751aff462d3c0a6a66e73c501368` build passed the visible
 Windows comparison, input-change staleness and active-Blender cancellation
 procedure (`native-review-c401b33-r2/report.json`). Accepted state survived.
