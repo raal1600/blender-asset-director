@@ -107,3 +107,16 @@ at most 0.1 degrees and root RMS at most 0.0001 of reviewed height. Quaternion
 sign and metadata are irrelevant. Raw and corrected differences are reported
 separately so correction-erased diversity is visible. Different durations are
 reported separately without time warping. This is not a baked quality pass.
+
+Straight rest elbows have no observable bend plane. Anatomical profile v2 can
+now retain `motion-bricks.hinge-calibration.v1` evidence proposed by
+`tools/inspect_motion_bricks_hinges.py` from an explicitly selected Action/slot
+and interval. Each side needs 8–128 non-singular measured bends (10–165 degrees),
+with signed rest-space normals agreeing within 5 degrees. The proposal starts
+unreviewed. `prepare_motion_bricks_rig.py --hinge-calibration` requires a separate
+reviewed record, matching rest/mapping identities, and planes perpendicular to
+the actual rest arm segments. Non-singular rest geometry must also agree.
+The evidence retains source content, slot, FPS and exact sample frames and is
+included in the profile/dependency hash. It does not alter rest geometry or
+native curves. This is rig calibration, not animation-name logic or a quality
+exception. No client calibration editor or automatic approval is implied.

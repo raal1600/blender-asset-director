@@ -9,8 +9,11 @@ Do not treat historical continuity passes or unit tests as production readiness.
 The implementation branch is `feature/motionbricks-authoring-20261006` in the
 isolated `blender-asset-director-motionbricks-authoring` worktree. The latest
 committed native-client evidence currently identifies
-`9474ccaec164e91ae444f36db45f641732570a7d`; subsequent refinement, diagnostics and
-camera changes are under investigation. A final delivery must replace this
+`b23e76d1e4e75f1ace63ffed8dcb058846551b8d`; subsequent explicit measured hinge
+calibration and correction experiments are under investigation. Native b23e76d
+evidence verifies attempt identities, numerical candidate diversity, stale
+completion, active cancellation, provider crash and interrupted-job recovery.
+All candidates still failed quality. A final delivery must replace this
 paragraph with its exact tested source/build receipt.
 
 The inspected combined baseline is #31

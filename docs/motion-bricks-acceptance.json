@@ -109,13 +109,13 @@
       "threshold_or_invariant": "near duplicates excluded using measured corrected motion",
       "command_or_journey": "real corrected-candidate comparison",
       "identities": {
-        "application": "9474ccaec164e91ae444f36db45f641732570a7d; later dirty experiments identified by their input implementation hashes",
+        "application": "b23e76d1e4e75f1ace63ffed8dcb058846551b8d",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Isolated Windows candidate; final build pending"
+        "build": "Windows native host SHA256 b21023549902980bbd961a6b2672ec066857fd88c5974f3e087b658d0d8dbd89; isolated candidate-b23e76d.json receipt"
       },
       "status": "FAIL",
-      "evidence_path": "corrected-diversity-comparison.json",
-      "known_limitations": "Earlier correction retained meaningful variation. Final refined cleanup has not completed the same-seed/different-seed regression."
+      "evidence_path": "native-review-b23e76d/report.json; diversity-attempt-tests.log",
+      "known_limitations": "Real three-seed batch retains numerical raw and corrected comparison. Corrected world-rotation RMS differences exceed 19 degrees for the measured pairs. Same-setting corrected repetition/near-duplicate native UI and final refined cleanup regression remain pending; all candidates failed quality."
     },
     {
       "id": "reference",
@@ -205,13 +205,13 @@
       "threshold_or_invariant": "successful generation and quality; rejection is not generation coverage",
       "command_or_journey": "second-rig provider sequence",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "b23e76d plus uncommitted explicit hinge-calibration implementation; retained input implementation hash where emitted",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "Windows native host SHA256 b21023549902980bbd961a6b2672ec066857fd88c5974f3e087b658d0d8dbd89; isolated candidate-b23e76d.json receipt"
       },
       "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "evidence_path": "beta-hinge-review.json; beta-mapping-contexts.json; beta-sequence-v1/report.json; second-rig-profile-review.json",
+      "known_limitations": "Independent Beta humanoid measured hinge calibration and 32-pose round trip verified (max 1.1e-6 m / 0.000125 degrees). Full selected interval refused for unsupported boundary contacts before inference. Five of 29 interior contexts were eligible; selected intervals were not changed. Paladin calibration dispersion 36–39 degrees refused. No second-rig successful generation/quality coverage yet."
     },
     {
       "id": "transforms-fps",
@@ -477,13 +477,13 @@
       "threshold_or_invariant": "owned worker stopped; interrupted outputs quarantined; accepted survives",
       "command_or_journey": "native journey D",
       "identities": {
-        "application": "9474ccaec164e91ae444f36db45f641732570a7d; later dirty experiments identified by their input implementation hashes",
+        "application": "b23e76d1e4e75f1ace63ffed8dcb058846551b8d",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Isolated Windows candidate; final build pending"
+        "build": "Windows native host SHA256 b21023549902980bbd961a6b2672ec066857fd88c5974f3e087b658d0d8dbd89; isolated candidate-b23e76d.json receipt"
       },
-      "status": "FAIL",
-      "evidence_path": "native-review-c401b33-r2/report.json; stage1-provider/summary.json",
-      "known_limitations": "Visible cancellation after Blender start passed in 0.567 s and preserved accepted state. Combined real provider crash and native restart journey remains pending."
+      "status": "PASS",
+      "evidence_path": "native-review-b23e76d/report.json; native-faults-b23e76d-r3/report.json",
+      "known_limitations": "Actual owned Blender cancellation 0.554 s; actual owned provider crash; launcher/host restart during generation; unpublished output quarantined; accepted checkpoint and prior five candidates unchanged. No successful motion-quality acceptance is inferred."
     },
     {
       "id": "journey-e",
@@ -546,8 +546,8 @@
         "build": "Windows proof-vulkan O1; implementation acceptance pending"
       },
       "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "evidence_path": "stage1-provider/summary.json; native-faults-b23e76d-r3/report.json; hinge-calibration-offline.log",
+      "known_limitations": "Actual provider crash and restart during generation now verified. Complete final-build corruption/missing-model/mapping/budget/duplicate-acceptance suite remains unfinished; unit tests are not a substitute."
     },
     {
       "id": "preview-render",
@@ -661,8 +661,8 @@
     "blocked": []
   },
   "counts": {
-    "PASS": 10,
-    "FAIL": 30,
+    "PASS": 11,
+    "FAIL": 29,
     "BLOCKED": 0
   },
   "counts_scope": "Current progress rows; not final delivery acceptance"

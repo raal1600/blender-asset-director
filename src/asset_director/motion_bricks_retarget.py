@@ -45,7 +45,7 @@ def rest_identity(rig):
                              [list(row) for row in b.matrix_local]) for b in rig.data.bones]})
 
 
-def build_profile(rig, skeleton, roles, ground_z, *, reference_origin_z=None, reference_height_m=None, encoding='g1-anatomical-frames-v2'):
+def build_profile(rig, skeleton, roles, ground_z, *, reference_origin_z=None, reference_height_m=None, encoding='g1-anatomical-frames-v2', hinge_calibration=None):
     from mathutils import Vector, Quaternion, Matrix
     require(encoding in ('g1-serial-axes-v1','g1-anatomical-frames-v2','g1-anatomical-frames-v3'),
             'MOTION_BRICKS_RETARGET_PROFILE','Unknown anatomical frame calibration')
@@ -91,6 +91,11 @@ def build_profile(rig, skeleton, roles, ground_z, *, reference_origin_z=None, re
     model_height=-min(p[1] for p in skeleton['neutral_joints'])
     require(.2<height<4 and .1<model_height/height<5,
             'MOTION_BRICKS_RETARGET_SCALE','Pelvis/ground height is implausible')
+    reviewed_planes=None
+    if hinge_calibration is not None:
+        from .motion_bricks_calibration import validate
+        require(encoding=='g1-anatomical-frames-v2','MOTION_BRICKS_HINGE_CALIBRATION','Reviewed elbow planes require anatomical profile v2')
+        reviewed_planes=validate(hinge_calibration,rest_identity(rig),digest(roles))
     alignment={role:Quaternion().copy() for role in GROUPS}
     for role,(start,end,target_end) in PRIMARY.items():
         a=Vector(skeleton['neutral_joints'][end])-Vector(skeleton['neutral_joints'][start])
@@ -113,6 +118,14 @@ def build_profile(rig, skeleton, roles, ground_z, *, reference_origin_z=None, re
             native_a=canonical[side+'_forearm']-canonical[side+'_upper_arm']
             native_b=canonical[side+'_hand']-canonical[side+'_forearm']
             mn=model_a.normalized().cross(model_b.normalized());nn=native_a.normalized().cross(native_b.normalized())
+            if reviewed_planes:
+                measured=inv@Vector(reviewed_planes[side]['normal_world_rest'])
+                require(max(abs(measured.dot(v.normalized())) for v in (native_a,native_b))<=math.sin(math.radians(5)),
+                        'MOTION_BRICKS_HINGE_CALIBRATION','Reviewed plane is not perpendicular to the rest arm segments')
+                if nn.length>.02:
+                    require(nn.normalized().dot(measured)>math.cos(math.radians(5)),
+                            'MOTION_BRICKS_HINGE_CALIBRATION','Reviewed plane disagrees with the non-singular rest elbow geometry')
+                nn=measured
             require(nn.length>.02,'MOTION_BRICKS_HINGE_CALIBRATION','Rest elbow bend is too small to determine a stable anatomical plane; use a reviewed rig calibration')
             for role,model_direction,native_direction in ((side+'_upper_arm',model_a,native_a),(side+'_forearm',model_b,native_b)):
                 alignment[role]=(frame(native_direction,nn)@frame(model_direction,mn).transposed()).to_quaternion().normalized()
@@ -133,6 +146,7 @@ def build_profile(rig, skeleton, roles, ground_z, *, reference_origin_z=None, re
             **({'reference_height_m':reference_height_m} if reference_height_m is not None else {}),
             'rest_identity':rest_identity(rig),'skeleton':skeleton,'roles':dict(roles),
             'encoding':encoding,
+            **({'hinge_calibration':hinge_calibration} if hinge_calibration is not None else {}),
             'alignment_wxyz':{r:list(q) for r,q in alignment.items()},
             'world_to_model_scale':model_height/height,'ground_z':ground_z,'reference_origin_z':reference_origin_z,
             'mapping_status':'GEOMETRY_VALIDATED_REQUIRES_ROUNDTRIP_AND_GENERATED_QUALITY',
@@ -198,7 +212,7 @@ def load_profile(rig):
         profile = json.loads(raw)
         require(profile.get('schema') == 'motion-bricks.explicit-humanoid-profile.v1',
                 'MOTION_BRICKS_RETARGET_PROFILE', 'Unsupported rig mapping version')
-        rebuilt = build_profile(rig, profile['skeleton'], profile['roles'], profile['ground_z'], reference_origin_z=profile['reference_origin_z'], reference_height_m=profile.get('reference_height_m'), encoding=profile.get('encoding'))
+        rebuilt = build_profile(rig, profile['skeleton'], profile['roles'], profile['ground_z'], reference_origin_z=profile['reference_origin_z'], reference_height_m=profile.get('reference_height_m'), encoding=profile.get('encoding'), hinge_calibration=profile.get('hinge_calibration'))
         require(profile.get('encoding') == rebuilt['encoding'] and profile['rest_identity'] == rebuilt['rest_identity'] and
                 profile['alignment_wxyz'] == rebuilt['alignment_wxyz'] and
                 abs(profile['world_to_model_scale'] - rebuilt['world_to_model_scale']) < 1e-9,

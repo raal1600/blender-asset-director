@@ -2,6 +2,30 @@
 
 ## 2026-10-07 — continued repair and native falsification
 
+The subsequent `b23e76d1e4e75f1ace63ffed8dcb058846551b8d` native build verified
+distinct attempt jobs, raw/corrected numerical diversity, active cancellation,
+and stale completion. `native-faults-b23e76d-r3/report.json` additionally records
+an owned provider-process crash and a launcher/host restart during generation.
+The accepted checkpoint and five prior candidate identities survived; the
+interrupted unpublished output was quarantined rather than counted successful.
+These are real Windows/WebView2/process tests. They do not establish successful
+motion acceptance or final render parity; all generated candidates failed quality.
+
+Independent copied Beta and Paladin humanoids were inspected locally. Both have
+ambiguous straight rest elbows. New explicit measured hinge calibration accepts
+only reviewed, consistent signed planes bound to rest/mapping/content evidence.
+Beta's measured planes agree within 0.00013 degrees; its 32 native-pose
+encode/decode checks measured at most 0.0000011 m and 0.000125 degrees error.
+Paladin's observed 36–39 degree plane dispersion does not establish a supported
+calibration. Neither rejection nor round-trip calibration counts as successful
+second-rig generation. Beta's full-interval transition was rejected before
+inference because its source context had no planted grounded foot. Read-only
+analysis found five eligible interior contexts out of 29; it did not change the
+selected native interval. Evidence: `beta-mapping-contexts.json`,
+`beta-sequence-v1`, `beta-hinge-review.json`, `second-rig-profile-review.json`.
+Private assets remain local; this technical inspection grants no redistribution
+rights. The original file hashes and native channel preservation are retained.
+
 The local `c401b33a77eb751aff462d3c0a6a66e73c501368` build passed the visible
 Windows comparison, input-change staleness and active-Blender cancellation
 procedure (`native-review-c401b33-r2/report.json`). Accepted state survived.
@@ -17,11 +41,9 @@ correction. A bounded world-acceleration optimization also exceeded the preset
 correction limit. These experimental corrections were not adopted. Evidence:
 `endpoint-increments-v1`, `strong-filter-v1`, `world-filter-v1` through `v3`.
 
-Implemented after that native checkpoint: distinct generation-attempt job
-identities and hash-verified raw/corrected candidate duplicate detection. These
-have portable regression evidence; their next real native verification is
-pending. No new backend, weights, dependency version or acceptance threshold
-was introduced.
+Distinct generation-attempt job identities and hash-verified raw/corrected
+duplicate detection now also have the b23e76d native evidence described above.
+No new backend, weights, dependency version or acceptance threshold was introduced.
 
 ## 2026-10-07 authoring investigation (in progress)
 

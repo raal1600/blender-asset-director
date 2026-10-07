@@ -26,6 +26,7 @@ def main():
     parser.add_argument('--mapping', type=Path, required=True)
     parser.add_argument('--ground-z', type=float, required=True)
     parser.add_argument('--height-m', type=float, required=True, help='Fixed reviewed rest-character height, not generated-pose height')
+    parser.add_argument('--hinge-calibration',type=Path,help='Explicitly reviewed measured elbow planes for ambiguous straight rest arms')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:])
     require(args.output.is_absolute() and args.output.suffix == '.blend' and not args.output.exists(),
@@ -39,7 +40,8 @@ def main():
     actual = execute(config)['skeleton']
     validate_skeleton(skeleton, actual)
     rig = bpy.data.objects[args.rig]
-    profile = build_profile(rig, skeleton, mapping, args.ground_z, reference_height_m=args.height_m)
+    calibration=json.loads(args.hinge_calibration.read_text(encoding='utf-8-sig')) if args.hinge_calibration else None
+    profile = build_profile(rig, skeleton, mapping, args.ground_z, reference_height_m=args.height_m,hinge_calibration=calibration)
     rig[PROPERTY] = json.dumps(profile)
     require(load_profile(rig) == profile, 'PROFILE_ROUNDTRIP', 'Prepared mapping did not validate')
     args.output.parent.mkdir(parents=True, exist_ok=True)

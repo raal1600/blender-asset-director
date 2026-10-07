@@ -10,6 +10,15 @@ seams. See the [client workflow](MOTION_BRICKS_CLIENT_RECONCILIATION.md),
 [acceptance matrix](motion-bricks-acceptance.json) and
 [working research handoff](MOTION_BRICKS_RESEARCH_HANDOFF.md).
 
+Rigs with straight rest elbows now have an explicit measured-calibration route:
+run `tools/inspect_motion_bricks_hinges.py` on a copied file with an observed
+rig, anatomical mapping, Action/slot and selected interval. Retain the unreviewed
+proposal, inspect its measured planes and native motion, and provide a separate
+reviewed JSON to `tools/prepare_motion_bricks_rig.py --hinge-calibration`.
+Inconsistent planes are refused even if the review flag is set. This preparation
+preserves native curves and rest geometry; it does not approve a transition.
+See the versioned evidence requirements in the input contract.
+
 The Action layer's **MotionBricks repositioning** connection samples the end of
 one native Action and the beginning of the next, generates a separate interval,
 and starts the second Action at its original opening. Neither native clip is

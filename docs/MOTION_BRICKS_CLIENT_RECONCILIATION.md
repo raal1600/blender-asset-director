@@ -1,13 +1,17 @@
 # Offline transition review — implementation in progress
 
-Latest completed native procedure: `native-review-c401b33-r2/report.json`,
-application `c401b33a77eb751aff462d3c0a6a66e73c501368`. The actual visible
-Windows host generated three candidates and opened two source-aligned baked
-previews with the complete character framed. During a fourth real attempt,
-changing duration made its completion stale and stopped the remaining batch.
-Cancellation after Blender started completed in 0.567 seconds. The accepted
-checkpoint was unchanged throughout. All candidates failed the fixed quality
-gate; this does not establish acceptance, restore, final rendering or naturalness.
+Latest native evidence identifies application
+`b23e76d1e4e75f1ace63ffed8dcb058846551b8d` and host SHA-256
+`b21023549902980bbd961a6b2672ec066857fd88c5974f3e087b658d0d8dbd89`.
+`native-review-b23e76d/report.json` retains three real candidates, two framed
+source-aligned baked previews, numerical raw/corrected diversity, input-change
+staleness, and active cancellation in 0.554 seconds. Its later fault-injection
+step failed a harness timing assertion. The separate corrected native procedure
+`native-faults-b23e76d-r3/report.json` passed actual provider crash and restart
+during generation: prior candidates and the accepted checkpoint survived, while
+unpublished interrupted output was quarantined. All generated candidates failed
+the fixed quality gate. Acceptance, restore, final rendering and naturalness
+are not established by these tests.
 
 The preceding `7fc75d2` native startup failed because a packaged helper was not
 served; `c401b33` fixes the allowlist and tests the transitive HTTP module graph.
@@ -27,6 +31,6 @@ Reviewed stationary root intent resolves an in-place ambiguity only when evaluat
 
 Changing motion, trim, duration, contacts, sampling plan or other request dependencies makes older candidates stale. Selecting a clip alone does not. The batch stops scheduling further seeds after a dependency edit. Discard clears the working request while preserving accepted and candidate artifacts. Prior accepted artifacts can be restored without regeneration. An early-join edit regenerates the complete requested timeline, including subsequent joins; partial inconsistent acceptance is refused by accepting complete checkpoints only.
 
-Cancellation uses the existing native job lifecycle. Restart recovery checks both launcher ownership and native executor/Blender process evidence; it does not clear a live writer's lease. Incomplete attempts remain interrupted and excluded from valid candidates. Recovery and the complete A–E journeys still require final native-client acceptance.
+Cancellation uses the existing native job lifecycle. Restart recovery checks both launcher ownership and native executor/Blender process evidence; it does not clear a live writer's lease. Incomplete attempts remain interrupted and excluded from valid candidates. The b23e76d native fault procedure verifies this path; the complete A, B and E journeys still require acceptance evidence.
 
-Current evidence: the 9474cca native Windows/WebView2 run generated three actual model candidates in 96.743 seconds and preserved the accepted checkpoint. Both real candidate previews loaded, source-stitch alignment and full-speed playback controls worked, and no page errors were recorded. All three candidates failed quality, so this is not acceptance/render evidence. The preceding 91cb591 run exposed the comparison initialization bug and remains retained. A later camera-only change frames the exact exported performer rather than the entire floor; it requires a fresh native rerun. No successful native acceptance/render journey is claimed yet.
+Historical evidence remains retained: the 9474cca native batch took 96.743 seconds and the preceding 91cb591 run exposed a comparison initialization bug. Later c401b33 and b23e76d native tests verified framing of the complete performer. These isolated observations are not benchmark percentiles or successful acceptance/render journeys.
