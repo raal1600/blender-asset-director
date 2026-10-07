@@ -17,6 +17,16 @@ working and candidate checkpoints. Atomic acceptance rechecks the request,
 runtime, source checkpoint and every candidate artifact hash. Complete native
 acceptance/recovery journeys remain a separate runtime evidence gate.
 
+`dependencies.root.context_kinematics` records source and target stitch position,
+rest-aligned pelvis orientation, heading, linear velocity and angular velocity.
+Coordinates are Blender world metres/Z-up; heading is positive about Z with
+zero facing -Y. Orientation is the reviewed G1 pelvis frame, not an assumption
+about an arbitrary native bone's local axes. Second-order one-sided derivatives
+use the actual context samples at 1/30-second spacing, including the boundary;
+angular logs use `q(t) * inverse(q(boundary))` in a common world frame. A vertical
+forward vector has an explicitly undefined heading. These conditioning-context
+estimates are distinct from the dense seam-quality estimator described below.
+
 Each boundary covers 0.1 seconds (four samples at 30 FPS). Sampling cannot wrap,
 extrapolate or reach outside the selected single native interval. Repeated cycles
 must first be split explicitly for this domain. Output N=24,28,…,64 includes both

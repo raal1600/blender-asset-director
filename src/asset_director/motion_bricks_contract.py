@@ -91,6 +91,39 @@ def sampling_settings(mode, seed):
             'seed_affects_output': mode != 'argmax', 'duration_selection': 'fixed-mask'}
 
 
+def boundary_motion(context, side, model_scale, world_origin):
+    """Interpretable kinematics of the actual four model-conditioning samples.
+
+    Derivatives are second-order one-sided at the included stitch, in seconds.
+    Relative rotations use q(t) * inverse(q(stitch)), a common world frame.
+    These 30 Hz context estimates are distinct from the dense quality gate.
+    """
+    require(side in ('source','target') and finite(model_scale) and model_scale>0
+            and len(world_origin)==3 and all(finite(v) for v in world_origin)
+            and len(context['roots'])==4 and len(context['local_xyzw'])==4,
+            'MOTION_BRICKS_CONTEXT','Boundary motion needs four evaluated model samples')
+    axes=lambda v:[v[0],-v[2],v[1]]
+    c=[math.sqrt(.5),math.sqrt(.5),0.,0.]
+    positions=[qm.add(qm.mul(axes(p),1/model_scale),world_origin) for p in context['roots']]
+    rotations=[qm.unit(qm.qmul(qm.qmul(c,[row[0][3],*row[0][:3]]),qm.inverse(c)))
+               for row in context['local_xyzw']]
+    indices=[3,2,1] if side=='source' else [0,1,2]
+    coefficients=[3,-4,1] if side=='source' else [-3,4,-1]
+    derivative=lambda values:[sum(k*values[i][j] for k,i in zip(coefficients,indices))*MODEL_FPS/2 for j in range(3)]
+    q=rotations[indices[0]]
+    logs=[qm.qlog(qm.qmul(v,qm.inverse(q))) for v in rotations]
+    forward=qm.qmul(qm.qmul(q,[0.,0.,-1.,0.]),qm.inverse(q))[1:]
+    heading=math.degrees(math.atan2(forward[0],-forward[1])) if math.hypot(*forward[:2])>1e-6 else None
+    return {'position_m':positions[indices[0]],'orientation_wxyz':q,
+            'heading_degrees':heading,'heading_status':'DEFINED' if heading is not None else 'VERTICAL_FORWARD_UNDEFINED',
+            'linear_velocity_m_s':derivative(positions),'angular_velocity_rad_s':derivative(logs),
+            'coordinate_frame':'Blender world metres, Z-up; reviewed rest-aligned G1 pelvis orientation',
+            'heading_convention':'positive about world Z; zero faces Blender -Y',
+            'sample_seconds_from_stitch':[(i-3 if side=='source' else i)/MODEL_FPS for i in range(4)],
+            'derivative':'second-order one-sided, included stitch, h=1/30 s; angular log in common world frame',
+            'scope':'evaluated conditioning context; not the dense seam quality estimator'}
+
+
 def motion_difference(first, second, height_m):
     """Compare sampled motion in the same frame/timebase, never metadata.
 

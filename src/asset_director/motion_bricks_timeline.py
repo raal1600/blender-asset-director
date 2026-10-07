@@ -132,6 +132,7 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
         'evaluated_model_request':request,'timing':timing,'sampling':sampling,'support_analysis':support,
         'root':{'owner':'native object/pelvis plus one composed delta path',
                 'model_origin_blender_m':list(origin),'model_to_blender':'Y-up/+Z-forward to Z-up/-Y-forward',
+                'context_kinematics':{side:contract.boundary_motion(request[side],side,profile['world_to_model_scale'],list(origin)) for side in ('source','target')},
                 'native_world_velocity_m_s':[list(v*fps) for v in root_velocities]},
         'placement':{'target_xy':'predicted','target_heading':'native-context','target_height':'native',
                      'heading_override':False,'hard_model_pins':False},
