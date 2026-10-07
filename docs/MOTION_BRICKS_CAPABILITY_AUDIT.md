@@ -59,6 +59,23 @@ The complete portable/installer run records 805 tests (802 passed, three
 disclosed skips). Broader coverage, final native acceptance and benchmarks remain
 pending. No preset quality threshold or backend pin was relaxed.
 
+The Beta convergence failure was then reproduced from captured, evaluated
+optimizer inputs. At the finer 69-sample grid, six finger curves exhausted the
+iteration limit. Scaling the numerical ADMM penalty with the existing smoothing
+weight made all 52 curves converge (maximum 880 iterations, primal residual
+below 1e-8 and dual residual below 1e-6). The objective, endpoints, curvature
+bound and quality thresholds are unchanged; both residuals are now required.
+This numerical repair does not establish suitable motion: the original Beta
+duration is still refused for excessive additional filtering. Explicit 30- and
+42-frame bridge alternatives pass continuity, contact and fresh reopening but
+fail the 45-degree total correction limit at 58.46 and 59.46 degrees respectively.
+Evidence: `beta-optimizer-diagnosis.json`, `beta-optimizer-rho-1.json`,
+`beta-continuous-v2`, and `beta-duration-v1`. All failed attempts are retained.
+The application rerun with that numerical change
+(`application-continuous-rho-v1`) again passes argmax and stochastic seeds 7/42,
+including fresh reopening; stochastic seed 1234 still fails penetration. The
+four-case report correctly remains FAIL because it retains that failed sample.
+
 The local `c401b33a77eb751aff462d3c0a6a66e73c501368` build passed the visible
 Windows comparison, input-change staleness and active-Blender cancellation
 procedure (`native-review-c401b33-r2/report.json`). Accepted state survived.

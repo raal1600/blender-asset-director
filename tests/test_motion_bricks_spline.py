@@ -44,3 +44,15 @@ class ContinuousSplineTests(unittest.TestCase):
             if len(calls)>=3:raise RuntimeError('cancelled')
         solve=continuous_system(20,100.,acceleration_bound=.001,check=check)
         with self.assertRaisesRegex(RuntimeError,'cancelled'):solve([[i*.03] for i in range(20)],[[0.],[.57],[0.],[0.]])
+
+    def test_finer_grid_converges_without_weakening_continuous_bound(self):
+        count=69;bound=.004
+        values=[[.5*math.sin(i*.08)+.06*math.sin(i*.7),.03*math.sin(i*.6)] for i in range(count)]
+        ends=[values[0],values[-1],[.04,0.],[.025,0.]]
+        result,slopes,report=continuous_system(count,1296.,acceleration_bound=bound)(values,ends)
+        self.assertLess(report['primal_residual'],1e-8)
+        self.assertLess(report['dual_residual'],1e-6)
+        for a,b,p,q in zip(result,result[1:],slopes,slopes[1:]):
+            for row in ([6*(y-x)-4*v-2*w for x,y,v,w in zip(a,b,p,q)],
+                        [-6*(y-x)+2*v+4*w for x,y,v,w in zip(a,b,p,q)]):
+                self.assertLessEqual(math.hypot(*row),bound+1e-8)

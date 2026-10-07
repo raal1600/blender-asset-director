@@ -62,7 +62,10 @@ def continuous_system(count,weight,*,acceleration_bound=None,check=lambda:None):
             'MOTION_BRICKS_REFINEMENT','Choose 8–1025 generated samples and a positive finite smoothing weight')
     require(acceleration_bound is None or type(acceleration_bound) in (int,float) and math.isfinite(acceleration_bound) and acceleration_bound>0,
             'MOTION_BRICKS_REFINEMENT','Curvature bound must be positive and finite')
-    check();size=2*count;rho=256. if acceleration_bound is not None else 0.
+    # The physical smoothing weight grows with sampling density. Match the
+    # numerical penalty to that weight so finer grids do not make constraint
+    # convergence arbitrarily slower. This changes no objective or hard bound.
+    check();size=2*count;rho=max(256.,weight) if acceleration_bound is not None else 0.
     band=[[0.]*4 for _ in range(size)]
     for i in range(count):band[2*i][0]=1.
     # Unknowns are [y_i, p_i, y_i+1, p_i+1], p=h*dy/dt.
@@ -113,7 +116,8 @@ def continuous_system(count,weight,*,acceleration_bound=None,check=lambda:None):
             primal=max(norm([a-b for a,b in zip(v,zz)]) for v,zz in zip(acceleration,z))
             dual=max(norm([a-b for a,b in zip(v,zz)]) for v,zz in zip(old,z))*rho
             if primal<1e-8 and dual<1e-6:break
-        require(not rho or primal<1e-7,'MOTION_BRICKS_REFINEMENT','Bounded generated smoothing did not converge; choose another duration or boundary')
+        require(not rho or primal<1e-8 and dual<1e-6,'MOTION_BRICKS_REFINEMENT',
+                'Bounded generated smoothing did not converge; choose another duration or boundary')
         check()
         return ([[column[2*i] for column in components] for i in range(count)],
                 [[column[2*i+1] for column in components] for i in range(count)],

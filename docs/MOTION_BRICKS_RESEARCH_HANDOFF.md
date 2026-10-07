@@ -44,6 +44,10 @@ device evidence is described in the capability audit; pins were not upgraded.
   exact pins, monitored budgets, cancellation and actual loaded DLL identity.
 - `motion_bricks_feet.py`, `motion_bricks_refinement.py`: deterministic bounded
   bridge processing. These are application corrections, not neural features.
+- `motion_bricks_spline.py`, `motion_bricks_world_refinement.py`: continuous
+  clamped cubic smoothing with vector curvature bounds and bounded numerical
+  convergence. Sampling density changes the numerical penalty, not the objective
+  or quality limits. Failed convergence/correction is an explicit refusal.
 - `motion_bricks_validation.py`, `motion_bricks_quality.py`: common-time seams,
   actual planted landmarks, dense baked kinematics and hard gates before rank.
 - `launcher/lib/transition-review.mjs`, `checkpoint-job.mjs`: immutable candidates,
