@@ -56,15 +56,19 @@ The baseline Save path immediately approved a generated checkpoint. The current
 implementation integrates working requests and immutable MotionBricks candidates
 with `checkpointJob` and its existing recovery/serialization. Explicit acceptance
 checks quality, dependency and artifact identities, including the clean-build
-installation receipt. Native success of the complete acceptance workflow remains
-outstanding while required motion quality fails.
+installation receipt. The 95234c3 native reference now passes explicit
+acceptance, exact restore, fresh reopening, actual rendering and movie playback,
+with matching accepted preview/render identity. Two of three sampled candidates
+pass quality; the failed candidate remains rejected. Generalization and the
+remaining refinement/multi-join journeys are still mandatory unfinished work.
 
 Pinned source `planner.cpp` skips random uniforms under argmax; changing its seed
 is ineffective. Gumbel temperature is fixed at 1, with the RNG restarted per call.
 Ten fresh Vulkan worker experiments confirm exact same-setting repetition and
 exact output across argmax seeds. Stochastic seeds produce material raw pose
-differences. Earlier correction-surviving diversity was measured; the final
-refined cleanup still needs its own reproducibility/diversity rerun.
+differences. The later native runs also preserve meaningful corrected variation;
+six jobs repeat three fixed seeds twice with exact numeric equality per seed on
+this device. This is neither cross-device identity nor universal quality.
 
 The baseline real reference and unseen idle→back pair pass continuity, original
 Action preservation and fresh Blender reopen. Their contact and visual quality

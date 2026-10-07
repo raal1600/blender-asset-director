@@ -5,6 +5,38 @@ Environment verified locally: Windows 11 Home, RTX 4070 (12,282 MiB), driver
 `9e2066aef7ef`, pinned Vulkan backend. CPU is an explicit alternative; no silent
 fallback was used. Model and DLL identities are in the capability audit.
 
+`native-benchmark-4e45674-95234c3.json` retains six actual candidate jobs:
+three fixed stochastic seeds, each repeated on two builds whose Python motion
+implementation is identical (only client refresh changed). Click-to-review for
+the complete batches was 122.548 and 118.834 seconds. Each worker loads its own
+model; these are warm filesystem/driver observations, not a persistent-model or
+forced cold-cache benchmark. Median and observed maximum, in seconds:
+
+| Measured stage | n | Median | Maximum |
+|---|---:|---:|---:|
+| Launcher admission through candidate publication/finish | 6 | 39.496 | 41.691 |
+| Native job execution including Blender | 6 | 38.192 | 40.458 |
+| Input loaded to boundary-support stage | 6 | 7.913 | 9.749 |
+| Context sampling | 6 | 0.542 | 0.569 |
+| Model hash verification | 6 | 5.381 | 5.403 |
+| Worker model loading | 6 | 0.762 | 0.903 |
+| Native inference | 6 | 0.03110 | 0.03257 |
+| Contact/refinement processing | 6 | 9.732 | 9.833 |
+| Baking through operation completion | 6 | 1.966 | 1.977 |
+| Fresh reopening and quality validation | 6 | 8.145 | 8.252 |
+
+Rows describe nested stages and must not all be summed. Exact raw traces,
+resource observations and artifact identities are in that local JSON. Native
+inference is a small part of measured latency. No validation was removed to
+improve these figures. Preview export and final cancellation/release repetitions
+are still separate outstanding measurements.
+
+For all three fixed-seed repeats the C ABI request, raw numeric arrays and
+corrected numeric arrays were exactly equal on this same Vulkan device. The
+quaternion comparison reports up to 0.00000342 degrees from its floating-point
+acos calculation even for those equal arrays. This is below the 0.1-degree
+near-duplicate threshold, not useful variation or cross-device reproducibility.
+
 The ten fresh-worker baseline runs in `baseline-sampling/report.json` retain
 individual inference, loading, total duration and sampled memory values. The
 first request took 2.754 seconds end to end, including 1.496 seconds loading and

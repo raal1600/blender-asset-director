@@ -2,6 +2,28 @@
 
 ## 2026-10-07 — continued repair and native falsification
 
+The subsequent `95234c3528bfd1c288f6670ca701c4789b0a1aff` native build repaired
+the accepted-preview refresh failure documented below. Two of three real
+stochastic candidates pass the unchanged quality gates. Explicit acceptance,
+exact prior-artifact restore, restoration of the chosen artifact and fresh
+native restart preserve the accepted SHA-256 and preview identity. Actual OptiX
+rendering used that same accepted file. A mistaken harness click on the movie's
+seek rail was retained as a failure; the unchanged movie subsequently passed
+native keyboard playback at rate 1 through both stitches. All 72 render-frame
+hashes match both the renderer and encoder receipts.
+
+Fresh Blender versus actual client GLB parity measured maximum skin displacement
+0.01183 mm and joint orientation 0.14951 degrees at every integer render frame
+plus fractional boundary samples. Agent inspection covered all 72 rendered
+frames as contact sheets; automated native temporal playback and human artistic
+review are distinct (no human review claimed). Evidence:
+`native-accept-95234c3`, `native-playback-95234c3-r2`, and
+`native-benchmark-4e45674-95234c3.json`. The two valid stochastic candidates differ
+by 15.40 degrees RMS in corrected world joint rotations. Same-seed repetitions
+have exactly equal raw and corrected numeric arrays on this device. This does
+not establish second-rig generalization, physical feasibility or cross-device
+identity. Contact-refinement and multi-join native journeys remain unfinished.
+
 The subsequent `b23e76d1e4e75f1ace63ffed8dcb058846551b8d` native build verified
 distinct attempt jobs, raw/corrected numerical diversity, active cancellation,
 and stale completion. `native-faults-b23e76d-r3/report.json` additionally records

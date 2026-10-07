@@ -96,7 +96,11 @@ for case in cases:
    frames=math.ceil((interval[1]-interval[0])/speed)+1
    c={'id':'clip_'+str(i),'take_id':take['id'],'start':start,'frames':frames,'speed':speed,'repeat_reviewed':False,'travel':None}
    if 'source_ranges' in case:c['source_range']=interval
-   if i:c['transition']={'frames':case['extra'],'mode':'generated','match_phase':False,'seed':case.get('seed',1234),'sampling':case.get('sampling','argmax'),'profile_sha256':digest(profile)}
+   if i:
+    c['transition']={'frames':case['extra'],'mode':'generated','match_phase':False,'seed':case.get('seed',1234),'sampling':case.get('sampling','argmax'),'profile_sha256':digest(profile)}
+    if 'contacts' in case:
+     from asset_director.motion_bricks_contract import contact_plan
+     c['transition']['contacts']=contact_plan(case['contacts'])
    if i and case.get('heading'):c['heading_deg']=case['heading']
    clips.append(c);start+=frames+case['extra']
   row['selected_native_intervals']=[{'action':name,'source_fps':sf,'range':c.get('source_range',next(t['range'] for t in performer['takes'] if t['action']==name)),'selection':'explicit-manifest' if 'source_ranges' in case else 'full-native'} for (name,sf),c in zip(selected,clips)]

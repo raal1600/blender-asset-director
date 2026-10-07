@@ -120,18 +120,18 @@
     {
       "id": "reference",
       "requirement": "Reference native Xâ†’bridgeâ†’Y",
-      "fixture": "Adventurer backâ†’left baseline",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
       "expected_behavior": "Real X → bridge → Y with preserved native intervals, fresh reopening and every fixed kinematic gate passing",
       "threshold_or_invariant": "Continuity thresholds plus upright-grounded-kinematic-v2; quality failure cannot be counted as generation coverage",
-      "command_or_journey": "run_motion_bricks_sequences.py --manifest baseline-manifest.json",
+      "command_or_journey": "node <private-evidence>/native_accept_95234c3.mjs; node <private-evidence>/native_playback_95234c3_r2.mjs; python <private-evidence>/run_accepted_parity.py; python <private-evidence>/record_accepted_visual_review.py",
       "identities": {
-        "application": "9474ccaec164e91ae444f36db45f641732570a7d; later dirty experiments identified by their input implementation hashes",
+        "application": "95234c3528bfd1c288f6670ca701c4789b0a1aff",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Isolated Windows candidate; final build pending"
+        "build": "Windows native host 36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872; verified clean installed source manifest"
       },
-      "status": "FAIL",
-      "evidence_path": "final-tangent-reconcile-v2/report.json; dense-quality-convergence.json",
-      "known_limitations": "Native intervals, continuity and fresh-process reopening pass. Dense joint acceleration fails the fixed 6000 degrees/s² gate. Earlier continuity-only PASS does not satisfy this requirement."
+      "status": "PASS",
+      "evidence_path": "native-accept-95234c3/report.json; application-continuous-rho-v1/report.json",
+      "known_limitations": "Controlled reference scope only. Two of three stochastic seeds pass quality; seed 1234 remains rejected. Initial native movie harness clicked the seek rail; separate native retry plays the unchanged accepted render. All 72 frames inspected as contact sheets; full-speed playback clock checked by native automation. No human artistic approval or physics claim. Final delivery rerun and other rigs/journeys remain separate gates."
     },
     {
       "id": "unseen-pair",
@@ -210,8 +210,8 @@
         "build": "Windows native host SHA256 b21023549902980bbd961a6b2672ec066857fd88c5974f3e087b658d0d8dbd89; isolated candidate-b23e76d.json receipt"
       },
       "status": "FAIL",
-      "evidence_path": "beta-mapping-contexts.json; beta-sequence-v1/report.json; beta-explicit-range-v1/report.json; beta-explicit-range-v2/report.json",
-      "known_limitations": "Original full interval refused for contacts and remains unchanged. Separately declared Beta intervals [1,9] and [3,32] generated through the real model, preserved source channels and passed continuity/fresh reopen after correcting rig-unit versus metre comparison. Hard quality fails joint acceleration 16511 degrees/s2. Explicit [1,2] source selection refuses insufficient context. No successful second-rig quality coverage yet."
+      "evidence_path": "beta-explicit-range-v2; beta-continuous-v1/v2; beta-duration-v1; beta-variation-v1; beta-duration-20-v1",
+      "known_limitations": "Beta calibration and actual inference/native preservation/reopen are verified, but no quality-pass generation coverage. Extra-24 argmax/seed7/seed42 fail maximum rotation correction at 46.49/52.57/52.92 degrees; extra-30/42 fail at 58.46/59.46 degrees. Other durations hit the additional-filter bound. Limits remain unchanged. Paladin calibration was refused; rejected clips are not successful coverage."
     },
     {
       "id": "transforms-fps",
@@ -344,18 +344,18 @@
     {
       "id": "native-preservation",
       "requirement": "Structural and evaluated source preservation",
-      "fixture": "entire selected X and Y intervals",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
       "expected_behavior": "Structural and evaluated source preservation",
       "threshold_or_invariant": "unchanged curves/timing/evaluated poses except explicit rigid placement",
-      "command_or_journey": "native preservation/reopen fixture",
+      "command_or_journey": "node <private-evidence>/native_accept_95234c3.mjs; node <private-evidence>/native_playback_95234c3_r2.mjs; python <private-evidence>/run_accepted_parity.py; python <private-evidence>/record_accepted_visual_review.py",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "95234c3528bfd1c288f6670ca701c4789b0a1aff",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "Windows native host 36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872; verified clean installed source manifest"
       },
-      "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "status": "PASS",
+      "evidence_path": "application-continuous-rho-v1/*/RESULTS.json and fresh-process.json; native-accept-95234c3/native-parity.json",
+      "known_limitations": "Controlled reference scope only. Two of three stochastic seeds pass quality; seed 1234 remains rejected. Initial native movie harness clicked the seek rail; separate native retry plays the unchanged accepted render. All 72 frames inspected as contact sheets; full-speed playback clock checked by native automation. No human artistic approval or physics claim. Final delivery rerun and other rigs/journeys remain separate gates."
     },
     {
       "id": "separation",
@@ -376,66 +376,66 @@
     {
       "id": "acceptance",
       "requirement": "Atomic fingerprint-checked acceptance",
-      "fixture": "valid/stale/corrupt/duplicate",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
       "expected_behavior": "Atomic fingerprint-checked acceptance",
       "threshold_or_invariant": "verify current dependencies and artifact; idempotency; no stale overwrite",
-      "command_or_journey": "acceptance transaction tests",
+      "command_or_journey": "node <private-evidence>/native_accept_95234c3.mjs; node <private-evidence>/native_playback_95234c3_r2.mjs; python <private-evidence>/run_accepted_parity.py; python <private-evidence>/record_accepted_visual_review.py",
       "identities": {
-        "application": "9474ccaec164e91ae444f36db45f641732570a7d; later dirty experiments identified by their input implementation hashes",
+        "application": "95234c3528bfd1c288f6670ca701c4789b0a1aff",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Isolated Windows candidate; final build pending"
+        "build": "Windows native host 36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872; verified clean installed source manifest"
       },
-      "status": "FAIL",
-      "evidence_path": "stage4-recovery-unit-r2.log",
-      "known_limitations": "Atomic acceptance/idempotence/corruption tested with synthetic transport. Real quality-passing native acceptance remains unverified."
+      "status": "PASS",
+      "evidence_path": "native-accept-95234c3/report.json; snapshot-node-v1.log; launcher/test/action-layer.test.mjs",
+      "known_limitations": "Controlled reference scope only. Two of three stochastic seeds pass quality; seed 1234 remains rejected. Initial native movie harness clicked the seek rail; separate native retry plays the unchanged accepted render. All 72 frames inspected as contact sheets; full-speed playback clock checked by native automation. No human artistic approval or physics claim. Final delivery rerun and other rigs/journeys remain separate gates."
     },
     {
       "id": "history",
       "requirement": "History and restore",
-      "fixture": "two accepted revisions",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
       "expected_behavior": "History and restore",
       "threshold_or_invariant": "restore exact prior artifact without regeneration",
-      "command_or_journey": "native restore/save/reopen",
+      "command_or_journey": "node <private-evidence>/native_accept_95234c3.mjs; node <private-evidence>/native_playback_95234c3_r2.mjs; python <private-evidence>/run_accepted_parity.py; python <private-evidence>/record_accepted_visual_review.py",
       "identities": {
-        "application": "9474ccaec164e91ae444f36db45f641732570a7d; later dirty experiments identified by their input implementation hashes",
+        "application": "95234c3528bfd1c288f6670ca701c4789b0a1aff",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Isolated Windows candidate; final build pending"
+        "build": "Windows native host 36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872; verified clean installed source manifest"
       },
-      "status": "FAIL",
-      "evidence_path": "stage4-recovery-unit-r2.log",
-      "known_limitations": "Exact restore and retained immutable history pass synthetic transport tests; native accepted-artifact restore is pending."
+      "status": "PASS",
+      "evidence_path": "native-accept-95234c3/report.json (restore events and identical preview identity after restart)",
+      "known_limitations": "Controlled reference scope only. Two of three stochastic seeds pass quality; seed 1234 remains rejected. Initial native movie harness clicked the seek rail; separate native retry plays the unchanged accepted render. All 72 frames inspected as contact sheets; full-speed playback clock checked by native automation. No human artistic approval or physics claim. Final delivery rerun and other rigs/journeys remain separate gates."
     },
     {
       "id": "comparison",
       "requirement": "Synchronized A/B",
-      "fixture": "same and different durations",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
       "expected_behavior": "Synchronized A/B",
       "threshold_or_invariant": "align source stitch, actual speed, labeled target stitches, boundary scrub",
-      "command_or_journey": "native journey A",
+      "command_or_journey": "node <private-evidence>/native_accept_95234c3.mjs; node <private-evidence>/native_playback_95234c3_r2.mjs; python <private-evidence>/run_accepted_parity.py; python <private-evidence>/record_accepted_visual_review.py",
       "identities": {
-        "application": "9474ccaec164e91ae444f36db45f641732570a7d; later dirty experiments identified by their input implementation hashes",
+        "application": "95234c3528bfd1c288f6670ca701c4789b0a1aff",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Isolated Windows candidate; final build pending"
+        "build": "Windows native host 36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872; verified clean installed source manifest"
       },
-      "status": "FAIL",
-      "evidence_path": "native-review-c401b33-r2/04-comparison.png; native-review-c401b33-r2/05-playback.png; native-review-c401b33-r2/report.json",
-      "known_limitations": "Actual source-aligned full-speed A/B with performer framing verified and screenshots inspected by agent. Different-duration comparison and complete motion playback review remain pending."
+      "status": "PASS",
+      "evidence_path": "native-accept-95234c3/report.json (source/target scrubs; 1.045 s physical clock in 1.084 s wall time)",
+      "known_limitations": "Controlled reference scope only. Two of three stochastic seeds pass quality; seed 1234 remains rejected. Initial native movie harness clicked the seek rail; separate native retry plays the unchanged accepted render. All 72 frames inspected as contact sheets; full-speed playback clock checked by native automation. No human artistic approval or physics claim. Final delivery rerun and other rigs/journeys remain separate gates."
     },
     {
       "id": "journey-a",
       "requirement": "Generate compare accept save reopen render",
-      "fixture": "actual Windows WebView2 client",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
       "expected_behavior": "Generate compare accept save reopen render",
       "threshold_or_invariant": "visible controls and real worker/model/Blender outputs",
-      "command_or_journey": "native journey A",
+      "command_or_journey": "node <private-evidence>/native_accept_95234c3.mjs; node <private-evidence>/native_playback_95234c3_r2.mjs; python <private-evidence>/run_accepted_parity.py; python <private-evidence>/record_accepted_visual_review.py",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "95234c3528bfd1c288f6670ca701c4789b0a1aff",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "Windows native host 36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872; verified clean installed source manifest"
       },
-      "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "status": "PASS",
+      "evidence_path": "native-accept-95234c3/report.json; native-playback-95234c3-r2/report.json; native-accept-95234c3/preview-parity.json",
+      "known_limitations": "Controlled reference scope only. Two of three stochastic seeds pass quality; seed 1234 remains rejected. Initial native movie harness clicked the seek rail; separate native retry plays the unchanged accepted render. All 72 frames inspected as contact sheets; full-speed playback clock checked by native automation. No human artistic approval or physics claim. Final delivery rerun and other rigs/journeys remain separate gates."
     },
     {
       "id": "journey-b",
@@ -552,34 +552,34 @@
     {
       "id": "preview-render",
       "requirement": "Saved baked identity parity",
-      "fixture": "accepted blend/GLB/movie",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
       "expected_behavior": "Saved baked identity parity",
-      "threshold_or_invariant": "same source hash; â‰¤0.1mm sampled skin parity; fresh reopen",
-      "command_or_journey": "native render + GLB parity",
+      "threshold_or_invariant": "Exact accepted source SHA-256 for renderer/encoder; all sampled skin positions <=0.1 mm and joint orientations <=1 degree; fresh Blender reopening; 72 frame hashes match render and encoder receipts",
+      "command_or_journey": "node <private-evidence>/native_accept_95234c3.mjs; node <private-evidence>/native_playback_95234c3_r2.mjs; python <private-evidence>/run_accepted_parity.py; python <private-evidence>/record_accepted_visual_review.py",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "95234c3528bfd1c288f6670ca701c4789b0a1aff",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "Windows native host 36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872; verified clean installed source manifest"
       },
-      "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "status": "PASS",
+      "evidence_path": "native-accept-95234c3/preview-parity.json; native-playback-95234c3-r2/report.json; native-accept-95234c3/agent-visual-review.json",
+      "known_limitations": "Controlled reference scope only. Two of three stochastic seeds pass quality; seed 1234 remains rejected. Initial native movie harness clicked the seek rail; separate native retry plays the unchanged accepted render. All 72 frames inspected as contact sheets; full-speed playback clock checked by native automation. No human artistic approval or physics claim. Final delivery rerun and other rigs/journeys remain separate gates."
     },
     {
       "id": "visual",
       "requirement": "All-frame and full-speed review",
-      "fixture": "short acceptance movies",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
       "expected_behavior": "All-frame and full-speed review",
       "threshold_or_invariant": "feet and full bridge visible; all frames inspected; human review separate",
-      "command_or_journey": "native playback + frame inspection",
+      "command_or_journey": "node <private-evidence>/native_accept_95234c3.mjs; node <private-evidence>/native_playback_95234c3_r2.mjs; python <private-evidence>/run_accepted_parity.py; python <private-evidence>/record_accepted_visual_review.py",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "95234c3528bfd1c288f6670ca701c4789b0a1aff",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "Windows native host 36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872; verified clean installed source manifest"
       },
-      "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "status": "PASS",
+      "evidence_path": "native-accept-95234c3/agent-visual-review.json; native-playback-95234c3-r2/report.json",
+      "known_limitations": "Controlled reference scope only. Two of three stochastic seeds pass quality; seed 1234 remains rejected. Initial native movie harness clicked the seek rail; separate native retry plays the unchanged accepted render. All 72 frames inspected as contact sheets; full-speed playback clock checked by native automation. No human artistic approval or physics claim. Final delivery rerun and other rigs/journeys remain separate gates."
     },
     {
       "id": "budgets",
@@ -661,8 +661,8 @@
     "blocked": []
   },
   "counts": {
-    "PASS": 11,
-    "FAIL": 29,
+    "PASS": 19,
+    "FAIL": 21,
     "BLOCKED": 0
   },
   "counts_scope": "Current progress rows; not final delivery acceptance"

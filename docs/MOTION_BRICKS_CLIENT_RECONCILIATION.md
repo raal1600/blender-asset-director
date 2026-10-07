@@ -1,6 +1,21 @@
 # Offline transition review — implementation in progress
 
-Latest native evidence identifies application
+Latest reference evidence identifies application
+`95234c3528bfd1c288f6670ca701c4789b0a1aff`, host SHA-256
+`36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872`.
+`native-accept-95234c3/report.json` records three real candidates (two quality
+passes), source-aligned comparison, explicit acceptance, exact prior-artifact
+restore, restoration of the selected candidate, fresh native restart and the
+same preview identity. It reached real OptiX rendering but its playback click
+hit the seek rail. The retained movie was then reopened and played at rate 1
+through both stitches in `native-playback-95234c3-r2/report.json`.
+Fresh Blender/actual GLB parity measured maximum skin error 0.01183 mm and joint
+orientation error 0.14951 degrees across every rendered integer frame and
+fractional boundary samples. All 72 rendered frames were inspected separately;
+human artistic approval is not claimed. Contact refinement and multi-join
+reconciliation journeys remain unfinished.
+
+Earlier native evidence identifies application
 `b23e76d1e4e75f1ace63ffed8dcb058846551b8d` and host SHA-256
 `b21023549902980bbd961a6b2672ec066857fd88c5974f3e087b658d0d8dbd89`.
 `native-review-b23e76d/report.json` retains three real candidates, two framed
@@ -19,7 +34,7 @@ The first `c401b33` procedure asserted editability during transient request
 admission. Its corrected procedure waits for editability while still requiring
 a running native job; no application editability gate was weakened.
 
-The accepted checkpoint and the working transition request are separate. Generate creates immutable candidate checkpoints. Acceptance verifies the current request fingerprint, runtime implementation, source checkpoint, candidate and evidence hashes, and hard quality report before atomically publishing the complete timeline. A failed candidate is inspectable but cannot be accepted.
+The accepted checkpoint and the working transition request are separate. Generate creates immutable candidate checkpoints. Acceptance verifies the current request fingerprint, runtime implementation, source checkpoint, candidate and evidence hashes, and hard quality report before atomically publishing the complete timeline. A failed candidate is inspectable but cannot be accepted. Snapshot refresh checks only existing cached edits, so acceptance/restore cannot reconstruct a discarded old working request.
 
 Select a generated connection, set its duration, generate, inspect the candidate, refine, compare, and explicitly accept. “Generate alternatives (3)” uses the pinned ABI's Gumbel sampler at fixed temperature 1, with seeds 1234, 7 and 42. Argmax seed changes are not alternatives. The tested raw and corrected diversity evidence is described in the capability audit; updated cleanup still needs its final diversity regression.
 

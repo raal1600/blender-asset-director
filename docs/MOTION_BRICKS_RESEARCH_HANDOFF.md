@@ -1,7 +1,7 @@
 # MotionBricks implementation evidence — working handoff
 
 This record is **IN PROGRESS, NOT ACCEPTED**. No Deep Research was launched.
-Mandatory quality and complete native-client acceptance remain unfinished.
+Mandatory generalization and complete native-client journeys remain unfinished.
 Do not treat historical continuity passes or unit tests as production readiness.
 
 ## Revisions and isolation
@@ -9,12 +9,16 @@ Do not treat historical continuity passes or unit tests as production readiness.
 The implementation branch is `feature/motionbricks-authoring-20261006` in the
 isolated `blender-asset-director-motionbricks-authoring` worktree. The latest
 committed native-client evidence currently identifies
-`b23e76d1e4e75f1ace63ffed8dcb058846551b8d`; subsequent explicit measured hinge
-calibration and correction experiments are under investigation. Native b23e76d
+`95234c3528bfd1c288f6670ca701c4789b0a1aff`: the reference now has two passing
+stochastic alternatives, explicit acceptance, exact restore, native restart,
+preview parity, actual OptiX rendering and retained-movie playback. Its initial
+movie harness clicked the seek rail; the separate native playback retry passes
+on the unchanged rendered artifact. The preceding 4e45674 build exposed and
+retained a real stale-draft refresh failure, fixed at 95234c3. Native b23e76d
 evidence verifies attempt identities, numerical candidate diversity, stale
 completion, active cancellation, provider crash and interrupted-job recovery.
-All candidates still failed quality. A final delivery must replace this
-paragraph with its exact tested source/build receipt.
+Those earlier b23e76d candidates all failed quality. A final delivery must
+replace this paragraph with its exact final tested source/build receipt.
 
 The inspected combined baseline is #31
 `cea64d0ebeaf09302adcf650b83b70d459b12bf9`, descending from #30
@@ -81,8 +85,20 @@ Verified runtime observations:
   seed changes materially different; independent source/target influence and
   near invariance to unconstrained target XY placeholders.
 - `corrected-diversity-comparison.json`: earlier cleanup retained roughly
-  7.14/7.24 degrees RMS joint differences between seeds. **Final cleanup diversity
-  still needs retesting.** No cross-device bitwise reproducibility claim.
+  7.14/7.24 degrees RMS joint differences between seeds. The later actual
+  `native-accept-95234c3/report.json` measures 15.40 degrees RMS corrected world
+  joint difference between its two quality-passing candidates. Raw model-local
+  and corrected world rotations use different joint sets/frames; their RMS
+  values are not a correction-attenuation ratio. The six-job benchmark repeats
+  each seed twice with exactly equal raw and corrected arrays on this device.
+  No cross-device bitwise reproducibility claim.
+- `native-accept-95234c3`, `native-playback-95234c3-r2`: explicit candidate
+  acceptance, exact history restore, identical accepted preview after native
+  restart, actual render and 1x movie playback. The retained first movie click
+  failure was a harness seek-rail click. `preview-parity.json` and
+  `agent-visual-review.json` bind the accepted Blender file, GLB, all 72 rendered
+  frames and encoder receipt. Static agent inspection, automated temporal
+  playback and absent human artistic approval are identified separately.
 - `native-review-9474cca/report.json`: actual visible Windows host/WebView2;
   three model-generated candidates; accepted checkpoint preserved; two real
   candidate previews and synchronized full-speed controls exercised. All
@@ -95,20 +111,25 @@ Verified runtime observations:
 
 Current failures and missing evidence:
 
-- Reference and unseen-pair generation preserve native intervals but fail
-  acceleration and, in some experiments, contact/correction limits.
+- Reference argmax and stochastic seeds 7/42 now pass the fixed quality gates;
+  seed 1234 still fails penetration. Independent Beta generation preserves
+  native intervals but its tested durations/seeds fail correction limits.
+  No quality-pass second-rig or unseen-pair coverage is established yet.
 - `dense-quality-convergence.json` falsifies a 60 Hz apparent pass: the same
   repeated-clip bake fails at 240/480 Hz. Dense endpoint acceleration is a real
-  unresolved acceptance issue, separate from the repaired seam derivative
-  estimator. Thresholds were not loosened.
+  historical failure, separate from the repaired seam derivative estimator.
+  Later bounded continuous correction passes the reference; convergence must
+  still be demonstrated across the required broader coverage. Thresholds were
+  not loosened.
 - Two independent verified humanoid rigs, all required generalization cases,
-  four-clip reconciliation, native A–E journeys and complete accepted rendering
-  remain outstanding. The inspected Arabic-Warrior GLB is an unrigged static
+  four-clip reconciliation and native B/E journeys remain outstanding. Native A
+  now has the evidence above; C/D have earlier native fault/staleness evidence
+  requiring final-build regression. The inspected Arabic-Warrior GLB is an unrigged static
   mesh, not second-rig evidence. Rejected clips do not count as successful
   generation coverage.
 - Acceptance/restore/recovery/corruption tests using synthetic transport verify
-  persistence logic only. Real native-client fault and acceptance journeys are
-  separate mandatory gates.
+  persistence logic only. The native acceptance and b23e76d fault evidence are
+  separate; the entire mandatory fault matrix is not yet complete.
 
 Unsupported scope remains arbitrary human motion, terrain/jumps, airborne or
 unstable contact boundaries, negative/nonuniform scale, unreviewed rigs, exact

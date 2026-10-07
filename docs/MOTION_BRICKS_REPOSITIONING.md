@@ -6,7 +6,11 @@ quality, cancellation or a pending replacement retains the accepted checkpoint.
 The paragraphs below describing the earlier delivered reference are historical
 evidence, not acceptance of the expanded current quality gate. Dense evaluation
 has exposed acceleration failures despite preserved native intervals and good
-seams. See the [client workflow](MOTION_BRICKS_CLIENT_RECONCILIATION.md),
+seams. The later `95234c3528bfd1c288f6670ca701c4789b0a1aff` build passes the
+reference's expanded kinematic gates for two stochastic alternatives and now
+has explicit native acceptance, restore, reopen, preview parity and render
+playback evidence. The failed seed remains rejected; broader generalization is
+unfinished. See the [client workflow](MOTION_BRICKS_CLIENT_RECONCILIATION.md),
 [acceptance matrix](motion-bricks-acceptance.json) and
 [working research handoff](MOTION_BRICKS_RESEARCH_HANDOFF.md).
 
