@@ -1,5 +1,28 @@
 # Offline MotionBricks transition authoring — implementation record
 
+## Final scoped result — 2026-10-07
+
+The supported offline path, immutable candidates, hard validity/ranking, explicit
+acceptance/history, contact refinement, downstream reconciliation and failure
+recovery are implemented and verified through the real local stack. Runnable
+application commit: `5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c`. The accepted
+reference and four-clip scene both have native client, model, Blender, persistence,
+preview, render and playback evidence. Two reviewed rigs have positive generation
+coverage; failed samples and rejected intervals remain recorded.
+
+The mandatory matrix counts requirement/invariant verification within the stated
+domain, not all attempted candidate successes. The unchanged legacy suite still
+has three preparation failures; separate explicit prepared requests demonstrate
+the supported remedy. There is no guarantee that every admitted sample passes,
+no automatic in-place travel inference, no dynamics proof and no universal
+production-readiness claim. Exact counts, qualifications, source/build identities,
+raw timing reports and reproduction commands are in the matrix and
+`MOTION_BRICKS_RESEARCH_HANDOFF.md`. No Deep Research was launched.
+
+The remaining sections retain the baseline and repair decisions in their original
+chronological scope. Later runtime evidence supersedes their then-pending status.
+
+
 Goal: selected native X → separately generated movement → selected native Y.
 Keep both selected native intervals, their clocks and original Actions intact.
 Generate through the pinned real C ABI in an isolated standalone Python worker.

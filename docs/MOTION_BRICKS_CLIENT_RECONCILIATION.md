@@ -1,85 +1,95 @@
-# Offline transition review — implementation in progress
+# Offline transition review
 
-The review panel now shows a quality review order for current, verified,
-nonduplicate candidates after every join passes every hard gate. It averages
-the existing normalized per-join errors for the complete request; equal scores
-share a rank. Missing scores, incomplete joins, unknown presets, failures and
-stale results are unranked. The chronological history and explicit acceptance
-controls are unchanged. This order is a kinematic review aid, not a naturalness
-or physical-feasibility judgment. Native verification of this presentation is
-recorded separately from the already verified motion and acceptance pipeline.
+The working request and accepted scene are independent. Generate creates a
+reviewable candidate; only explicit acceptance replaces the complete accepted
+timeline. Failure, cancellation and pending generation preserve its checkpoint.
+The tested native workflows and exact revisions are in
+[the research handoff](MOTION_BRICKS_RESEARCH_HANDOFF.md); historical failures are
+retained in [the capability audit](MOTION_BRICKS_CAPABILITY_AUDIT.md).
 
-The later native `f30b389890b6bc11f62efce56e355d3a981d5431` build (host SHA-256
-`68de34b1a648eeeeecbe7085b9b98fc0dae81575e406e16fcce37f88e023e3a3`) verifies
-contact editing, two real three-candidate batches, comparison, explicit refined
-acceptance and restart in `native-contact-f30b389-v1`. The same accepted artifact
-is rendered and played by the native client, with fresh Blender/GLB parity and
-all 72 frames inspected. Source/target windows 0.16 → 0.08 seconds reduce seed42
-planted drift 31.09 → 5.68 mm while its neural request/output remain identical.
-This demonstrates deterministic refinement, not changed model conditioning.
+## Normal workflow
 
-The current source also identifies affected downstream joins by animation label
-and target frame. A/B review starts at the selected connection and offers a
-transition selector. If a candidate lacks that connection, it is labeled absent
-and synchronized playback is disabled; the UI never substitutes the first join.
-These later multi-join controls have automated tests; their native journey is
-still pending at this point in the record.
+1. Select the intended performer, native clips and explicit intervals in Action.
+   Generated mode preserves those intervals and their clocks. An interruption is
+   a new request with an explicit trim, not a hidden shortening of either clip.
+2. Complete reviewed mapping/rest/root preparation if needed. A stationary root
+   does not establish intended travel. The root-intent selector permits reviewed
+   stationary intent only when evaluated root travel is stationary; it cannot
+   erase native curves. Travelling in-place motion requires reviewed derived
+   preparation. Import its copied checkpoint from More, inspect the unaccepted
+   preview, then choose Keep & continue building or Reject prepared checkpoint.
+   Keeping preparation does not accept a generated transition or approve Action.
+3. Select a generated connection and its duration, then Generate candidate or
+   Generate alternatives (3). Alternatives use verified fixed-temperature Gumbel
+   samples with seeds 1234, 7 and 42. Argmax seed changes are not alternatives.
+   Model lengths and generated-only retiming limit the offered timing; invalid
+   durations are refused. No native clip is retimed to make the bridge fit.
+4. Inspect the validation result and compare candidates. Quality review order
+   includes only current, verified, nonduplicate candidates with all joins passing
+   all hard gates. It averages normalized per-join error scores; tied scores share
+   a rank. Failed, missing, stale, incomplete and unknown-preset evidence is
+   unranked. Ranking is a review aid, not naturalness or physical certification.
+5. Refine contacts or try a supported duration/sample and regenerate. The contact
+   panel records reviewed left/right/both support and interval durations. Source
+   support begins at its stitch inside the bridge; target support ends at its
+   stitch. Extensions are 0.04–0.20 seconds with room required inside the bridge.
+   No support extension disables that side's extension. Evaluated native support
+   must still qualify: a correction cannot declare an airborne foot planted.
+6. Explicitly accept a hard-valid current candidate. Dependency and file hashes
+   are rechecked before atomic acceptance. A whole consistent checkpoint is
+   accepted, including all affected downstream joins. No downstream result is
+   silently accepted. Accepted history / restore selects exact prior artifacts.
+7. Save/reopen and render the accepted scene. Candidate previews are labeled
+   unaccepted; normal rendering uses the accepted checkpoint. Preview and render
+   identities are hash-bound to the same baked source.
 
-The first native multi-join attempt exposed a missing review route for imported
-preparation: the specialized Action screen hid the generic checkpoint Keep and
-Reject controls. The Action screen now presents an explicit prepared-checkpoint
-review panel, identifies the preview as unaccepted, and uses the existing
-hash-verified Keep & continue building / discard operations. Keeping stays in
-Action; it does not approve the activity or accept a generated transition.
-The failed native attempts are retained in `native-multi-abfbf61-v1` and `v2`;
-the repaired native journey must be rerun.
+## What refinement actually changes
 
-Earlier reference acceptance evidence identifies application
-`95234c3528bfd1c288f6670ca701c4789b0a1aff`, host SHA-256
-`36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872`.
-`native-accept-95234c3/report.json` records three real candidates (two quality
-passes), source-aligned comparison, explicit acceptance, exact prior-artifact
-restore, restoration of the selected candidate, fresh native restart and the
-same preview identity. It reached real OptiX rendering but its playback click
-hit the seek rail. The retained movie was then reopened and played at rate 1
-through both stitches in `native-playback-95234c3-r2/report.json`.
-Fresh Blender/actual GLB parity measured maximum skin error 0.01183 mm and joint
-orientation error 0.14951 degrees across every rendered integer frame and
-fractional boundary samples. All 72 rendered frames were inspected separately;
-human artistic approval is not claimed. Contact refinement is subsequently verified below; multi-join
-reconciliation remains unfinished.
+Contact editing changes deterministic bridge foot/toe orientation, IK, release
+and bounded smoothing. It is not a contact-label input to the neural model. In
+the actual native refinement test, 0.16 → 0.08 second support windows reduced
+seed42 drift from 31.09 to 5.68 mm while leaving the neural request and raw arrays
+exactly equal. Original Actions remain intact. Correction magnitude, acceleration,
+penetration and planted support still have to pass fixed quality limits.
 
-Earlier native evidence identifies application
-`b23e76d1e4e75f1ace63ffed8dcb058846551b8d` and host SHA-256
-`b21023549902980bbd961a6b2672ec066857fd88c5974f3e087b658d0d8dbd89`.
-`native-review-b23e76d/report.json` retains three real candidates, two framed
-source-aligned baked previews, numerical raw/corrected diversity, input-change
-staleness, and active cancellation in 0.554 seconds. Its later fault-injection
-step failed a harness timing assertion. The separate corrected native procedure
-`native-faults-b23e76d-r3/report.json` passed actual provider crash and restart
-during generation: prior candidates and the accepted checkpoint survived, while
-unpublished interrupted output was quarantined. All generated candidates failed
-the fixed quality gate. Acceptance, restore, final rendering and naturalness
-are not established by these tests.
+Comparison uses one physical clock aligned at the selected source stitch. Choose
+which join to review, scrub either stitch or play both at full speed. Each view
+labels its bridge duration, target-stitch time and baked artifact. Different
+durations are not time-warped. A missing join is labeled absent and synchronized
+playback is disabled; the first join is not silently substituted.
 
-The preceding `7fc75d2` native startup failed because a packaged helper was not
-served; `c401b33` fixes the allowlist and tests the transitive HTTP module graph.
-The first `c401b33` procedure asserted editability during transient request
-admission. Its corrected procedure waits for editability while still requiring
-a running native job; no application editability gate was weakened.
+Native root travel uses explicit timeline composition placement, with no second
+manual travel path. Generated heading overrides, arbitrary target locks,
+waypoints, pose editing, subinterval regeneration, text prompts, precision knobs
+and decorative sliding sliders are not offered. A full graphical root-preparation
+editor is not implemented; reviewed preparation tools plus checkpoint import are
+the supported workflow. Optional viewing overlays must not change baked motion.
 
-The accepted checkpoint and the working transition request are separate. Generate creates immutable candidate checkpoints. Acceptance verifies the current request fingerprint, runtime implementation, source checkpoint, candidate and evidence hashes, and hard quality report before atomically publishing the complete timeline. A failed candidate is inspectable but cannot be accepted. Snapshot refresh checks only existing cached edits, so acceptance/restore cannot reconstruct a discarded old working request.
+## Working states and recovery
 
-Select a generated connection, set its duration, generate, inspect the candidate, refine, compare, and explicitly accept. “Generate alternatives (3)” uses the pinned ABI's Gumbel sampler at fixed temperature 1, with seeds 1234, 7 and 42. Argmax seed changes are not alternatives. The tested raw and corrected diversity evidence is described in the capability audit. Saved generated timelines also offer explicit regeneration with unchanged settings; repeated output is subject to duplicate detection. The review panel refreshes after contact edits without replacing the scene viewer.
+Needs preparation and actionable refusal messages identify missing mapping,
+ambiguous root intent, unavailable context, unsupported transforms or contact
+boundaries. Ready, queued/generating, validating, ready for review, failed quality,
+failed execution, cancelled, stale and accepted states retain distinct meanings.
+Validation progress comes from the owned job, including fresh Blender reopening.
+Detailed provider settings, provenance and metrics are expandable.
 
-Comparison uses one physical clock aligned at the source stitch. Duration and target-stitch time are displayed independently. No time warping is applied. Each view resolves its identified baked checkpoint. Normal scene preview and rendering resolve the accepted checkpoint. Candidate views are labeled separately and do not grant acceptance.
+Changing a relevant input makes older candidates stale; merely selecting a clip
+does not. A batch stops scheduling more seeds when its request becomes stale.
+An early-join edit identifies downstream labels and target frames affected by
+timing/placement. The previous complete accepted revision remains usable while
+the replacement is pending. A new candidate never overwrites a newer request.
 
-The foot-contact refinement panel records a user-reviewed source and target support selection and interval duration. A source interval begins at its stitch; a target interval ends at its stitch. Durations are bounded to 0.04–0.20 seconds and must leave sufficient bridge time. Left/right/both selections must be supported by evaluated native contexts; they cannot override an airborne foot into a planted one. “No support extension” disables that boundary extension. The mechanism is deterministic foot/toe orientation and positional IK with bounded release, filtering, and correction measurements. It is not a contact-label input to the neural backend. Regeneration is required. Final contact/quality checks remain authoritative.
+Cancellation reaches the owned job/process lifecycle. Restart checks ownership,
+quarantines interrupted unpublished outputs and retains accepted revisions plus
+valid candidates. Corrupt candidate artifacts cannot be accepted. Repeating the
+same acceptance event is idempotent; a distinct repeated event is refused.
+Discard clears the working draft after cancellation; it does not delete the
+accepted scene. The native exit safeguard may wait for active preview work;
+finish that operation and refresh status rather than force-closing unrelated work.
 
-Reviewed stationary root intent resolves an in-place ambiguity only when evaluated root travel is stationary. It does not erase moving root curves. Travelling in-place clips require a reviewed derived root preparation. `tools/prepare_root_contact_paths.py` creates separate derived Actions; preparation requires observed landmarks and intervals. Clip names are labels and do not supply direction. A complete client preparation editor is not yet implemented.
-
-Changing motion, trim, duration, contacts, sampling plan or other request dependencies makes older candidates stale. Selecting a clip alone does not. The batch stops scheduling further seeds after a dependency edit. Discard clears the working request while preserving accepted and candidate artifacts. Prior accepted artifacts can be restored without regeneration. An early-join edit regenerates the complete requested timeline, including subsequent joins; partial inconsistent acceptance is refused by accepting complete checkpoints only.
-
-Cancellation uses the existing native job lifecycle. Restart recovery checks both launcher ownership and native executor/Blender process evidence; it does not clear a live writer's lease. Incomplete attempts remain interrupted and excluded from valid candidates. The b23e76d native fault procedure verifies this path; B is now verified at f30b389; E and final-build fault regression remain unfinished.
-
-Historical evidence remains retained: the 9474cca native batch took 96.743 seconds and the preceding 91cb591 run exposed a comparison initialization bug. Later c401b33 and b23e76d native tests verified framing of the complete performer. These isolated observations are not benchmark percentiles or successful acceptance/render journeys.
+Real Windows evidence: final alternatives/ranking/acceptance/render at 5d4a7ba;
+contact refinement and stale/cancel/provider-crash/restart at 5f1b8b8; native
+multi-join comparison and exact restoration at 2cd8ed9. The final motion and
+persistence code trees match 5f1b8b8 exactly. These are finite reviewed fixtures,
+not a guarantee that every candidate passes or every humanoid generalizes.

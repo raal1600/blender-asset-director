@@ -1,18 +1,21 @@
 # Generated repositioning between intact native clips (development)
 
-**Current authoring investigation, 2026-10-07:** generation now creates immutable
-review candidates, followed by explicit fingerprint-checked acceptance. Failed
-quality, cancellation or a pending replacement retains the accepted checkpoint.
-The paragraphs below describing the earlier delivered reference are historical
-evidence, not acceptance of the expanded current quality gate. Dense evaluation
-has exposed acceleration failures despite preserved native intervals and good
-seams. The later `95234c3528bfd1c288f6670ca701c4789b0a1aff` build passes the
-reference's expanded kinematic gates for two stochastic alternatives and now
-has explicit native acceptance, restore, reopen, preview parity and render
-playback evidence. The failed seed remains rejected; broader generalization is
-unfinished. See the [client workflow](MOTION_BRICKS_CLIENT_RECONCILIATION.md),
+**Verified local authoring, 2026-10-07:** the supported native X → real
+model bridge → native Y path now has immutable candidates, explicit stale-checked
+acceptance, exact history/restore, contact refinement and hard-gated review order.
+Actual Windows workflows, two reviewed rigs, the four-clip sequence, native fault
+recovery, fresh reopening and accepted preview/render parity are recorded in the
 [acceptance matrix](motion-bricks-acceptance.json) and
-[working research handoff](MOTION_BRICKS_RESEARCH_HANDOFF.md).
+[research handoff](MOTION_BRICKS_RESEARCH_HANDOFF.md). Runnable source is
+`5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c`; the motion/persistence implementation
+matches the extensively tested 5f1b8b8 source trees. Some candidates and explicit
+intervals still fail fixed quality gates and remain rejected. Unprepared in-place
+inputs need reviewed intent/preparation. These finite results do not establish
+arbitrary motion, physical validity or universal production readiness. See the
+[client workflow](MOTION_BRICKS_CLIENT_RECONCILIATION.md) for supported controls.
+
+The original reference measurements below remain historical and must not be
+substituted for the later, expanded acceptance evidence.
 
 Rigs with straight rest elbows now have an explicit measured-calibration route:
 run `tools/inspect_motion_bricks_hinges.py` on a copied file with an observed

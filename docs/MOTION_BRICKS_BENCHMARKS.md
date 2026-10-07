@@ -1,114 +1,135 @@
-# MotionBricks pipeline measurements — in progress
+# MotionBricks pipeline measurements
 
-Environment verified locally: Windows 11 Home, RTX 4070 (12,282 MiB), driver
-616.56, approximately 31.85 GiB physical RAM, Blender 5.2.1 LTS
-`9e2066aef7ef`, pinned Vulkan backend. CPU is an explicit alternative; no silent
-fallback was used. Model and DLL identities are in the capability audit.
+Measured locally on Windows 11 Home, RTX 4070 (12,282 MiB), driver 616.56,
+about 31.85 GiB RAM, Blender 5.2.1 LTS `9e2066aef7ef`, pinned Vulkan backend.
+No silent CPU fallback, dependency upgrade or persistent production model worker.
+The exact pins/build are in [the handoff](MOTION_BRICKS_RESEARCH_HANDOFF.md).
+Raw reports named below are under the private evidence root identified there.
 
-`native-benchmark-4e45674-95234c3.json` retains six actual candidate jobs:
-three fixed stochastic seeds, each repeated on two builds whose Python motion
-implementation is identical (only client refresh changed). Click-to-review for
-the complete batches was 122.548 and 118.834 seconds. Each worker loads its own
-model; these are warm filesystem/driver observations, not a persistent-model or
-forced cold-cache benchmark. Median and observed maximum, in seconds:
+## Identical-input optimization comparison
 
-| Measured stage | n | Median | Maximum |
-|---|---:|---:|---:|
-| Launcher admission through candidate publication/finish | 6 | 39.496 | 41.691 |
-| Native job execution including Blender | 6 | 38.192 | 40.458 |
-| Input loaded to boundary-support stage | 6 | 7.913 | 9.749 |
-| Context sampling | 6 | 0.542 | 0.569 |
-| Model hash verification | 6 | 5.381 | 5.403 |
-| Worker model loading | 6 | 0.762 | 0.903 |
-| Native inference | 6 | 0.03110 | 0.03257 |
-| Contact/refinement processing | 6 | 9.732 | 9.833 |
-| Baking through operation completion | 6 | 1.966 | 1.977 |
-| Fresh reopening and quality validation | 6 | 8.145 | 8.252 |
+`soles-pipeline-comparison-final-v1.json` retains 18 complete real fixture jobs:
+three identical requests per rig at each of a08e46d (before), 0c804ca (after) and
+5f1b8b8 (final motion implementation). Every request, raw numeric array, corrected
+sample/path/world pose and evaluated baked frame is exactly equal within each
+rig across all nine repetitions. Every hard gate, native preservation and fresh
+reopen check passes, with owned process release.
 
-Rows describe nested stages and must not all be summed. Exact raw traces,
-resource observations and artifact identities are in that local JSON. Native
-inference is a small part of measured latency. No validation was removed to
-improve these figures. Preview export and final cancellation/release repetitions
-are still separate outstanding measurements.
+| Complete fixture generation plus separate reopen | n per revision | Before median / max (s) | After median / max (s) | Final median / max (s) |
+| --- | ---: | ---: | ---: | ---: |
+| Reference | 3 | 46.411 / 46.573 | 45.703 / 46.175 | 46.176 / 46.721 |
+| Beta | 3 | 41.476 / 42.185 | 33.281 / 33.746 | 33.958 / 34.118 |
 
-For all three fixed-seed repeats the C ABI request, raw numeric arrays and
-corrected numeric arrays were exactly equal on this same Vulkan device. The
-quaternion comparison reports up to 0.00000342 degrees from its floating-point
-acos calculation even for those equal arrays. This is below the 0.1-degree
-near-duplicate threshold, not useful variation or cross-device reproducibility.
+The sole-height optimization transforms only the foot-dominated vertices used
+by the existing check, preserving the evaluated mesh and world matrix. No sampling
+density or validation threshold changed. The reference timings mostly overlap;
+the denser rig has a clear observed reduction in this small sample. The earlier
+16-pose/twenty-calls-per-method microbenchmark also has exact height equality.
+Three repetitions do not support a population p95 claim. Fixture timings include
+diagnostic seam sampling beyond the normal client operation.
 
-The ten fresh-worker baseline runs in `baseline-sampling/report.json` retain
-individual inference, loading, total duration and sampled memory values. The
-first request took 2.754 seconds end to end, including 1.496 seconds loading and
-0.0617 seconds native inference. Later workers still load their own model;
-filesystem/driver warming does not make them persistent warm-model requests.
-These mixed sampling/context experiments are not a fixed-input latency percentile.
+## Native authoring and preview
 
-Native Windows three-candidate generation to review was 91.606 seconds at
-91cb591 and 96.743 seconds at 9474cca, **one observation per build**. Their source
-calibration/cleanup changed, so this is not an identical-input optimization
-comparison. Candidate preview export follows separately. The 9474cca A/B control
-journey passed, while candidate quality failed. The historical 24–27 ms inference
-claim and approximately 99-second client test are not whole-pipeline benchmarks.
+`final-native-timings-5f1b8b8-v1.json` joins eight actual native jobs to their
+launcher, Blender and provider traces: six reference candidates across two
+contact settings and two identical complete four-clip requests. Final 5d4a7ba
+changes only ranking presentation; `runtime-scope-identity-5d4a7ba-v1.json`
+verifies identical motion/persistence/preview source trees.
 
-New source instrumentation links `Runs/<request>.json` to the native job and its
-`blender-trace.json`. Launcher events measure queue admission, preflight, job
-preparation, native execution, result validation, hashing, checkpoint copy and
-atomic publication. Blender events cover input load, per-transition sampling,
-provider, retargeting, seam/contact processing, baking, saving and fresh-reopen
-quality validation. Provider receipts separately retain model loading, request
-conversion, inference and result conversion. Client-ready/preview-ready timing is
-an additional harness observation, not inferred from native inference duration.
-
-The 32 evaluated samples per scene preview frame are real: see
-`viewer_sampling.subdivisions` and `evaluated_sampling`, followed by
-`viewer_timebase.normalize`. Only the disposable preview worker is time-remapped;
-output seconds and source Actions are preserved. This density has not been
-reduced. Dense quality convergence already found errors missed by 60 Hz checks,
-so a lower preview density requires measured positional/orientation parity.
-
-Monitored budgets remain whole GPU 9,216 MiB, provider increase 8,192 MiB, reserved
-headroom 2,048 MiB and provider host 2,048 MiB. NVML whole-device sampling cannot
-attribute unrelated applications' memory to this provider; these are monitored
-admission/runtime limits, not allocator caps. Stage-one retained host peaks were
-approximately 823–892 MiB; whole-device peaks approximately 3,111–3,134 MiB, with
-whole-device memory returning to the observed 2,396 MiB baseline after those
-workers exited. Other runs had different desktop baselines.
-
-Mandatory work still outstanding: identical-input baseline/final repetitions,
-fixed-input cold and warm distributions, complete single/batch generation,
-preview timings, cancellation latency and release on final code. Report sample
-counts, median and observed maximum/tail only after collecting them. No latency
-target, persistent-worker benefit or final performance PASS is claimed here.
-
-
-## Measured sole-height optimization — 0c804ca
-
-`soles-pipeline-comparison-v1.json` retains twelve complete real Vulkan fixture
-jobs: three identical requests per rig at clean baseline
-`a08e46d588616382ef61db9c11409119d2daefe0`, then three at clean
-`0c804ca5827433996b379f32d05d260a7fa70fd0`. Every request, raw numeric array,
-corrected sample/path/world pose and evaluated baked frame is exactly equal
-within each rig across all six repetitions. All hard gates and fresh reopen
-checks pass. Model workers exit and release their process trees after each run.
-
-| Complete fixture generation + separate reopen | n per revision | Before median / max (s) | After median / max (s) |
+| Observation | n | Median (s) | Observed maximum (s) |
 | --- | ---: | ---: | ---: |
-| Reference rig | 3 | 46.411 / 46.573 | 45.703 / 46.175 |
-| Denser Beta rig | 3 | 41.476 / 42.185 | 33.281 / 33.746 |
+| Refined single candidate, server admission to publication | 3 distinct seeds | 41.499 | 41.662 |
+| Same candidate jobs, native execution | 3 | 39.515 | 39.726 |
+| Loaded scene to boundary support | 3 | 8.207 | 8.225 |
+| Fresh reopen/quality validation | 3 | 8.466 | 8.558 |
+| Checkpoint copy/hash verification | 3 | 0.249 | 0.261 |
+| Complete four-clip candidate, server admission to publication | 2 identical requests | 82.451 | 82.796 |
+| Complete four-clip native execution | 2 | 80.400 | 80.606 |
+| Four-clip fresh reopen/quality | 2 | 10.536 | 10.545 |
+| Actual uncached preview native jobs, differing sources/profiles | 10 | 12.384 | 17.631 |
+| Same jobs' evaluated export operation | 10 | 10.120 | 14.787 |
+| Fixed-source cached native comparison click to ready | 3 | 1.448 | 1.463 |
 
-This bounded change transforms only foot-dominated vertices actually used by
-`Soles.heights`, with the same evaluated mesh and world matrix on every call.
-No sampling reduction or cross-pose cache is involved. The preceding sixteen-pose
-per-rig microbenchmark has exact height equality and twenty calls per method per
-pose with alternating method order. It is supporting evidence, not end-to-end
-latency. The full fixture includes extra seam diagnostics and is not a native
-click-to-review benchmark. All workers are fresh; filesystem/driver warming is
-not warm persistent-model inference. Three observations do not support p95 claims.
-Provider stage timings and monitored resource measurements remain in the raw JSON.
+These are nested spans and must not all be summed. Preview export is separate
+from candidate publication. Different seeds/sources are not identical-input
+replications; the raw JSON retains each identity, stage and resource observation.
 
-The f30b389 native contact-refinement batches took 126.399 and 125.396 seconds
-from generation click to three reviewable results, with different support windows.
-They establish complete workflow latency observations, not an identical-input
-optimization comparison. Final native preview/cancellation and cold/warm resource
-distributions remain outstanding.
+The native contact batches take 126.524 and 127.230 seconds from click to three
+reviewable outcomes, with different support windows. The final ranked batch at
+5d4a7ba takes 129.862 seconds. Both refined batches have two hard passes and one
+retained failure. The two identical complete four-clip requests take 84.319 and
+84.289 seconds click-to-review. These figures include far more than native
+inference; candidate preview loading can add separate time afterward.
+
+Launcher trace stages cover queue admission, preflight, preparation, execution,
+contract/hash validation, checkpoint copy and atomic publication. Blender traces
+cover startup estimate, input load, context sampling, conversion, per-join model
+execution, retargeting, seam/contact processing, baking, save and fresh reopening.
+Provider receipts contain model load, native inference and request/output
+conversion. Exact preview IDs link to their own native trace; client-ready
+measurements are harness observations, not inferred from model timings.
+
+## Cold-model and warm-model inference
+
+`provider-profile-5f1b8b8-v1/report.json` profiles three separately loaded models,
+each with 30 identical calls. Numeric output hashes are equal within and across
+the three runs on this same device. This bounded diagnostic retains a model;
+production still starts and releases an isolated worker for every request.
+
+| Stage | n | Median | Minimum–maximum |
+| --- | ---: | ---: | ---: |
+| Model loading | 3 | 0.7002 s | 0.6964–0.7007 s |
+| First inference after loading | 3 | 34.92 ms | 34.25–37.79 ms |
+| Same-model warm inference | 87 | 24.16 ms | 22.31–25.85 ms |
+| Complete diagnostic profile process | 3 | 2.533 s | 2.483–2.538 s |
+
+Cold here means newly loaded model, not a forced cold operating-system cache or
+driver. OS caches were not flushed. No cross-device bitwise identity is promised.
+The historical 24–27 ms warm inference and approximately 99-second client test
+are not authoring latency targets or isolated complete-generation benchmarks.
+
+## Cancellation, release and monitored resources
+
+`native-lifecycle-5f1b8b8-v1` measures one native cancellation at 0.78 seconds after
+an actual Blender job begins and verifies preservation through provider/launcher
+crashes. The final 5d4a7ba native cancellation procedure repeats three times: median
+0.782 s, minimum 0.778 s, maximum 0.790 s from Cancel to terminal state, with
+owned Blender process release, unchanged accepted hash and normal host exit
+(`native-cancellation-5d4a7ba-v2/report.json`). Its first procedure completed
+cancellation but timed out at the native shutdown safeguard. Safe Refresh status
+recovery and the corrected wait for asynchronous discard/preview remain recorded
+in the v1 report and `exit-recovery.json`; the v1 run is not a clean harness pass.
+These measurements do not claim interruption inside the approximately 30 ms
+native inference kernel. Provider cancellation/timeout/budget execution and
+process ownership are separate real-worker checks.
+
+Configured budgets remain 9,216 MiB whole GPU, 8,192 MiB increase over baseline,
+2,048 MiB GPU headroom and 2,048 MiB provider host. Final eight-job native traces
+show provider host peaks 877.94–880.04 MiB and whole-device peaks 2,964.62–3,058.50
+MiB. `provider-faults-5f1b8b8-v3` safely lowers limits in disposable dictionaries,
+verifies admission/runtime refusal and actual worker termination, then succeeds
+with the original unchanged Vulkan configuration. All three profile processes
+return observed GPU use within 32 MiB of their respective baselines.
+
+NVML measures the whole device, including unrelated display applications, at
+approximately 10–20 ms intervals. Host peak/private-memory counters and GPU
+samples are monitored limits, not hard allocator caps. A terminated Windows
+process can retain readable peak-memory counters while a handle remains open;
+the corrected release procedure checks process termination, not absence of those
+counters. All observed resource limits and measurement gaps are preserved in raw
+reports. No CPU performance distribution was measured.
+
+## Remaining performance questions
+
+The 32 evaluated samples per scene preview frame were verified in
+`viewer_sampling.subdivisions`/`evaluated_sampling` and `viewer_timebase.normalize`.
+Only a disposable preview worker is resampled; source Actions and physical output
+time are preserved. Density was not reduced. Final reference/four-clip GLB parity
+has maximum skin error 0.01183 mm and joint orientation below 0.162 degrees against
+fresh Blender at every rendered frame and fractional stitch samples.
+
+Measured time is dominated by work outside inference. Correctly invalidated
+evaluation/hash/preview caches deserve investigation before a persistent model
+worker. Any such worker must earn its complexity through measured benefit,
+bounded lifetime/memory, real cancellation, crash recovery and a return to per-job
+execution. No claim of real-time application performance follows from this report.

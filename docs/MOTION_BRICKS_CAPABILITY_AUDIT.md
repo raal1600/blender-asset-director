@@ -1,5 +1,57 @@
 # MotionBricks capability audit (2026-10-05)
 
+## 2026-10-07 — final local verification of the supported authoring path
+
+Runnable source `5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c` adds visible hard-gated
+ranking and passes actual native alternatives, comparison, explicit acceptance,
+exact restore, reopening, OptiX rendering, complete 1x retained-movie playback
+and fresh-Blender preview parity. Two of three samples pass; the penetration
+failure remains rejected. All 72 rendered frames were inspected separately.
+
+The final motion implementation is `5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e`.
+Its source/persistence/tool trees are identical in 5d4a7ba. Real native contact
+refinement again reduces 31.09 to 5.68 mm drift with identical neural output.
+Native stale completion, cancellation, actual provider crash, launcher restart,
+quarantine, duplicate motion/acceptance and corrupted-artifact refusal pass with
+the old accepted checkpoint intact. Actual model-missing and reduced-budget
+refusals recover through real Vulkan inference.
+
+Commit `2cd8ed9eea8961569e02ebf541bafca3b0fefc97` repairs the missing prepared-copy
+review controls found by native E. Its full native four-clip workflow passes
+downstream invalidation, selected-join/different-duration A/B, complete explicit
+acceptance, exact history and reopening. The 5f1b8b8 four-clip regression passes
+all three hard gates, 480 Hz diagnostics, accepted rendering/preview parity and
+inspection of all 176 rendered frames. This is finite three-join coverage.
+
+The final unchanged broader suite is seven PASS and three FAIL, retained as such:
+unprepared idle-walk, walk-idle and walk-run lack reviewed root intent. Separate
+explicit full-interval preparation follow-ups pass idle-walk and walk-idle, and
+correctly refuse the run entry's unstable support. Rejections are not generation
+coverage. Seven of nine predeclared Beta trim pairs pass; two fail correction or
+support limits. The final code repeats the Beta center and reference three times
+each with exact raw/corrected/baked parity and fresh reopening. Additional 480 Hz
+checks pass; Beta's 60-frame diagnostic movie plays at full speed separately from
+the actual Windows application acceptance evidence.
+
+Verified transforms include root offsets, 24/30/60 FPS, translated stable parents
+and a compensated positive uniform parent scale. New context and airborne/mixed
+refusal procedures preserve source files and refuse before neural artifacts.
+Current boundary provenance includes physical world heading, linear/angular
+velocity and its actual sampled timestamps. Historical failures below remain
+chronological evidence; their then-pending wording is superseded only by the
+specific later observations described here and in the matrix.
+
+Native authored alternatives still take about 127–130 seconds per three-candidate
+batch despite 24 ms median warm inference. Eighteen identical-input fixture jobs
+support exact parity for the sole-height optimization; Beta median complete
+generation/reopen changes from 41.48 to 33.96 seconds. Sampling and quality limits
+were not weakened. See the benchmark report for sample counts, variability and
+whole-device measurement limitations. The later review handoff classifies runtime
+verification, source-only capabilities, historical reports and unsupported scope.
+No Deep Research, release, private upload or broad production-readiness claim was
+made.
+
+
 ## 2026-10-07 — continued repair and native falsification
 
 Later evidence in this same repair cycle verifies the earlier pending fixes:
