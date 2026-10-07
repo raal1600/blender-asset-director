@@ -35,3 +35,10 @@ test('raw provider validation never claims final quality validation',()=>{
  assert.equal(transitionPhase({...run,phase:'verify-result'}),'Validating');
  assert.equal(transitionPhase({...run,nativeProgress:{stage:'unknown'}}),'Generating');
 });
+
+test('checkpoint jobs without a launcher phase display their verified native stage',()=>{
+ const run={state:'RUNNING',nativeProgress:{stage:'fresh_reopen_quality_validation'}};
+ assert.match(progressLabel(run),/Validating the reopened/);
+ assert.match(progressLabel({...run,phase:'save-checkpoint'}),/Saving and verifying/);
+ assert.equal(progressLabel({...run,state:'FAILED'}),'Working from the frozen checkpoint');
+});

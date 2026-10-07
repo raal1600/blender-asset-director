@@ -4,6 +4,16 @@ This record is **IN PROGRESS, NOT ACCEPTED**. No Deep Research was launched.
 Mandatory generalization and complete native-client journeys remain unfinished.
 Do not treat historical continuity passes or unit tests as production readiness.
 
+Latest additions to the evidence record: f30b389 verifies native contact
+refinement, accepted render/playback and preview parity; the same revision's
+Beta grid passes seven of nine explicit interval pairs on the second rig.
+a08e46d fixes fixture contact timestamps for the now-passing 60 FPS case.
+0c804ca proves exact before/after motion parity for the measured sole-height
+optimization. Exact full revisions and evidence paths are in the audit and
+acceptance matrix. The older native observations below remain historical scope;
+they do not stand in for a final delivery run. The mandatory four-clip and final
+multi-join/fault/performance gates are still open.
+
 ## Revisions and isolation
 
 The implementation branch is `feature/motionbricks-authoring-20261006` in the
@@ -121,8 +131,9 @@ Current failures and missing evidence:
   Later bounded continuous correction passes the reference; convergence must
   still be demonstrated across the required broader coverage. Thresholds were
   not loosened.
-- Two independent verified humanoid rigs, all required generalization cases,
-  four-clip reconciliation and native B/E journeys remain outstanding. Native A
+- The Beta grid now supplies seven hard-quality passes on a second calibrated
+  rig; broader generalization, four-clip reconciliation and native E remain
+  outstanding. Native B is verified at f30b389. Native A
   now has the evidence above; C/D have earlier native fault/staleness evidence
   requiring final-build regression. The inspected Arabic-Warrior GLB is an unrigged static
   mesh, not second-rig evidence. Rejected clips do not count as successful

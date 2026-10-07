@@ -1,0 +1,130 @@
+{
+  "schema": "motion-bricks.redacted-evidence-manifest.v1",
+  "state": "IN_PROGRESS_NOT_FINAL_ACCEPTANCE",
+  "evidence_root": "local:AssetDirector-MotionBricks-Authoring-20261006",
+  "privacy": "Only relative identifiers, report hashes, sizes and redacted summaries. No private assets, binary motion, images, credentials, databases or model weights are included.",
+  "application_revisions": [
+    "3a95251c253af4ae1dbe09c985913c24d29ac919",
+    "f30b389890b6bc11f62efce56e355d3a981d5431",
+    "a08e46d588616382ef61db9c11409119d2daefe0",
+    "0c804ca5827433996b379f32d05d260a7fa70fd0"
+  ],
+  "provider_revision": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+  "dll_sha256": "e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7",
+  "entries": [
+    {
+      "evidence": "rename-generation-v1/rename-invariance.json",
+      "sha256": "9831e43f7f220cb0b6c722958bb6e062daee6f6fdfe5689ab170d3de0926bff1",
+      "bytes": 1108,
+      "redacted_summary": "Actual Action rename; equal model request and raw/corrected arrays."
+    },
+    {
+      "evidence": "native-contact-f30b389-v1/report.json",
+      "sha256": "4255dd95e4b963db5652f1af43e5f5769c830dce43f56fe27efd24d9f6823fc2",
+      "bytes": 2988415,
+      "redacted_summary": "Visible Windows contact correction, generation, comparison, acceptance and reopen."
+    },
+    {
+      "evidence": "native-render-f30b389-v1/report.json",
+      "sha256": "66e5d37567d69369b3ead39acc2c22d6c18ca60abb96ea5282405da64e6b1b3f",
+      "bytes": 425197,
+      "redacted_summary": "Accepted native render and full-speed movie playback."
+    },
+    {
+      "evidence": "native-render-f30b389-v1/agent-visual-review.json",
+      "sha256": "8e93fe3f5dca16b1d6f8ba9ab53fd7ad5ba772be591d3db720ba68e8b0a1980f",
+      "bytes": 13846,
+      "redacted_summary": "Separate static inspection of all 72 frames; no human artistic approval."
+    },
+    {
+      "evidence": "native-parity-f30b389-v1/preview-parity.json",
+      "sha256": "961e80eaefaad2e44b2b7f4fc7feb5e6ccffea298c2fff5ff1ea2d80b3503732",
+      "bytes": 19082,
+      "redacted_summary": "Actual client GLB versus fresh Blender evaluated skin and joints."
+    },
+    {
+      "evidence": "beta-boundary-grid-f30b389-v1/report.json",
+      "sha256": "86514ffd5aa7b1d0e163b38b39839143182ec9d6c3daa9cdc5577811deb626cb",
+      "bytes": 3859,
+      "redacted_summary": "Nine predeclared explicit trim pairs: seven quality passes and two failures."
+    },
+    {
+      "evidence": "beta-boundary-grid-f30b389-v1/independent-influence.json",
+      "sha256": "4606164340206ca2acb25414c02946c6d70f05dd9d9980e28df8913118fb6b25",
+      "bytes": 20623,
+      "redacted_summary": "Independent source/target motion influence, raw and corrected."
+    },
+    {
+      "evidence": "beta-boundary-grid-f30b389-v1/visual-center-v1/agent-visual-review.json",
+      "sha256": "23474bb70d4b6ae98f4e40c573c2982d802ccce98efbfef53102a7841c4a588a",
+      "bytes": 10350,
+      "redacted_summary": "All 60 frames statically inspected; full-speed naturalness not established."
+    },
+    {
+      "evidence": "broader-scenarios-f30b389-v1/report.json",
+      "sha256": "94e3faa3d07a0ab9ddfd5a8e3dda00aa2414c3875177e402daceb6934ea1d7da",
+      "bytes": 3432,
+      "redacted_summary": "Complete historical ten-case rerun; six passes, four retained failures."
+    },
+    {
+      "evidence": "fps60-a08e46d-v1/report.json",
+      "sha256": "b167d4b9dab80c106abfa9e7421a19942f779aafed3732b303347bf9e02e31a4",
+      "bytes": 756,
+      "redacted_summary": "60 FPS rerun after fixing disposable fixture contact timestamps."
+    },
+    {
+      "evidence": "sole-sampling-benchmark-v1.json",
+      "sha256": "e5e25b580a878ea52eee931dcacb9610fb6e658d0fbc9bb2ef42b1b0ad93a9b6",
+      "bytes": 7526,
+      "redacted_summary": "Exact evaluated-height parity microbenchmark on two rigs."
+    },
+    {
+      "evidence": "soles-pipeline-comparison-v1.json",
+      "sha256": "d20e07776c112f2438b11d52cb3507cf9cc3c7e2875d536004278dc5bd3b9cc7",
+      "bytes": 36022,
+      "redacted_summary": "Twelve identical-input generation/reopen jobs; exact numeric parity and measured timings."
+    },
+    {
+      "evidence": "additional-root-review-evidence-v1.json",
+      "sha256": "b2800a2a1985f3b125658b167e0147f34f5ac4991abeb1b94b96fe9f73685e4f",
+      "bytes": 1619,
+      "redacted_summary": "Explicit derived travel/contact proposal based on observed sole movement."
+    },
+    {
+      "evidence": "additional-root-prepared-v1.json",
+      "sha256": "8e0839574bb90d536c7a27987a35168e11e45c2e4f3f2165619a5a5124f07c18",
+      "bytes": 3916,
+      "redacted_summary": "Separate copied Action/root preparation; original and bone channels preserved."
+    },
+    {
+      "evidence": "four-clips-0c804ca-v1/report.json",
+      "sha256": "8b2625b42eb9dc63e64fd99b01b19deab3669c9defe24bddc927d7435d0b01fe",
+      "bytes": 2492,
+      "redacted_summary": "Six real tests: four passes, sliding failure and generated-key-budget refusal."
+    },
+    {
+      "evidence": "contact-timebase-offline-v1.log",
+      "sha256": "936db04a07ee299af7b95ba2929ad9d878ec5a5d24bba7ebb48c0abde16327c9",
+      "bytes": 225424,
+      "redacted_summary": "812 tests, 809 passed and three disclosed skips; installer checks pass."
+    },
+    {
+      "evidence": "sole-optimization-offline-v1.log",
+      "sha256": "59e0b1691e6c6630caf8ab7929d790027915ec7484c66015d0b5fd422dc2698b",
+      "bytes": 225424,
+      "redacted_summary": "812 tests, 809 passed and three disclosed skips; installer checks pass."
+    },
+    {
+      "evidence": "multi-join-ui-offline-v1.log",
+      "sha256": "f9d030d2e596e0c628c815ee394288f5773bc18deb97dc9c7b693453c86a2c66",
+      "bytes": 225426,
+      "redacted_summary": "812 tests, 809 passed and three disclosed skips; installer checks pass."
+    },
+    {
+      "evidence": "multi-join-ui-node-final.log",
+      "sha256": "31448b1222f8d121806bd193fb09b3ec71aeee89107bc9bd7bd2836c91678f52",
+      "bytes": 181400,
+      "redacted_summary": "405 launcher tests pass."
+    }
+  ]
+}

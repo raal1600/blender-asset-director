@@ -311,8 +311,9 @@ python tools/run_motion_bricks_sequences.py --manifest /absolute/fixture.json \
 `--case NAME` can be repeated. Each case has a finite 300-second process limit
 (configurable up to 900); later cases still run after a failure. A fresh process
 checks every recorded frame and original Action hashes. Source-FPS variants are
-new copies with explicitly rescaled key/handle times and source/scene clock
-normalization. Offsets are declared in world XY. Existing source bytes, original
+new copies with explicitly rescaled key/handle times, reviewed contact timestamps
+and source/scene clock normalization. Physical contact seconds and original
+Action metadata are preserved. Offsets are declared in world XY. Existing source bytes, original
 Actions, and the production project are not changed. A new test timeline is
 constructed only inside the disposable fixture worker.
 

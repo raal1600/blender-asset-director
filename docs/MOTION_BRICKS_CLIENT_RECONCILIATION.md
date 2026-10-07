@@ -1,6 +1,22 @@
 # Offline transition review — implementation in progress
 
-Latest reference evidence identifies application
+The later native `f30b389890b6bc11f62efce56e355d3a981d5431` build (host SHA-256
+`68de34b1a648eeeeecbe7085b9b98fc0dae81575e406e16fcce37f88e023e3a3`) verifies
+contact editing, two real three-candidate batches, comparison, explicit refined
+acceptance and restart in `native-contact-f30b389-v1`. The same accepted artifact
+is rendered and played by the native client, with fresh Blender/GLB parity and
+all 72 frames inspected. Source/target windows 0.16 → 0.08 seconds reduce seed42
+planted drift 31.09 → 5.68 mm while its neural request/output remain identical.
+This demonstrates deterministic refinement, not changed model conditioning.
+
+The current source also identifies affected downstream joins by animation label
+and target frame. A/B review starts at the selected connection and offers a
+transition selector. If a candidate lacks that connection, it is labeled absent
+and synchronized playback is disabled; the UI never substitutes the first join.
+These later multi-join controls have automated tests; their native journey is
+still pending at this point in the record.
+
+Earlier reference acceptance evidence identifies application
 `95234c3528bfd1c288f6670ca701c4789b0a1aff`, host SHA-256
 `36a88e1ccb36492db9699a1b95b25eddcf0632fb6245478a307f223ac9f90872`.
 `native-accept-95234c3/report.json` records three real candidates (two quality
@@ -12,8 +28,8 @@ through both stitches in `native-playback-95234c3-r2/report.json`.
 Fresh Blender/actual GLB parity measured maximum skin error 0.01183 mm and joint
 orientation error 0.14951 degrees across every rendered integer frame and
 fractional boundary samples. All 72 rendered frames were inspected separately;
-human artistic approval is not claimed. Contact refinement and multi-join
-reconciliation journeys remain unfinished.
+human artistic approval is not claimed. Contact refinement is subsequently verified below; multi-join
+reconciliation remains unfinished.
 
 Earlier native evidence identifies application
 `b23e76d1e4e75f1ace63ffed8dcb058846551b8d` and host SHA-256
@@ -46,6 +62,6 @@ Reviewed stationary root intent resolves an in-place ambiguity only when evaluat
 
 Changing motion, trim, duration, contacts, sampling plan or other request dependencies makes older candidates stale. Selecting a clip alone does not. The batch stops scheduling further seeds after a dependency edit. Discard clears the working request while preserving accepted and candidate artifacts. Prior accepted artifacts can be restored without regeneration. An early-join edit regenerates the complete requested timeline, including subsequent joins; partial inconsistent acceptance is refused by accepting complete checkpoints only.
 
-Cancellation uses the existing native job lifecycle. Restart recovery checks both launcher ownership and native executor/Blender process evidence; it does not clear a live writer's lease. Incomplete attempts remain interrupted and excluded from valid candidates. The b23e76d native fault procedure verifies this path; B and E remain unfinished, and fault paths need final-build regression.
+Cancellation uses the existing native job lifecycle. Restart recovery checks both launcher ownership and native executor/Blender process evidence; it does not clear a live writer's lease. Incomplete attempts remain interrupted and excluded from valid candidates. The b23e76d native fault procedure verifies this path; B is now verified at f30b389; E and final-build fault regression remain unfinished.
 
 Historical evidence remains retained: the 9474cca native batch took 96.743 seconds and the preceding 91cb591 run exposed a comparison initialization bug. Later c401b33 and b23e76d native tests verified framing of the complete performer. These isolated observations are not benchmark percentiles or successful acceptance/render journeys.

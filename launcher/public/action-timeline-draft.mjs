@@ -45,6 +45,13 @@ export function timelineDraft(checkpoint,run){
   get dependencyKey(){return JSON.stringify({changes:this.changes,errors:this.errors,samplingPlan});},get dirty(){return changed().length>0||raw.size>0;},get count(){return changed().length;},get canUndo(){return history.length>0;},get errors(){return errors();},get invalid(){return errors().length>0;},
   get changes(){return changed().map(([performer])=>({performer,mode:'timeline',clips:copy(sorted(performer))}));},
   get hasGeneratedTransitions(){return [...tracks.values()].some(clips=>clips.some(c=>c.transition?.mode==='generated'));},
+  get dependencyImpact(){return changed().map(([name])=>{
+   const order=sorted(name),old=[...baseline.get(name)].sort((a,b)=>a.start-b.start),p=performer(name);
+   let first=order.findIndex((c,i)=>JSON.stringify(c)!==JSON.stringify(old[i]));
+   if(first<0)first=old.length!==order.length?order.length:order.findIndex(c=>c.transition?.mode==='generated');
+   const label=c=>p.takes.find(t=>t.id===c?.take_id)?.action||'Changed animation';
+   return {performer:name,changedClip:label(order[first]||old[first]),joins:order.slice(Math.max(1,first)).filter(c=>c.transition).map(c=>({clipId:c.id,label:label(c),targetFrame:c.start}))};
+  });},
   get gait(){const c=this.selectedClip;return performer(selected).takes.find(t=>t.id===c?.take_id)?.gait;},
   get canConnect(){const c=this.selectedClip,order=sorted(selected),previous=order[order.findIndex(x=>x.id===c?.id)-1],p=performer(selected);return !!c&&canConnect(p,previous,p.takes.find(t=>t.id===c.take_id));},
   get connection(){try{const c=this.selectedClip;if(c?.transition?.mode==='generated'&&!this.dirty){const saved=performer(selected).timeline.connections?.find(j=>j.clip_id===c.id);if(saved)return saved;}return c?join(selected,c):null;}catch{return null;}},

@@ -2,6 +2,46 @@
 
 ## 2026-10-07 — continued repair and native falsification
 
+Later evidence in this same repair cycle verifies the earlier pending fixes:
+`f30b389890b6bc11f62efce56e355d3a981d5431` passes the actual Windows contact
+refinement journey in `native-contact-f30b389-v1`. Changing reviewed support
+windows from 0.16 to 0.08 seconds leaves the seed42 C ABI request and raw arrays
+exactly unchanged while measured planted drift falls from 31.09 to 5.68 mm.
+The client compares, explicitly accepts, saves and reopens the refinement.
+Its accepted file SHA-256 is
+`41c9d21e3da5e4381a38d17a928a99879b21e3217b38c1719623827745aaad3d`.
+`native-render-f30b389-v1` records actual OptiX rendering and native 1x movie
+playback; `native-parity-f30b389-v1` measures 0.01183 mm maximum skin difference
+and 0.14951 degrees maximum joint orientation difference against fresh Blender.
+All 72 frames have separate static agent inspection. This controlled annotation
+experiment does not establish automatic contact truth or human artistic approval.
+
+The second-rig `beta-boundary-grid-f30b389-v1` predeclares nine explicit interval
+pairs of the independently calibrated Beta Action. Seven pass unchanged hard
+quality, native preservation and fresh reopen gates; two fail. Independent source
+and target changes influence both raw and corrected output. All 60 frames of the
+predeclared center were inspected statically. Earlier failed selections are
+retained; this narrow successful coverage does not prove broad generalization.
+
+The ten-case broader suite was rerun at f30b389: six PASS, four FAIL. Three are
+unprepared in-place root ambiguity; the fourth exposed a 60 FPS fixture bug:
+key times changed without contact timestamps. Commit
+`a08e46d588616382ef61db9c11409119d2daefe0` normalizes both on derived copies and
+the actual 60 FPS rerun passes. Original metadata is preserved. Prepared
+left-to-idle and idle-to-walk requests subsequently pass at 0c804ca; the longer
+left-to-idle request still fails planted sliding. These are separate requests,
+not retrospective passes for the unprepared cases.
+
+Commit `0c804ca5827433996b379f32d05d260a7fa70fd0` transforms only observed sole
+vertices during height checks. Two-rig microbenchmarks and twelve complete
+before/after fixture jobs show exact numeric raw/corrected/baked parity. See
+`soles-pipeline-comparison-v1.json` and the benchmark document for timings.
+No sampling density, validation threshold or provider pin changed.
+
+The following paragraphs retain the earlier failures in chronological context.
+Their then-pending native regeneration/reopen repairs are verified by f30b389
+above; the complete final-build acceptance remains unfinished.
+
 The subsequent contact-refinement journey on `95234c3` stopped before inference:
 after acceptance, the alternatives button disappeared because its view examined
 only changed clips. Evidence `native-contact-95234c3-v1` retains that failure and

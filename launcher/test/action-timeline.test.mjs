@@ -4,6 +4,22 @@ import {timelineDraft,suggestedPath} from '../public/action-timeline-draft.mjs';
 import {validateTimeline,timelineTiming,generatedDurationPlan} from '../public/action-timeline-contract.mjs';
 const take='take_'+'a'.repeat(64),other='take_'+'b'.repeat(64);
 const cp={id:'cp_saved',sha256:'a'.repeat(64)},run={id:'run_saved',inspection:{sha256:'b'.repeat(64),frame_range:[1,250],fps:24,reference_frame:1,performers:['One','Two'].map((name,i)=>({name,takes:[{id:i?other:take,action:'Native',range:[1,25],travel_blocker:null}],timeline:{version:'action-timeline-v1',clips:[],origin_m:[0,0,0],meters_per_unit:1}}))}};
+
+test('working dependency chain starts at the changed join and survives undo correctly',()=>{
+ const saved=structuredClone(run),p=saved.inspection.performers[0];
+ Object.assign(p.timeline,{stitch_version:'native-stitch-v1',edit_version:'native-motion-edit-v1',motion_bricks:{status:'CONFIGURED',profile_sha256:'c'.repeat(64)}});
+ Object.assign(p.takes[0],{stitch_blocker:null,stitch_channels:'d'.repeat(64),heading_blocker:null});
+ p.timeline.clips=[0,1,2,3].map(i=>({id:'clip_'+i,take_id:take,start:1+i*37,frames:25,speed:1,travel:null,repeat_reviewed:false,...(i?{transition:{frames:12,mode:'generated',seed:1234,match_phase:false,profile_sha256:'c'.repeat(64)}}:{})}));
+ const d=timelineDraft(cp,saved);assert.deepEqual(d.dependencyImpact,[]);
+ d.select('One','clip_2','transition');d.edit('transition_frames','16');
+ assert.deepEqual(d.dependencyImpact[0].joins.map(j=>j.clipId),['clip_2','clip_3']);
+ assert.deepEqual(d.dependencyImpact[0].joins.map(j=>j.targetFrame),[79,116]);
+ d.undo();assert.deepEqual(d.dependencyImpact,[]);
+ d.select('One','clip_1','transition');d.edit('contact_source_seconds','.1');
+ assert.deepEqual(d.dependencyImpact[0].joins.map(j=>j.clipId),['clip_1','clip_2','clip_3']);
+ d.discard();assert.deepEqual(d.dependencyImpact,[]);
+ assert.equal(saved.inspection.performers[0].timeline.clips[2].transition.frames,12);
+});
 test('generated durations use exact model windows and bounded bridge-only retiming',()=>{
  for(let n=24;n<=64;n+=4){const p=generatedDurationPlan((n-7)/30);assert.equal(p.model_frames,n);assert.equal(p.generated_retime_ratio,1);}
  for(const value of [NaN,Infinity,true,0,.4816,2.18501])assert.throws(()=>generatedDurationPlan(value));

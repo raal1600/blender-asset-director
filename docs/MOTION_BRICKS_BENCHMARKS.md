@@ -80,3 +80,35 @@ fixed-input cold and warm distributions, complete single/batch generation,
 preview timings, cancellation latency and release on final code. Report sample
 counts, median and observed maximum/tail only after collecting them. No latency
 target, persistent-worker benefit or final performance PASS is claimed here.
+
+
+## Measured sole-height optimization — 0c804ca
+
+`soles-pipeline-comparison-v1.json` retains twelve complete real Vulkan fixture
+jobs: three identical requests per rig at clean baseline
+`a08e46d588616382ef61db9c11409119d2daefe0`, then three at clean
+`0c804ca5827433996b379f32d05d260a7fa70fd0`. Every request, raw numeric array,
+corrected sample/path/world pose and evaluated baked frame is exactly equal
+within each rig across all six repetitions. All hard gates and fresh reopen
+checks pass. Model workers exit and release their process trees after each run.
+
+| Complete fixture generation + separate reopen | n per revision | Before median / max (s) | After median / max (s) |
+| --- | ---: | ---: | ---: |
+| Reference rig | 3 | 46.411 / 46.573 | 45.703 / 46.175 |
+| Denser Beta rig | 3 | 41.476 / 42.185 | 33.281 / 33.746 |
+
+This bounded change transforms only foot-dominated vertices actually used by
+`Soles.heights`, with the same evaluated mesh and world matrix on every call.
+No sampling reduction or cross-pose cache is involved. The preceding sixteen-pose
+per-rig microbenchmark has exact height equality and twenty calls per method per
+pose with alternating method order. It is supporting evidence, not end-to-end
+latency. The full fixture includes extra seam diagnostics and is not a native
+click-to-review benchmark. All workers are fresh; filesystem/driver warming is
+not warm persistent-model inference. Three observations do not support p95 claims.
+Provider stage timings and monitored resource measurements remain in the raw JSON.
+
+The f30b389 native contact-refinement batches took 126.399 and 125.396 seconds
+from generation click to three reviewable results, with different support windows.
+They establish complete workflow latency observations, not an identical-input
+optimization comparison. Final native preview/cancellation and cold/warm resource
+distributions remain outstanding.

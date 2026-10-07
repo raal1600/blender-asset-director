@@ -139,15 +139,15 @@
       "fixture": "Adventurer idle\u00e2\u2020\u2019back baseline",
       "expected_behavior": "Real X \u2192 bridge \u2192 Y with preserved native intervals, fresh reopening and every fixed kinematic gate passing",
       "threshold_or_invariant": "Continuity thresholds plus upright-grounded-kinematic-v2; quality failure cannot be counted as generation coverage",
-      "command_or_journey": "run_motion_bricks_sequences.py --manifest baseline-manifest.json",
+      "command_or_journey": "python tools/run_motion_bricks_sequences.py --manifest <private-evidence>/four-clips-prepared-manifest-v1.json --case left-idle-12 --case idle-prepared-12 --case idle-prepared-24 --blender <Blender> --output <new-directory>",
       "identities": {
-        "application": "9474ccaec164e91ae444f36db45f641732570a7d; later dirty experiments identified by their input implementation hashes",
+        "application": "0c804ca5827433996b379f32d05d260a7fa70fd0",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Isolated Windows candidate; final build pending"
+        "build": "Actual Blender 5.2.1 LTS 9e2066aef7ef; isolated real Vulkan C ABI; DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
       },
-      "status": "FAIL",
-      "evidence_path": "refinement-unseen/report.json",
-      "known_limitations": "Actual idle-to-prepared-back generation preserves native intervals but fails acceleration or correction limits. Rejections are not successful generalization coverage."
+      "status": "PASS",
+      "evidence_path": "four-clips-0c804ca-v1/left-idle-12/RESULTS.json; four-clips-0c804ca-v1/idle-prepared-12/RESULTS.json; four-clips-0c804ca-v1/idle-prepared-24/RESULTS.json; additional-root-review-evidence-v1.json; additional-root-prepared-v1.json",
+      "known_limitations": "Three successful generations across two new Action pairs, including original idle and explicitly prepared derived walk. Original bone curves/actions preserved. Longer left-to-idle candidate fails sliding and remains failed. Headless kinematic/reopen coverage; whole-sequence native/visual review pending."
     },
     {
       "id": "rename",
@@ -171,15 +171,15 @@
       "fixture": "canonical contexts changed separately",
       "expected_behavior": "Independent source and target influence",
       "threshold_or_invariant": "each boundary changes output materially",
-      "command_or_journey": "early_sampling.py source/target",
+      "command_or_journey": "python <private-evidence>/analyze_beta_grid_v1.py",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "f30b389890b6bc11f62efce56e355d3a981d5431",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "Actual Blender 5.2.1 LTS 9e2066aef7ef; isolated real Vulkan C ABI; DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
       },
       "status": "PASS",
-      "evidence_path": "baseline-sampling/report.json",
-      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+      "evidence_path": "baseline-sampling/report.json; beta-boundary-grid-f30b389-v1/independent-influence.json",
+      "known_limitations": "Independent source and target interval changes produce raw differences of 2.93 to 12.12 degrees RMS from the predeclared center; corrected differences survive. Other-side local context rotations remain exactly unchanged. Source-relative target root placeholders may shift with source context. One unseen Action and a 0.1-second sampled context horizon."
     },
     {
       "id": "placeholder",
@@ -203,15 +203,15 @@
       "fixture": "second independently calibrated humanoid",
       "expected_behavior": "Generalization beyond reference rig",
       "threshold_or_invariant": "successful generation and quality; rejection is not generation coverage",
-      "command_or_journey": "second-rig provider sequence",
+      "command_or_journey": "python tools/run_motion_bricks_sequences.py --manifest <private-evidence>/beta-boundary-grid-manifest-v1.json --blender <Blender> --output <new-directory>",
       "identities": {
-        "application": "f3804f0cbd9eab048d207247f77c43c848598c35 plus physical-unit guard and explicit fixture interval changes; retained input implementation hash",
+        "application": "f30b389890b6bc11f62efce56e355d3a981d5431",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows native host SHA256 b21023549902980bbd961a6b2672ec066857fd88c5974f3e087b658d0d8dbd89; isolated candidate-b23e76d.json receipt"
+        "build": "Actual Blender 5.2.1 LTS 9e2066aef7ef; isolated real Vulkan C ABI; DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
       },
-      "status": "FAIL",
-      "evidence_path": "beta-explicit-range-v2; beta-continuous-v1/v2; beta-duration-v1; beta-variation-v1; beta-duration-20-v1",
-      "known_limitations": "Beta calibration and actual inference/native preservation/reopen are verified, but no quality-pass generation coverage. Extra-24 argmax/seed7/seed42 fail maximum rotation correction at 46.49/52.57/52.92 degrees; extra-30/42 fail at 58.46/59.46 degrees. Other durations hit the additional-filter bound. Limits remain unchanged. Paladin calibration was refused; rejected clips are not successful coverage."
+      "status": "PASS",
+      "evidence_path": "beta-boundary-grid-f30b389-v1/report.json; beta-boundary-grid-f30b389-v1/independent-influence.json; beta-boundary-grid-f30b389-v1/visual-center-v1/agent-visual-review.json",
+      "known_limitations": "Nine predeclared explicit trim pairs of one unseen Action on independently calibrated Beta: seven fixed-quality/preservation/reopen passes, two failures (45.233-degree correction; planted support height). Earlier failed full/other intervals retained. All 60 center diagnostic frames inspected; full-speed artistic review remains unverified. This is narrow second-rig coverage, not nine independent clips."
     },
     {
       "id": "transforms-fps",
@@ -221,13 +221,13 @@
       "threshold_or_invariant": "fixed seam thresholds; preserved source clocks; no double root motion",
       "command_or_journey": "broader sequence fixtures",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "f30b389890b6bc11f62efce56e355d3a981d5431; FPS fixture repair a08e46d588616382ef61db9c11409119d2daefe0",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "Actual Blender 5.2.1 LTS 9e2066aef7ef; isolated real Vulkan C ABI; DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
       },
       "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "evidence_path": "broader-scenarios-f30b389-v1/report.json; fps60-a08e46d-v1/report.json",
+      "known_limitations": "24/30 FPS, explicit Action-root offsets and repeated joins pass. 60 FPS initially exposed unscaled contact timestamps in a disposable copy; timebase conversion now preserves physical seconds and the rerun passes. Independent static parent/transform coverage remains to be completed. Original failed report retained."
     },
     {
       "id": "trim-context",
@@ -283,15 +283,15 @@
       "fixture": "client editable stance intervals",
       "expected_behavior": "Accessible contact corrections",
       "threshold_or_invariant": "persist provenance; demonstrated preparation/correction effect",
-      "command_or_journey": "native journey B",
+      "command_or_journey": "node <private-evidence>/native_contact_f30b389_v1.mjs; node native_render_f30b389_v1.mjs; python run_accepted_parity_f30b389.py",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "f30b389890b6bc11f62efce56e355d3a981d5431",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "Windows visible WebView2 host SHA256 68de34b1a648eeeeecbe7085b9b98fc0dae81575e406e16fcce37f88e023e3a3; candidate-f30b389.json"
       },
-      "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "status": "PASS",
+      "evidence_path": "native-contact-f30b389-v1/report.json; native-render-f30b389-v1/report.json; native-parity-f30b389-v1/preview-parity.json; native-render-f30b389-v1/agent-visual-review.json",
+      "known_limitations": "Actual visible client changed support windows 0.16 to 0.08 seconds, regenerated, compared, explicitly accepted and reopened. Seed42 planted drift fell 31.09 to 5.68 mm; raw model request/arrays exactly unchanged. Controlled overlong annotation experiment; the short window matches default cleanup. Automated 1x playback and static all-frame agent inspection, not human artistic approval."
     },
     {
       "id": "boundary-domain",
@@ -443,15 +443,15 @@
       "fixture": "actual Windows WebView2 client",
       "expected_behavior": "Sliding correction and regeneration",
       "threshold_or_invariant": "measured and visually reviewed improvement",
-      "command_or_journey": "native journey B",
+      "command_or_journey": "node <private-evidence>/native_contact_f30b389_v1.mjs; node native_render_f30b389_v1.mjs; python run_accepted_parity_f30b389.py",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "f30b389890b6bc11f62efce56e355d3a981d5431",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "Windows visible WebView2 host SHA256 68de34b1a648eeeeecbe7085b9b98fc0dae81575e406e16fcce37f88e023e3a3; candidate-f30b389.json"
       },
-      "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "status": "PASS",
+      "evidence_path": "native-contact-f30b389-v1/report.json; native-render-f30b389-v1/report.json; native-parity-f30b389-v1/preview-parity.json; native-render-f30b389-v1/agent-visual-review.json",
+      "known_limitations": "Actual visible client changed support windows 0.16 to 0.08 seconds, regenerated, compared, explicitly accepted and reopened. Seed42 planted drift fell 31.09 to 5.68 mm; raw model request/arrays exactly unchanged. Controlled overlong annotation experiment; the short window matches default cleanup. Automated 1x playback and static all-frame agent inspection, not human artistic approval."
     },
     {
       "id": "journey-c",
@@ -525,13 +525,13 @@
       "threshold_or_invariant": "all cases rerun; no inherited historical passes",
       "command_or_journey": "run_motion_bricks_sequences.py",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "f30b389890b6bc11f62efce56e355d3a981d5431; 60 FPS rerun a08e46d588616382ef61db9c11409119d2daefe0",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "Actual Blender 5.2.1 LTS 9e2066aef7ef; isolated real Vulkan C ABI; DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
       },
       "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "evidence_path": "broader-scenarios-f30b389-v1/report.json; fps60-a08e46d-v1/report.json",
+      "known_limitations": "All ten historical scenarios rerun: five generation passes plus expected heading refusal, three unprepared root-intent failures and one fixture timebase failure. The corrected 60 FPS rerun passes. Prepared unseen-pair successes are separate new requests and do not erase original failures. Final delivered-source rerun still required."
     },
     {
       "id": "faults",
@@ -661,8 +661,8 @@
     "blocked": []
   },
   "counts": {
-    "PASS": 20,
-    "FAIL": 20,
+    "PASS": 24,
+    "FAIL": 16,
     "BLOCKED": 0
   },
   "counts_scope": "Current progress rows; not final delivery acceptance"
