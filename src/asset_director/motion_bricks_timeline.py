@@ -101,10 +101,15 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
             state(p);before={n:clone.pose.bones[n].matrix.copy() for n in spec if n}
             root,q=ret.encode_pose(clone,profile,world_origin=origin,placement=velocity*relative)
             ret.apply_rotations(clone,ret.decode_rotations(clone,profile,q))
-            maximum=max((clone.pose.bones[n].matrix.translation-v.translation).length for n,v in before.items())
+            rig_error=max((clone.pose.bones[n].matrix.translation-v.translation).length for n,v in before.items())
+            # Imported centimetre rigs legitimately use a positive uniform 0.01
+            # object scale. The physical error gate is in scene metres, not in
+            # rig units whose size changes with that supported representation.
+            maximum=max((clone.matrix_world.to_3x3()@(clone.pose.bones[n].matrix.translation-v.translation)).length for n,v in before.items())
             angle=max(qm.norm(qm.qlog(qm.qmul(qm.inverse(list(v.to_quaternion())),list(clone.pose.bones[n].matrix.to_quaternion())))) for n,v in before.items())
-            require(maximum<1e-5 and angle<math.radians(.05),'MOTION_BRICKS_RETARGET_ROUNDTRIP','Mapped native pose does not round-trip; review the anatomical mapping')
-            roundtrip.append({'position_rig_units':maximum,'orientation_degrees':math.degrees(angle)})
+            require(maximum<1e-5 and angle<math.radians(.05),'MOTION_BRICKS_RETARGET_ROUNDTRIP',
+                    f'Mapped native pose does not round-trip ({maximum:.6g} m, {math.degrees(angle):.6g} degrees); review the anatomical mapping')
+            roundtrip.append({'position_m':maximum,'position_limit_m':1e-5,'position_rig_units':rig_error,'orientation_degrees':math.degrees(angle)})
             roots.append(root);rotations.append(q)
         request[side]={'roots':roots,'local_xyzw':rotations}
     from . import action_layer as layer, blender_ops as ops

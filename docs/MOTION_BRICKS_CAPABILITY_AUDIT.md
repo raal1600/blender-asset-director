@@ -26,6 +26,27 @@ selected native interval. Evidence: `beta-mapping-contexts.json`,
 Private assets remain local; this technical inspection grants no redistribution
 rights. The original file hashes and native channel preservation are retained.
 
+A subsequent, separately requested fixture selected Beta intervals [1,9] and
+[3,32] at 30 FPS. It exposed a unit bug: the context round-trip guard compared
+rig-space displacement directly with 0.00001, incorrectly rejecting a 0.01-scale
+rig whose physical error was under that metre limit. The guard now compares
+world-metre displacement and retains both units in diagnostics. Actual model
+generation, baking, native preservation and fresh reopening then succeeded.
+Quality still failed at 16,511 degrees/s²; no second-rig quality pass is claimed.
+The separate [1,2] source interval correctly refused insufficient context before
+inference. The original full-interval rejection remains unchanged. Evidence:
+`beta-explicit-range-v1`, `beta-explicit-range-v2`, and their explicit manifests.
+
+Private continuous-spline experiments isolated the reference acceleration
+problem. Endpoint-curvature energy reduced the peak but still failed; increasing
+smoothing also introduced penetration. A bounded continuous world-rotation
+variant then passed the reference's unchanged kinematic gates at 240 and 480 Hz
+(4,830 and 4,841 degrees/s² respectively), with structural preservation and
+fresh reopening. This is an experimental script, not yet the application path.
+Its 72-frame diagnostic render was inspected as three complete contact sheets;
+full-speed temporal review, broader rigs/seeds and native acceptance are pending.
+Evidence: `continuous-bounded-v1`, including the retained failed precursors.
+
 The local `c401b33a77eb751aff462d3c0a6a66e73c501368` build passed the visible
 Windows comparison, input-change staleness and active-Blender cancellation
 procedure (`native-review-c401b33-r2/report.json`). Accepted state survived.

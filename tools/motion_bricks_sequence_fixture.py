@@ -57,6 +57,8 @@ case=cases[0];assert 2<=len(case['clips'])<=4 and 1<=case['fps']<=120 and isinst
 assert isinstance(case['extra'],int) and 2<=case['extra']<=120
 assert len(case.get('source_fps',case['clips']))==len(case['clips'])
 assert all(isinstance(v,(int,float)) and 1<=v<=120 for v in case.get('source_fps',[manifest['source_fps']]))
+assert 'source_ranges' not in case or (isinstance(case['source_ranges'],list) and len(case['source_ranges'])==len(case['clips'])
+ and all(isinstance(v,list) and len(v)==2 and all(type(f) in (int,float) and math.isfinite(f) for f in v) and v[0]<v[1] for v in case['source_ranges']))
 assert not case.get('expected') or isinstance(case['expected'],str) and len(case['expected'])>0
 assert 'offset' not in case or len(case['offset'])==2 and all(isinstance(v,(int,float)) and math.isfinite(v) and abs(v)<=100 for v in case['offset'])
 assert not a.output.exists(),'Preserve earlier evidence; use a fresh output directory'
@@ -89,11 +91,15 @@ for case in cases:
    selected.append((action.name,source_fps))
   scene.frame_set(1);basis.restore(rig,baseline);bpy.context.view_layer.update();audit=layer.audit();performer=next(p for p in audit['performers'] if p['name']==manifest['rig']);clips=[];start=1
   for i,(name,source_fps) in enumerate(selected):
-   take=next(t for t in performer['takes'] if t['action']==name);speed=source_fps/case['fps'];frames=math.ceil((take['range'][1]-take['range'][0])/speed)+1
+   take=next(t for t in performer['takes'] if t['action']==name);speed=source_fps/case['fps'];interval=case['source_ranges'][i] if 'source_ranges' in case else take['range']
+   assert take['range'][0]<=interval[0]<interval[1]<=take['range'][1],'Explicit fixture selection must remain inside its native Action'
+   frames=math.ceil((interval[1]-interval[0])/speed)+1
    c={'id':'clip_'+str(i),'take_id':take['id'],'start':start,'frames':frames,'speed':speed,'repeat_reviewed':False,'travel':None}
+   if 'source_ranges' in case:c['source_range']=interval
    if i:c['transition']={'frames':case['extra'],'mode':'generated','match_phase':False,'seed':case.get('seed',1234),'sampling':case.get('sampling','argmax'),'profile_sha256':digest(profile)}
    if i and case.get('heading'):c['heading_deg']=case['heading']
    clips.append(c);start+=frames+case['extra']
+  row['selected_native_intervals']=[{'action':name,'source_fps':sf,'range':c.get('source_range',next(t['range'] for t in performer['takes'] if t['action']==name)),'selection':'explicit-manifest' if 'source_ranges' in case else 'full-native'} for (name,sf),c in zip(selected,clips)]
   options={'version':'action-layer-v1','audit_sha256':audit['sha256'],'frame_range':[1,clips[-1]['start']+clips[-1]['frames']-1],'changes':[{'performer':manifest['rig'],'mode':'timeline','clips':clips}]};atomic_json(folder/'options.json',options)
   report=layer.apply(options,case['name'],execution={'directory':folder,'progress':lambda event:print(json.dumps({'seconds':time.monotonic(),'progress':event}),flush=True)});atomic_json(folder/'report.json',report)
   assert not case.get('expected'),'Expected incompatible input rejection'

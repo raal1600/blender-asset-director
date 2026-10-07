@@ -120,3 +120,15 @@ The evidence retains source content, slot, FPS and exact sample frames and is
 included in the profile/dependency hash. It does not alter rest geometry or
 native curves. This is rig calibration, not animation-name logic or a quality
 exception. No client calibration editor or automatic approval is implied.
+
+The per-context encode/decode guard measures position in world metres: less
+than 0.00001 m, with orientation less than 0.05 degrees. Rig-unit error is also
+retained as a diagnostic, but is not compared to a metre threshold. This matters
+for supported positive uniform scale, including imported centimetre rigs at
+object scale 0.01. No seam, quality or correction threshold changes with scale.
+
+The real sequence fixture accepts an explicit `source_ranges` array, one
+native-frame interval per clip. Omission means the complete native interval.
+Selections are checked against the observed Action ranges and recorded in
+`RESULTS.json`; the runner never searches for a different boundary. An explicit
+short-context case must be refused rather than sampling beyond its selection.

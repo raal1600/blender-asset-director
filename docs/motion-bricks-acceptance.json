@@ -205,13 +205,13 @@
       "threshold_or_invariant": "successful generation and quality; rejection is not generation coverage",
       "command_or_journey": "second-rig provider sequence",
       "identities": {
-        "application": "b23e76d plus uncommitted explicit hinge-calibration implementation; retained input implementation hash where emitted",
+        "application": "f3804f0cbd9eab048d207247f77c43c848598c35 plus physical-unit guard and explicit fixture interval changes; retained input implementation hash",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
         "build": "Windows native host SHA256 b21023549902980bbd961a6b2672ec066857fd88c5974f3e087b658d0d8dbd89; isolated candidate-b23e76d.json receipt"
       },
       "status": "FAIL",
-      "evidence_path": "beta-hinge-review.json; beta-mapping-contexts.json; beta-sequence-v1/report.json; second-rig-profile-review.json",
-      "known_limitations": "Independent Beta humanoid measured hinge calibration and 32-pose round trip verified (max 1.1e-6 m / 0.000125 degrees). Full selected interval refused for unsupported boundary contacts before inference. Five of 29 interior contexts were eligible; selected intervals were not changed. Paladin calibration dispersion 36–39 degrees refused. No second-rig successful generation/quality coverage yet."
+      "evidence_path": "beta-mapping-contexts.json; beta-sequence-v1/report.json; beta-explicit-range-v1/report.json; beta-explicit-range-v2/report.json",
+      "known_limitations": "Original full interval refused for contacts and remains unchanged. Separately declared Beta intervals [1,9] and [3,32] generated through the real model, preserved source channels and passed continuity/fresh reopen after correcting rig-unit versus metre comparison. Hard quality fails joint acceleration 16511 degrees/s2. Explicit [1,2] source selection refuses insufficient context. No successful second-rig quality coverage yet."
     },
     {
       "id": "transforms-fps",
