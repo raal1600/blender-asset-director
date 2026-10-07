@@ -4,16 +4,18 @@ import {assert,digest,json,safe} from './storage.mjs';
 import {validHash,validId} from './workbench-model.mjs';
 import {checkpointJob} from './checkpoint-job.mjs';
 import {assertCurrentActionInspection} from './action-inspection.mjs';
+import {generatedRequest,setWorking,publishCandidate,requestFingerprint} from './transition-review.mjs';
 import {validateTimeline,timelineTiming,connection,stitchVersion,motionEditVersion} from '../public/action-timeline-contract.mjs';
 
 const version='action-layer-v1';
 const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
 const integer=value=>Number.isInteger(value)&&value>=-100000&&value<=100000;
 export function validateActionRequest(request,inspect=false){
-  const fields=['version','requestId','checkpointId','sha256',...(inspect?[]:['inspectionId','audit_sha256','changes','frame_range'])];
+  const fields=['version','requestId','checkpointId','sha256',...(inspect?[]:['inspectionId','audit_sha256','changes','frame_range','sampling_plan','working_request_id'])];
   assert(object(request)&&Object.keys(request).every(k=>fields.includes(k)),'Invalid Action request.');
   assert(request.version===version&&validId(request.requestId,'run_')&&validId(request.checkpointId,'cp_')&&validHash(request.sha256),'Invalid Action identity.');
   if(inspect)return request;
+  assert(request.working_request_id===undefined||validId(request.working_request_id,'trq_'),'Invalid working transition request identity.');
   assert(validId(request.inspectionId,'run_')&&validHash(request.audit_sha256),'Inspect the saved performers first.');
   assert(Array.isArray(request.changes)&&request.changes.length>0&&request.changes.length<=32,'Choose one to 32 observed performers.');
   const seen=new Set();
@@ -31,6 +33,12 @@ export function validateActionRequest(request,inspect=false){
   }
   if(request.frame_range!==undefined)assert(Array.isArray(request.frame_range)&&request.frame_range.length===2&&request.frame_range.every(integer)&&request.frame_range[0]<=request.frame_range[1]&&request.frame_range[1]-request.frame_range[0]<=3600,'Playback range exceeds the supported bound.');
   assert(!request.changes.some(c=>c.mode==='timeline')||request.changes.every(c=>c.mode==='timeline'),'Save timeline changes separately from legacy changes.');
+  if(request.sampling_plan!==undefined){
+    const plan=request.sampling_plan;
+    assert(object(plan)&&Object.keys(plan).length===2&&plan.mode==='gumbel-temperature-1'&&Array.isArray(plan.seeds)&&plan.seeds.length>=1&&plan.seeds.length<=3&&new Set(plan.seeds).size===plan.seeds.length&&plan.seeds.every(s=>Number.isInteger(s)&&s>=0&&s<2**32),'A candidate batch needs one to three distinct Gumbel seeds.');
+    const joins=request.changes.flatMap(c=>c.clips||[]).filter(c=>c.transition?.mode==='generated');
+    assert(joins.length>0&&joins.every(c=>c.transition.sampling===plan.mode&&plan.seeds.includes(c.transition.seed)),'Every generated join must use this bounded sampling plan.');
+  }
   return request;
 }
 
@@ -50,7 +58,8 @@ export function registerActionSave(work,id,sceneId,revision,request){
   work.actionSaves ||= new Map();const identity=digest({id,sceneId,revision,request}),prior=work.actionSaves.get(request.requestId);
   if(prior){assert(prior.identity===identity,'Action request conflicts with an active Save.',409);return prior;}
   assert(work.actionSaves.size<64,'Too many pending Action saves.',429);
-  const entry={id,sceneId,runId:request.requestId,identity,cancelled:false,committing:false,jobId:null};work.actionSaves.set(request.requestId,entry);return entry;
+  const entry={id,sceneId,runId:request.requestId,identity,cancelled:false,committing:false,jobId:null,
+    enqueuedAt:new Date().toISOString(),enqueuedMonotonic:performance.now()};work.actionSaves.set(request.requestId,entry);return entry;
 }
 export async function cancelActionSave(work,id,sceneId,runId){
   assert(validId(runId,'run_'),'Invalid Action save identity.');
@@ -63,10 +72,14 @@ export async function cancelActionSave(work,id,sceneId,runId){
 }
 export async function saveAction(work,id,sceneId,revision,request){
   const cancellation=registerActionSave(work,id,sceneId,revision,request);
-  const options={version,audit_sha256:request.audit_sha256,changes:request.changes,...(request.frame_range?{frame_range:request.frame_range}:{})};
+  const reviewOnly=generatedRequest(request);let working;
+  const options={version,audit_sha256:request.audit_sha256,changes:request.changes,...(request.frame_range?{frame_range:request.frame_range}:{}),
+    ...(reviewOnly?{generation_attempt:request.requestId}:{})};
   try{return await checkpointJob(work,id,sceneId,revision,request,{
-    stage:'action',operation:'action-edit',options,cancellation,
-    check:async({p,cp})=>{
+    stage:'action',operation:'action-edit',options,cancellation,reviewOnly,
+    ...(reviewOnly?{implementation:async()=>{const cap=await work.available();assert(validHash(cap.implementation),'Matching runtime unavailable.',409);return cap.implementation;},
+      publish:context=>publishCandidate(context,working,work.config.library)}:{}),
+    check:async({p,scene,cp})=>{
       const run=await json(await safe(p.directory,`Runs/${request.inspectionId}.json`));
       assert(run.projectId===id&&run.sceneId===sceneId&&run.action==='action-audit'&&run.state==='SUCCEEDED'&&run.checkpointId===cp.id&&run.checkpointSha256===cp.sha256&&run.inspection?.sha256===request.audit_sha256,'Action inspection is stale or belongs to another scene.',409);
       verifyAudit(run.inspection);
@@ -98,6 +111,10 @@ export async function saveAction(work,id,sceneId,revision,request){
         }
         else if(c.mode==='clip')assert(performer.takes.some(t=>t.id===c.take_id&&t.performer===c.performer),'This motion does not belong to the selected performer.',409);
         else assert(c.frame>=run.inspection.frame_range[0]&&c.frame<=run.inspection.frame_range[1],'Hold a frame within the observed scene range.',409);
+      }
+      if(reviewOnly){
+        if(request.working_request_id)assert(scene.transitionReview?.working?.id===request.working_request_id&&scene.transitionReview.working.fingerprint===requestFingerprint(request,run.implementation),'Working transition changed before generation. The stale queued attempt was refused.',409);
+        working=structuredClone(setWorking(scene,request,run.implementation));await work.store.save(p,p.revision);
       }
     },
     verify:data=>{

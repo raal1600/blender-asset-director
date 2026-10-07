@@ -1,5 +1,31 @@
 # Generated repositioning between intact native clips (development)
 
+**Verified local authoring, 2026-10-07:** the supported native X → real
+model bridge → native Y path now has immutable candidates, explicit stale-checked
+acceptance, exact history/restore, contact refinement and hard-gated review order.
+Actual Windows workflows, two reviewed rigs, the four-clip sequence, native fault
+recovery, fresh reopening and accepted preview/render parity are recorded in the
+[acceptance matrix](motion-bricks-acceptance.json) and
+[research handoff](MOTION_BRICKS_RESEARCH_HANDOFF.md). Runnable source is
+`5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c`; the motion/persistence implementation
+matches the extensively tested 5f1b8b8 source trees. Some candidates and explicit
+intervals still fail fixed quality gates and remain rejected. Unprepared in-place
+inputs need reviewed intent/preparation. These finite results do not establish
+arbitrary motion, physical validity or universal production readiness. See the
+[client workflow](MOTION_BRICKS_CLIENT_RECONCILIATION.md) for supported controls.
+
+The original reference measurements below remain historical and must not be
+substituted for the later, expanded acceptance evidence.
+
+Rigs with straight rest elbows now have an explicit measured-calibration route:
+run `tools/inspect_motion_bricks_hinges.py` on a copied file with an observed
+rig, anatomical mapping, Action/slot and selected interval. Retain the unreviewed
+proposal, inspect its measured planes and native motion, and provide a separate
+reviewed JSON to `tools/prepare_motion_bricks_rig.py --hinge-calibration`.
+Inconsistent planes are refused even if the review flag is set. This preparation
+preserves native curves and rest geometry; it does not approve a transition.
+See the versioned evidence requirements in the input contract.
+
 The Action layer's **MotionBricks repositioning** connection samples the end of
 one native Action and the beginning of the next, generates a separate interval,
 and starts the second Action at its original opening. Neither native clip is
@@ -288,8 +314,9 @@ python tools/run_motion_bricks_sequences.py --manifest /absolute/fixture.json \
 `--case NAME` can be repeated. Each case has a finite 300-second process limit
 (configurable up to 900); later cases still run after a failure. A fresh process
 checks every recorded frame and original Action hashes. Source-FPS variants are
-new copies with explicitly rescaled key/handle times and source/scene clock
-normalization. Offsets are declared in world XY. Existing source bytes, original
+new copies with explicitly rescaled key/handle times, reviewed contact timestamps
+and source/scene clock normalization. Physical contact seconds and original
+Action metadata are preserved. Offsets are declared in world XY. Existing source bytes, original
 Actions, and the production project are not changed. A new test timeline is
 constructed only inside the disposable fixture worker.
 

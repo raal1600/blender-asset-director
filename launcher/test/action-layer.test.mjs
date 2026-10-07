@@ -8,6 +8,7 @@ import {randomUUID} from 'node:crypto';
 import {Store} from '../lib/projects.mjs';
 import {Workbench} from '../lib/workbench.mjs';
 import {validateActionRequest} from '../lib/action-layer.mjs';
+import {candidateStatus,recoverTransitionJobs} from '../lib/transition-review.mjs';
 import {exists,fileHash,json,writeJson} from '../lib/storage.mjs';
 const uid=p=>p+randomUUID(),take='take_'+'b'.repeat(64);
 const inspection={version:'action-layer-v1',sha256:'a'.repeat(64),frame_range:[1,48],fps:24,unassigned:[],
@@ -18,7 +19,7 @@ async function fixture(t,observed=inspection){
   const store=new Store(root);await store.init();let project=await store.create('Action test','Generated transport fixture');
   const config={library:path.join(root,'Database/AssetDirector'),blender:process.execPath};
   const jobs=new Map(),calls=[],control={fail:false,wrong:false,pause:null,implementation:'e'.repeat(64),jobImplementation:null};
-  const runtime={config,harness:async args=>{
+  const runtime={config,applicationIdentity:async()=>({status:'VERIFIED',commit:'1'.repeat(40),scope:'SYNTHETIC_TRANSPORT_ONLY'}),harness:async args=>{
     if(args[0]==='workbench-capabilities')return {implementation:control.implementation,action_layer:'action-layer-v1',action_task:'action-task-v1',task_workspace:true,...control.capabilities};
     calls.push(args);if(args[0]==='job-prepare'){
       const job={id:'j_'+randomUUID().replaceAll('-','').slice(0,24),state:'PLANNED',outputs:[],specification:{implementation:control.jobImplementation||control.implementation,operation:args[1],options:await json(args[args.indexOf('--options')+1]),inputs:[]}};jobs.set(job.id,job);return job;
@@ -29,7 +30,7 @@ async function fixture(t,observed=inspection){
     const folder=path.join(config.library,'jobs',job.id);await fs.mkdir(folder,{recursive:true});
     let data=observed;
     if(job.specification.operation==='action-edit'){
-      data={version:inspection.version,request:job.specification.options,reopened:!control.wrong,performance_acceptance:'NOT_EVALUATED',scene_audit:{objects:[]},action_audit:observed};
+      data={version:inspection.version,request:job.specification.options,reopened:!control.wrong,performance_acceptance:'NOT_EVALUATED',scene_audit:{objects:[]},action_audit:observed,...(control.validation?{transition_validation:control.validation}:{})};
       await fs.writeFile(path.join(folder,'result.blend'),'BLENDER SYNTHETIC ACTION RESULT');
       job.outputs.push({path:`jobs/${job.id}/result.blend`,...await fileHash(path.join(folder,'result.blend'))});
     }
@@ -208,4 +209,115 @@ test('imported checkpoint camera inspection makes its observed shot available wi
  assert.deepEqual(await fileHash(f.source),before);
  const saved=await f.work.saveShot(p.id,scene.id,p.revision,{name:'Actual imported camera',camera:'Observed camera',start:1,end:72});
  assert.equal(saved.workbench.scenes[0].shots[0].camera,'Observed camera');
+});
+
+async function generatedFixture(t){
+ const observed=structuredClone(inspection),performer=observed.performers[0],second='take_'+'c'.repeat(64);
+ performer.timeline={version:'action-timeline-v1',stitch_version:'native-stitch-v1',edit_version:'native-motion-edit-v1',error:null,clips:[],motion_bricks:{status:'CONFIGURED',profile_sha256:'d'.repeat(64)}};
+ performer.takes=[take,second].map(id=>({id,performer:performer.name,range:[1,25],travel_blocker:null,heading_blocker:null,stitch_blocker:null,stitch_channels:'e'.repeat(64)}));
+ const f=await fixture(t,observed);f.project=await f.inspect();
+ const first={id:'clip_a',take_id:take,start:1,frames:25,speed:1,repeat_reviewed:false,travel:null};
+ f.request={...f.request,frame_range:[1,70],changes:[{performer:performer.name,mode:'timeline',clips:[first,{...first,id:'clip_b',take_id:second,start:38,transition:{mode:'generated',frames:12,match_phase:false,seed:1234,profile_sha256:'d'.repeat(64)}}]}]};
+ return f;
+}
+test('generated completion publishes immutable review, acceptance and restore keep exact prior artifacts',async t=>{
+ const f=await generatedFixture(t);f.control.validation={status:'PASS',scope:'SYNTHETIC_TRANSPORT_ONLY'};
+ await f.work.saveAction(f.project.id,f.scene.id,f.project.revision,f.request);
+ let p=await f.wait(),s=p.workbench.scenes[0],review=s.transitionReview,candidate=review.candidates[0];
+ assert.equal(s.current,f.cp.id);assert.equal(s.candidate,null);assert.equal(candidateStatus(s,candidate),'READY_FOR_REVIEW');
+ assert.equal(candidate.previewSource.sha256,candidate.sha256);assert.equal(review.acceptances.length,0);
+ const event={candidateId:candidate.id,eventId:uid('run_'),fingerprint:candidate.fingerprint};
+ p=await f.work.acceptTransition(p.id,s.id,p.revision,event);s=p.workbench.scenes[0];
+ assert.equal(s.current,candidate.checkpointId);assert.equal(s.transitionReview.acceptances.length,1);assert.equal(candidateStatus(s,candidate),'ACCEPTED');
+ assert.equal((await f.work.acceptTransition(p.id,s.id,p.revision-1,event)).revision,p.revision);
+ await assert.rejects(f.work.acceptTransition(p.id,s.id,p.revision,{...event,fingerprint:'f'.repeat(64)}),/conflict/);
+ p=await f.work.restoreTransition(p.id,s.id,p.revision,{checkpointId:f.cp.id,eventId:uid('run_')});
+ assert.equal(p.workbench.scenes[0].current,f.cp.id);
+ assert.deepEqual(await fileHash(f.source),{sha256:f.cp.sha256,size:f.cp.size});
+ assert.equal(p.workbench.scenes[0].transitionReview.candidates[0].sha256,candidate.sha256);
+});
+test('changed working request during native generation makes completion stale without replacing accepted scene',async t=>{
+ const f=await generatedFixture(t);f.control.validation={status:'PASS'};let finish;f.control.pause=new Promise(resolve=>{finish=resolve;});
+ await f.work.saveAction(f.project.id,f.scene.id,f.project.revision,f.request);
+ let p=await f.store.get(f.project.id),request=structuredClone(f.request);request.changes[0].clips[1].transition.seed=7;
+ p=await f.work.updateTransitionRequest(p.id,f.scene.id,p.revision,request);
+ finish();p=await f.wait();const s=p.workbench.scenes[0],candidate=s.transitionReview.candidates[0];
+ assert.equal(candidateStatus(s,candidate),'STALE');assert.equal(s.current,f.cp.id);
+ await assert.rejects(f.work.acceptTransition(p.id,s.id,p.revision,{candidateId:candidate.id,eventId:uid('run_'),fingerprint:candidate.fingerprint}),/stale/);
+});
+test('repeated generation keeps the dependency fingerprint but creates distinct immutable native attempts',async t=>{
+ const f=await generatedFixture(t);f.control.validation={status:'FAIL'};
+ await f.work.saveAction(f.project.id,f.scene.id,f.project.revision,f.request);
+ let p=await f.wait();const first=p.workbench.scenes[0].transitionReview.candidates[0];
+ const nextRequest={...f.request,requestId:uid('run_')};
+ await f.work.saveAction(p.id,f.scene.id,p.revision,nextRequest);p=await f.wait();
+ const candidates=p.workbench.scenes[0].transitionReview.candidates;
+ assert.equal(candidates.length,2);assert.deepEqual(candidates[0],first);
+ assert.equal(candidates[1].fingerprint,first.fingerprint);
+ assert.notEqual(candidates[1].nativeJobId,first.nativeJobId);
+ assert.equal(first.requestedTimeline.generation_attempt,f.request.requestId);
+ assert.equal(candidates[1].requestedTimeline.generation_attempt,nextRequest.requestId);
+ assert.equal(p.workbench.scenes[0].current,f.cp.id);
+});
+test('missing or failed quality reports cannot be accepted, and corrupt artifacts are refused',async t=>{
+ for(const status of [undefined,'FAIL','PASS']){
+  const f=await generatedFixture(t);if(status)f.control.validation={status};
+  await f.work.saveAction(f.project.id,f.scene.id,f.project.revision,f.request);const p=await f.wait(),s=p.workbench.scenes[0],c=s.transitionReview.candidates[0];
+  if(status==='PASS')await fs.appendFile(path.join(p.directory,s.checkpoints.find(x=>x.id===c.checkpointId).path),'CORRUPT');
+  await assert.rejects(f.work.acceptTransition(p.id,s.id,p.revision,{candidateId:c.id,eventId:uid('run_'),fingerprint:c.fingerprint}));
+  assert.equal((await f.store.get(p.id)).workbench.scenes[0].current,f.cp.id);
+ }
+});
+test('failed and cancelled generation leave accepted checkpoint and reviewable candidate history intact',async t=>{
+ const f=await generatedFixture(t);f.control.validation={status:'PASS'};
+ await f.work.saveAction(f.project.id,f.scene.id,f.project.revision,f.request);let p=await f.wait();const previous=structuredClone(p.workbench.scenes[0].transitionReview.candidates);
+ f.control.fail=true;await f.work.saveAction(p.id,f.scene.id,p.revision,{...f.request,requestId:uid('run_')});p=await f.wait();
+ assert.equal(p.workbench.scenes[0].current,f.cp.id);assert.deepEqual(p.workbench.scenes[0].transitionReview.candidates,previous);
+ f.control.fail=false;let finish;f.control.pause=new Promise(resolve=>{finish=resolve;});const request={...f.request,requestId:uid('run_')};
+ await f.work.saveAction(p.id,f.scene.id,p.revision,request);await f.work.cancelActionSave(p.id,f.scene.id,request.requestId);finish();p=await f.wait();
+ assert.equal(p.workbench.scenes[0].current,f.cp.id);assert.deepEqual(p.workbench.scenes[0].transitionReview.candidates,previous);assert.equal(f.control.cancelled,true);
+});
+
+test('candidate acceptance refuses a changed application build even when the Python implementation is unchanged',async t=>{
+ const f=await generatedFixture(t);f.control.validation={status:'PASS'};
+ await f.work.saveAction(f.project.id,f.scene.id,f.project.revision,f.request);const p=await f.wait(),s=p.workbench.scenes[0],candidate=s.transitionReview.candidates[0];
+ f.work.runtime.applicationIdentity=async()=>({status:'VERIFIED',commit:'2'.repeat(40),scope:'SYNTHETIC_TRANSPORT_ONLY'});
+ await assert.rejects(f.work.acceptTransition(p.id,s.id,p.revision,{candidateId:candidate.id,eventId:uid('run_'),fingerprint:candidate.fingerprint}),/Application build identity/);
+ assert.equal((await f.store.get(p.id)).workbench.scenes[0].current,f.cp.id);
+});
+
+test('discarding a working request preserves candidate history and accepted playback while making old work stale',async t=>{
+ const f=await generatedFixture(t);f.control.validation={status:'PASS'};
+ await f.work.saveAction(f.project.id,f.scene.id,f.project.revision,f.request);let p=await f.wait();
+ const before=structuredClone(p.workbench.scenes[0].transitionReview.candidates);
+ p=await f.work.discardTransitionRequest(p.id,f.scene.id,p.revision);const scene=p.workbench.scenes[0];
+ assert.equal(scene.current,f.cp.id);assert.equal(scene.transitionReview.working,null);
+ assert.deepEqual(scene.transitionReview.candidates,before);assert.equal(candidateStatus(scene,before[0]),'STALE');
+});
+
+test('restart quarantines an interrupted unpublished attempt and preserves its previous accepted scene',async t=>{
+ const f=await generatedFixture(t);let p=await f.store.get(f.project.id);
+ const runId=uid('run_'),file=path.join(p.directory,`Runs/${runId}.json`);
+ const record={schema:1,id:runId,sceneId:f.scene.id,projectId:p.id,action:'action-edit',state:'PREPARING',publication:'TRANSITION_REVIEW_ONLY',launcherPid:2147483647};
+ await f.work.lock(p,runId);p.workbench.scenes[0].run=runId;await f.store.save(p,p.revision);await writeJson(file,record);
+ await recoverTransitionJobs(f.work,p.id);p=await f.store.get(p.id);
+ assert.equal(p.workbench.scenes[0].current,f.cp.id);assert.equal(p.workbench.scenes[0].run,null);
+ const recovered=await json(file);assert.equal(recovered.state,'INTERRUPTED');assert.equal(recovered.quarantine.state,'EXCLUDED_FROM_CANDIDATES');
+ assert.equal(await exists(path.join(p.directory,'Runs/.workbench-writer.lock')),false);
+ assert.deepEqual(await fileHash(f.source),{sha256:f.cp.sha256,size:f.cp.size});
+});
+
+test('restart restores an already published candidate without accepting it and leaves live writers alone',async t=>{
+ const f=await generatedFixture(t);f.control.validation={status:'PASS'};
+ await f.work.saveAction(f.project.id,f.scene.id,f.project.revision,f.request);let p=await f.wait();
+ const candidate=structuredClone(p.workbench.scenes[0].transitionReview.candidates[0]),file=path.join(p.directory,`Runs/${f.request.requestId}.json`);
+ const record=await json(file);await f.work.lock(p,record.id);
+ record.state='RUNNING';record.launcherPid=process.pid;await writeJson(file,record);
+ p.workbench.scenes[0].run=record.id;p=await f.store.save(p,p.revision);
+ await recoverTransitionJobs(f.work,p.id);assert.equal((await json(file)).state,'RUNNING');
+ assert.equal(await exists(path.join(p.directory,'Runs/.workbench-writer.lock')),true);
+ record.launcherPid=2147483647;await writeJson(file,record);await recoverTransitionJobs(f.work,p.id);
+ p=await f.store.get(p.id);assert.equal((await json(file)).state,'SUCCEEDED');
+ assert.equal(p.workbench.scenes[0].current,f.cp.id);assert.equal(p.workbench.scenes[0].run,null);
+ assert.deepEqual(p.workbench.scenes[0].transitionReview.candidates,[candidate]);assert.equal(p.workbench.scenes[0].transitionReview.acceptances.length,0);
 });

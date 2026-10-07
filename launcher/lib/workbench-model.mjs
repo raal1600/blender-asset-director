@@ -37,6 +37,14 @@ export function validateWorkbench(w) {
       relativeName(c.path); assert(/^Scenes\/[^/]+\.blend$/.test(c.path),'Checkpoint must stay in project Scenes.');
     }
     assert((!s.current || cp.has(s.current)) && (!s.candidate || cp.has(s.candidate)),'Unknown selected checkpoint.');
+    if(s.transitionReview!==undefined){
+      const r=s.transitionReview;
+      assert(r&&r.version==='transition-review-v1'&&Array.isArray(r.candidates)&&r.candidates.length<=200&&Array.isArray(r.acceptances)&&r.acceptances.length<=500,'Invalid transition review history.');
+      assert(!r.working||validId(r.working.id,'trq_')&&validHash(r.working.fingerprint)&&validHash(r.working.implementation)&&cp.has(r.working.baseCheckpointId),'Invalid working transition identity.');
+      assert(new Set(r.candidates.map(c=>c.id)).size===r.candidates.length,'Duplicate transition candidate.');
+      for(const c of r.candidates)assert(validId(c.id,'run_')&&validId(c.requestId,'trq_')&&validHash(c.fingerprint)&&validHash(c.sha256)&&validHash(c.implementation)&&cp.has(c.checkpointId)&&cp.has(c.baseCheckpointId)&&Array.isArray(c.artifacts),'Invalid immutable transition candidate.');
+      assert(new Set(r.acceptances.map(e=>e.id)).size===r.acceptances.length&&r.acceptances.every(e=>validId(e.id,'run_')&&['ACCEPT','RESTORE'].includes(e.type)&&cp.has(e.checkpointId)&&cp.has(e.previousCheckpointId)&&validHash(e.sha256)),'Invalid transition acceptance event.');
+    }
     assert(Object.entries(s.completed).every(([stage,id])=>stageIndex(stage)>=0&&cp.has(id)),'Unknown activity checkpoint.');
     if(s.shots!==undefined){
       assert(Array.isArray(s.shots)&&s.shots.length<=200&&new Set(s.shots.map(x=>x.id)).size===s.shots.length,'Invalid shot list.');

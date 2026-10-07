@@ -1,0 +1,36 @@
+from pathlib import Path
+import sys,json,hashlib,math
+r=Path(__file__).parent;repo=Path('<SOURCE_WORKTREE>');sys.path.insert(0,str(repo/'src'))
+from asset_director.motion_bricks_contract import motion_difference
+folder=r/'beta-boundary-grid-f30b389-v1';read=lambda p:json.loads(p.read_text(encoding='utf-8'));sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+def artifacts(name):
+ p=folder/name
+ return read(p/'motion-bricks-clip_1-raw.json'),read(p/'motion-bricks-clip_1-corrected.json'),read(p/'RESULTS.json')
+def comparable(value):
+ return {'roots':value['roots_m'],'local_xyzw':[[[frame[n][1],frame[n][2],frame[n][3],frame[n][0]] for n in sorted(frame)] for frame in value['rotations_wxyz']]}
+center='beta-source-7-target-4';base,corrected,ref=artifacts(center);rows=[]
+for case in read(folder/'report.json')['cases']:
+ name=case['name'];raw,final,result=artifacts(name)
+ side='target' if name.startswith('beta-source-7-target-') else 'source'
+ if name==center:side='unchanged-center'
+ input_difference={}
+ for boundary in ('source','target'):
+  x,y=base['request'][boundary],raw['request'][boundary]
+  input_difference[boundary]={'local_rotations_exact_equal':x['local_xyzw']==y['local_xyzw'],
+    'roots_exact_equal':x['roots']==y['roots'],'root_component_max_difference':max(abs(a-b) for u,v in zip(x['roots'],y['roots']) for a,b in zip(u,v))}
+  if side not in ('unchanged-center',boundary):assert input_difference[boundary]['local_rotations_exact_equal']
+ comparison=motion_difference(base['result'],raw['result'],ref['character_height_m'])
+ final_comparison=motion_difference(comparable(corrected['comparison']['corrected']),comparable(final['comparison']['corrected']),ref['character_height_m'])
+ if side!='unchanged-center':assert not comparison['near_duplicate'] and not final_comparison['near_duplicate']
+ rows.append({'case':name,'explicitly_changed_boundary':side,'quality':case['status'],'input_comparison':input_difference,
+              'raw_model_local_difference':comparison,'corrected_world_difference':final_comparison,'native_preserved':result['source_actions_preserved'],
+              'native_intervals':result['selected_native_intervals'],'result_sha256':result['result_sha256'],
+              'raw_artifact_sha256':sha(folder/name/'motion-bricks-clip_1-raw.json'),'corrected_artifact_sha256':sha(folder/name/'motion-bricks-clip_1-corrected.json')})
+report={'schema':'motion-bricks.boundary-influence.v1','status':'PASS_INDEPENDENT_INFLUENCE_WITH_RETAINED_QUALITY_FAILURES','application_commit':read(folder/'report.json')['commit'],
+ 'center':center,'generation_quality_counts':{'PASS':sum(v['quality']=='PASS' for v in rows),'FAIL':sum(v['quality']=='FAIL' for v in rows)},
+ 'coverage':'One unseen compatible Action on an independently calibrated second rig; nine explicit interval pairs. Not nine independent Actions or broad motion coverage.',
+ 'coordinate_note':'Model requests are relative to each source boundary. A changed source may change target root placeholders despite unchanged target local rotations; target XY placeholders are unconstrained.',
+ 'comparison_note':'Raw model-local and corrected world comparisons use their own consistent frames and different skeleton representations; their RMS values are not a correction-attenuation ratio.',
+ 'context_horizon_seconds':.1,'rows':rows}
+out=folder/'independent-influence.json';assert not out.exists();out.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+print(json.dumps({'status':report['status'],'counts':report['generation_quality_counts'],'raw_rms_degrees':[v['raw_model_local_difference']['rotation_rms_degrees'] for v in rows]}))

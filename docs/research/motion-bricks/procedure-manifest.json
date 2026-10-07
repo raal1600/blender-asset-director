@@ -1,0 +1,103 @@
+{
+  "schema": "motion-bricks.public-procedures.v1",
+  "procedures": [
+    {
+      "public_file": "procedures/native_ranked_5d4a7ba_v1.mjs.txt",
+      "original_private_id": "native_ranked_5d4a7ba_v1.mjs",
+      "original_sha256": "e4d574f75ba7791038228c8911240906a00dcd859a05796ba6c978292af3e83f",
+      "public_sha256": "38580172d2a14123435b7bdda5d8cde67c17e49ebe86fb98c985a710f0299396",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/native_contact_5f1b8b8_v1.mjs.txt",
+      "original_private_id": "native_contact_5f1b8b8_v1.mjs",
+      "original_sha256": "36b5e9d7bd83f3a6975420353e6004b491a2647deaf13d4ded47832b3dfc540f",
+      "public_sha256": "9ab0b91f5fca46cf21183af383ccba7c6390199e83e045fbb914ba9dfcd2f95a",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/native_lifecycle_5f1b8b8_v1.mjs.txt",
+      "original_private_id": "native_lifecycle_5f1b8b8_v1.mjs",
+      "original_sha256": "b330848f4368eb74c82dbe41e719b0dec09724ec47dc8d66f9db96ac05d6ccc8",
+      "public_sha256": "6a98287f4fe6c3b01eb87ae335503cb299e711f6b4cd1857a0d44c0cbac16f29",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/native_multi_2cd8ed9_v1.mjs.txt",
+      "original_private_id": "native_multi_2cd8ed9_v1.mjs",
+      "original_sha256": "ba86fd86fe69f3b89a8940022390d71f920f731961d60aa00033daa54a2cbd65",
+      "public_sha256": "8af82e88766ec20773f55a315f55b64cfd6c9cd0dd0d74d1b6ecf7b47153994a",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/native_cancellation_5d4a7ba_v2.mjs.txt",
+      "original_private_id": "native_cancellation_5d4a7ba_v2.mjs",
+      "original_sha256": "d86dd38ed4093867fbcc736544096c295ba3577c3d0f9140388fb4293fd55aa5",
+      "public_sha256": "72670a6dcf964e36e3d67c9201a99861980860d4d70767a7d72e6ce139b2849e",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/native_render_ranked_5d4a7ba_v1.mjs.txt",
+      "original_private_id": "native_render_ranked_5d4a7ba_v1.mjs",
+      "original_sha256": "52db8eec2ddfee11e6394c62c1ed799158983f23b8eba1bbed668eaf4068fe07",
+      "public_sha256": "a516695769ff086fbb7eb6b8e021d7ad7f0700ce71cfb3c8bad8617a8b6d6a61",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/native_playback_ranked_5d4a7ba_v1.mjs.txt",
+      "original_private_id": "native_playback_ranked_5d4a7ba_v1.mjs",
+      "original_sha256": "e130d7041b8f086fe6936d5a770fac2f6544d5fda81bac0f241b55fcf6e5d76e",
+      "public_sha256": "d63d0a1531961c54d33b9a79abbe7aa66b00fd284ef3a55edeb7640f6127491c",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/run_accepted_parity_ranked_5d4a7ba_v1.py.txt",
+      "original_private_id": "run_accepted_parity_ranked_5d4a7ba_v1.py",
+      "original_sha256": "4e35449f89d3689b1ab1192f7d58562c7ce0d22c11dcae257fececa7bbd03aff",
+      "public_sha256": "b6c72c4c2fbe153f5a03e0eb69592fbe5142f97b3280a5c06012ac5a25014d20",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/sample_accepted_parity_v2.py.txt",
+      "original_private_id": "sample_accepted_parity_v2.py",
+      "original_sha256": "b20726ddf02ffa199b81221647b1a1846e92532e3bc886eb4d1b759fb3ac0576",
+      "public_sha256": "b20726ddf02ffa199b81221647b1a1846e92532e3bc886eb4d1b759fb3ac0576",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/check_accepted_parity.mjs.txt",
+      "original_private_id": "check_accepted_parity.mjs",
+      "original_sha256": "e7471ff4a463a3bd6ce39e377db2a88c14a7134c04b223c9695f8cc76e08a699",
+      "public_sha256": "2da463f1bec64780c565ff5befe84b905e5a98c6188d21b46997a6fdb1fdd7e3",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/run_dense_final_quality_v1.py.txt",
+      "original_private_id": "run_dense_final_quality_v1.py",
+      "original_sha256": "c6242cffae191695f86bbb64a0caa1112a03c661cc51dbfa7155cd265bc2b3c7",
+      "public_sha256": "0c130bee137f3c9eebb59e7459dee449011c04acdc70e3a7c972beecf768891d",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/dense_final_quality_v1.py.txt",
+      "original_private_id": "dense_final_quality_v1.py",
+      "original_sha256": "3ccadb78b3a1befeda0addc629590a587d6d62dce04b70d0956c9bc8fd717193",
+      "public_sha256": "9725795007eccf443fd0df5ed31da2cd74ac2b698a2cb297ab0509499eb55ead",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/analyze_beta_grid_v1.py.txt",
+      "original_private_id": "analyze_beta_grid_v1.py",
+      "original_sha256": "0815e4e1f29729cf141c209c5d26f15da88ed0142feaa64d9bfac7dad7a0da5e",
+      "public_sha256": "0d2d26766f473795a66346cdeba7d3b2949ac24a4b5f2ad41cf409cca8af234c",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    },
+    {
+      "public_file": "procedures/reconcile_broader_evidence_v1.py.txt",
+      "original_private_id": "reconcile_broader_evidence_v1.py",
+      "original_sha256": "f027f4febed0f7855e4fea3ecbc57043d3c5fba841f1d429e927b9cab991302d",
+      "public_sha256": "dbf53c0ad89306193cfc7ce5cfab9b38b6f4ae297a93bb1e5d9981e8d75f2861",
+      "redaction": "Absolute workstation paths replaced with literal placeholders; source logic/assertions retained. Documentation-only review copy, not a portable runnable fixture."
+    }
+  ]
+}

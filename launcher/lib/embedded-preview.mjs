@@ -51,7 +51,7 @@ async function checkpointSource(work,id,sceneId,revision,request) {
 }
 
 export class EmbeddedPreviews {
-  constructor(work){this.work=work;this.owned=new Map();this.queue=Promise.resolve();this.identity=Promise.all(['./embedded-preview.mjs','./preview-cache.mjs','./checkpoint-dependencies.mjs','./viewer-gltf.mjs','./asset-preview.mjs','./world-preview-bindings.mjs','./shot-preview.mjs','../public/world-draft.mjs','../public/world-editor.mjs','../public/viewer-3d.mjs','../public/shot-view.mjs','../public/vendor/three/VENDOR.json'].map(async name=>({name,...await fileHash(fileURLToPath(new URL(name,import.meta.url)))}))).then(digest);}
+  constructor(work){this.work=work;this.owned=new Map();this.queue=Promise.resolve();this.identity=Promise.all(['./embedded-preview.mjs','./preview-cache.mjs','./checkpoint-dependencies.mjs','./viewer-gltf.mjs','./asset-preview.mjs','./world-preview-bindings.mjs','./shot-preview.mjs','../public/world-draft.mjs','../public/world-editor.mjs','../public/viewer-3d.mjs','../public/performer-framing.mjs','../public/shot-view.mjs','../public/vendor/three/VENDOR.json'].map(async name=>({name,...await fileHash(fileURLToPath(new URL(name,import.meta.url)))}))).then(digest);}
   remember(item){
     const weight=Buffer.byteLength(JSON.stringify({record:item.record,source:item.source}));
     assert(weight<=MAX_PREVIEW_METADATA_BYTES,'Preview metadata exceeds the active-memory bound.',409);

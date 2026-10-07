@@ -49,7 +49,7 @@ def tangents(a, b, ap, bn, dt):
     return result
 
 
-def smooth_keys(curve, endpoint_slopes=None, interval=None):
+def smooth_keys(curve, endpoint_slopes=None, interval=None, *, continuous=False):
     """Cubic Hermite segments; explicit slopes avoid Blender auto-handle overshoot.
 
     Interior central differences approximate the densely sampled trajectory.
@@ -59,11 +59,16 @@ def smooth_keys(curve, endpoint_slopes=None, interval=None):
     keys = [k for k in curve.keyframe_points if interval is None or interval[0]-1e-5 <= k.co[0] <= interval[1]+1e-5]
     if len(keys) < 2:
         return
+    clamped=None
+    if continuous:
+        from .motion_bricks_spline import clamped_key_slopes
+        clamped=clamped_key_slopes([k.co[0] for k in keys],[k.co[1] for k in keys],endpoint_slopes)
     for i, key in enumerate(keys):
         previous, following = keys[max(0, i-1)], keys[min(len(keys)-1, i+1)]
         slope = (following.co[1]-previous.co[1])/(following.co[0]-previous.co[0])
         if endpoint_slopes is not None and i in (0, len(keys)-1):
             slope = endpoint_slopes[0 if i == 0 else 1]
+        if clamped is not None:slope=clamped[i]
         left = (key.co[0]-previous.co[0])/3 if i else (following.co[0]-key.co[0])/3
         right = (following.co[0]-key.co[0])/3 if i < len(keys)-1 else left
         key.interpolation = 'BEZIER'

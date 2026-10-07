@@ -1,5 +1,384 @@
 # MotionBricks capability audit (2026-10-05)
 
+## 2026-10-07 — final local verification of the supported authoring path
+
+Runnable source `5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c` adds visible hard-gated
+ranking and passes actual native alternatives, comparison, explicit acceptance,
+exact restore, reopening, OptiX rendering, complete 1x retained-movie playback
+and fresh-Blender preview parity. Two of three samples pass; the penetration
+failure remains rejected. All 72 rendered frames were inspected separately.
+
+The final motion implementation is `5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e`.
+Its source/persistence/tool trees are identical in 5d4a7ba. Real native contact
+refinement again reduces 31.09 to 5.68 mm drift with identical neural output.
+Native stale completion, cancellation, actual provider crash, launcher restart,
+quarantine, duplicate motion/acceptance and corrupted-artifact refusal pass with
+the old accepted checkpoint intact. Actual model-missing and reduced-budget
+refusals recover through real Vulkan inference.
+
+Commit `2cd8ed9eea8961569e02ebf541bafca3b0fefc97` repairs the missing prepared-copy
+review controls found by native E. Its full native four-clip workflow passes
+downstream invalidation, selected-join/different-duration A/B, complete explicit
+acceptance, exact history and reopening. The 5f1b8b8 four-clip regression passes
+all three hard gates, 480 Hz diagnostics, accepted rendering/preview parity and
+inspection of all 176 rendered frames. This is finite three-join coverage.
+
+The final unchanged broader suite is seven PASS and three FAIL, retained as such:
+unprepared idle-walk, walk-idle and walk-run lack reviewed root intent. Separate
+explicit full-interval preparation follow-ups pass idle-walk and walk-idle, and
+correctly refuse the run entry's unstable support. Rejections are not generation
+coverage. Seven of nine predeclared Beta trim pairs pass; two fail correction or
+support limits. The final code repeats the Beta center and reference three times
+each with exact raw/corrected/baked parity and fresh reopening. Additional 480 Hz
+checks pass; Beta's 60-frame diagnostic movie plays at full speed separately from
+the actual Windows application acceptance evidence.
+
+Verified transforms include root offsets, 24/30/60 FPS, translated stable parents
+and a compensated positive uniform parent scale. New context and airborne/mixed
+refusal procedures preserve source files and refuse before neural artifacts.
+Current boundary provenance includes physical world heading, linear/angular
+velocity and its actual sampled timestamps. Historical failures below remain
+chronological evidence; their then-pending wording is superseded only by the
+specific later observations described here and in the matrix.
+
+Native authored alternatives still take about 127–130 seconds per three-candidate
+batch despite 24 ms median warm inference. Eighteen identical-input fixture jobs
+support exact parity for the sole-height optimization; Beta median complete
+generation/reopen changes from 41.48 to 33.96 seconds. Sampling and quality limits
+were not weakened. See the benchmark report for sample counts, variability and
+whole-device measurement limitations. The later review handoff classifies runtime
+verification, source-only capabilities, historical reports and unsupported scope.
+No Deep Research, release, private upload or broad production-readiness claim was
+made.
+
+
+## 2026-10-07 — continued repair and native falsification
+
+Later evidence in this same repair cycle verifies the earlier pending fixes:
+`f30b389890b6bc11f62efce56e355d3a981d5431` passes the actual Windows contact
+refinement journey in `native-contact-f30b389-v1`. Changing reviewed support
+windows from 0.16 to 0.08 seconds leaves the seed42 C ABI request and raw arrays
+exactly unchanged while measured planted drift falls from 31.09 to 5.68 mm.
+The client compares, explicitly accepts, saves and reopens the refinement.
+Its accepted file SHA-256 is
+`41c9d21e3da5e4381a38d17a928a99879b21e3217b38c1719623827745aaad3d`.
+`native-render-f30b389-v1` records actual OptiX rendering and native 1x movie
+playback; `native-parity-f30b389-v1` measures 0.01183 mm maximum skin difference
+and 0.14951 degrees maximum joint orientation difference against fresh Blender.
+All 72 frames have separate static agent inspection. This controlled annotation
+experiment does not establish automatic contact truth or human artistic approval.
+
+The second-rig `beta-boundary-grid-f30b389-v1` predeclares nine explicit interval
+pairs of the independently calibrated Beta Action. Seven pass unchanged hard
+quality, native preservation and fresh reopen gates; two fail. Independent source
+and target changes influence both raw and corrected output. All 60 frames of the
+predeclared center were inspected statically. Earlier failed selections are
+retained; this narrow successful coverage does not prove broad generalization.
+
+The ten-case broader suite was rerun at f30b389: six PASS, four FAIL. Three are
+unprepared in-place root ambiguity; the fourth exposed a 60 FPS fixture bug:
+key times changed without contact timestamps. Commit
+`a08e46d588616382ef61db9c11409119d2daefe0` normalizes both on derived copies and
+the actual 60 FPS rerun passes. Original metadata is preserved. Prepared
+left-to-idle and idle-to-walk requests subsequently pass at 0c804ca; the longer
+left-to-idle request still fails planted sliding. These are separate requests,
+not retrospective passes for the unprepared cases.
+
+Commit `0c804ca5827433996b379f32d05d260a7fa70fd0` transforms only observed sole
+vertices during height checks. Two-rig microbenchmarks and twelve complete
+before/after fixture jobs show exact numeric raw/corrected/baked parity. See
+`soles-pipeline-comparison-v1.json` and the benchmark document for timings.
+No sampling density, validation threshold or provider pin changed.
+
+The following paragraphs retain the earlier failures in chronological context.
+Their then-pending native regeneration/reopen repairs are verified by f30b389
+above; the complete final-build acceptance remains unfinished.
+
+The subsequent contact-refinement journey on `95234c3` stopped before inference:
+after acceptance, the alternatives button disappeared because its view examined
+only changed clips. Evidence `native-contact-95234c3-v1` retains that failure and
+the unchanged accepted artifact. Source now exposes regeneration for saved
+generated tracks, includes explicitly resampled tracks even with unchanged
+settings, and refreshes review controls after local edits. Native rerun is pending.
+
+Source inspection also found Action labels in the saved native-defaults equality
+check. `native_basis_contract.py` now compares a multiset of content bindings,
+retaining slots, intervals, annotations and duplicate counts. Saved integrity,
+rest, parent, units and unkeyed defaults remain checked; request/audit identities
+still invalidate an old selection after rename. This permits defaults reuse,
+not stale-candidate acceptance. `rename-generation-v1` subsequently passed both
+real baseline and opaque-renamed generation at `3a95251c253af4ae1dbe09c985913c24d29ac919`:
+quality, continuity, preservation and fresh reopening passed. C ABI requests,
+raw arrays, corrected arrays and composition paths are exactly equal on this
+device. This is label invariance for one reference pair, not unseen-motion coverage.
+
+`native-contact-3a95251-v1` then exposed a restored-working-request startup issue:
+an empty scene-viewer placeholder could be retained solely because the restored
+draft was dirty. No new generation ran and the accepted hash remained intact.
+Source now retains only an owned initialized viewer, ignores navigation to the
+already active stage, labels accepted/history/candidate A/B views separately,
+and exposes job-bound native progress including actual fresh-reopen validation.
+Malformed or unrelated progress cannot change job state or acceptance. Native
+rerun remains required; these source changes are not yet runtime claims.
+
+The subsequent `95234c3528bfd1c288f6670ca701c4789b0a1aff` native build repaired
+the accepted-preview refresh failure documented below. Two of three real
+stochastic candidates pass the unchanged quality gates. Explicit acceptance,
+exact prior-artifact restore, restoration of the chosen artifact and fresh
+native restart preserve the accepted SHA-256 and preview identity. Actual OptiX
+rendering used that same accepted file. A mistaken harness click on the movie's
+seek rail was retained as a failure; the unchanged movie subsequently passed
+native keyboard playback at rate 1 through both stitches. All 72 render-frame
+hashes match both the renderer and encoder receipts.
+
+Fresh Blender versus actual client GLB parity measured maximum skin displacement
+0.01183 mm and joint orientation 0.14951 degrees at every integer render frame
+plus fractional boundary samples. Agent inspection covered all 72 rendered
+frames as contact sheets; automated native temporal playback and human artistic
+review are distinct (no human review claimed). Evidence:
+`native-accept-95234c3`, `native-playback-95234c3-r2`, and
+`native-benchmark-4e45674-95234c3.json`. The two valid stochastic candidates differ
+by 15.40 degrees RMS in corrected world joint rotations. Same-seed repetitions
+have exactly equal raw and corrected numeric arrays on this device. This does
+not establish second-rig generalization, physical feasibility or cross-device
+identity. Contact-refinement and multi-join native journeys remain unfinished.
+
+The subsequent `b23e76d1e4e75f1ace63ffed8dcb058846551b8d` native build verified
+distinct attempt jobs, raw/corrected numerical diversity, active cancellation,
+and stale completion. `native-faults-b23e76d-r3/report.json` additionally records
+an owned provider-process crash and a launcher/host restart during generation.
+The accepted checkpoint and five prior candidate identities survived; the
+interrupted unpublished output was quarantined rather than counted successful.
+These are real Windows/WebView2/process tests. They do not establish successful
+motion acceptance or final render parity; all generated candidates failed quality.
+
+Independent copied Beta and Paladin humanoids were inspected locally. Both have
+ambiguous straight rest elbows. New explicit measured hinge calibration accepts
+only reviewed, consistent signed planes bound to rest/mapping/content evidence.
+Beta's measured planes agree within 0.00013 degrees; its 32 native-pose
+encode/decode checks measured at most 0.0000011 m and 0.000125 degrees error.
+Paladin's observed 36–39 degree plane dispersion does not establish a supported
+calibration. Neither rejection nor round-trip calibration counts as successful
+second-rig generation. Beta's full-interval transition was rejected before
+inference because its source context had no planted grounded foot. Read-only
+analysis found five eligible interior contexts out of 29; it did not change the
+selected native interval. Evidence: `beta-mapping-contexts.json`,
+`beta-sequence-v1`, `beta-hinge-review.json`, `second-rig-profile-review.json`.
+Private assets remain local; this technical inspection grants no redistribution
+rights. The original file hashes and native channel preservation are retained.
+
+A subsequent, separately requested fixture selected Beta intervals [1,9] and
+[3,32] at 30 FPS. It exposed a unit bug: the context round-trip guard compared
+rig-space displacement directly with 0.00001, incorrectly rejecting a 0.01-scale
+rig whose physical error was under that metre limit. The guard now compares
+world-metre displacement and retains both units in diagnostics. Actual model
+generation, baking, native preservation and fresh reopening then succeeded.
+Quality still failed at 16,511 degrees/s²; no second-rig quality pass is claimed.
+The separate [1,2] source interval correctly refused insufficient context before
+inference. The original full-interval rejection remains unchanged. Evidence:
+`beta-explicit-range-v1`, `beta-explicit-range-v2`, and their explicit manifests.
+
+Private continuous-spline experiments isolated the reference acceleration
+problem. Endpoint-curvature energy reduced the peak but still failed; increasing
+smoothing also introduced penetration. A bounded continuous world-rotation
+variant then passed the reference's unchanged kinematic gates at 240 and 480 Hz
+(4,830 and 4,841 degrees/s² respectively), with structural preservation and
+fresh reopening. This is an experimental script, not yet the application path.
+Its 72-frame diagnostic render was inspected as three complete contact sheets;
+full-speed temporal review, broader rigs/seeds and native acceptance are pending.
+Evidence: `continuous-bounded-v1`, including the retained failed precursors.
+
+The bounded continuous refinement was subsequently implemented in the application
+(`motion_bricks_spline.py`, `motion_bricks_world_refinement.py`, and the existing
+refinement/baking path). `application-continuous-v1` passes the real reference
+generation, unchanged hard quality gates, source preservation and fresh reopen.
+`application-continuous-seeds-v1` passes seeds 7 and 42; seed 1234 remains rejected.
+These are application-path results, not yet an accepted native-client revision.
+The independent Beta request fails the optimizer's convergence limit under this
+implementation; its mandatory generalization gate remains unfulfilled.
+The complete portable/installer run records 805 tests (802 passed, three
+disclosed skips). Broader coverage, final native acceptance and benchmarks remain
+pending. No preset quality threshold or backend pin was relaxed.
+
+The Beta convergence failure was then reproduced from captured, evaluated
+optimizer inputs. At the finer 69-sample grid, six finger curves exhausted the
+iteration limit. Scaling the numerical ADMM penalty with the existing smoothing
+weight made all 52 curves converge (maximum 880 iterations, primal residual
+below 1e-8 and dual residual below 1e-6). The objective, endpoints, curvature
+bound and quality thresholds are unchanged; both residuals are now required.
+This numerical repair does not establish suitable motion: the original Beta
+duration is still refused for excessive additional filtering. Explicit 30- and
+42-frame bridge alternatives pass continuity, contact and fresh reopening but
+fail the 45-degree total correction limit at 58.46 and 59.46 degrees respectively.
+Evidence: `beta-optimizer-diagnosis.json`, `beta-optimizer-rho-1.json`,
+`beta-continuous-v2`, and `beta-duration-v1`. All failed attempts are retained.
+The application rerun with that numerical change
+(`application-continuous-rho-v1`) again passes argmax and stochastic seeds 7/42,
+including fresh reopening; stochastic seed 1234 still fails penetration. The
+four-case report correctly remains FAIL because it retains that failed sample.
+
+The clean `4e45674bc2305900d8a8c9d82b38c7be3477e0ad` native Windows build
+generated three immutable candidates, of which two passed quality. Actual
+source-aligned A/B controls played both passing alternatives. Explicit acceptance
+persisted the chosen checkpoint and event, but the client then recreated its old
+working draft during snapshot refresh and left the accepted preview empty. The
+complete journey is therefore FAIL, not an acceptance/render pass. The accepted
+artifact remains intact. Snapshot guards now inspect cached edits without lazily
+reconstructing the prior request; unit regressions protect both this repair and
+real unsaved edits. A fresh isolated native rerun is required. Evidence:
+`native-accept-4e45674/report.json`, `accepted-wait.txt`, and
+`snapshot-reconciliation-unit-v1.log`.
+
+The local `c401b33a77eb751aff462d3c0a6a66e73c501368` build passed the visible
+Windows comparison, input-change staleness and active-Blender cancellation
+procedure (`native-review-c401b33-r2/report.json`). Accepted state survived.
+Candidate quality still failed; no successful acceptance/render is inferred.
+The earlier `7fc75d2` client failed to load an unserved helper. The subsequent
+HTTP import-graph regression catches that integration failure.
+
+Further private reference experiments retained the fixed limits: explicit early
+tangent increments moved the acceleration peak and failed; stronger local
+smoothing exceeded 15 degrees; world-rotation smoothing at 0.05 seconds still
+measured 13,388 degrees/s², and at 0.075 seconds required 17.35 degrees of local
+correction. A bounded world-acceleration optimization also exceeded the preset
+correction limit. These experimental corrections were not adopted. Evidence:
+`endpoint-increments-v1`, `strong-filter-v1`, `world-filter-v1` through `v3`.
+
+Distinct generation-attempt job identities and hash-verified raw/corrected
+duplicate detection now also have the b23e76d native evidence described above.
+No new backend, weights, dependency version or acceptance threshold was introduced.
+
+## 2026-10-07 authoring investigation (in progress)
+
+### Subsequent native review and dense quality falsification
+
+`native-review-9474cca/report.json` verifies actual visible Windows/WebView2
+three-candidate generation, unchanged accepted checkpoint, two real baked
+previews, source-aligned comparison and full-speed controls. It recorded no page
+errors. All three candidates failed quality. The 96.743-second click-to-review
+observation is one sample, not a performance percentile or acceptance/render pass.
+
+Later source experiments replaced repeated partial foot-orientation projection
+with fixed targets and added constrained endpoint/tangent smoothing. The fixed
+acceleration threshold was not loosened. `dense-quality-convergence.json` shows
+why a coarse pass is insufficient: the same repeated travelling-clip candidate
+measured 4,795 degrees/s² at 60 Hz, 6,778 at 240 Hz and 11,081 at 480 Hz. The
+reference also has large near-stitch peaks. The current v2 quality preset uses
+240 Hz by default, checks that the measured contact landmark itself is grounded,
+and still requires further convergence/visual evidence. It is not a physical
+feasibility certificate. Historical 60 Hz passes are not inherited.
+
+`final-tangent-reconcile-v2` reduced the corrected root acceleration enough to
+pass its dense gate with 4.83 mm maximum additional generated-root smoothing.
+Joint acceleration still failed at about 13,468 degrees/s². Native preservation
+and fresh reopening passed. The sequence runner now returns overall FAIL for
+failed kinematic quality, while retaining continuity and fresh-process results
+separately. Earlier runner PASS labels covered only their declared continuity
+scope. No quality-failed candidate has been accepted.
+
+`cleanup-comparison-240.json` evaluates identical reference inputs/bakes with the
+same validator: earlier cleanup measured 29,275 degrees/s² joint acceleration
+and 58.46 m/s² root acceleration; retained refinement measured 13,468 and 16.48,
+respectively. The joint gate still fails. An experimental clamped spline bake
+increased the peak slightly and was reverted. `stage4-checkpoint-offline.log`
+passes 797 tests (794 passed, 3 skipped) and installer checks;
+`stage4-checkpoint-node-r3.log` passes 390 launcher tests for this local stage.
+
+Restart unit tests cover an interrupted unpublished attempt, publication before
+launcher failure, preservation of the accepted scene and refusal to clear a live
+writer's lease. Their synthetic transport is not native fault-injection evidence.
+New queue/native/save/hash traces and camera focus are awaiting final native
+validation. In-progress portable checks passed 795 tests (792 passed, 3 skipped)
+plus installer checks, and 386 launcher tests, before subsequent refinements.
+
+Pinned code/weight license texts were inspected and copied by the updated setup
+helper into a new isolated evidence directory. Their exact hashes are retained
+in `setup-notices-proof.json`; code and weight terms remain distinct. See
+`THIRD_PARTY_NOTICES.md`. No private assets or model binaries were added to Git.
+
+### Later repair-loop evidence, following 91cb591
+
+The actual isolated Windows/WebView2 client generated three immutable model
+candidates in 91.606 seconds (`native-review-91cb591/report.json`, one observation,
+not a latency percentile). The accepted checkpoint remained unchanged. All three
+failed hard quality checks and the visible Accept controls were disabled.
+Comparison loaded its first baked candidate, then failed because initialization
+read the not-yet-selected second candidate. The source repair and a sequential
+viewer regression test pass; native comparison rerun remains outstanding.
+
+The v2 anatomical arm calibration reduced maximum reference correction from
+75.1 to 31.7 degrees. Short 3D support locks fixed the measured floating contact;
+bounded rotation filtering, reach-margin planning, and support/floor projection
+were tested as subsequent independent experiments. `bounded-refinement-v1`
+passes its seam, planted-contact, penetration, speed and correction gates but
+still FAILS acceleration (11,100.6 degrees/s² against 6,000). Longer-duration
+experiments also failed sliding/penetration/acceleration before the latest
+projection repair. These are retained failures, not supported quality coverage.
+No candidate from this repair loop has been accepted as good motion.
+
+`seam-convergence.json` separates an estimator defect from those real quality
+failures. On identical baked motion, the old second-order angular seam estimate
+was 142.27, 35.56, 8.93 and 2.23 degrees/s as h decreased from 1/384 to 1/3072 s.
+The cubic one-sided estimate at h=1/768 and 1/1536 s was below 0.56 degrees/s.
+The implementation now uses four samples on each side and a common rotational
+frame. The 5 degrees/s threshold is unchanged. The acceleration failure is not
+removed by this derivative correction.
+
+A v3 knee-plane calibration was also tested on a separate copied rig. Its real
+inference path refused excessive filtering (`anatomical-v3`,
+`MOTION_BRICKS_EXCESSIVE_FILTER`). V2 remains the default. V3 is an unaccepted
+experimental source capability, not an advertised runtime improvement.
+
+The client now has persisted bridge support intervals and explicit stationary
+root intent, draft undo, stale-request checks, explicit discard, and comparison
+repair. These source changes require the next complete native-client pass.
+Stage-three offline checks passed 792 tests (789 pass, 3 disclosed skips) and
+installer checks; the launcher passed 382 tests before the final additional
+discard/derivative regressions. This chronology does not transfer passes to a
+later source revision automatically.
+
+Isolated branch `feature/motionbricks-authoring-20261006`, foundation commit
+`90db942`, extends the combined #31/#30/visual-turn ancestry. Earlier entries
+remain historical evidence, not current acceptance of all quality gates.
+Private evidence root: `AssetDirector-MotionBricks-Authoring-20261006` under the
+operator's Documents directory. No private assets or model binaries are tracked.
+
+Verified in the current Windows Vulkan runtime: the configured DLL is the file
+actually loaded; SHA-256
+`e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7`.
+The pinned backend/GGML/weights remain unchanged. Same-setting raw repetitions
+were exact on this device. Changing the seed under argmax had no effect.
+Gumbel temperature 1 produced material differences, including after correction:
+two seed comparisons measured 7.14 and 7.24 degrees RMS interior local joint
+rotation difference. This demonstrates variation for the reference rig/pair,
+not naturalness, physical feasibility, or cross-device reproducibility.
+
+The expanded fixed quality preset falsified the older reference's overall
+acceptability despite passing endpoint seams: no qualifying measured stance in
+some outputs, excessive joint speed/acceleration, and about 75 degrees of maximum
+deterministic correction. Seeds 1234/7/42 and longer 1/1.5/2-second requests did
+not remove the large arm correction. These are mandatory quality FAILs.
+
+Investigation found a rest-calibration defect: independent shortest-arc segment
+alignments encoded a 76.24-degree, multi-axis elbow offset at rest, whereas G1
+has a hinge elbow. The new `g1-anatomical-frames-v2` uses the complete reviewed
+rest arm plane and the segment controlled by the final shoulder axis. A real
+reference run reduced maximum correction from 75.11 to 31.75 degrees and maximum
+joint speed from 1094 to 679 degrees/second while preserving round-trip, native
+channels, stitches and fresh reopening. Contact and acceleration gates STILL
+FAIL; the repair is not full acceptance. Straight/degenerate rest arms need
+explicit calibration rather than an invented bend plane. Legacy profiles remain
+readable for existing artifacts. New calibration changes the dependency hash.
+
+Implemented but not yet native-client-verified: separate immutable review
+checkpoints, stale-checked atomic acceptance, exact restore, persisted working
+requests, bounded three-seed alternatives, physical-time A/B viewing and restart
+reconciliation. Synthetic transport tests cover separation, failure, cancellation,
+corruption and acceptance idempotence; they do not substitute for visible native
+WebView2 journeys. See `motion-bricks-acceptance.json` for outstanding gates.
+
+## Earlier capability proof (2026-10-05)
+
 This is source evidence and a completed isolated CPU/Vulkan capability proof,
 not full neural-transition application acceptance. The user explicitly authorized local provider
 inference for this task. No installed runtime, user project, or original asset

@@ -303,7 +303,7 @@ def apply(options, job_id, before, *, execution=None):
                     if curve.data_path == 'delta_location':
                         slopes = [(inverse @ Vector((*join[key], 0)) / unit)[curve.array_index]
                                   for key in ('velocity_in', 'velocity_out')]
-                    motion_stitch_math.smooth_keys(curve, slopes, (join['start'], join['end']))
+                    motion_stitch_math.smooth_keys(curve, slopes, (join['start'], join['end']), continuous=join.get('provider')=='motion-bricks.cpp')
                     # Only the bridge owns interpolation. The incoming native
                     # path remains exactly linear with its authored velocity.
                     for key in curve.keyframe_points:

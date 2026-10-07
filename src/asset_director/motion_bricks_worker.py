@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import sys
 import time
-from .core import DirectorError, atomic_json, digest, load_json, require
+from .core import DirectorError, atomic_json, digest, file_hash, load_json, require
 from .motion_bricks_provider import (CONVENTIONS, GGML_REVISION, MAX_JSON, MODEL_REVISION, RESULT_SCHEMA,
     SOURCE_REVISION, boundary_masks, validate_config, validate_request, validate_result, validate_skeleton)
 
@@ -35,6 +35,8 @@ def _flat(value):
 
 class Native:
     def __init__(self, config):
+        require('bpy' not in sys.modules, 'MOTION_BRICKS_PROCESS_ISOLATION',
+                'The native model must run in standalone Python, never Blender Python')
         validate_config(config)
         self.config = config
         self.paths = contextlib.ExitStack()
@@ -46,6 +48,19 @@ class Native:
         except OSError as exc:
             self.paths.close()
             raise DirectorError("MOTION_BRICKS_MISSING_BINARY", f"Cannot load native library/dependencies: {exc}") from exc
+        loaded = Path(config['library']).resolve()
+        if os.name == 'nt':
+            kernel = c.WinDLL('kernel32', use_last_error=True)
+            kernel.GetModuleFileNameW.argtypes = [c.c_void_p, c.c_wchar_p, c.c_uint32]
+            kernel.GetModuleFileNameW.restype = c.c_uint32
+            buffer = c.create_unicode_buffer(32768)
+            length = kernel.GetModuleFileNameW(self.lib._handle, buffer, len(buffer))
+            require(0 < length < len(buffer), 'MOTION_BRICKS_INSTALL_IDENTITY', 'Cannot identify loaded DLL')
+            loaded = Path(buffer.value).resolve()
+            require(loaded == Path(config['library']).resolve(), 'MOTION_BRICKS_INSTALL_IDENTITY',
+                    'Windows loaded a different native library path')
+        self.loaded_library = {'path': str(loaded), 'sha256': file_hash(loaded),
+                               'observation': 'GetModuleFileNameW' if os.name == 'nt' else 'explicit CDLL path'}
         self.model = P()
         self._bind()
         require(self.lib.mb_abi_version() == 1, "MOTION_BRICKS_ABI", "Expected upstream ABI version 1")
@@ -126,7 +141,9 @@ class Native:
             self.call("mb_inference_request_set_mask", handle, 3, durations, 11)
             self.call("mb_inference_request_set_seed", handle, request["seed"])
             self.call("mb_inference_request_set_sampling_argmax", handle, int(request.get("argmax", False)))
+            inference_start = time.monotonic()
             self.call("mb_model_infer", self.model, handle, c.byref(motion))
+            inference_end = time.monotonic()
             frames, joints = U(), U()
             self.call("mb_motion_get_frame_count", motion, c.byref(frames))
             self.call("mb_motion_get_joint_count", motion, c.byref(joints))
@@ -146,7 +163,11 @@ class Native:
                 "request_hash": digest(request), "frames": frames.value, "conventions": dict(CONVENTIONS),
                 "target_placement": request.get("target_placement", "fixed"), "constraint_masks": masks,
                 "roots": roots, "local_xyzw": rotations, "seed": request["seed"], "argmax": request.get("argmax", False),
-                "timings": {"inference_seconds": time.monotonic() - started},
+                "loaded_library": self.loaded_library,
+                "timings": {"inference_seconds": inference_end-inference_start,
+                            "request_conversion_seconds": inference_start-started,
+                            "output_conversion_seconds": time.monotonic()-inference_end,
+                            "inference_request_seconds": time.monotonic()-started},
                 "acceptance": "CANDIDATE_REQUIRES_SEAM_AND_CONTACT_VALIDATION", "exact_boundary_pins": False}
             return validate_result(result, request)
         finally:
@@ -201,6 +222,7 @@ def main(argv=None):
         loading_seconds = time.monotonic() - started
         if payload.get("request") is None:
             result = {"status": "SUCCESS", "skeleton": native.skeleton(), "source_revision": SOURCE_REVISION,
+                      "loaded_library": native.loaded_library,
                       "ggml_revision": GGML_REVISION,
                       "model_revision": MODEL_REVISION, "timings": {"loading_seconds": loading_seconds}}
         else:

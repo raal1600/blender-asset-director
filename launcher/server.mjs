@@ -46,6 +46,8 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assets['/world-add-flow.mjs']='world-add-flow.mjs';
         assets['/workbench-world.css']='workbench-world.css';
         assets['/workbench-action.mjs']='workbench-action.mjs';
+        assets['/transition-review-view.mjs']='transition-review-view.mjs';
+        assets['/transition-comparison.mjs']='transition-comparison.mjs';
         assets['/action-inspection.mjs']='action-inspection.mjs';
         assets['/workbench-action.css']='workbench-action.css';
         for(const name of ['action-timeline-contract.mjs','action-timeline-draft.mjs','action-timeline-view.mjs','action-path-editor.mjs','action-selection.mjs','action-rotation-editor.mjs','action-turn-preview.mjs'])assets['/'+name]=name;
@@ -55,6 +57,7 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
         assets['/workbench-render.mjs']='workbench-render.mjs';
         assets['/workbench-film.mjs']='workbench-film.mjs';
         assets['/viewer-3d.mjs']='viewer-3d.mjs';
+        assets['/performer-framing.mjs']='performer-framing.mjs';
         assets['/workbench-preview-storage.mjs']='workbench-preview-storage.mjs';
         for(const name of ['world-draft.mjs','world-editor.mjs','shot-view.mjs'])assets['/'+name]=name;
         assets['/icon.svg']='icon.svg';
@@ -155,6 +158,10 @@ res.setHeader('X-Frame-Options','DENY'); res.setHeader('Content-Security-Policy'
             if(command==='world-prepare')return workbench.prepareWorld(id,sid,rev,body.request);
             if(command==='action-inspect')return workbench.inspectAction(id,sid,rev,body.request);
             if(command==='action-save')return workbench.saveAction(id,sid,rev,body.request);
+            if(command==='transition-request')return workbench.updateTransitionRequest(id,sid,rev,body.request);
+            if(command==='transition-discard')return workbench.discardTransitionRequest(id,sid,rev);
+            if(command==='transition-accept')return workbench.acceptTransition(id,sid,rev,body.request);
+            if(command==='transition-restore')return workbench.restoreTransition(id,sid,rev,body.request);
             if(command==='scene-layer-inspect')return workbench.inspectSceneLayer(id,sid,rev,body.request);
             if(command==='scene-layer-save')return workbench.saveSceneLayer(id,sid,rev,body.request);
             if(command==='source')return workbench.selectSource(id,sid,rev,body.sourceId,body.selected);

@@ -1,0 +1,715 @@
+{
+  "schema": "motion-bricks.acceptance-matrix.v1",
+  "date": "2026-10-07",
+  "phase": "SCOPED_LOCAL_ACCEPTANCE",
+  "completion": "VERIFIED_SUPPORTED_DOMAIN_WITH_RETAINED_CASE_FAILURES",
+  "evidence_root": "local:AssetDirector-MotionBricks-Authoring-20261006",
+  "rows": [
+    {
+      "id": "baseline-python",
+      "requirement": "Portable baseline regression",
+      "fixture": "cea64d0",
+      "expected_behavior": "Portable baseline regression",
+      "threshold_or_invariant": "782 tests / 779 passed / 3 disclosed environment skips; installer checks passed",
+      "command_or_journey": "python tools/run_checks.py --offline",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-offline-python.log",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "baseline-node",
+      "requirement": "Launcher baseline regression",
+      "fixture": "cea64d0",
+      "expected_behavior": "Launcher baseline regression",
+      "threshold_or_invariant": "375/375 passed",
+      "command_or_journey": "node --test (launcher)",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-node.log",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "runtime-pins",
+      "requirement": "Actual loaded DLL, model hashes and build settings",
+      "fixture": "Windows Vulkan",
+      "expected_behavior": "Actual loaded DLL, model hashes and build settings",
+      "threshold_or_invariant": "exact source/GGML/weights; loaded DLL path and content; recorded build settings",
+      "command_or_journey": "python <R>/run_final_profiles_v1.py; inspect per-call loaded_module/model hashes and retained build settings in stage1-provider/summary.json",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "stage1-provider/result.json; final-tangent-reconcile-v2/argmax-a/motion-bricks-clip_1-raw.json",
+      "known_limitations": "Actual loaded module path/hash and model files verified. Backend/build pins unchanged; no cross-device claim."
+    },
+    {
+      "id": "argmax-repeat",
+      "requirement": "Fixed-setting reproducibility",
+      "fixture": "canonical evaluated G1 contexts",
+      "expected_behavior": "Fixed-setting reproducibility",
+      "threshold_or_invariant": "exact raw arrays on this device",
+      "command_or_journey": "python <R>/early_sampling.py (fresh copy with a new output root; runs all ten named experiments)",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-sampling/report.json",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "argmax-seeds",
+      "requirement": "Argmax seed has no effect",
+      "fixture": "canonical contexts seeds 1234/7",
+      "expected_behavior": "Argmax seed has no effect",
+      "threshold_or_invariant": "identical arrays; no misleading seed control",
+      "command_or_journey": "python <R>/early_sampling.py (fresh copy with a new output root; runs all ten named experiments)",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-sampling/report.json",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "stochastic-raw",
+      "requirement": "Stochastic variation and repetition",
+      "fixture": "Gumbel seeds 1234/7/42",
+      "expected_behavior": "Stochastic variation and repetition",
+      "threshold_or_invariant": "material interior variation; fixed seed exact",
+      "command_or_journey": "python <R>/early_sampling.py (fresh copy with a new output root; runs all ten named experiments)",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-sampling/report.json",
+      "known_limitations": "Baseline scope only; raw/canonical/structural checks do not establish final client/contact/visual acceptance."
+    },
+    {
+      "id": "corrected-diversity",
+      "requirement": "Correction-surviving meaningful alternatives",
+      "fixture": "same pair, three seeds",
+      "expected_behavior": "Correction-surviving meaningful alternatives",
+      "threshold_or_invariant": "Material corrected variation; measured near duplicates identified and omitted from quality ranking; hard failures unranked",
+      "command_or_journey": "node <R>/native_ranked_5d4a7ba_v1.mjs; node <R>/native_lifecycle_5f1b8b8_v1.mjs; python <R>/analyze_soles_pipeline_final_v1.py",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-ranked-5d4a7ba-v1/report.json; native-lifecycle-5f1b8b8-v1/report.json; soles-pipeline-comparison-final-v1.json",
+      "known_limitations": "Two hard-valid stochastic alternatives differ 15.40 degrees RMS corrected world rotation. Fixed-setting four-clip repeats are flagged as near duplicates; same-device arrays repeat exactly. Raw/local and corrected/world RMS are not an attenuation ratio. Duplicate identification excludes them from useful-diversity and ranking claims, not from immutable history."
+    },
+    {
+      "id": "reference",
+      "requirement": "Reference native X→bridge→Y",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
+      "expected_behavior": "Real X → bridge → Y with preserved native intervals, fresh reopening and every fixed kinematic gate passing",
+      "threshold_or_invariant": "Continuity thresholds plus upright-grounded-kinematic-v2; quality failure cannot be counted as generation coverage",
+      "command_or_journey": "node <R>/native_ranked_5d4a7ba_v1.mjs; node <R>/native_render_ranked_5d4a7ba_v1.mjs; node <R>/native_playback_ranked_5d4a7ba_v1.mjs",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-ranked-5d4a7ba-v1/report.json; native-playback-ranked-5d4a7ba-v1/report.json; native-parity-ranked-5d4a7ba-v1/preview-parity.json",
+      "known_limitations": "Actual owned visible Windows/WebView2 host, real C ABI, Blender bake, two passing alternatives and one retained penetration failure. Explicit accept/restore/reopen; physical-time comparison. Native selected intervals are preserved. Controlled reviewed reference only; no human artistic or physical-feasibility claim."
+    },
+    {
+      "id": "unseen-pair",
+      "requirement": "Unseen compatible pair",
+      "fixture": "Adventurer idle→back baseline",
+      "expected_behavior": "Real X → bridge → Y with preserved native intervals, fresh reopening and every fixed kinematic gate passing",
+      "threshold_or_invariant": "Continuity thresholds plus upright-grounded-kinematic-v2; quality failure cannot be counted as generation coverage",
+      "command_or_journey": "python tools/run_motion_bricks_sequences.py --manifest <private-evidence>/four-clips-prepared-manifest-v1.json --case left-idle-12 --case idle-prepared-12 --case idle-prepared-24 --blender <Blender> --output <new-directory>",
+      "identities": {
+        "application": "0c804ca5827433996b379f32d05d260a7fa70fd0",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Actual Blender 5.2.1 LTS 9e2066aef7ef; isolated real Vulkan C ABI; DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "four-clips-0c804ca-v1/left-idle-12/RESULTS.json; four-clips-0c804ca-v1/idle-prepared-12/RESULTS.json; four-clips-0c804ca-v1/idle-prepared-24/RESULTS.json; additional-root-review-evidence-v1.json; additional-root-prepared-v1.json; soles-pipeline-final-v1/report.json; qualified-broader-5f1b8b8-v1/report.json; dense-final-quality-v1/report.json",
+      "known_limitations": "Three successful generations across two new Action pairs, including original idle and explicitly prepared derived walk. Original bone curves/actions preserved. Longer left-to-idle candidate fails sliding and remains failed. Headless kinematic/reopen coverage; whole-sequence native/visual review pending. Final source repeats the predeclared Beta center three times with exact motion parity. Seven of nine Beta interval pairs pass; two retained failures (22.2%) are not successful coverage. This is one unseen Action with different explicit intervals, not nine independent styles."
+    },
+    {
+      "id": "rename",
+      "requirement": "Name independence",
+      "fixture": "Full reference native intervals, baseline labels versus opaque 8291 / opaque 3512",
+      "expected_behavior": "Name independence",
+      "threshold_or_invariant": "Exactly equal C ABI request, raw and corrected numeric arrays and composition paths; hard quality, continuity, structural/evaluated preservation and fresh reopen pass",
+      "command_or_journey": "python tools/run_motion_bricks_sequences.py --manifest <evidence>/rename-manifest-v1.json --blender <Blender 5.2.1> --output <new-directory>",
+      "identities": {
+        "application": "3a95251c253af4ae1dbe09c985913c24d29ac919",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Clean isolated source; real Blender 5.2.1 and pinned Vulkan DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "rename-generation-v1/report.json; rename-generation-v1/rename-invariance.json",
+      "known_limitations": "One unchanged reference pair on the verified Windows/Vulkan device. No unseen-motion or cross-device claim. Renaming invalidates prior selection fingerprints and requires a fresh inspection."
+    },
+    {
+      "id": "independent-influence",
+      "requirement": "Independent source and target influence",
+      "fixture": "canonical contexts changed separately",
+      "expected_behavior": "Independent source and target influence",
+      "threshold_or_invariant": "each boundary changes output materially",
+      "command_or_journey": "python <private-evidence>/analyze_beta_grid_v1.py",
+      "identities": {
+        "application": "f30b389890b6bc11f62efce56e355d3a981d5431",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Actual Blender 5.2.1 LTS 9e2066aef7ef; isolated real Vulkan C ABI; DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-sampling/report.json; beta-boundary-grid-f30b389-v1/independent-influence.json; soles-pipeline-final-v1/report.json; qualified-broader-5f1b8b8-v1/report.json; dense-final-quality-v1/report.json",
+      "known_limitations": "Independent source and target interval changes produce raw differences of 2.93 to 12.12 degrees RMS from the predeclared center; corrected differences survive. Other-side local context rotations remain exactly unchanged. Source-relative target root placeholders may shift with source context. One unseen Action and a 0.1-second sampled context horizon. Final source repeats the predeclared Beta center three times with exact motion parity. Seven of nine Beta interval pairs pass; two retained failures (22.2%) are not successful coverage. This is one unseen Action with different explicit intervals, not nine independent styles."
+    },
+    {
+      "id": "placeholder",
+      "requirement": "Unconstrained target position invariance",
+      "fixture": "target placeholder shifted metres",
+      "expected_behavior": "Unconstrained target position invariance",
+      "threshold_or_invariant": "root ≤1e-5m and quaternion component ≤1e-5; no target-lock claim",
+      "command_or_journey": "python <R>/early_sampling.py (fresh copy with a new output root; runs all ten named experiments)",
+      "identities": {
+        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+      },
+      "status": "PASS",
+      "evidence_path": "baseline-sampling/report.json; stage1-provider/summary.json",
+      "known_limitations": "Raw output nearly invariant to unconstrained target XY placeholders; numerical tolerance recorded, not exact target locking."
+    },
+    {
+      "id": "second-rig",
+      "requirement": "Generalization beyond reference rig",
+      "fixture": "second independently calibrated humanoid",
+      "expected_behavior": "Generalization beyond reference rig",
+      "threshold_or_invariant": "successful generation and quality; rejection is not generation coverage",
+      "command_or_journey": "python tools/run_motion_bricks_sequences.py --manifest <private-evidence>/beta-boundary-grid-manifest-v1.json --blender <Blender> --output <new-directory>",
+      "identities": {
+        "application": "f30b389890b6bc11f62efce56e355d3a981d5431",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Actual Blender 5.2.1 LTS 9e2066aef7ef; isolated real Vulkan C ABI; DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "beta-boundary-grid-f30b389-v1/report.json; beta-boundary-grid-f30b389-v1/independent-influence.json; beta-boundary-grid-f30b389-v1/visual-center-v1/agent-visual-review.json; soles-pipeline-final-v1/report.json; qualified-broader-5f1b8b8-v1/report.json; dense-final-quality-v1/report.json",
+      "known_limitations": "Nine predeclared explicit trim pairs of one unseen Action on independently calibrated Beta: seven fixed-quality/preservation/reopen passes, two failures (45.233-degree correction; planted support height). Earlier failed full/other intervals retained. All 60 center diagnostic frames inspected; full-speed artistic review remains unverified. This is narrow second-rig coverage, not nine independent clips. Final source repeats the predeclared Beta center three times with exact motion parity. Seven of nine Beta interval pairs pass; two retained failures (22.2%) are not successful coverage. This is one unseen Action with different explicit intervals, not nine independent styles."
+    },
+    {
+      "id": "transforms-fps",
+      "requirement": "Supported transforms and FPS",
+      "fixture": "offset/scale/parent/24/30/60",
+      "expected_behavior": "Supported transforms and FPS",
+      "threshold_or_invariant": "fixed seam thresholds; preserved source clocks; no double root motion",
+      "command_or_journey": "python tools/run_motion_bricks_sequences.py --manifest <R>/broader-scenarios-manifest-v1.json --blender <blender.exe> --output <fresh-folder>; python <R>/run_parent_space_v2.py",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "broader-scenarios-5f1b8b8-v1/report.json; translated-parent-5f1b8b8-v2/report.json; scaled-parent-5f1b8b8-v2/report.json",
+      "known_limitations": "24/30/60 FPS, root offset, translated stable parent and compensated positive uniform parent scale pass. Rest-geometry-changing reparenting is refused; arbitrary transforms are not claimed. The unchanged broader suite retains three separate preparation failures."
+    },
+    {
+      "id": "trim-context",
+      "requirement": "Trim and context validation",
+      "fixture": "selected intervals and insufficient contexts",
+      "expected_behavior": "Trim and context validation",
+      "threshold_or_invariant": "four actual samples at 30 FPS, no wrap/extrapolation; refuse before inference",
+      "command_or_journey": "python tools/run_motion_bricks_sequences.py --manifest <R>/context-refusal-manifest-v1.json --blender <blender.exe> --output <fresh-folder>; python <R>/run_dense_final_quality_v1.py",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "context-refusal-5f1b8b8-v1/report.json; beta-boundary-grid-f30b389-v1/report.json; dense-final-quality-v1/report.json",
+      "known_limitations": "Both insufficient source and target contexts refuse before inference. Seven explicit Beta interval pairs pass; two fail fixed quality/support limits. Context spans 0.1 seconds on each side; no wrap, extrapolation or silent native trim."
+    },
+    {
+      "id": "input-contract",
+      "requirement": "Complete versioned dependency contract",
+      "fixture": "project/rig/actions/contacts/request",
+      "expected_behavior": "Complete versioned dependency contract",
+      "threshold_or_invariant": "stable identities, content and evaluation dependency fingerprint; stale invalidation",
+      "command_or_journey": "python tools/run_checks.py --offline; python <R>/run_parent_space_v2.py; node <R>/native_lifecycle_5f1b8b8_v1.mjs",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "translated-parent-5f1b8b8-v2/report.json; scaled-parent-5f1b8b8-v2/report.json; native-lifecycle-5f1b8b8-v1/report.json; boundary-kinematics-offline-v1.log",
+      "known_limitations": "Versioned evaluated dependency contract includes explicit world boundary position/heading/linear and angular velocity, timestamps, root owner, scene/rig/rest/Action-slot content, contacts, transforms, constraints, provider and timing identities. Native jobs verify real dependency invalidation. Detailed schema and derivative frames are in MOTION_BRICKS_INPUT_CONTRACT.md."
+    },
+    {
+      "id": "root-intent",
+      "requirement": "In-place intent and derived preparation",
+      "fixture": "unprepared in-place clip",
+      "expected_behavior": "In-place intent and derived preparation",
+      "threshold_or_invariant": "client explains ambiguity, persists reviewed intent, preserves originals",
+      "command_or_journey": "node <R>/native_multi_2cd8ed9_v1.mjs; python tools/run_motion_bricks_sequences.py --manifest <R>/qualified-broader-manifest-v1.json --blender <blender.exe> --output <fresh-folder>",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-multi-2cd8ed9-v1/report.json; qualified-broader-5f1b8b8-v1/report.json; broader-reconciliation-5f1b8b8-v1.json",
+      "known_limitations": "Ambiguity requires explicit reviewed intent or preparation. Reviewed derived root data preserve original Actions/bone curves; actual client imports, inspects and keeps the prepared checkpoint. Full prepared idle-walk and walk-idle requests pass. There is no full graphical root-preparation editor; names never determine travel."
+    },
+    {
+      "id": "contacts-client",
+      "requirement": "Accessible contact corrections",
+      "fixture": "client editable stance intervals",
+      "expected_behavior": "Accessible contact corrections",
+      "threshold_or_invariant": "persist provenance; demonstrated preparation/correction effect",
+      "command_or_journey": "node <R>/native_contact_5f1b8b8_v1.mjs",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-contact-5f1b8b8-v1/report.json",
+      "known_limitations": "Actual 0.16 to 0.08 second reviewed support edits reduce seed42 planted drift 31.09 to 5.68 mm with identical model request/raw arrays. Two refined candidates pass; one remains rejected. This is deterministic bridge refinement, not neural contact conditioning. Exact runtime source equivalence to final UI build is separately recorded."
+    },
+    {
+      "id": "boundary-domain",
+      "requirement": "Grounded eligibility",
+      "fixture": "planted/airborne/mixed contexts",
+      "expected_behavior": "Grounded eligibility",
+      "threshold_or_invariant": "genuine nonempty support or actionable pre-inference rejection",
+      "command_or_journey": "blender --background --factory-startup --disable-autoexec --python <R>/native_domain_refusals_v2.py; python tools/run_motion_bricks_sequences.py --manifest <R>/qualified-broader-manifest-v1.json --blender <blender.exe> --output <fresh-folder>",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-domain-refusals-5f1b8b8-v2/report.json; qualified-broader-5f1b8b8-v1/report.json",
+      "known_limitations": "Actual airborne and mixed target contexts refuse before provider artifacts; grounded positive fixtures retain nonempty planted evidence. Invalid anatomical mapping also refuses. Airborne contact metrics are not represented as zero-error passes."
+    },
+    {
+      "id": "hard-quality",
+      "requirement": "Hard constraints before ranking",
+      "fixture": "raw and corrected baked candidates",
+      "expected_behavior": "Hard constraints before ranking",
+      "threshold_or_invariant": "position ≤.001H; orientation ≤1deg; root velocity ≤.05H/s; angular velocity ≤5deg/s; drift ≤.01H; penetration ≤.005H",
+      "command_or_journey": "python <R>/run_dense_final_quality_v1.py; node <R>/native_ranked_5d4a7ba_v1.mjs; node <R>/native_contact_5f1b8b8_v1.mjs",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "dense-final-quality-v1/report.json; native-ranked-5d4a7ba-v1/report.json; beta-boundary-grid-f30b389-v1/report.json; native-contact-5f1b8b8-v1/report.json",
+      "known_limitations": "Fixed upright-grounded-kinematic-v2 limits; 240 Hz production and additional 480 Hz checks. All accepted four-clip joins and Beta center pass; excessive correction, penetration, support and sliding failures remain unranked/unaccepted. Dense kinematic gates and visual review are not physics certification."
+    },
+    {
+      "id": "correction-limits",
+      "requirement": "Bounded corrections and plausibility",
+      "fixture": "reviewed rig presets",
+      "expected_behavior": "Bounded corrections and plausibility",
+      "threshold_or_invariant": "preset acceleration/joint/excessive correction thresholds; retain failures",
+      "command_or_journey": "python <R>/run_dense_final_quality_v1.py; node <R>/native_ranked_5d4a7ba_v1.mjs; node <R>/native_contact_5f1b8b8_v1.mjs",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "dense-final-quality-v1/report.json; native-ranked-5d4a7ba-v1/report.json; beta-boundary-grid-f30b389-v1/report.json; native-contact-5f1b8b8-v1/report.json",
+      "known_limitations": "Fixed upright-grounded-kinematic-v2 limits; 240 Hz production and additional 480 Hz checks. All accepted four-clip joins and Beta center pass; excessive correction, penetration, support and sliding failures remain unranked/unaccepted. Dense kinematic gates and visual review are not physics certification."
+    },
+    {
+      "id": "native-preservation",
+      "requirement": "Structural and evaluated source preservation",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
+      "expected_behavior": "Structural and evaluated source preservation",
+      "threshold_or_invariant": "unchanged curves/timing/evaluated poses except explicit rigid placement",
+      "command_or_journey": "node <R>/native_multi_2cd8ed9_v1.mjs; node <R>/native_lifecycle_5f1b8b8_v1.mjs; node <R>/native_render_four_5f1b8b8_v1.mjs; python <R>/run_dense_final_quality_v1.py",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-multi-2cd8ed9-v1/report.json; native-lifecycle-5f1b8b8-v1/report.json; native-render-four-5f1b8b8-v1/report.json; dense-final-quality-v1/report.json",
+      "known_limitations": "walk_back-derived to walk_left-derived to native idle to reviewed derived walk; three real bridges, full selected native intervals and explicit composition placement. Original Actions/curves and source clocks preserved. Accepted scene/render has 176 frames, including scene-end padding; local seam gates are not arbitrary-length quality proof."
+    },
+    {
+      "id": "separation",
+      "requirement": "Accepted and candidate separation",
+      "fixture": "generation/failure/cancellation",
+      "expected_behavior": "Accepted and candidate separation",
+      "threshold_or_invariant": "accepted checkpoint remains usable until explicit acceptance",
+      "command_or_journey": "node <R>/native_lifecycle_5f1b8b8_v1.mjs; python <R>/run_provider_faults_v3.py; blender --background --factory-startup --disable-autoexec --python <R>/native_domain_refusals_v2.py",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-lifecycle-5f1b8b8-v1/report.json; provider-faults-5f1b8b8-v3/report.json; native-domain-refusals-5f1b8b8-v2/report.json",
+      "known_limitations": "Real stale completion, cancellation, owned provider crash, launcher restart, interrupted-output quarantine, corrupted unaccepted artifact, duplicate acceptance, unavailable model, reduced-budget refusal and invalid mapping. Prior accepted hash survives. Faults are safely bounded; no workstation destabilization. Earlier procedure failures remain retained."
+    },
+    {
+      "id": "acceptance",
+      "requirement": "Atomic fingerprint-checked acceptance",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
+      "expected_behavior": "Atomic fingerprint-checked acceptance",
+      "threshold_or_invariant": "verify current dependencies and artifact; idempotency; no stale overwrite",
+      "command_or_journey": "node <R>/native_ranked_5d4a7ba_v1.mjs; node <R>/native_render_ranked_5d4a7ba_v1.mjs; node <R>/native_playback_ranked_5d4a7ba_v1.mjs",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-ranked-5d4a7ba-v1/report.json; native-playback-ranked-5d4a7ba-v1/report.json; native-parity-ranked-5d4a7ba-v1/preview-parity.json",
+      "known_limitations": "Actual owned visible Windows/WebView2 host, real C ABI, Blender bake, two passing alternatives and one retained penetration failure. Explicit accept/restore/reopen; physical-time comparison. Native selected intervals are preserved. Controlled reviewed reference only; no human artistic or physical-feasibility claim."
+    },
+    {
+      "id": "history",
+      "requirement": "History and restore",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
+      "expected_behavior": "History and restore",
+      "threshold_or_invariant": "restore exact prior artifact without regeneration",
+      "command_or_journey": "node <R>/native_ranked_5d4a7ba_v1.mjs; node <R>/native_render_ranked_5d4a7ba_v1.mjs; node <R>/native_playback_ranked_5d4a7ba_v1.mjs",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-ranked-5d4a7ba-v1/report.json; native-playback-ranked-5d4a7ba-v1/report.json; native-parity-ranked-5d4a7ba-v1/preview-parity.json",
+      "known_limitations": "Actual owned visible Windows/WebView2 host, real C ABI, Blender bake, two passing alternatives and one retained penetration failure. Explicit accept/restore/reopen; physical-time comparison. Native selected intervals are preserved. Controlled reviewed reference only; no human artistic or physical-feasibility claim."
+    },
+    {
+      "id": "comparison",
+      "requirement": "Synchronized A/B",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
+      "expected_behavior": "Synchronized A/B",
+      "threshold_or_invariant": "align source stitch, actual speed, labeled target stitches, boundary scrub",
+      "command_or_journey": "node <R>/native_ranked_5d4a7ba_v1.mjs; node <R>/native_render_ranked_5d4a7ba_v1.mjs; node <R>/native_playback_ranked_5d4a7ba_v1.mjs",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-ranked-5d4a7ba-v1/report.json; native-playback-ranked-5d4a7ba-v1/report.json; native-parity-ranked-5d4a7ba-v1/preview-parity.json",
+      "known_limitations": "Actual owned visible Windows/WebView2 host, real C ABI, Blender bake, two passing alternatives and one retained penetration failure. Explicit accept/restore/reopen; physical-time comparison. Native selected intervals are preserved. Controlled reviewed reference only; no human artistic or physical-feasibility claim."
+    },
+    {
+      "id": "journey-a",
+      "requirement": "Generate compare accept save reopen render",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
+      "expected_behavior": "Generate compare accept save reopen render",
+      "threshold_or_invariant": "visible controls and real worker/model/Blender outputs",
+      "command_or_journey": "node <R>/native_ranked_5d4a7ba_v1.mjs; node <R>/native_render_ranked_5d4a7ba_v1.mjs; node <R>/native_playback_ranked_5d4a7ba_v1.mjs",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-ranked-5d4a7ba-v1/report.json; native-playback-ranked-5d4a7ba-v1/report.json; native-parity-ranked-5d4a7ba-v1/preview-parity.json",
+      "known_limitations": "Actual owned visible Windows/WebView2 host, real C ABI, Blender bake, two passing alternatives and one retained penetration failure. Explicit accept/restore/reopen; physical-time comparison. Native selected intervals are preserved. Controlled reviewed reference only; no human artistic or physical-feasibility claim."
+    },
+    {
+      "id": "journey-b",
+      "requirement": "Sliding correction and regeneration",
+      "fixture": "actual Windows WebView2 client",
+      "expected_behavior": "Sliding correction and regeneration",
+      "threshold_or_invariant": "measured and visually reviewed improvement",
+      "command_or_journey": "node <R>/native_contact_5f1b8b8_v1.mjs",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-contact-5f1b8b8-v1/report.json",
+      "known_limitations": "Actual 0.16 to 0.08 second reviewed support edits reduce seed42 planted drift 31.09 to 5.68 mm with identical model request/raw arrays. Two refined candidates pass; one remains rejected. This is deterministic bridge refinement, not neural contact conditioning. Exact runtime source equivalence to final UI build is separately recorded."
+    },
+    {
+      "id": "journey-c",
+      "requirement": "Change inputs during generation",
+      "fixture": "actual Windows WebView2 client",
+      "expected_behavior": "Change inputs during generation",
+      "threshold_or_invariant": "old result stale and cannot overwrite",
+      "command_or_journey": "node <R>/native_lifecycle_5f1b8b8_v1.mjs; python <R>/run_provider_faults_v3.py; blender --background --factory-startup --disable-autoexec --python <R>/native_domain_refusals_v2.py",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-lifecycle-5f1b8b8-v1/report.json; provider-faults-5f1b8b8-v3/report.json; native-domain-refusals-5f1b8b8-v2/report.json",
+      "known_limitations": "Real stale completion, cancellation, owned provider crash, launcher restart, interrupted-output quarantine, corrupted unaccepted artifact, duplicate acceptance, unavailable model, reduced-budget refusal and invalid mapping. Prior accepted hash survives. Faults are safely bounded; no workstation destabilization. Earlier procedure failures remain retained."
+    },
+    {
+      "id": "journey-d",
+      "requirement": "Cancel failure and restart",
+      "fixture": "actual Windows WebView2 client",
+      "expected_behavior": "Cancel failure and restart",
+      "threshold_or_invariant": "owned worker stopped; interrupted outputs quarantined; accepted survives",
+      "command_or_journey": "node <R>/native_lifecycle_5f1b8b8_v1.mjs; python <R>/run_provider_faults_v3.py; blender --background --factory-startup --disable-autoexec --python <R>/native_domain_refusals_v2.py; node <R>/native_cancellation_5d4a7ba_v2.mjs",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-lifecycle-5f1b8b8-v1/report.json; provider-faults-5f1b8b8-v3/report.json; native-domain-refusals-5f1b8b8-v2/report.json; native-cancellation-5d4a7ba-v2/report.json; native-cancellation-5d4a7ba-v1/exit-recovery.json",
+      "known_limitations": "Real stale completion, cancellation, owned provider crash, launcher restart, interrupted-output quarantine, corrupted unaccepted artifact, duplicate acceptance, unavailable model, reduced-budget refusal and invalid mapping. Prior accepted hash survives. Faults are safely bounded; no workstation destabilization. Earlier procedure failures remain retained. Final native cancellation repeated three times: median/max 0.782/0.790 s, actual process release and normal shutdown. The earlier harness shutdown timeout is retained with safe recovery, not counted as a clean pass."
+    },
+    {
+      "id": "journey-e",
+      "requirement": "Downstream reconciliation",
+      "fixture": "early edit in multi-clip sequence",
+      "expected_behavior": "Downstream reconciliation",
+      "threshold_or_invariant": "affected chain explained; old revision usable; explicit acceptance",
+      "command_or_journey": "node <R>/native_multi_2cd8ed9_v1.mjs; node <R>/native_lifecycle_5f1b8b8_v1.mjs",
+      "identities": {
+        "application": "2cd8ed9eea8961569e02ebf541bafca3b0fefc97",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-multi-2cd8ed9-v1/report.json; native-lifecycle-5f1b8b8-v1/report.json; runtime-scope-identity-5d4a7ba-v1.json",
+      "known_limitations": "Actual native prepared-checkpoint review, early join timing edit, named downstream chain, last/first-join physical A/B, full revision acceptance, exact restore/reopen. Native E ran at 2cd8ed9; final motion/persistence and unchanged reconciliation controls are separately regression-verified, not relabeled as a new E run."
+    },
+    {
+      "id": "four-clips",
+      "requirement": "Complete requested sequence",
+      "fixture": "back→left→idle→walk",
+      "expected_behavior": "Complete requested sequence",
+      "threshold_or_invariant": "three real joins; accumulated placement; full native intervals",
+      "command_or_journey": "node <R>/native_multi_2cd8ed9_v1.mjs; node <R>/native_lifecycle_5f1b8b8_v1.mjs; node <R>/native_render_four_5f1b8b8_v1.mjs; python <R>/run_dense_final_quality_v1.py",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-multi-2cd8ed9-v1/report.json; native-lifecycle-5f1b8b8-v1/report.json; native-render-four-5f1b8b8-v1/report.json; dense-final-quality-v1/report.json",
+      "known_limitations": "walk_back-derived to walk_left-derived to native idle to reviewed derived walk; three real bridges, full selected native intervals and explicit composition placement. Original Actions/curves and source clocks preserved. Accepted scene/render has 176 frames, including scene-end padding; local seam gates are not arbitrary-length quality proof."
+    },
+    {
+      "id": "broader-suite",
+      "requirement": "Existing broader scenarios on final code",
+      "fixture": "ten-case manifest",
+      "expected_behavior": "Existing broader scenarios on final code",
+      "threshold_or_invariant": "all cases rerun; no inherited historical passes",
+      "command_or_journey": "python tools/run_motion_bricks_sequences.py --manifest <R>/broader-scenarios-manifest-v1.json --blender <blender.exe> --output <fresh-folder>; python tools/run_motion_bricks_sequences.py --manifest <R>/qualified-broader-manifest-v1.json --blender <blender.exe> --output <fresh-folder>; python <R>/reconcile_broader_evidence_v1.py",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "broader-scenarios-5f1b8b8-v1/report.json; qualified-broader-5f1b8b8-v1/report.json; broader-reconciliation-5f1b8b8-v1.json",
+      "known_limitations": "PASS means the required unchanged-suite rerun and input-contract triage are complete, not that all legacy expectations pass. Original suite remains 7 PASS / 3 FAIL: unprepared idle-walk, walk-idle, walk-run need explicit root intent. New explicit reviewed preparation produces two full-interval generation passes and a genuine run-entry contact refusal. No rejection is counted as successful generation; original assertions and failures remain retained.",
+      "legacy_suite_status": "FAIL",
+      "legacy_case_counts": {
+        "PASS": 7,
+        "FAIL": 3
+      },
+      "prepared_followup_counts": {
+        "generation_PASS": 2,
+        "expected_contact_refusal_PASS": 1
+      }
+    },
+    {
+      "id": "faults",
+      "requirement": "Bounded failure paths",
+      "fixture": "crash/model/mapping/budget/corruption",
+      "expected_behavior": "Bounded failure paths",
+      "threshold_or_invariant": "actionable refusal; no accepted partial artifact; process release",
+      "command_or_journey": "node <R>/native_lifecycle_5f1b8b8_v1.mjs; python <R>/run_provider_faults_v3.py; blender --background --factory-startup --disable-autoexec --python <R>/native_domain_refusals_v2.py",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-lifecycle-5f1b8b8-v1/report.json; provider-faults-5f1b8b8-v3/report.json; native-domain-refusals-5f1b8b8-v2/report.json",
+      "known_limitations": "Real stale completion, cancellation, owned provider crash, launcher restart, interrupted-output quarantine, corrupted unaccepted artifact, duplicate acceptance, unavailable model, reduced-budget refusal and invalid mapping. Prior accepted hash survives. Faults are safely bounded; no workstation destabilization. Earlier procedure failures remain retained."
+    },
+    {
+      "id": "preview-render",
+      "requirement": "Saved baked identity parity",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
+      "expected_behavior": "Saved baked identity parity",
+      "threshold_or_invariant": "Exact accepted source SHA-256 for renderer/encoder; all sampled skin positions <=0.1 mm and joint orientations <=1 degree; fresh Blender reopening; 72 frame hashes match render and encoder receipts",
+      "command_or_journey": "python <R>/run_accepted_parity_ranked_5d4a7ba_v1.py; node <R>/native_playback_ranked_5d4a7ba_v1.mjs; python <R>/record_ranked_visual_v1.py; python <R>/record_native_four_visual_5f_v1.py; node <R>/beta_movie_playback_v1.mjs",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-parity-ranked-5d4a7ba-v1/preview-parity.json; native-render-ranked-5d4a7ba-v1/agent-visual-review.json; native-playback-ranked-5d4a7ba-v1/report.json; native-parity-four-5f1b8b8-v1/preview-parity.json; native-render-four-5f1b8b8-v1/agent-visual-review.json; beta-movie-playback-v1/report.json",
+      "known_limitations": "All 72 final reference and 176 current four-clip rendered frames inspected with complete body/feet visible. Exact native media IDs, source hashes and 1x playback verified. Maximum skin parity error 0.01183 mm; orientation 0.14951/0.16106 degrees. Beta all 60 frames inspected separately and auxiliary movie playback verified. Static agent inspection, automated temporal playback and absent human artistic approval are distinct."
+    },
+    {
+      "id": "visual",
+      "requirement": "All-frame and full-speed review",
+      "fixture": "Adventurer reviewed anatomical v2, full walk_back and walk_left derived native intervals",
+      "expected_behavior": "All-frame and full-speed review",
+      "threshold_or_invariant": "feet and full bridge visible; all frames inspected; human review separate",
+      "command_or_journey": "python <R>/run_accepted_parity_ranked_5d4a7ba_v1.py; node <R>/native_playback_ranked_5d4a7ba_v1.mjs; python <R>/record_ranked_visual_v1.py; python <R>/record_native_four_visual_5f_v1.py; node <R>/beta_movie_playback_v1.mjs",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "native-parity-ranked-5d4a7ba-v1/preview-parity.json; native-render-ranked-5d4a7ba-v1/agent-visual-review.json; native-playback-ranked-5d4a7ba-v1/report.json; native-parity-four-5f1b8b8-v1/preview-parity.json; native-render-four-5f1b8b8-v1/agent-visual-review.json; beta-movie-playback-v1/report.json",
+      "known_limitations": "All 72 final reference and 176 current four-clip rendered frames inspected with complete body/feet visible. Exact native media IDs, source hashes and 1x playback verified. Maximum skin parity error 0.01183 mm; orientation 0.14951/0.16106 degrees. Beta all 60 frames inspected separately and auxiliary movie playback verified. Static agent inspection, automated temporal playback and absent human artistic approval are distinct."
+    },
+    {
+      "id": "budgets",
+      "requirement": "Monitored resource limits",
+      "fixture": "RTX4070 Vulkan",
+      "expected_behavior": "Monitored resource limits",
+      "threshold_or_invariant": "whole ≤9216MiB; delta ≤8192; headroom ≥2048; host ≤2048; no silent fallback",
+      "command_or_journey": "python <R>/run_provider_faults_v3.py; python <R>/run_final_profiles_v1.py; python <R>/collect_final_native_timings_v1.py",
+      "identities": {
+        "application": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "provider-faults-5f1b8b8-v3/report.json; provider-profile-5f1b8b8-v1/report.json; final-native-timings-5f1b8b8-v1.json",
+      "known_limitations": "Real safely reduced-budget refusals and worker exit/recovery. Configured limits remain 9216 whole GPU / 8192 provider increase / 2048 headroom / 2048 host MiB. Final native host peaks 877.94-880.04 MiB, whole GPU 2964.62-3058.50 MiB. Whole-device interference and sampling gaps remain; these are monitored budgets, not allocator caps."
+    },
+    {
+      "id": "performance",
+      "requirement": "Whole-pipeline baseline/final benchmarks",
+      "fixture": "identical inputs, repeats",
+      "expected_behavior": "Whole-pipeline baseline/final benchmarks",
+      "threshold_or_invariant": "n/median/tail/max, stage trace, cancellation/release; inference distinct from review latency",
+      "command_or_journey": "python <R>/run_soles_pipeline_final_v1.py; python <R>/analyze_soles_pipeline_final_v1.py; python <R>/run_final_profiles_v1.py; node <R>/native_preview_benchmark_5f_v1.mjs; python <R>/collect_final_native_timings_v1.py; node <R>/native_cancellation_5d4a7ba_v2.mjs",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "soles-pipeline-comparison-final-v1.json; final-native-timings-5f1b8b8-v1.json; provider-profile-5f1b8b8-v1/report.json; native-preview-benchmark-5f1b8b8-v1/report.json; native-ranked-5d4a7ba-v1/report.json; native-cancellation-5d4a7ba-v2/report.json; native-cancellation-5d4a7ba-v1/exit-recovery.json",
+      "known_limitations": "Three identical complete requests per rig per revision (18 total) with exact motion parity; three loaded-model first calls and 87 warm calls; complete native single/batch jobs, ten actual preview exports, three fixed-source cached openings, cancellation and process release. Final UI-only changes have identical motion/persistence trees. OS cache was not forced cold; small samples are not p95 or latency guarantees. Final native cancellation repeated three times: median/max 0.782/0.790 s, actual process release and normal shutdown. The earlier harness shutdown timeout is retained with safe recovery, not counted as a clean pass."
+    },
+    {
+      "id": "final-regressions",
+      "requirement": "Delivered runnable source regressions",
+      "fixture": "final commit/candidate install",
+      "expected_behavior": "Delivered runnable source regressions",
+      "threshold_or_invariant": "Required local portable/launcher checks and real supported-domain runtime gates pass; retained negative/legacy expectations are reported separately",
+      "command_or_journey": "python tools/run_checks.py --offline; node --test (launcher); dated real-runtime procedures listed in the handoff",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "ranking-offline-v1.log; ranking-node-full-v2.log; runtime-scope-identity-5d4a7ba-v1.json; native-ranked-5d4a7ba-v1/report.json; native-contact-5f1b8b8-v1/report.json; native-lifecycle-5f1b8b8-v1/report.json; soles-pipeline-final-v1/report.json",
+      "known_limitations": "814 Python tests: 811 passed, three disclosed environment skips, installer checks pass; 409/409 launcher tests. Actual provider/Blender/native/media evidence is separate. Local-only checks, no remote CI claim. The unchanged legacy suite retains its explicitly reconciled three preparation failures."
+    },
+    {
+      "id": "handoff",
+      "requirement": "Evidence and licenses research handoff",
+      "fixture": "final build/code/evidence",
+      "expected_behavior": "Evidence and licenses research handoff",
+      "threshold_or_invariant": "exact pins, references, commands, hashes, limitations and hypotheses",
+      "command_or_journey": "Inspect docs/MOTION_BRICKS_RESEARCH_HANDOFF.md, docs/motion-bricks-acceptance.json, docs/motion-bricks-evidence-manifest.json and their hash-bound local evidence",
+      "identities": {
+        "application": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+        "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+        "build": "Verified isolated Windows/WebView2 candidate receipt; Vulkan pinned DLL e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7"
+      },
+      "status": "PASS",
+      "evidence_path": "runtime-scope-identity-5d4a7ba-v1.json; setup-notices-proof.json; final-evidence-queue-v1.json",
+      "known_limitations": "Exact source/build/provider identities, chronological failures, reproduction procedures, raw-versus-corrected observations, finite coverage/rejection rates, performance and separate licenses are documented. Later research is not launched; no arbitrary-motion, physical-feasibility or universal production claim."
+    }
+  ],
+  "capabilities": {
+    "verified_current_runtime": [
+      "Real isolated Vulkan C ABI on reviewed upright G1-mapped Adventurer and Beta rigs",
+      "Native interval preservation, immutable review and explicit atomic acceptance",
+      "Contact refinement, meaningful stochastic alternatives, hard-gated ranking and exact history",
+      "Native stale/cancel/crash/restart and accepted preview/render parity"
+    ],
+    "implemented_not_current_runtime_verified": [
+      "CPU performance and reproducibility",
+      "Every otherwise compatible constraint/driver combination",
+      "Cross-device numeric equivalence"
+    ],
+    "unsupported": [
+      "arbitrary rigs or arbitrary human motion",
+      "negative/nonuniform scale, changing parent spaces",
+      "terrain/jumps, airborne or unstable contact contexts",
+      "hard model endpoint/contact pins",
+      "generated heading overrides",
+      "text prompts, arbitrary trajectories, waypoints or precision knobs",
+      "game-engine real-time guarantees"
+    ],
+    "historical": [
+      "October 5 supplied workstation evidence is historical, not inherited acceptance",
+      "Earlier failed model/quality/client/procedure attempts remain retained in chronological audit"
+    ],
+    "blocked": []
+  },
+  "counts": {
+    "PASS": 40,
+    "FAIL": 0,
+    "BLOCKED": 0
+  },
+  "counts_scope": "Mandatory requirement/invariant rows under the explicit supported-domain contract; not a count of all attempted candidates or historical scenario assertions. Retained case failures are separately mandatory disclosure.",
+  "application_revision": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+  "motion_runtime_revision": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+  "retained_case_failures": {
+    "legacy_suite": {
+      "status": "FAIL",
+      "counts": {
+        "PASS": 7,
+        "FAIL": 3
+      },
+      "evidence": "broader-scenarios-5f1b8b8-v1/report.json",
+      "interpretation": "Three unprepared requests refuse under required root-intent policy; new explicit prepared requests tested separately."
+    },
+    "beta_predeclared_grid": {
+      "PASS": 7,
+      "FAIL": 2,
+      "failed_fraction": 0.2222222222222222,
+      "evidence": "beta-boundary-grid-f30b389-v1/report.json"
+    },
+    "final_reference_alternatives": {
+      "PASS": 2,
+      "FAIL": 1,
+      "evidence": "native-ranked-5d4a7ba-v1/report.json"
+    }
+  }
+}

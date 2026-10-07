@@ -1,0 +1,19 @@
+from pathlib import Path
+import sys,json,bpy
+r=Path(__file__).parent;repo=Path('<SOURCE_WORKTREE>');sys.path.insert(0,str(repo/'src'))
+from asset_director.motion_bricks_validation import evaluate
+from asset_director.core import file_hash,atomic_json
+out=r/'dense-final-quality-v1';out.mkdir(exist_ok=False);rows=[]
+native=json.loads((r/'native-lifecycle-5f1b8b8-v1/report.json').read_text(encoding='utf-8'));assert native['status'].startswith('PASS_NATIVE_');chosen=native['chosen']
+project=r/'Studio-review-5f1b8b8/Workspace/Projects/layered-acceptance-2026-10-02--09a67565';p=json.loads((project/'project.json').read_text(encoding='utf-8'));scene=next(s for s in p['workbench']['scenes'] if s['id']=='sc_a6212e34-cc33-4db7-90b1-4d9e837a049a');cp=next(c for c in scene['checkpoints'] if c['id']==chosen['checkpointId'])
+cases=[('native-four',project/cp['path'],chosen['sha256'],{'changes':[{'performer':'Rig','timeline':{'connections':chosen['transitions']}}]},chosen['validation'])]
+folder=r/'beta-boundary-grid-f30b389-v1/beta-source-7-target-4';assert folder.exists()
+report=json.loads((folder/'report.json').read_text(encoding='utf-8'));results=json.loads((folder/'RESULTS.json').read_text(encoding='utf-8'))
+cases.append(('beta-center',folder/'result.blend',results['result_sha256'],report,report['transition_validation']))
+for name,source,digest,report,baseline in cases:
+ assert file_hash(source)==digest;bpy.ops.wm.open_mainfile(filepath=str(source),load_ui=False,use_scripts=False)
+ actual=evaluate(report,sampling_hz=480);atomic_json(out/(name+'-480hz.json'),actual);assert file_hash(source)==digest
+ row={'fixture':name,'source_sha256':digest,'status':actual['status'],'native_motion_unchanged':True,'sample_hz':480,'baseline_hz':240,'joins':[{'clip_id':j['clip_id'],'status':j['status'],'failures':j['failures'],'metrics':j['metrics'],'baseline_metrics':next(b['metrics'] for b in baseline['joins'] if b['clip_id']==j['clip_id'])} for j in actual['joins']]};rows.append(row)
+ print(json.dumps({'fixture':name,'status':actual['status'],'failures':[j['failures'] for j in actual['joins']]}),flush=True)
+atomic_json(out/'report.json',{'status':'PASS' if all(v['status']=='PASS' for v in rows) else 'FAIL','application_commit':'5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e','scope':'unchanged fixed gates at twice production sampling density; no physical-feasibility or human-review claim','rows':rows})
+assert all(v['status']=='PASS' for v in rows),'Retained 480 Hz failures require repair'

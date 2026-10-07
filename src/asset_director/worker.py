@@ -1,6 +1,7 @@
 """Entry point for background Blender. This file is reviewed code, not asset content."""
 from pathlib import Path
 import sys
+from time import monotonic, time
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from asset_director.core import DirectorError, Library, atomic_json, file_hash, require, within, digest
@@ -34,6 +35,7 @@ def stage(target):
 
 
 def execute(job_path, *, live=False):
+    entered=monotonic()
     import bpy
     from asset_director import blender_ops as ops
     from asset_director import backend
@@ -45,6 +47,14 @@ def execute(job_path, *, live=False):
         require(actual == job_path, "INVALID_JOB", "Job must be inside its registered library")
         spec = job["specification"]; op = spec["operation"]; options = spec["options"]
         directory = job_path.parent
+        trace={'schema':'blender-job-trace-v1','native_job_id':job['id'],'operation':op,
+               'clock':'process monotonic; elapsed seconds from Python entry','events':[],
+               'launch_to_python_estimate_seconds':max(0.,time()-job['started_at']) if job.get('started_at') else None,
+               'startup_limitations':'Same-machine wall-clock estimate includes runner launch and initial job validation; not isolated Blender startup.'}
+        def mark(stage,**fields):
+            trace['events'].append({'stage':stage,'seconds':monotonic()-entered,**fields})
+            atomic_json(directory/'blender-trace.json',trace)
+        mark('job_validated')
         def resource_queue_check():
             from asset_director.jobs import _cancelled
             require(not _cancelled(job_path,job), 'JOB_CANCELLED', 'Job cancelled while waiting for local GPU resources')
@@ -58,6 +68,7 @@ def execute(job_path, *, live=False):
             bpy.context.preferences.filepaths.use_scripts_auto_execute = False
             if spec["inputs"]: ops.load_input(Path(spec["inputs"][0]["path"]))
             else: bpy.ops.wm.read_factory_settings(use_empty=True)
+            mark('input_scene_loaded')
             from asset_director import license_policy as lp
             import json
             embedded = json.loads(bpy.context.scene.get(lp.SCENE_KEY, '[]'))
@@ -118,8 +129,12 @@ def execute(job_path, *, live=False):
             elif op in {'action-audit', 'action-edit'}:
                 from asset_director import action_layer
                 from asset_director.jobs import _cancelled
+                def progress(value):
+                    atomic_json(directory/'motion-progress.json',dict(value,
+                        schema='motion-job-progress-v1',native_job_id=job['id'],observed_at=time()))
+                    mark('transition_progress',provider_stage=value.get('stage'),clip_id=value.get('clip_id'))
                 context = {'directory': directory, 'cancelled': lambda: _cancelled(job_path, job),
-                           'progress': lambda value: atomic_json(directory / 'motion-progress.json', value)}
+                           'progress': progress}
                 data = action_layer.apply(options, job['id'], execution=context) if op == 'action-edit' else action_layer.audit()
             elif op in {'scene-layer-audit', 'scene-layer-edit'}:
                 from asset_director import scene_layer
@@ -254,18 +269,23 @@ def execute(job_path, *, live=False):
                 scene.frame_end, _ = inclusive_scene_end(data["frame_range"][0], data["duration_seconds"], data["fps"])
                 data["scene_frame_range"] = [scene.frame_start, scene.frame_end]
             from asset_director.jobs import MUTATIONS
+            mark('operation_complete')
             if op in MUTATIONS:
                 dest = directory / "result.blend"
                 require(not any(Path(f["path"]).resolve() == dest for f in spec["inputs"]), "ORIGINAL_OVERWRITE", "Output must not be an original input")
                 if spec.get("license_grants"):
                     bpy.context.scene[lp.SCENE_KEY] = json.dumps(spec["license_grants"])
                 bpy.ops.wm.save_as_mainfile(filepath=str(dest), check_existing=False)
+                mark('checkpoint_saved')
                 if op == 'world-transform':
                     world_transform.verify_saved(data, dest)
                 if op == 'world-prepare':
                     world_prepare.verify_saved(data, dest)
                 if op == 'action-edit':
+                    progress({'stage':'fresh_reopen_quality_validation'})
                     action_layer.verify_saved(data, dest)
+                    progress({'stage':'quality_validation_complete'})
+                    mark('fresh_reopen_quality_validation_complete')
                 if op == 'scene-layer-edit':
                     scene_layer.verify_saved(data, dest)
                 lp.retain_derivation(lib, dest, spec.get("license_grants", []))
@@ -274,6 +294,8 @@ def execute(job_path, *, live=False):
         if op in {"transfer-plan", "sequence-plan"}:
             prefix = "tp_" if op == "transfer-plan" else "sq_"
             data["id"] = prefix + digest({k:v for k,v in data.items() if k != "id"})
+        mark('result_ready')
+        if op=='action-edit':data['worker_trace']=trace
         summary = {"operation": op, "blender_version": bpy.app.version_string, "clips": len(data.get("clips", [])), "visual_acceptance": "PENDING"}
         atomic_json(directory / "result.json", {"status": "OK", "job_id": job["id"], "summary": summary, "data": data})
         return summary

@@ -1,0 +1,27 @@
+"""Read-only fresh Blender samples of the actual accepted native-client artifact."""
+import bpy,sys,json,math,hashlib
+from pathlib import Path
+root=Path(__file__).parent;report_path=Path(sys.argv[sys.argv.index('--')+1]);client=json.loads(report_path.read_text(encoding='utf-8'))
+studio=root/('Studio-review-'+client['commit'][:7]);project=studio/'Workspace/Projects/layered-acceptance-2026-10-02--09a67565'
+manifest=json.loads((project/'project.json').read_text(encoding='utf-8'));scene_record=next(s for s in manifest['workbench']['scenes'] if s['id']=='sc_a6212e34-cc33-4db7-90b1-4d9e837a049a')
+cp=next(c for c in scene_record['checkpoints'] if c['id']==client['chosen']['checkpointId']);source=project/cp['path']
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+assert sha(source)==client['chosen']['sha256']==cp['sha256']
+bpy.ops.wm.open_mainfile(filepath=str(source),load_ui=False,use_scripts=False)
+rig=bpy.data.objects['Rig'];scene=bpy.context.scene;fps=scene.render.fps/scene.render.fps_base
+timeline=json.loads(rig['bad_action_timeline_v1']);edges=[v for j in timeline['connections'] for v in (j['start'],j['end'])]
+meshes=[o for o in scene.objects if o.type=='MESH' and any(m.type=='ARMATURE' and m.object==rig for m in o.modifiers)]
+assert meshes and len(rig.pose.bones)>30
+times=sorted(set(list(range(scene.frame_start,scene.frame_end+1))+[edge+off for edge in edges for off in (-1,-.25,-.125,0,.125,.25,1)]))
+samples=[]
+for f in times:
+ scene.frame_set(math.floor(f),subframe=f%1);bpy.context.view_layer.update();dg=bpy.context.evaluated_depsgraph_get();er=rig.evaluated_get(dg)
+ joints={pb.name:{'p':list((er.matrix_world@pb.matrix).translation),'q':list((er.matrix_world@pb.matrix).to_quaternion())} for pb in er.pose.bones}
+ skins={}
+ for mesh in meshes:
+  em=mesh.evaluated_get(dg);skins[mesh.name]=[list(em.matrix_world@v.co) for v in em.data.vertices]
+ samples.append({'frame':f,'joints':joints,'meshes':skins})
+assert sha(source)==cp['sha256']
+out={'schema':'accepted-native-parity.v1','commit':client['commit'],'source_sha256':cp['sha256'],'checkpoint_id':cp['id'],'rig':rig.name,'meshes':[m.name for m in meshes],'fps':fps,'frame_range':[scene.frame_start,scene.frame_end],'boundaries':edges,'samples':samples,'source_unchanged':True}
+(report_path.parent/'native-parity.json').write_text(json.dumps(out,separators=(',',':')))
+print(json.dumps({'status':'SAMPLED','source_sha256':cp['sha256'],'samples':len(samples),'bones':len(joints),'meshes':out['meshes']}))

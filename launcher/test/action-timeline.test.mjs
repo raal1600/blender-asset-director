@@ -1,9 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {timelineDraft,suggestedPath} from '../public/action-timeline-draft.mjs';
-import {validateTimeline,timelineTiming} from '../public/action-timeline-contract.mjs';
+import {validateTimeline,timelineTiming,generatedDurationPlan} from '../public/action-timeline-contract.mjs';
 const take='take_'+'a'.repeat(64),other='take_'+'b'.repeat(64);
 const cp={id:'cp_saved',sha256:'a'.repeat(64)},run={id:'run_saved',inspection:{sha256:'b'.repeat(64),frame_range:[1,250],fps:24,reference_frame:1,performers:['One','Two'].map((name,i)=>({name,takes:[{id:i?other:take,action:'Native',range:[1,25],travel_blocker:null}],timeline:{version:'action-timeline-v1',clips:[],origin_m:[0,0,0],meters_per_unit:1}}))}};
+
+test('working dependency chain starts at the changed join and survives undo correctly',()=>{
+ const saved=structuredClone(run),p=saved.inspection.performers[0];
+ Object.assign(p.timeline,{stitch_version:'native-stitch-v1',edit_version:'native-motion-edit-v1',motion_bricks:{status:'CONFIGURED',profile_sha256:'c'.repeat(64)}});
+ Object.assign(p.takes[0],{stitch_blocker:null,stitch_channels:'d'.repeat(64),heading_blocker:null});
+ p.timeline.clips=[0,1,2,3].map(i=>({id:'clip_'+i,take_id:take,start:1+i*37,frames:25,speed:1,travel:null,repeat_reviewed:false,...(i?{transition:{frames:12,mode:'generated',seed:1234,match_phase:false,profile_sha256:'c'.repeat(64)}}:{})}));
+ const d=timelineDraft(cp,saved);assert.deepEqual(d.dependencyImpact,[]);
+ d.select('One','clip_2','transition');d.edit('transition_frames','16');
+ assert.deepEqual(d.dependencyImpact[0].joins.map(j=>j.clipId),['clip_2','clip_3']);
+ assert.deepEqual(d.dependencyImpact[0].joins.map(j=>j.targetFrame),[79,116]);
+ d.undo();assert.deepEqual(d.dependencyImpact,[]);
+ d.select('One','clip_1','transition');d.edit('contact_source_seconds','.1');
+ assert.deepEqual(d.dependencyImpact[0].joins.map(j=>j.clipId),['clip_1','clip_2','clip_3']);
+ d.discard();assert.deepEqual(d.dependencyImpact,[]);
+ assert.equal(saved.inspection.performers[0].timeline.clips[2].transition.frames,12);
+});
+test('generated durations use exact model windows and bounded bridge-only retiming',()=>{
+ for(let n=24;n<=64;n+=4){const p=generatedDurationPlan((n-7)/30);assert.equal(p.model_frames,n);assert.equal(p.generated_retime_ratio,1);}
+ for(const value of [NaN,Infinity,true,0,.4816,2.18501])assert.throws(()=>generatedDurationPlan(value));
+ assert.equal(generatedDurationPlan(2.185).model_frames,64);
+});
 test('travel derives occupancy; append starts after the inclusive last frame',()=>{
  const d=timelineDraft(cp,run);d.add(take,'clip_one');d.edit('travel',true);assert(d.invalid);d.edit('distance','5');d.edit('pace','2.5');assert(d.invalid);d.edit('repeat_reviewed',true);assert(!d.invalid);
  assert.equal(d.selectedClip.frames,49);assert.equal(d.nextFrame(),50);assert.deepEqual(d.arrow().delta_m.map(v=>Math.round(v)),[0,5]);
@@ -25,8 +46,8 @@ test('wire bounds, overlap, cross-take and unreviewed repeat refuse',()=>{
  assert.throws(()=>timelineTiming({...c,frames:60},run.inspection.performers[0].takes[0]),/repeatable/);
  for(const patch of [{frames:NaN},{speed:Infinity},{start:1.2},{repeat_reviewed:1},{travel:{delta_m:[0,0],meters_per_cycle:1}}])assert.throws(()=>validateTimeline({performer:'One',mode:'timeline',clips:[{...c,...patch}]}));
 });
-test('label hints are editable suggestions; drag is one undo group and pace reuses an authored cycle',()=>{
- assert.deepEqual(suggestedPath('walk_back'),[0,-1]);assert.deepEqual(suggestedPath('walk:right'),[1,0]);assert.deepEqual(suggestedPath('walk left'),[-1,0]);
+test('renaming cannot change the manual world-axis default; drag is one undo group',()=>{
+ for(const name of ['walk_back','walk:right','walk left','opaque 8291','idle'])assert.deepEqual(suggestedPath(name),[0,1]);
  const d=timelineDraft(cp,run);d.add(take,'clip_one');d.edit('travel',true);d.edit('pace','2.5');const before=d.selectedClip;d.finishEdit();d.moveEndpoint([2,3]);d.moveEndpoint([3,4]);d.finishEdit();d.undo();assert.deepEqual(d.selectedClip,before);
  d.add(take,'clip_two');d.edit('travel',true);assert.equal(d.selectedClip.travel.meters_per_cycle,2.5);
 });
@@ -73,6 +94,28 @@ test('generated repositioning binds the rig and seed and keeps original clip bou
  assert.throws(()=>d.edit('match_phase',true),/native opening/);
  const generated=d.request('run_generated');validateTimeline(generated.changes[0]);
  const saved=structuredClone(inspected);saved.inspection.performers[0].timeline.clips=d.clips('One');const reopened=timelineDraft(cp,saved);reopened.select('One','clip_second');assert.deepEqual(reopened.selectedClip.transition,d.selectedClip.transition);
+ assert(reopened.hasGeneratedTransitions);assert(!reopened.dirty);
+ reopened.setSamplingPlan([1234,7,42]);const repeated=reopened.request('run_repeated');
+ assert.equal(repeated.changes.length,1);assert.equal(repeated.changes[0].clips.length,2);
+ const sampled=structuredClone(saved);sampled.inspection.performers[0].timeline.clips=repeated.changes[0].clips;
+ const same=timelineDraft(cp,sampled);assert(!same.dirty);same.setSamplingPlan([1234,7,42]);
+ assert.deepEqual(same.request('run_identical').changes[0].clips,sampled.inspection.performers[0].timeline.clips);
+ same.undo();assert(!same.dirty);assert(same.hasGeneratedTransitions);
  d.edit('transition_mode','blend');assert.equal(d.selectedClip.transition.seed,undefined);assert.equal(d.selectedClip.transition.profile_sha256,undefined);
  const bad=structuredClone(generated.changes[0]);bad.clips[1].transition.seed=NaN;assert.throws(()=>validateTimeline(bad));
+});
+
+test('reviewed contacts and sampling survive undo/reopen while selection leaves dependencies unchanged',()=>{
+ const inspected=structuredClone(run),p=inspected.inspection.performers[0];
+ Object.assign(p.timeline,{stitch_version:'native-stitch-v1',edit_version:'native-motion-edit-v1',motion_bricks:{status:'CONFIGURED',profile_sha256:'c'.repeat(64)}});
+ Object.assign(p.takes[0],{stitch_blocker:null,stitch_channels:'d'.repeat(64),heading_blocker:null});
+ const d=timelineDraft(cp,inspected);d.add(take,'clip_a');d.add(take,'clip_b');d.edit('transition_mode','generated');d.finishEdit();
+ const key=d.dependencyKey;d.select('One','clip_b','transition');assert.equal(d.dependencyKey,key);
+ d.edit('contact_source_support','right');d.finishEdit();d.edit('contact_source_seconds','.12');d.finishEdit();
+ d.setSamplingPlan([1234,7,42]);const request=d.request('run_review');
+ assert.equal(request.changes[0].clips[1].transition.contacts.source.seconds,.12);validateTimeline(request.changes[0]);
+ const reopened=timelineDraft(cp,inspected);reopened.restoreRequest(request);assert.deepEqual(reopened.request('run_new').sampling_plan,request.sampling_plan);
+ d.undo();assert.equal(d.request('run_no_batch').sampling_plan,undefined);assert.equal(d.input('contact_source_seconds'),.12);
+ d.edit('contact_source_seconds','');assert(d.invalid);assert.throws(()=>d.request('run_invalid'));
+ d.discard();assert(!d.dirty);d.add(take,'clip_new');assert.equal(d.request('run_clean').sampling_plan,undefined);
 });

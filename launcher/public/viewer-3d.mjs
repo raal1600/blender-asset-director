@@ -1,5 +1,6 @@
 /** Local WebGL inspection. No project writes and no connection to live Blender. */
 import {shotFrame,shotViewport,sampledCamera} from './shot-view.mjs';
+import {performerMeshes} from './performer-framing.mjs';
 export function viewerPlaceholder() {
   return '<section class="viewer-3d" data-viewer-host aria-label="Interactive 3D preview"><div class="viewer-message"><strong>Explore in 3D</strong><p>Orbit, zoom and pan the actual saved geometry. World focuses on arrangement; Action exposes motion.</p><p class="muted">Read-only inspection, not a final render or a live link to Blender.</p></div></section>';
 }
@@ -35,9 +36,9 @@ export function previewFailure(error) {
   return {title:'3D preview unavailable',message:textures?'This asset exceeds the in-app texture conversion limits. You can inspect the full-resolution asset in Blender.':'Director could not prepare this in-app preview. You can inspect the asset separately in Blender.',detail};
 }
 
-export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,actionEdit,release}) {
+export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,actionEdit,release,focusPerformer}) {
   let actionPath=null,actionRotation=null;
-  let seekActionFrame=null;
+  let seekActionFrame=null,resetCamera=null;
   let disposed=false,renderer,controls,world,mixer,editor,frame=0,observer,model,action,playing=false,last=0,dirty=true,resize,loadedScenes=[],playback=null;
   let shotView=null,shotTime=0,shotFixed=true,staticFrame=null;
   const abort=new AbortController(),cleanups=[];
@@ -72,7 +73,10 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,a
       const key=new THREE.DirectionalLight(0xffffff,3);key.position.set(3,5,4);world.add(key);
       const fill=new THREE.DirectionalLight(0xbed6ff,2);fill.position.set(-3,2,-2);world.add(fill);
       model.updateMatrixWorld(true);
-      const box=new THREE.Box3().setFromObject(model,true),center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
+      const focusedMeshes=performerMeshes(gltf,focusPerformer);
+      host.dataset.framing=focusedMeshes.length?'performer':'scene';
+      const bounds=box=>{box.makeEmpty();if(focusedMeshes.length){for(const mesh of focusedMeshes)box.expandByObject(mesh,true);}else box.setFromObject(model,true);return box;};
+      const box=bounds(new THREE.Box3()),center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
       let radius=Math.max(size.length()/2,0.01);if(!Number.isFinite(radius)||radius>1e9)throw Error('Invalid model dimensions.');
       const camera=new THREE.PerspectiveCamera(40,1,Math.max(radius/10000,.00001),radius*1000);
       shotView=record.shotView;const shotRig=shotView?sampledCamera(THREE,shotView):null;
@@ -92,7 +96,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,a
       const reset=()=>{
         // Fit the evaluated pose, not the bind pose cached before animation.
         model.updateMatrixWorld(true);model.traverse(o=>o.skeleton?.update());
-        box.setFromObject(model,true);
+        bounds(box);
         if(!shotRig)for(const point of actionPathPoints(actionEdit?.getDraft?.()?.arrow?.()))box.expandByPoint(new THREE.Vector3(...point));
         box.getCenter(center);box.getSize(size);radius=Math.max(size.length()/2,.01);
         if(!Number.isFinite(radius)||radius>1e9)throw Error('Invalid animated dimensions.');
@@ -105,6 +109,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,a
       reset();resize=()=>{if(disposed)return;const width=surface.clientWidth,height=surface.clientHeight;if(width>0&&height>0){renderer.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();actionPath?.update();actionRotation?.update();dirty=true;}};
       observer=new ResizeObserver(resize);observer.observe(surface);resize();
       const resetView=()=>{if(shotRig)shotMode(true);else reset();};
+      resetCamera=resetView;
       listen(node('reset'),'click',resetView);listen(canvas,'keydown',e=>{if(e.key.toLowerCase()==='f'){e.preventDefault();resetView();}});
       listen(node('grid'),'click',()=>{grid.visible=!grid.visible;node('grid').setAttribute('aria-pressed',String(grid.visible));dirty=true;});
       listen(node('wire'),'click',()=>{const on=node('wire').getAttribute('aria-pressed')!=='true';node('wire').setAttribute('aria-pressed',String(on));model.traverse(o=>{for(const m of Array.isArray(o.material)?o.material:o.material?[o.material]:[])if('wireframe' in m)m.wireframe=on;});dirty=true;});
@@ -118,10 +123,10 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,a
       const select=()=>{mixer.stopAllAction();playing=false;node('play').textContent='Play';const clip=takes[Number(node('take').value)],staticPose=clip.duration===0;action=mixer.clipAction(clip);action.reset().setLoop(staticPose||shotRig?THREE.LoopOnce:THREE.LoopRepeat,Infinity);action.clampWhenFinished=staticPose||!!shotRig;action.play();mixer.update(0);node('time').max=String(clip.duration);node('play').disabled=staticPose;node('time').disabled=staticPose;clock();reset();dirty=true;};
       if(takes.length)select();else{host.querySelector('.viewer-animation').hidden=true;}
       const seekNote=document.createElement('p');seekNote.className='viewer-seek-note';seekNote.dataset.viewSeekNote='';seekNote.hidden=true;surface.after(seekNote);
-      seekActionFrame=(value,turnTarget=false)=>{
+      seekActionFrame=(value,turnTarget=false,exact=false)=>{
         if(!playback||shotView||(!action&&!playback.static)||!Number.isFinite(value))return;
         if(!turnTarget)actionRotation?.clear();playing=false;node('play').textContent='Play';
-        const requested=Math.round(value),actual=Math.max(playback.start,Math.min(playback.end,requested));
+        const requested=exact?value:Math.round(value),actual=Math.max(playback.start,Math.min(playback.end,requested));
         if(action){action.setLoop(THREE.LoopOnce,1);action.clampWhenFinished=true;action.paused=false;action.enabled=true;action.time=(actual-playback.start)/playback.fps;mixer.update(0);}else staticFrame=actual;
         clock();seekNote.hidden=requested===actual&&!playback.static;
         seekNote.textContent=playback.static?'Static saved pose at frame '+actual+'. Save changes to preview this animation.':'Draft starts at frame '+requested+'; saved playback covers '+playback.start+'–'+playback.end+'. Showing saved frame '+actual+'. Save changes to preview the new timing.';
@@ -181,7 +186,7 @@ export function openViewer({host,prepare,fetchModel,inspectInBlender,worldEdit,a
       const details=document.createElement('details'),summary=document.createElement('summary'),reason=document.createElement('p');summary.textContent='Technical details';reason.textContent=failure.detail;details.append(summary,reason);box.append(details);host.append(box);host.dataset.viewerState='failed';
     }
   })();
-  return {dispose,ready,seekFrame:value=>seekActionFrame?.(value),updateActionPath:()=>{actionPath?.update();actionRotation?.update();},get dirty(){return !!editor?.dirty;},get draft(){return editor?.state;},
+  return {dispose,ready,framePerformer:()=>resetCamera?.(),seekFrame:value=>seekActionFrame?.(value),seekFrameExact:value=>seekActionFrame?.(value,false,true),updateActionPath:()=>{actionPath?.update();actionRotation?.update();},get dirty(){return !!editor?.dirty;},get draft(){return editor?.state;},
     get currentFrame(){return shotView?shotFrame(shotView,shotTime):playback?.static?staticFrame:playback?Math.min(playback.end,Math.round(playback.start+(action?.time||0)*playback.fps)):null;},
     request:id=>{if(!editor)throw Error('This saved scene needs placement preparation in Blender.');return editor.request(id);},
     targets:()=>editor?.targets()||[],undo:()=>editor?.undo(),discard:()=>editor?.discard(),setEnabled:value=>editor?.setEnabled(value)};

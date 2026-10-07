@@ -31,6 +31,11 @@ def result(value):
 
 
 class MotionBricksContractTests(unittest.TestCase):
+    def test_native_library_refuses_blender_process_before_loading(self):
+        from asset_director.motion_bricks_worker import Native
+        with patch.dict('sys.modules', {'bpy': object()}):
+            self.fails('MOTION_BRICKS_PROCESS_ISOLATION', Native, {})
+
     def fails(self, code, function, *args):
         with self.assertRaises(DirectorError) as error:
             function(*args)

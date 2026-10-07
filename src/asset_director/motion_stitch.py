@@ -326,7 +326,7 @@ def bake(obj, plan, job_id, clip_id):
                         av, bv = coordinates(backward), coordinates(forward)
                         slope = (bv[component]-av[component])/(2*h)
             slopes.append(slope)
-        sm.smooth_keys(curve, slopes)
+        sm.smooth_keys(curve, slopes, continuous=plan.get('provider')=='motion-bricks.cpp')
     slot = getattr(ad, 'action_slot', None); ad.action = None
     track = add_strip(obj, action, slot, action.name, plan['start'], [plan['start'], plan['end']], 1)
     track.strips[0].extrapolation = 'NOTHING'

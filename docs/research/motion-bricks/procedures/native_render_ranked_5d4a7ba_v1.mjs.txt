@@ -1,0 +1,88 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {spawn,execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {pathToFileURL} from 'node:url';
+import net from 'node:net';
+const exec=promisify(execFile),root=String.raw`<PRIVATE_EVIDENCE_ROOT>`,historical=String.raw`<PRIVATE_BASELINE_ROOT>`;
+const studio=path.join(root,'Studio-review-5d4a7ba'),repo=String.raw`<SOURCE_WORKTREE>`,out=path.join(root,'native-render-ranked-5d4a7ba-v1');
+await fs.mkdir(out);
+const {json,fileHash,writeJson}=await import(pathToFileURL(path.join(studio,'SystemRuntime/Launcher/lib/storage.mjs')));
+const {Store}=await import(pathToFileURL(path.join(studio,'SystemRuntime/Launcher/lib/projects.mjs')));
+const {createApp}=await import(pathToFileURL(path.join(studio,'SystemRuntime/Launcher/server.mjs')));
+const config=await json(path.join(studio,'SystemRuntime/UserData/Launcher/config.json')),provenance=await json(path.join(historical,'PROVENANCE.json'));
+const store=new Store(studio),report={commit:'5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c',scope:'ACTUAL_VISIBLE_WINDOWS_WEBVIEW2_GENERATION_AND_REVIEW',status:'FAIL',errors:[],human_review:'NOT_CLAIMED'};
+let app,proc,browser,page,session,log;
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+async function wait(fn,label,ms=240000){const until=Date.now()+ms;while(Date.now()<until){const value=await fn();if(value)return value;await delay(250);}throw Error('Timed out: '+label);}
+async function state(){return store.get(provenance.source_project_id);}
+async function snap(label){await fs.writeFile(path.join(out,label+'.txt'),await page.locator('body').ariaSnapshot());await page.screenshot({path:path.join(out,label+'.png'),fullPage:true});}
+let bootCount=0;report.boots=[];
+async function boot(p){const previousBackend=report.native?.backend_pid;
+ const port=await new Promise(resolve=>{const probe=net.createServer();probe.listen(0,'127.0.0.1',()=>{const port=probe.address().port;probe.close(()=>resolve(port));});});
+ const exe=path.join(studio,'SystemRuntime/Launcher/Asset Director.exe');report.exe=await fileHash(exe);
+ log=await fs.open(path.join(out,'native-host-'+(++bootCount)+'.log'),'wx');
+ proc=spawn(exe,[],{cwd:path.dirname(exe),windowsHide:false,stdio:['ignore',log.fd,log.fd],env:{...process.env,WEBVIEW2_USER_DATA_FOLDER:path.join(studio,'SystemRuntime/UserData/Launcher/WebView2'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:'--remote-debugging-port='+port+' --remote-debugging-address=127.0.0.1'}});
+ session=await wait(async()=>{assert.equal(proc.exitCode,null);try{const value=await json(path.join(studio,'SystemRuntime/UserData/Launcher/session.json'));return value.pid!==previousBackend?value:null;}catch{return null;}},'native session',45000);
+ assert.equal(path.resolve(session.root).toLowerCase(),path.resolve(studio).toLowerCase());report.native={host_pid:proc.pid,backend_pid:session.pid,cdp_port:port};
+ await wait(async()=>{try{return (await fetch('http://127.0.0.1:'+port+'/json/version')).ok;}catch{return false;}},'owned CDP',30000);
+ const ps="$connections=@(Get-NetTCPConnection -State Listen -LocalPort "+port+");foreach($c in $connections){if($c.LocalAddress -notin @('127.0.0.1','::1')){throw 'Nonlocal listener'};$chain=@();$currentId=[int]$c.OwningProcess;for($i=0;$i -lt 12 -and $currentId -gt 0;$i++){$chain+=$currentId;if($currentId -eq "+proc.pid+"){break};$info=Get-CimInstance Win32_Process -Filter ('ProcessId = '+$currentId);$currentId=[int]$info.ParentProcessId};if($chain -notcontains "+proc.pid+"){throw 'Foreign listener'};[pscustomobject]@{address=$c.LocalAddress;pid=$c.OwningProcess;ancestry=$chain}|ConvertTo-Json -Compress}";
+ report.listener=(await exec('powershell',['-NoProfile','-NonInteractive','-Command',ps],{windowsHide:true,timeout:30000})).stdout.trim();
+ report.boots.push({...report.native});const {chromium}=await import(pathToFileURL(path.join(historical,'../..','../../AppData/Local/Temp/asset-director-browser-deps-20261005/node_modules/playwright/index.mjs')).href).catch(()=>import('file:///<LOCAL_PATH_REDACTED>'));
+ browser=await chromium.connectOverCDP('http://127.0.0.1:'+port);
+ page=await wait(()=>browser.contexts()[0].pages().find(p=>p.url().startsWith(session.origin+'/')),'native page');
+ page.setDefaultTimeout(45000);await page.setViewportSize({width:1440,height:1050});
+ page.on('pageerror',e=>report.errors.push(e.message));page.on('dialog',async d=>{if(/Mark Action ready|Mark this layer ready|^Authorize .*render:/.test(d.message())){(report.scripted_qa_confirmations||=[]).push(d.message());await d.accept();}else{report.errors.push('Unexpected dialog: '+d.message());await d.dismiss();}});
+ await page.goto(session.origin+'/workbench#'+session.token);
+ await page.locator('[data-action="project"][data-id="'+p.id+'"]').click();
+ const actionTab=page.getByRole('navigation',{name:'Activities in this scene'}).getByRole('button',{name:/Action/});if(await actionTab.isEnabled())await actionTab.click({timeout:180000});
+ await page.getByLabel('Performer',{exact:true}).waitFor({timeout:180000});
+ await page.getByLabel('Performer',{exact:true}).selectOption('Rig');
+ await wait(()=>page.locator('[data-scene-viewer]').getAttribute('data-viewer-state').then(v=>v==='ready'),'initial preview');
+
+}
+
+async function closeOwned(){
+ const life=await fetch(session.origin+'/api/lifecycle',{headers:{Authorization:'Bearer '+session.token}}).then(r=>r.json());assert(!life.busy,'Close only after all bounded work finishes');
+ await exec('powershell',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(repo,'tools/native_desktop_ui.ps1'),'-ProcessIdentifier',String(proc.pid),'-Action','close','-Text','Asset Director'],{windowsHide:true,timeout:25000});
+ await wait(()=>proc.exitCode!==null,'normal host exit',15000);assert.equal(proc.exitCode,0);
+ await browser.close();browser=null;await log.close();log=null;
+}
+async function click(selector){await page.locator(selector).click();await wait(()=>page.locator('body').evaluate(n=>!n.classList.contains('working')),'client operation idle',240000);}
+async function previewReady(){await wait(()=>page.locator('[data-scene-viewer]').getAttribute('data-viewer-state').then(v=>v==='ready'),'accepted preview',240000);}
+
+
+try{
+ let p=await state(),after=p.workbench.scenes.find(s=>s.id===provenance.source_scene_id);const chosen=after.transitionReview.candidates.find(c=>c.checkpointId===after.current);assert(chosen?.validation.status==='PASS');report.chosen=chosen;report.accepted_before=after.current;await boot(p);await previewReady();
+ const audit=await wait(async()=>{const runs=await store.runs(provenance.source_project_id);return runs.filter(r=>r.action==='action-audit'&&r.checkpointId===chosen.checkpointId&&r.state==='SUCCEEDED').at(-1);},'accepted motion audit');report.audit_id=audit.id;
+ const seek=async frame=>{await page.locator('[data-view="time"]').evaluate((el,v)=>{el.value=String(v);el.dispatchEvent(new Event('input',{bubbles:true}));},(frame-1)/audit.inspection.fps);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));};
+ for(const frame of [...new Set([1,audit.inspection.frame_range[1],...chosen.transitions.flatMap(j=>[j.start,j.end].flatMap(f=>[Math.floor(f),Math.ceil(f)]))])].sort((a,b)=>a-b)){await seek(frame);await page.locator('[data-scene-viewer]').screenshot({path:path.join(out,'accepted-frame-'+frame+'.png')});}
+ await seek(1);await page.locator('[data-view="play"]').click();await wait(()=>page.locator('[data-view="time"]').inputValue().then(v=>Number(v)>(audit.inspection.frame_range[1]-audit.inspection.frame_range[0])/audit.inspection.fps-.15),'accepted full-speed preview',15000);await page.locator('[data-view="play"]').click();
+ report.accepted_preview_playback='PASS_PHYSICAL_SPEED_CONTROL';
+ report.scripted_confirmations_scope='Automated workflow inputs; not human or artistic approval';
+ await click('[data-action="action-ready"]');await page.locator('[data-action="new-shot"]').waitFor({timeout:180000});await click('[data-action="new-shot"]');
+ report.camera_options=await page.locator('#shot-camera option').evaluateAll(ns=>ns.map(n=>({value:n.value,label:n.textContent})));assert(report.camera_options.some(c=>c.value==='Generated motion review'),'Copied scene must contain the observed review camera');
+ await page.locator('#shot-name').fill('MotionBricks accepted revision diagnostic');await page.locator('#shot-camera').selectOption('Generated motion review');await page.locator('#shot-start').fill('1');await page.locator('#shot-end').fill(String(audit.inspection.frame_range[1]));await click('[data-action="save-shot"]');
+ await page.locator('[data-action="layer-ready"]').waitFor({timeout:180000});await click('[data-action="layer-ready"]');await page.getByRole('heading',{name:'Light your scene',exact:true}).waitFor({timeout:180000});await page.locator('[data-action="layer-ready"]').waitFor({timeout:180000});await click('[data-action="layer-ready"]');
+ await page.getByRole('heading',{name:'Render and review',exact:true}).waitFor({timeout:180000});await click('[data-action="readiness"]');
+ await page.locator('#render-device').waitFor({timeout:180000});const options=await page.locator('#render-device option').evaluateAll(ns=>ns.map(n=>({value:n.value,text:n.textContent})));const gpu=options.find(o=>/4070/.test(o.text));assert(gpu,'Actual readiness must expose the 4070');await page.locator('#render-device').selectOption(gpu.value);report.render_device=gpu;
+ for(const [field,value] of [['width','512'],['height','384'],['samples','8']])await page.locator('#render-'+field).fill(value);
+ await snap('09-render-configured');await click('[data-action="render"]');
+ const video=page.locator('video[data-media="render"]').first();await video.waitFor({timeout:900000});await wait(async()=>{const v=await video.evaluate(v=>({ready:v.readyState,error:v.error?.code}));assert(!v.error);return v.ready>=2;},'movie decode',60000);
+ await video.scrollIntoViewIfNeeded();await video.press('Space');await wait(()=>video.evaluate(v=>v.ended||v.currentTime>=v.duration-.1),'actual movie playback across both stitches',15000);await video.evaluate(v=>v.pause());
+ report.movie_playback=await video.evaluate(v=>({time:v.currentTime,duration:v.duration,width:v.videoWidth,height:v.videoHeight,ready:v.readyState,error:v.error?.code??null,playbackRate:v.playbackRate}));assert.equal(report.movie_playback.playbackRate,1);
+ for(const time of [0,...chosen.transitions.flatMap(j=>[j.start,j.end].map(f=>(f-1)/audit.inspection.fps)),(audit.inspection.frame_range[1]-1)/audit.inspection.fps]){await video.evaluate((v,t)=>{v.currentTime=t;},time);await delay(150);await video.screenshot({path:path.join(out,'movie-'+time+'.png')});}
+ after=(await state()).workbench.scenes.find(s=>s.id===provenance.source_scene_id);report.render=after.renders.at(-1);report.render_checkpoint=after.checkpoints.find(c=>c.id===after.current);assert.equal(report.render.checkpointId,report.render_checkpoint.id);assert.equal(report.render.options.render_device.backend,'OPTIX');
+ report.accepted_after=after.current;report.motion_source_checkpoint=chosen.checkpointId;report.motion_source_sha256=chosen.sha256;report.render_baked_parity='PENDING_SEPARATE_FRESH_BLENDER_CHECK';
+ await snap('10-rendered-playback');assert.equal(report.errors.length,0);report.status='PASS_NATIVE_RANKED_ACCEPTED_RENDER_PLAYBACK_PENDING_NUMERICAL_PARITY_AND_VISUAL_REVIEW';
+}catch(e){report.errors.push(e.stack);if(page)await snap('failure').catch(()=>{});throw e;}
+finally{
+ if(session&&proc?.exitCode===null){
+  try{const life=await fetch(session.origin+'/api/lifecycle',{headers:{Authorization:'Bearer '+session.token}}).then(r=>r.json());if(!life.busy){await exec('powershell',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(repo,'tools/native_desktop_ui.ps1'),'-ProcessIdentifier',String(proc.pid),'-Action','close','-Text','Asset Director'],{windowsHide:true,timeout:25000});await wait(()=>proc.exitCode!==null,'normal host exit',15000);report.exit_code=proc.exitCode;}else report.retained_running_for_recovery=life.reasons;}catch(e){report.errors.push('Close: '+e.message);}
+ }
+ if(browser&&proc?.exitCode!==null)await browser.close();if(log)await log.close();if(app)await new Promise(resolve=>app.server.close(resolve));
+ await writeJson(path.join(out,'report.json'),report);
+}
+
+

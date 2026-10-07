@@ -7,9 +7,16 @@ import {approveCheckpoint} from './workbench-model.mjs';
 import {checkpointScenePath} from './checkpoint-paths.mjs';
 
 export async function checkpointJob(work,id,sceneId,revision,request,policy) {
-  const {stage,operation,options,readOnly=false,candidateOnly=false,cancellation}=policy;
+  const {stage,operation,options,readOnly=false,candidateOnly=false,reviewOnly=false,cancellation}=policy;
+  const traceOrigin=cancellation?.enqueuedMonotonic??performance.now();
+  const trace={schema:'workbench-job-trace-v1',requestId:request.requestId,
+    enqueuedAt:cancellation?.enqueuedAt??now(),clock:'process monotonic; elapsed seconds',events:[],
+    limitations:'Server queue admission through publication. Native job reports contain Blender/provider stages; client preview-ready is measured separately.'};
+  const mark=stage=>trace.events.push({stage,seconds:(performance.now()-traceOrigin)/1000});
+  mark('dequeued');
   const checkCancelled=()=>assert(!cancellation?.cancelled,'Action Save cancelled; prior scene and local draft retained.',499);
   assert(!(readOnly&&candidateOnly),'Read-only inspection cannot publish a candidate.');
+  assert(!reviewOnly||!readOnly&&!candidateOnly,'Review-only publication must be a separate immutable checkpoint.');
   const p=await work.project(id),scene=work.scene(p,sceneId),runId=request.requestId;
   const identity=digest({projectId:id,sceneId,revision,request});
   const receipt=await safe(p.directory,`Runs/${runId}.json`);
@@ -35,17 +42,22 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
   const implementation=policy.implementation?await policy.implementation():null;
   const savedBase=scene.current,draftBase=scene.candidate;
   const record={schema:1,id:runId,projectId:id,sceneId,action:operation,state:'PREPARING',
+    launcherPid:process.pid,trace,
     requestIdentity:identity,checkpointId:cp.id,checkpointSha256:cp.sha256,requestedRevision:revision,
     ...(implementation?{implementation}:{}),
     startedAt:now(),authorization:readOnly?'explicit-launcher-inspection':candidateOnly?'explicit-launcher-preparation':'explicit-launcher-save',options,
     ...(candidateOnly?{publication:'SEPARATE_CANDIDATE_ONLY'}:{}),
+    ...(reviewOnly?{publication:'TRANSITION_REVIEW_ONLY'}:{}),
+    ...(reviewOnly?{applicationIdentity:await work.runtime.applicationIdentity?.()||{status:'UNVERIFIED',commit:null}}:{}),
     ...(policy.context?{context:policy.context}:{})};
   if(cancellation?.cancelled){record.state='CANCELLED';record.finishedAt=now();record.error='Action Save cancelled before native execution; prior scene and local draft retained.';await writeJson(receipt,record);return {run:record,reused:false};}
   await work.lock(p,runId);
   try {
+    mark('preflight_complete');
     await writeJson(receipt,record);checkCancelled();
     const optionsFile=await safe(p.directory,`Docs/Workbench/${runId}-options.json`);await writeJson(optionsFile,options);
     const job=await work.runtime.harness(['job-prepare',operation,'--input',await safe(p.directory,cp.path),'--options',optionsFile]);
+    trace.nativeJobId=job.id;mark('native_job_prepared');
     record.jobId=job.id;if(cancellation)cancellation.jobId=job.id;
     if(implementation)assert(job.specification?.implementation===implementation,'Native inspection runtime changed before execution.',409);
     assert(['PLANNED','SUCCEEDED'].includes(job.state),'Native Save needs explicit retry/recovery before execution.',409);
@@ -53,19 +65,22 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
       const s=work.scene(q,sceneId);
       assert(s.current===savedBase&&s.candidate===draftBase&&s.stage===stage&&!s.task&&!s.run,'Scene changed before Save.',409);s.run=runId;
     });
-    record.state='RUNNING';await writeJson(receipt,record);work.running.add(runId);
+    record.state='RUNNING';mark('native_execution_start');await writeJson(receipt,record);work.running.add(runId);
     const complete=async()=>{
       try {
         if(cancellation?.cancelled)await work.runtime.harness(['job-cancel',job.id]);
         const output=await work.runtime.harness(['job-run',job.id,'--blender',work.config.blender,'--timeout','180'],195000);
+        mark('native_execution_complete');
         checkCancelled();
         if(implementation)assert(output.specification?.implementation===implementation,'Native inspection runtime identity changed.',409);
         const data=await work.result(output);await policy.verify(data);
+        mark('result_contract_verified');
         let source,actual;
         if(!readOnly){
           const member=output.outputs.find(f=>f.path===`jobs/${job.id}/result.blend`);assert(member,'Native Save omitted its scene.');
           source=await safe(work.config.library,member.path);actual=await fileHash(source);
           assert(actual.sha256===member.sha256&&actual.size===member.size,'Native saved output changed.',409);
+          mark('artifact_hash_verified');
         }
         await work.serialize(async()=>{
           checkCancelled();if(cancellation)cancellation.committing=true;
@@ -87,18 +102,20 @@ export async function checkpointJob(work,id,sceneId,revision,request,policy) {
           await fs.copyFile(source,destination,constants.COPYFILE_EXCL);
           const copied=await fileHash(destination);
           assert(copied.sha256===actual.sha256&&copied.size===actual.size,'New saved checkpoint differs from the verified output.',409);
+          mark('checkpoint_copied_and_verified');
           const checkpoint={id:cpId,path:relative,...copied,parent:cp.id,stage,createdAt:now(),
             source:operation+'-job',jobId:job.id,audit:data.scene_audit};
           await writeJson(await safe(q.directory,`Docs/Workbench/${cpId}.json`),checkpoint);
           s.checkpoints.push(checkpoint);
-          if(candidateOnly)s.candidate=cpId;else approveCheckpoint(s,stage,cpId,false);
+          if(reviewOnly)await policy.publish({p:q,scene:s,checkpoint,data,record,output});
+          else if(candidateOnly)s.candidate=cpId;else approveCheckpoint(s,stage,cpId,false);
           s.run=null;
-          await work.store.save(q,q.revision);record.resultCheckpointId=cpId;
+          await work.store.save(q,q.revision);record.resultCheckpointId=cpId;mark('atomic_publication_complete');
         });
         record.state='SUCCEEDED';
       }catch(error){record.state=cancellation?.cancelled?'CANCELLED':'FAILED';record.error=cancellation?.cancelled?'Action Save cancelled; prior scene and local draft retained.':error.message;}
       finally{
-        record.finishedAt=now();await writeJson(receipt,record);
+        mark('attempt_finished');record.finishedAt=now();await writeJson(receipt,record);
         await work.serialize(async()=>{const q=await work.project(id),s=work.scene(q,sceneId);if(s.run===runId){s.run=null;await work.store.save(q,q.revision);}});
         await work.unlock(p,runId);work.running.delete(runId);if(cancellation)work.actionSaves.delete(runId);
       }

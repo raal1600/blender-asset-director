@@ -2,6 +2,13 @@
 export const timelineVersion='action-timeline-v1';
 export const stitchVersion='native-stitch-v1';
 export const motionEditVersion='native-motion-edit-v1';
+export function generatedDurationPlan(seconds){
+ const choices=Array.from({length:11},(_,i)=>24+4*i).map(n=>({model_frames:n,native_duration_seconds:(n-7)/30}));
+ const valid=choices.filter(x=>Number.isFinite(seconds)&&seconds>0&&seconds/x.native_duration_seconds>=.85-1e-12&&seconds/x.native_duration_seconds<=1.15+1e-12);
+ if(!valid.length)throw Error('Generated duration must fit 24,28,…,64 model frames at 30 FPS with bridge-only retiming 0.85–1.15 (0.481667–2.185 seconds).');
+ valid.sort((a,b)=>Math.abs(a.native_duration_seconds-seconds)-Math.abs(b.native_duration_seconds-seconds)||a.model_frames-b.model_frames);
+ return {...valid[0],requested_duration_seconds:seconds,generated_retime_ratio:seconds/valid[0].native_duration_seconds};
+}
 const fail=message=>{throw Error(message);};
 const object=v=>v&&typeof v==='object'&&!Array.isArray(v);
 const keys=(v,list)=>object(v)&&Object.keys(v).length===list.length&&Object.keys(v).every(k=>list.includes(k));
@@ -14,13 +21,14 @@ export function validateTimeline(change){
  if(!keys(change,['performer','mode','clips'])||change.mode!=='timeline'||!Array.isArray(change.clips)||change.clips.length>64)fail('Use at most 64 clips per performer.');
  let end=-100001;const ids=new Set();
  for(const [index,c] of change.clips.entries()){
-  if(!keys(c,['id','take_id','start','frames','speed','repeat_reviewed','travel',...['transition','source_range','heading_deg'].filter(k=>c?.[k]!==undefined)])||typeof c.id!=='string'||!/^clip_[a-zA-Z0-9_-]{1,64}$/.test(c.id)||ids.has(c.id)||typeof c.take_id!=='string'||!/^take_[a-f0-9]{64}$/.test(c.take_id))fail('Choose distinct clips and observed takes.');ids.add(c.id);
+  if(!keys(c,['id','take_id','start','frames','speed','repeat_reviewed','travel',...['transition','source_range','heading_deg','root_intent'].filter(k=>c?.[k]!==undefined)])||typeof c.id!=='string'||!/^clip_[a-zA-Z0-9_-]{1,64}$/.test(c.id)||ids.has(c.id)||typeof c.take_id!=='string'||!/^take_[a-f0-9]{64}$/.test(c.take_id))fail('Choose distinct clips and observed takes.');ids.add(c.id);
+  if(c.root_intent!==undefined&&c.root_intent!=='stationary-reviewed')fail('Choose reviewed stationary intent or prepare a derived root path.');
   if(c.heading_deg!==undefined&&!number(c.heading_deg,-180,180))fail('Body turn must be between -180 and 180 degrees.');
   if(c.source_range!==undefined&&(!Array.isArray(c.source_range)||c.source_range.length!==2||!c.source_range.every(v=>number(v,-100000,100000))||c.source_range[1]<=c.source_range[0]))fail('Choose increasing source In and Out frames.');
   if(!Number.isInteger(c.start)||!number(c.start,-100000,100000)||!Number.isInteger(c.frames)||!number(c.frames,2,3601)||!number(c.speed,.1,4)||typeof c.repeat_reviewed!=='boolean'||clipEnd(c)>100000)fail('Use integer frames and speed from 0.1 to 4.');
   if(c.start<=end)fail('Clips overlap on this character. Move or shorten the clip.');
   if(index&&Math.abs(turnAngle(change.clips[index-1].heading_deg||0,c.heading_deg||0))>1e-7&&c.transition?.mode!=='turn')fail('Choose Turn and connect to change body heading between clips.');
-  if(c.transition!==undefined&&c.transition!==null){const t=c.transition;if(index===0||!keys(t,['frames','match_phase',...(t.mode!==undefined?['mode']:[]),...(t.mode==='generated'?['seed','profile_sha256']:[])])||t.mode!==undefined&&!['blend','turn','generated'].includes(t.mode)||!Number.isInteger(t.frames)||!number(t.frames,2,120)||typeof t.match_phase!=='boolean')fail('A connection needs a previous clip and 2 to 120 added frames.');if(t.mode==='generated'&&(t.match_phase||!Number.isInteger(t.seed)||t.seed<0||t.seed>=2**32||!/^([a-f0-9]{64})$/.test(t.profile_sha256)))fail('Generated repositioning needs a verified rig profile and seed, with phase matching off.');if(c.start!==end+1+t.frames)fail('Connected clips must follow their visible transition; move following clips together.');}
+  if(c.transition!==undefined&&c.transition!==null){const t=c.transition;if(index===0||!keys(t,['frames','match_phase',...(t.mode!==undefined?['mode']:[]),...(t.mode==='generated'?['seed','profile_sha256',...(t.sampling!==undefined?['sampling']:[]),...(t.contacts!==undefined?['contacts']:[])]:[])])||t.mode!==undefined&&!['blend','turn','generated'].includes(t.mode)||!Number.isInteger(t.frames)||!number(t.frames,2,120)||typeof t.match_phase!=='boolean')fail('A connection needs a previous clip and 2 to 120 added frames.');if(t.mode==='generated'&&(t.match_phase||!Number.isInteger(t.seed)||t.seed<0||t.seed>=2**32||!/^([a-f0-9]{64})$/.test(t.profile_sha256)||t.sampling!==undefined&&!['argmax','gumbel-temperature-1'].includes(t.sampling)))fail('Generated repositioning needs a verified rig profile, supported sampling and seed, with phase matching off.');if(t.contacts!==undefined){const v=t.contacts;if(!keys(v,['origin','source','target'])||v.origin!=='user-reviewed'||!['source','target'].every(e=>keys(v[e],['support','seconds'])&&['auto','left','right','both','none'].includes(v[e].support)&&number(v[e].seconds,.04,.2)))fail('Contact intervals need a support foot, 0.04 to 0.20 seconds, and review provenance.');}if(c.start!==end+1+t.frames)fail('Connected clips must follow their visible transition; move following clips together.');}
   end=clipEnd(c);
   if(c.travel!==null){const t=c.travel,fields=['delta_m','meters_per_cycle',...(t?.gait_id!==undefined?['gait_id']:[])];if(!keys(t,fields)||t.gait_id!==undefined&&!/^[a-f0-9]{64}$/.test(t.gait_id)||!Array.isArray(t.delta_m)||t.delta_m.length!==2||!t.delta_m.every(v=>number(v,-10000,10000))||!number(Math.hypot(...t.delta_m),Number.MIN_VALUE,10000)||!number(t.meters_per_cycle,.001,1000))fail('Manual travel needs a calibrated metres-per-cycle value. Use automatic pace when available.');}
  }

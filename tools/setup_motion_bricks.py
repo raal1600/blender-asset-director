@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -17,6 +18,21 @@ from asset_director.core import DirectorError, atomic_json, file_hash, require
 from asset_director.motion_bricks_provider import (GGML_REVISION, INSTALL_SCHEMA,
     MODEL_REVISION, SOURCE_REVISION, execute)
 from owned_process import OwnedCommand
+
+
+def copy_notices(source, destination):
+    """Retain the exact pinned notices; code and weights have different terms."""
+    members={'motion-bricks-LICENSE':'LICENSE','ggml-LICENSE':'ggml/LICENSE',
+             'model-UPSTREAM_LICENSE':'scripts/hf/MotionBricks-G1-GGML/UPSTREAM_LICENSE',
+             'model-NOTICE':'scripts/hf/MotionBricks-G1-GGML/NOTICE'}
+    require(all((source/path).is_file() for path in members.values()),'MOTION_BRICKS_LICENSES','Pinned provider or weight license files are missing; restore the reviewed source checkout')
+    require(not destination.exists(),'MOTION_BRICKS_SETUP_EXISTS','License destination already exists; choose a new isolated configuration path')
+    destination.mkdir(parents=True)
+    receipts=[]
+    for name,path in members.items():
+        copied=destination/name;shutil.copyfile(source/path,copied)
+        receipts.append({'file':name,'source':path,'sha256':file_hash(copied),'size':copied.stat().st_size})
+    return receipts
 
 
 def run(command, cwd, env, timeout=120):
@@ -88,6 +104,7 @@ def main(argv=None):
     require(library.is_file(), "MOTION_BRICKS_MISSING_BINARY", "Build did not produce the native shared library")
     manifest = output.with_suffix(".installation.json")
     require(not manifest.exists(), "MOTION_BRICKS_SETUP_EXISTS", "Installation manifest already exists; choose a new output")
+    notices=copy_notices(source,output.with_suffix('.licenses'))
     config = {"library": str(library), "model_dir": str(source / "generated/g1-f32"),
               "python_executable": sys.executable,
               "installation_manifest": str(manifest), "device": a.device, "threads": 2,
@@ -96,7 +113,7 @@ def main(argv=None):
               "gpu_total_limit_mib": 9216}
     atomic_json(manifest, {"schema": INSTALL_SCHEMA, "source_revision": SOURCE_REVISION,
                           "ggml_revision": GGML_REVISION, "model_revision": MODEL_REVISION,
-                          "library_sha256": file_hash(library)})
+                          "library_sha256": file_hash(library),"license_receipts":notices})
     try:
         proof = execute(config)
         atomic_json(output.with_suffix(".discovery.json"), proof)

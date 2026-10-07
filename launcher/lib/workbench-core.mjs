@@ -1,4 +1,5 @@
 import {validateRenderDevice} from './render-device.mjs';
+import {recoverTransitionJobs,nativeTransitionProgress} from './transition-review.mjs';
 import {taskScenePaths} from './task-paths.mjs';
 /** Real local scene work. No prototype fixtures, fake progress, or model calls. */
 import fs from 'node:fs/promises';
@@ -54,6 +55,7 @@ export class Workbench {
     assert(source,'Source not found.',404);return {...source,subcategory:sourceCategory(source),prepared:await preparedSource(this,source)};
   }
   async state(id,{compact=false}={}) {
+    await recoverTransitionJobs(this,id);
     const p=await this.project(id);
     const locked=await exists(await safe(p.directory,lockName))||await exists(await safe(p.directory,sharedLock));
     const taskStatuses={};
@@ -62,7 +64,11 @@ export class Workbench {
       if(await exists(file)) {const status=await json(file);assert(status.taskId===scene.task&&status.projectId===id&&status.sceneId===scene.id,'Wrong task status identity.');taskStatuses[scene.id]=status;}
     }
     const inventory=await this.store.inventory();
-    return {project:p,stages,taskStatuses,savedScenes:await this.store.scenes(id),inventory:compact?selectedSourceSummary(inventory,p):inventory,locked,sourceUse:await this.interactions(id).sourceStatus(),runs:await this.store.runs(id)};
+    const runs=await this.store.runs(id);
+    await Promise.all(runs.filter(r=>p.workbench.scenes.some(s=>s.run===r.id)).map(async r=>{
+      const value=await nativeTransitionProgress(this.config.library,r);if(value)r.nativeProgress=value;
+    }));
+    return {project:p,stages,taskStatuses,savedScenes:await this.store.scenes(id),inventory:compact?selectedSourceSummary(inventory,p):inventory,locked,sourceUse:await this.interactions(id).sourceStatus(),runs};
   }
   async unlocked(p) {
     assert(!await exists(await safe(p.directory,lockName)),'This project has an unfinished workbench task. Collect or resolve it first.',409);

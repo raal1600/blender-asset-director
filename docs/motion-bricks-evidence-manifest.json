@@ -1,0 +1,630 @@
+{
+  "schema": "motion-bricks.redacted-evidence-manifest.v1",
+  "state": "SCOPED_LOCAL_ACCEPTANCE_WITH_RETAINED_FAILURES",
+  "evidence_root": "local:AssetDirector-MotionBricks-Authoring-20261006",
+  "privacy": "Only relative identifiers, report hashes, sizes and redacted summaries. No private assets, binary motion, images, credentials, databases or model weights are included.",
+  "application_revisions": [
+    "3a95251c253af4ae1dbe09c985913c24d29ac919",
+    "f30b389890b6bc11f62efce56e355d3a981d5431",
+    "a08e46d588616382ef61db9c11409119d2daefe0",
+    "0c804ca5827433996b379f32d05d260a7fa70fd0",
+    "2cd8ed9eea8961569e02ebf541bafca3b0fefc97",
+    "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+    "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c"
+  ],
+  "provider_revision": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
+  "dll_sha256": "e0b61e7e7113cf7a65f17343d270dbb3a2b745bfb31d2fae95e56bb599919aa7",
+  "entries": [
+    {
+      "evidence": "additional-root-prepared-v1.json",
+      "sha256": "8e0839574bb90d536c7a27987a35168e11e45c2e4f3f2165619a5a5124f07c18",
+      "bytes": 3916,
+      "redacted_summary": "Separate copied Action/root preparation; original and bone channels preserved."
+    },
+    {
+      "evidence": "additional-root-review-evidence-v1.json",
+      "sha256": "b2800a2a1985f3b125658b167e0147f34f5ac4991abeb1b94b96fe9f73685e4f",
+      "bytes": 1619,
+      "redacted_summary": "Explicit derived travel/contact proposal based on observed sole movement."
+    },
+    {
+      "evidence": "analyze_beta_grid_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "0815e4e1f29729cf141c209c5d26f15da88ed0142feaa64d9bfac7dad7a0da5e",
+      "bytes": 3701
+    },
+    {
+      "evidence": "analyze_soles_pipeline_final_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "4589efbdbee204a3a9a7c9fa80edfae8f838fdf0ef1bbb816d51e5b37a38c6aa",
+      "bytes": 4628
+    },
+    {
+      "evidence": "baseline-node.log",
+      "redacted_summary": "Evidence for Launcher baseline regression. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "edbe9c65275dfca5fa2741ac1e01b731a4eb0713942426a0f912966247e9db95",
+      "bytes": 167366
+    },
+    {
+      "evidence": "baseline-offline-python.log",
+      "redacted_summary": "Evidence for Portable baseline regression. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "c1145961a1c761be902b50d3535c46520a5098c09e743f7da27f319fc3689030",
+      "bytes": 214582
+    },
+    {
+      "evidence": "baseline-sampling/report.json",
+      "redacted_summary": "Ten actual worker experiments, argmax invariance, Gumbel variation/repeat and unconstrained placeholder invariance.",
+      "sha256": "8525963971a0bb90b56878ebbee639868ad1946e11d48cc393a27ffb50bd4445",
+      "bytes": 9270
+    },
+    {
+      "evidence": "beta-boundary-grid-f30b389-v1/independent-influence.json",
+      "sha256": "4606164340206ca2acb25414c02946c6d70f05dd9d9980e28df8913118fb6b25",
+      "bytes": 20623,
+      "redacted_summary": "Independent source/target motion influence, raw and corrected."
+    },
+    {
+      "evidence": "beta-boundary-grid-f30b389-v1/report.json",
+      "sha256": "86514ffd5aa7b1d0e163b38b39839143182ec9d6c3daa9cdc5577811deb626cb",
+      "bytes": 3859,
+      "redacted_summary": "Nine predeclared explicit trim pairs: seven quality passes and two failures."
+    },
+    {
+      "evidence": "beta-boundary-grid-f30b389-v1/visual-center-v1/agent-visual-review.json",
+      "sha256": "23474bb70d4b6ae98f4e40c573c2982d802ccce98efbfef53102a7841c4a588a",
+      "bytes": 10350,
+      "redacted_summary": "All 60 frames statically inspected; full-speed naturalness not established."
+    },
+    {
+      "evidence": "beta-boundary-grid-manifest-v1.json",
+      "redacted_summary": "Nine predeclared independent boundary pairs on the second reviewed rig.",
+      "sha256": "db9cb51954dd565beab72929001e92d61859a75d440b2ac68470d795743a03d0",
+      "bytes": 4207
+    },
+    {
+      "evidence": "beta-movie-playback-v1/report.json",
+      "redacted_summary": "Evidence for Saved baked identity parity. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "a0d81a437f042f9f88e5071cedc93c17aaa2bf89d992c5531ce3a413e67d4e6d",
+      "bytes": 4287
+    },
+    {
+      "evidence": "beta_movie_playback_v1.mjs",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "8ea42f7f85bdfc9f58431de6758bae808193f7a4eb3e6499cb02ff3fce0da79f",
+      "bytes": 4159
+    },
+    {
+      "evidence": "boundary-kinematics-offline-v1.log",
+      "redacted_summary": "Evidence for Complete versioned dependency contract. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "953ef5e87d3e48aea86a654b33fbe16e031457c7079d7f91620e2ae0ef8474dc",
+      "bytes": 226182
+    },
+    {
+      "evidence": "broader-reconciliation-5f1b8b8-v1.json",
+      "redacted_summary": "Evidence for In-place intent and derived preparation. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "ac27b59c2aeba67fb671c9ba48ec16e57dd95e6bf13b900c32b0b77dafd18d42",
+      "bytes": 4450
+    },
+    {
+      "evidence": "broader-scenarios-5f1b8b8-v1/report.json",
+      "redacted_summary": "Evidence for Supported transforms and FPS. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "37bb748489af3080b9d4b0fd7f1499bd9b06823e0178df6ce9d54750ac299af0",
+      "bytes": 3588
+    },
+    {
+      "evidence": "broader-scenarios-f30b389-v1/report.json",
+      "sha256": "94e3faa3d07a0ab9ddfd5a8e3dda00aa2414c3875177e402daceb6934ea1d7da",
+      "bytes": 3432,
+      "redacted_summary": "Complete historical ten-case rerun; six passes, four retained failures."
+    },
+    {
+      "evidence": "broader-scenarios-manifest-v1.json",
+      "redacted_summary": "Unchanged ten-case broader rerun inputs.",
+      "sha256": "fff8cfe6a6419b637df9649d665f2be62d7382fa380d82a7f1220ae8b17767c3",
+      "bytes": 2704
+    },
+    {
+      "evidence": "candidate-5d4a7ba.json",
+      "redacted_summary": "Creation-time isolated build inventory; later native tests establish runtime readiness.",
+      "sha256": "5d720e38993980d6af1aa65dd750736c947b00faa1d445f2e8577eb607b99b9a",
+      "bytes": 48718
+    },
+    {
+      "evidence": "candidate-5f1b8b8-contact.json",
+      "redacted_summary": "Isolated native contact-review installation inventory.",
+      "sha256": "5d34a925bf4bca32108fc1dba1a6a2d3737caab4df5efb5f9dbc0eab15e86466",
+      "bytes": 48747
+    },
+    {
+      "evidence": "collect_final_native_timings_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "45727a48335330578ee5265ef5bc273b2d526525218e24d54dbebf2037f78ca5",
+      "bytes": 7258
+    },
+    {
+      "evidence": "contact-timebase-offline-v1.log",
+      "sha256": "936db04a07ee299af7b95ba2929ad9d878ec5a5d24bba7ebb48c0abde16327c9",
+      "bytes": 225424,
+      "redacted_summary": "812 tests, 809 passed and three disclosed skips; installer checks pass."
+    },
+    {
+      "evidence": "context-refusal-5f1b8b8-v1/report.json",
+      "redacted_summary": "Evidence for Trim and context validation. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "72c788c2a85bb51ac6e2d51113f8b5400b9d343c3ebfae4dc690b5062fe27e52",
+      "bytes": 924
+    },
+    {
+      "evidence": "context-refusal-manifest-v1.json",
+      "redacted_summary": "Explicit short source and target context refusal requests.",
+      "sha256": "d539d131b703f914090f5c8972ac1fea6067859b8a5c3a73ee2080ddb0d80109",
+      "bytes": 1384
+    },
+    {
+      "evidence": "dense-final-quality-v1/report.json",
+      "redacted_summary": "Evidence for Unseen compatible pair. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "c1c93f5a4fb9d56b8bfe052fb3ffe6d704275c4f3c7b675664f30e423c331d22",
+      "bytes": 6829
+    },
+    {
+      "evidence": "early_sampling.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "a9d5a461255bc3b06a5360afb502f96a4598ee4e1961dd22e07115be073b92b7",
+      "bytes": 3231
+    },
+    {
+      "evidence": "final-evidence-queue-v1.json",
+      "redacted_summary": "Evidence for Evidence and licenses research handoff. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "663d366b21c25742ced143b0445a56516a7702a788e565cdbfbebd3b461788e0",
+      "bytes": 481
+    },
+    {
+      "evidence": "final-native-timings-5f1b8b8-v1.json",
+      "redacted_summary": "Evidence for Monitored resource limits. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "fdf948bfb0de494a01460bedaef5af922f30b5f977698909d8d3a6840cde7e4b",
+      "bytes": 130428
+    },
+    {
+      "evidence": "final-tangent-reconcile-v2/argmax-a/motion-bricks-clip_1-raw.json",
+      "redacted_summary": "Evidence for Actual loaded DLL, model hashes and build settings. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "7689f0ffe7852ae9ad286f3827aab4e2d25b0b2b1c0b472582a58c379963f08b",
+      "bytes": 94832
+    },
+    {
+      "evidence": "four-clips-0c804ca-v1/idle-prepared-12/RESULTS.json",
+      "redacted_summary": "Evidence for Unseen compatible pair. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "ac2d6dc8d595b4abc8d6f68553b3031dc94d7baa1dcd9e2f5d6f6fc621c47a58",
+      "bytes": 1141060
+    },
+    {
+      "evidence": "four-clips-0c804ca-v1/idle-prepared-24/RESULTS.json",
+      "redacted_summary": "Evidence for Unseen compatible pair. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "832935850e55135196e689f6e725bd9ff869e308739df03cc46526b4162a9a88",
+      "bytes": 1308980
+    },
+    {
+      "evidence": "four-clips-0c804ca-v1/left-idle-12/RESULTS.json",
+      "redacted_summary": "Evidence for Unseen compatible pair. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "aeb123da23e430469a49d2a19e39ccd6f781b8d7feac4febf9bb97cc090daacc",
+      "bytes": 1137906
+    },
+    {
+      "evidence": "four-clips-0c804ca-v1/report.json",
+      "sha256": "8b2625b42eb9dc63e64fd99b01b19deab3669c9defe24bddc927d7435d0b01fe",
+      "bytes": 2492,
+      "redacted_summary": "Six real tests: four passes, sliding failure and generated-key-budget refusal."
+    },
+    {
+      "evidence": "fps60-a08e46d-v1/report.json",
+      "sha256": "b167d4b9dab80c106abfa9e7421a19942f779aafed3732b303347bf9e02e31a4",
+      "bytes": 756,
+      "redacted_summary": "60 FPS rerun after fixing disposable fixture contact timestamps."
+    },
+    {
+      "evidence": "multi-join-ui-node-final.log",
+      "sha256": "31448b1222f8d121806bd193fb09b3ec71aeee89107bc9bd7bd2836c91678f52",
+      "bytes": 181400,
+      "redacted_summary": "405 launcher tests pass."
+    },
+    {
+      "evidence": "multi-join-ui-offline-v1.log",
+      "sha256": "f9d030d2e596e0c628c815ee394288f5773bc18deb97dc9c7b693453c86a2c66",
+      "bytes": 225426,
+      "redacted_summary": "812 tests, 809 passed and three disclosed skips; installer checks pass."
+    },
+    {
+      "evidence": "native-cancellation-5d4a7ba-v1/exit-recovery.json",
+      "redacted_summary": "Evidence for Cancel failure and restart. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "a2e1d1e6a2f40a1c896bd418a9bf339a053a96cd5f8b86cf3924e17009b13040",
+      "bytes": 836
+    },
+    {
+      "evidence": "native-cancellation-5d4a7ba-v1/report.json",
+      "redacted_summary": "Retained first procedure: cancellation passed, native host shutdown timed out; not a clean harness pass.",
+      "sha256": "2e28b062c0432cce0787acd121e5a3171d2e9093d8b4d0e56be04b0bfb16b530",
+      "bytes": 4080
+    },
+    {
+      "evidence": "native-cancellation-5d4a7ba-v2/report.json",
+      "redacted_summary": "Evidence for Cancel failure and restart. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "6ad55a746f5a94ed9c74dbabd98ac5acee18ad203c3725f0ca163a5cf7050965",
+      "bytes": 4052
+    },
+    {
+      "evidence": "native-contact-5f1b8b8-v1/report.json",
+      "redacted_summary": "Evidence for Accessible contact corrections. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "e02a93ac57ca48efd863ef1862e7ccb4cdc1d5c6ce506f9e141d5c321ecab4cd",
+      "bytes": 2988203
+    },
+    {
+      "evidence": "native-contact-f30b389-v1/report.json",
+      "sha256": "4255dd95e4b963db5652f1af43e5f5769c830dce43f56fe27efd24d9f6823fc2",
+      "bytes": 2988415,
+      "redacted_summary": "Visible Windows contact correction, generation, comparison, acceptance and reopen."
+    },
+    {
+      "evidence": "native-domain-refusals-5f1b8b8-v1.log",
+      "redacted_summary": "Retained procedure failure: incorrect stationary intent intercepted the intended contact test.",
+      "sha256": "4c7154420acea534a99e134df49b019cf1f961a8f9d4cea0f53572a8ff2ff1bf",
+      "bytes": 3288
+    },
+    {
+      "evidence": "native-domain-refusals-5f1b8b8-v2/report.json",
+      "redacted_summary": "Evidence for Grounded eligibility. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "ae04d4cdf883baac4d40a592d3aa91add3aea08f82a390d47a9feb36c8bd09f1",
+      "bytes": 1723
+    },
+    {
+      "evidence": "native-lifecycle-5f1b8b8-v1/report.json",
+      "redacted_summary": "Evidence for Correction-surviving meaningful alternatives. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "31fd9084efbda3760c8b66e0af7c99020fe015314091eaac49c5bdac986b635e",
+      "bytes": 1172770
+    },
+    {
+      "evidence": "native-multi-2cd8ed9-v1/report.json",
+      "redacted_summary": "Evidence for In-place intent and derived preparation. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "68ab6cdab98caea3e8323076f490e1bc1f744b70997a91ff0596b0aca611c916",
+      "bytes": 4902000
+    },
+    {
+      "evidence": "native-parity-f30b389-v1/preview-parity.json",
+      "sha256": "961e80eaefaad2e44b2b7f4fc7feb5e6ccffea298c2fff5ff1ea2d80b3503732",
+      "bytes": 19082,
+      "redacted_summary": "Actual client GLB versus fresh Blender evaluated skin and joints."
+    },
+    {
+      "evidence": "native-parity-four-5f1b8b8-v1/preview-parity.json",
+      "redacted_summary": "Evidence for Saved baked identity parity. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "2baad0ba034332c4bee17c7e24c20a61c36bf18d73e95b23a356e014e81d07a3",
+      "bytes": 43655
+    },
+    {
+      "evidence": "native-parity-ranked-5d4a7ba-v1/preview-parity.json",
+      "redacted_summary": "Evidence for Reference native X→bridge→Y. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "c1386cce4e0ffd7d312cdcffd44905433f57031b41db6894996b14c726580a50",
+      "bytes": 19082
+    },
+    {
+      "evidence": "native-playback-ranked-5d4a7ba-v1/report.json",
+      "redacted_summary": "Evidence for Reference native X→bridge→Y. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "04fbaa3df06d77a5c4366d76d28268fc8131adf96db32dc075f53a69a0369e74",
+      "bytes": 2126685
+    },
+    {
+      "evidence": "native-preview-benchmark-5f1b8b8-v1/report.json",
+      "redacted_summary": "Three actual native fixed-source cached comparison openings.",
+      "sha256": "1ee6685532250c7351b3f81782c7c71c29d274e1ed478067fe291682183784d9",
+      "bytes": 1859
+    },
+    {
+      "evidence": "native-ranked-5d4a7ba-v1/report.json",
+      "redacted_summary": "Evidence for Correction-surviving meaningful alternatives. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "522670952895a899c59cccbe519a2ebfd76dc0336a12fc58fc7748e88cc49d73",
+      "bytes": 1624571
+    },
+    {
+      "evidence": "native-render-f30b389-v1/agent-visual-review.json",
+      "sha256": "8e93fe3f5dca16b1d6f8ba9ab53fd7ad5ba772be591d3db720ba68e8b0a1980f",
+      "bytes": 13846,
+      "redacted_summary": "Separate static inspection of all 72 frames; no human artistic approval."
+    },
+    {
+      "evidence": "native-render-f30b389-v1/report.json",
+      "sha256": "66e5d37567d69369b3ead39acc2c22d6c18ca60abb96ea5282405da64e6b1b3f",
+      "bytes": 425197,
+      "redacted_summary": "Accepted native render and full-speed movie playback."
+    },
+    {
+      "evidence": "native-render-four-5f1b8b8-v1/agent-visual-review.json",
+      "redacted_summary": "Evidence for Saved baked identity parity. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "b43222fd0e7d5bf1e6631c83ffaeab2e89ecd1c9e99af7848757141d3703eeda",
+      "bytes": 27142
+    },
+    {
+      "evidence": "native-render-four-5f1b8b8-v1/report.json",
+      "redacted_summary": "Evidence for Structural and evaluated source preservation. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "6e2cc78b59e11c99b9dc72cc3caf1197e92e2a9b2eb5aa5a8c7e74710f5ace03",
+      "bytes": 1214663
+    },
+    {
+      "evidence": "native-render-ranked-5d4a7ba-v1/agent-visual-review.json",
+      "redacted_summary": "Evidence for Saved baked identity parity. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "08e2c133623dcf1582de77f8ff1a4e81951f20a381cdc4ef08f138db720b6c7c",
+      "bytes": 12071
+    },
+    {
+      "evidence": "native-render-ranked-5d4a7ba-v1/report.json",
+      "redacted_summary": "Actual accepted OptiX render; separate complete playback and numerical/visual reports resolve its then-pending checks.",
+      "sha256": "bf8cf5efdf1656aa2fd05d74acccd5cb4e297ca336510afb263df83e1639da8e",
+      "bytes": 425243
+    },
+    {
+      "evidence": "native_cancellation_5d4a7ba_v2.mjs",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "d86dd38ed4093867fbcc736544096c295ba3577c3d0f9140388fb4293fd55aa5",
+      "bytes": 18648
+    },
+    {
+      "evidence": "native_contact_5f1b8b8_v1.mjs",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "36b5e9d7bd83f3a6975420353e6004b491a2647deaf13d4ded47832b3dfc540f",
+      "bytes": 13768
+    },
+    {
+      "evidence": "native_domain_refusals_v2.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "9890743fa23c94f868a21de7095bb2fbc70d64fcb5e132a8b1fb5edc22bb78cb",
+      "bytes": 3701
+    },
+    {
+      "evidence": "native_lifecycle_5f1b8b8_v1.mjs",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "b330848f4368eb74c82dbe41e719b0dec09724ec47dc8d66f9db96ac05d6ccc8",
+      "bytes": 23688
+    },
+    {
+      "evidence": "native_multi_2cd8ed9_v1.mjs",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "ba86fd86fe69f3b89a8940022390d71f920f731961d60aa00033daa54a2cbd65",
+      "bytes": 18867
+    },
+    {
+      "evidence": "native_playback_ranked_5d4a7ba_v1.mjs",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "e130d7041b8f086fe6936d5a770fac2f6544d5fda81bac0f241b55fcf6e5d76e",
+      "bytes": 9694
+    },
+    {
+      "evidence": "native_preview_benchmark_5f_v1.mjs",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "cfc475cec1ed0ce00511c257995cc2f61dcf64d5683edb9c680cf1bfabe7b6cf",
+      "bytes": 12040
+    },
+    {
+      "evidence": "native_ranked_5d4a7ba_v1.mjs",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "e4d574f75ba7791038228c8911240906a00dcd859a05796ba6c978292af3e83f",
+      "bytes": 14277
+    },
+    {
+      "evidence": "native_render_four_5f1b8b8_v1.mjs",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "6a95b13df7c3c32fc77dc22d7f0bff75547fead394ce237a1eb950c063addc44",
+      "bytes": 12775
+    },
+    {
+      "evidence": "native_render_ranked_5d4a7ba_v1.mjs",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "52db8eec2ddfee11e6394c62c1ed799158983f23b8eba1bbed668eaf4068fe07",
+      "bytes": 12774
+    },
+    {
+      "evidence": "parent-space-preparation-v2.json",
+      "redacted_summary": "Explicit copied parent-space preparation and world/rest parity checks.",
+      "sha256": "14f914d0a4cab02c0e2424253f50b0a4e90c15c431f9fd260ae9d0b7b79a65a4",
+      "bytes": 2187
+    },
+    {
+      "evidence": "prepare_native_four_artifacts_5f_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "b18e5557b7fe230a6648a596a7c96674bedff2912aee6e9bb804095c903764cb",
+      "bytes": 2737
+    },
+    {
+      "evidence": "prepare_ranked_artifacts_5d_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "b029d2ad5769a884bd429f3af371aa24915c327d18a9c4613b681a91d5f1dc05",
+      "bytes": 2738
+    },
+    {
+      "evidence": "provider-faults-5f1b8b8-v1/report.json",
+      "redacted_summary": "Retained incorrect Windows process-memory-counter assertion after actual worker termination.",
+      "sha256": "63b768aba635346155aa050d510d81c7e0c5f72591171c8d175b4679284a63cc",
+      "bytes": 1080
+    },
+    {
+      "evidence": "provider-faults-5f1b8b8-v2/report.json",
+      "redacted_summary": "Retained procedure failure in final sandbox Git identity lookup after healthy inference.",
+      "sha256": "10bf84fb582246e31f924742d434b6327080412faf0b80c9fd425565cd54c2d4",
+      "bytes": 1880
+    },
+    {
+      "evidence": "provider-faults-5f1b8b8-v3/report.json",
+      "redacted_summary": "Evidence for Accepted and candidate separation. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "391125b21be093756a95322425a5e6fa60bd2c019a9365572f239644e749b341",
+      "bytes": 3055
+    },
+    {
+      "evidence": "provider-profile-5f1b8b8-v1/report.json",
+      "redacted_summary": "Evidence for Monitored resource limits. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "4d46021267ddf3ea009c7061da5099a0db2dd935b53686d24fc112602bd5fd62",
+      "bytes": 6204
+    },
+    {
+      "evidence": "qualified-broader-5f1b8b8-v1/report.json",
+      "redacted_summary": "Evidence for Unseen compatible pair. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "38917a3bef78d9939fc818de88d3cdea22369e2f1347fb516f3910ff41365b05",
+      "bytes": 1437
+    },
+    {
+      "evidence": "qualified-broader-manifest-v1.json",
+      "redacted_summary": "Separate predeclared prepared full-interval requests; does not overwrite legacy failures.",
+      "sha256": "f66e0f0772a4767c19af0c6cd4c3dc2ebb7f489a00a7b9d6828ff20e16fb947b",
+      "bytes": 1423
+    },
+    {
+      "evidence": "ranking-node-full-v2.log",
+      "redacted_summary": "Evidence for Delivered runnable source regressions. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "db127b25b04df5f0d0970a7b5a4bda7fc28ee9f18e4233080d69ecb1d208a1eb",
+      "bytes": 183332
+    },
+    {
+      "evidence": "ranking-offline-v1.log",
+      "redacted_summary": "Evidence for Delivered runnable source regressions. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "aaff62949403684090cccf345ed881f2a1bf5439d34ac8264976ab8346f879b0",
+      "bytes": 226182
+    },
+    {
+      "evidence": "reconcile_broader_evidence_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "f027f4febed0f7855e4fea3ecbc57043d3c5fba841f1d429e927b9cab991302d",
+      "bytes": 3045
+    },
+    {
+      "evidence": "record_native_four_visual_5f_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "af6aa244d0e0e1dad1c695cdee6d0b737e78e48812a5f9ace0cd4e5670f7fd55",
+      "bytes": 3506
+    },
+    {
+      "evidence": "record_ranked_visual_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "db1ef136c8e3f389cc51d30d93669f30f83c8f192498a0c81d704263376c4546",
+      "bytes": 3307
+    },
+    {
+      "evidence": "rename-generation-v1/rename-invariance.json",
+      "sha256": "9831e43f7f220cb0b6c722958bb6e062daee6f6fdfe5689ab170d3de0926bff1",
+      "bytes": 1108,
+      "redacted_summary": "Actual Action rename; equal model request and raw/corrected arrays."
+    },
+    {
+      "evidence": "rename-generation-v1/report.json",
+      "redacted_summary": "Evidence for Name independence. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "b8a1c85a456b1f7b48a5065c29e546b03112f89cb3209efffbec295c36a24152",
+      "bytes": 1135
+    },
+    {
+      "evidence": "run_accepted_parity_four_5f1b8b8_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "b858516de81208bef51e09be6f2d494a677b3741fbf7654fa8e83b980ab97156",
+      "bytes": 1328
+    },
+    {
+      "evidence": "run_accepted_parity_ranked_5d4a7ba_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "4e35449f89d3689b1ab1192f7d58562c7ce0d22c11dcae257fececa7bbd03aff",
+      "bytes": 1330
+    },
+    {
+      "evidence": "run_dense_final_quality_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "c6242cffae191695f86bbb64a0caa1112a03c661cc51dbfa7155cd265bc2b3c7",
+      "bytes": 800
+    },
+    {
+      "evidence": "run_final_profiles_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "038f9d954e1e856dbc9e2d7740101e4e3f6591bd9aaf45c8cd9013b1672c5f25",
+      "bytes": 2204
+    },
+    {
+      "evidence": "run_parent_space_v2.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "eb65c533740cc6b57f0ab3b9cffc9adb30659ffb495662dd330d1a5062f56305",
+      "bytes": 818
+    },
+    {
+      "evidence": "run_provider_faults_v3.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "acd9fda42450d395975f2a03aa4e5abdb643b1aaa56d57f15d45e28abcb3b467",
+      "bytes": 874
+    },
+    {
+      "evidence": "run_soles_pipeline_final_v1.py",
+      "redacted_summary": "Local reproducible procedure; private roots and fixture baselines must be copied to fresh output locations.",
+      "sha256": "d85e462d2d8d9d7194888a4916154b9f7c019a19323a49603c2c172e9a799856",
+      "bytes": 1379
+    },
+    {
+      "evidence": "runtime-scope-identity-5d4a7ba-v1.json",
+      "redacted_summary": "Evidence for Downstream reconciliation. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "17857388a688032f557117da423f232402212c5d248cfd27dcc8511f3aeaa8ed",
+      "bytes": 1429
+    },
+    {
+      "evidence": "scaled-parent-5f1b8b8-v2/report.json",
+      "redacted_summary": "Evidence for Supported transforms and FPS. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "884ba55cf32bd2b15bbeb9919f31ca7bcdb5480344b63d7e16cae403b326a7a4",
+      "bytes": 760
+    },
+    {
+      "evidence": "setup-notices-proof.json",
+      "redacted_summary": "Evidence for Evidence and licenses research handoff. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "0a186de17f8c0daf6a3327810ca3662b8153b6e13d95c00e04ecc3c72ef1d0fb",
+      "bytes": 767
+    },
+    {
+      "evidence": "sole-optimization-offline-v1.log",
+      "sha256": "59e0b1691e6c6630caf8ab7929d790027915ec7484c66015d0b5fd422dc2698b",
+      "bytes": 225424,
+      "redacted_summary": "812 tests, 809 passed and three disclosed skips; installer checks pass."
+    },
+    {
+      "evidence": "sole-sampling-benchmark-v1.json",
+      "sha256": "e5e25b580a878ea52eee931dcacb9610fb6e658d0fbc9bb2ef42b1b0ad93a9b6",
+      "bytes": 7526,
+      "redacted_summary": "Exact evaluated-height parity microbenchmark on two rigs."
+    },
+    {
+      "evidence": "soles-pipeline-comparison-final-v1.json",
+      "redacted_summary": "Evidence for Correction-surviving meaningful alternatives. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "062068072bd5d957310e335fae2063ce2dcc53266e4204ffda353bc98a4d1a3a",
+      "bytes": 53548
+    },
+    {
+      "evidence": "soles-pipeline-comparison-v1.json",
+      "sha256": "d20e07776c112f2438b11d52cb3507cf9cc3c7e2875d536004278dc5bd3b9cc7",
+      "bytes": 36022,
+      "redacted_summary": "Twelve identical-input generation/reopen jobs; exact numeric parity and measured timings."
+    },
+    {
+      "evidence": "soles-pipeline-final-v1/report.json",
+      "redacted_summary": "Evidence for Unseen compatible pair. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "693924b64bec0471eb87e874b623c2c4a1bfb22d33444f6aae06b8f33a703cb2",
+      "bytes": 1613
+    },
+    {
+      "evidence": "stage1-provider/result.json",
+      "redacted_summary": "Evidence for Actual loaded DLL, model hashes and build settings. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "dd1dd4a925e272d6b7b17e8ea72b1ae392066f7e7805bf9d2e1e07033664284b",
+      "bytes": 122606
+    },
+    {
+      "evidence": "stage1-provider/summary.json",
+      "redacted_summary": "Evidence for Unconstrained target position invariance. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "2d1f0c5a28b989d7af5fc7679e8800ab50d8294d40969fbe24782fefa320e63b",
+      "bytes": 3059
+    },
+    {
+      "evidence": "translated-parent-5f1b8b8-v2/report.json",
+      "redacted_summary": "Evidence for Supported transforms and FPS. Scope, case failures and limitations are retained in the acceptance matrix.",
+      "sha256": "f7feb33f2ff3352cecbee2ef9eefc34980b605060c1f40762a156ab6b9b03da9",
+      "bytes": 758
+    }
+  ],
+  "application_revision": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+  "motion_runtime_revision": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+  "ggml_revision": "8c63e70982c95ceb862e3a1073a2c1beef75d60a",
+  "weights_revision": "cc2a47603dbc203a4f18f35dd06ed3611833f506",
+  "native_host_sha256": "fdc1f89f4869e023a557246ed05c4bdba0dd7f5b084e44b32ba04408a1eec6da"
+}

@@ -4,7 +4,7 @@ from .core import fields, require
 from .motion_timing import number
 
 VERSION = 'action-layer-v1'
-FIELDS = {'version', 'audit_sha256', 'changes', 'frame_range'}
+FIELDS = {'version', 'audit_sha256', 'changes', 'frame_range', 'generation_attempt'}
 
 
 def validate(value):
@@ -36,6 +36,12 @@ def validate(value):
                     'INVALID_TIMING', 'Choose an explicit integer pose frame')
     require(not any(c['mode'] == 'timeline' for c in changes) or all(c['mode'] == 'timeline' for c in changes),
             'INVALID_TIMELINE', 'Save timeline changes separately from legacy clip/hold changes')
+    if 'generation_attempt' in value:
+        require(isinstance(value['generation_attempt'], str)
+                and re.fullmatch(r'run_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', value['generation_attempt'])
+                and any(clip.get('transition', {}).get('mode') == 'generated'
+                        for change in changes for clip in change.get('clips', [])),
+                'INVALID_ACTION', 'A generation attempt needs a unique request identity and generated motion')
     if 'frame_range' in value:
         interval = value['frame_range']
         require(isinstance(interval, list) and len(interval) == 2 and all(type(f) is int for f in interval)

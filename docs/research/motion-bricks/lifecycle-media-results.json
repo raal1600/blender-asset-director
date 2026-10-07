@@ -1,0 +1,136 @@
+{
+  "schema": "motion-bricks.public-lifecycle-media.v1",
+  "evidence_class": "REPORTED_LOCAL_RUNTIME_REDACTED_OUTCOMES_NOT_MEDIA_ACCESS",
+  "lifecycle": {
+    "source": {
+      "private_report_id": "native-lifecycle-5f1b8b8-v1/report.json",
+      "sha256": "31fd9084efbda3760c8b66e0af7c99020fe015314091eaac49c5bdac986b635e",
+      "public_access": "REDACTED_PROJECTION_ONLY"
+    },
+    "application_commit": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+    "status": "PASS_NATIVE_STALE_CANCEL_PROVIDER_CRASH_RESTART_DUPLICATES_CORRUPTION_ACCEPT_REOPEN",
+    "harness_errors": 0,
+    "exit_code": 0,
+    "stale_fingerprint_differs": true,
+    "stale_accepted_unchanged": true,
+    "cancellation_click_to_terminal_seconds": 0.78,
+    "provider_crash": {
+      "status": "INJECTED_OWNED_PROVIDER_CRASH",
+      "verified_owned_process": true
+    },
+    "restart": {
+      "backend_changed": true,
+      "accepted_unchanged": true,
+      "candidates_unchanged": true,
+      "quarantine_state": "EXCLUDED_FROM_CANDIDATES"
+    },
+    "corruption_status": "REFUSED_WITH_ACCEPTED_UNCHANGED",
+    "duplicate_acceptance": {
+      "exact_retry": "IDEMPOTENT_NO_SECOND_EVENT",
+      "new_event": "REFUSED_ALREADY_ACCEPTED"
+    },
+    "attempt_outcomes": [
+      {
+        "attempt_index": 1,
+        "state": "SUCCEEDED",
+        "total_seconds": 85.696
+      },
+      {
+        "attempt_index": 2,
+        "state": "CANCELLED",
+        "total_seconds": 3.97
+      },
+      {
+        "attempt_index": 3,
+        "state": "FAILED",
+        "total_seconds": 21.354
+      },
+      {
+        "attempt_index": 4,
+        "state": "INTERRUPTED",
+        "total_seconds": 11.954
+      },
+      {
+        "attempt_index": 5,
+        "state": "SUCCEEDED",
+        "total_seconds": 84.319
+      },
+      {
+        "attempt_index": 6,
+        "state": "SUCCEEDED",
+        "total_seconds": 84.289
+      }
+    ],
+    "accepted_preview_identity_equal_across_restart": true
+  },
+  "multi_join": {
+    "source": {
+      "private_report_id": "native-multi-2cd8ed9-v1/report.json",
+      "sha256": "68ab6cdab98caea3e8323076f490e1bc1f744b70997a91ff0596b0aca611c916",
+      "public_access": "REDACTED_PROJECTION_ONLY"
+    },
+    "application_commit": "2cd8ed9eea8961569e02ebf541bafca3b0fefc97",
+    "status": "PASS_NATIVE_FOUR_CLIP_DOWNSTREAM_COMPARE_ACCEPT_RESTORE_REOPEN",
+    "harness_errors": 0,
+    "exit_code": 0,
+    "accepted_preview_identity_equal_across_restart": true,
+    "procedure": "procedures/native_multi_2cd8ed9_v1.mjs.txt"
+  },
+  "media_parity": [
+    {
+      "source": {
+        "private_report_id": "native-parity-ranked-5d4a7ba-v1/preview-parity.json",
+        "sha256": "c1386cce4e0ffd7d312cdcffd44905433f57031b41db6894996b14c726580a50",
+        "public_access": "REDACTED_PROJECTION_ONLY"
+      },
+      "visual_report_source": {
+        "private_report_id": "native-render-ranked-5d4a7ba-v1/agent-visual-review.json",
+        "sha256": "08e2c133623dcf1582de77f8ff1a4e81951f20a381cdc4ef08f138db720b6c7c",
+        "public_access": "REDACTED_PROJECTION_ONLY"
+      },
+      "application_commit": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+      "status": "PASS",
+      "thresholds": {
+        "position_m": 0.0001,
+        "orientation_deg": 1
+      },
+      "maximum_mesh_error_m": 1.182798636024899e-05,
+      "maximum_orientation_deg": 0.14950838001963418,
+      "baked_source_sha256": "977dcff8230c5f7c6474b9ab85b96e892d52eed30a9e8b2534ee99d8f53ff470",
+      "glb_sha256": "70c9c6abf01a63a6a5d52dbbb03feeac4ab6b5ec71dc1530d6c57d55f2e30e59",
+      "sample_count": 83,
+      "reported_visual_status": "PASS_SCOPED_STATIC_VISUAL_AND_AUTOMATED_TEMPORAL_PLAYBACK",
+      "movie_sha256": "31a4425df5a585c84b287e47cd89ef5a919bebe457da076b7257b70cd7f53c1e",
+      "rendered_frame_count": 72,
+      "human_review": "NOT_CLAIMED"
+    },
+    {
+      "source": {
+        "private_report_id": "native-parity-four-5f1b8b8-v1/preview-parity.json",
+        "sha256": "2baad0ba034332c4bee17c7e24c20a61c36bf18d73e95b23a356e014e81d07a3",
+        "public_access": "REDACTED_PROJECTION_ONLY"
+      },
+      "visual_report_source": {
+        "private_report_id": "native-render-four-5f1b8b8-v1/agent-visual-review.json",
+        "sha256": "b43222fd0e7d5bf1e6631c83ffaeab2e89ecd1c9e99af7848757141d3703eeda",
+        "public_access": "REDACTED_PROJECTION_ONLY"
+      },
+      "application_commit": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+      "status": "PASS",
+      "thresholds": {
+        "position_m": 0.0001,
+        "orientation_deg": 1
+      },
+      "maximum_mesh_error_m": 1.182798636024899e-05,
+      "maximum_orientation_deg": 0.16105152700213637,
+      "baked_source_sha256": "9596edda74e1f58da7d646c170da983ac4b0b95078a878bf76fa4e59a3775ea6",
+      "glb_sha256": "0bf09da11a5255dd4b2946ae6e0beecd36ffb3be989ac3b97febbdd3279f1078",
+      "sample_count": 206,
+      "reported_visual_status": "PASS_SCOPED_STATIC_VISUAL_AND_AUTOMATED_TEMPORAL_PLAYBACK",
+      "movie_sha256": "66e2a009f31836243fdcdd36f99b3b46109c1fb2676548113d804e625006780c",
+      "rendered_frame_count": 176,
+      "human_review": "NOT_CLAIMED"
+    }
+  ],
+  "visual_scope": "Original media remain private. This file reports local numerical parity, prior static agent inspection and automated full-speed playback; the cloud reader cannot visually verify the images or infer human artistic approval."
+}
