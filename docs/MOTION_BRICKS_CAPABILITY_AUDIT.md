@@ -76,6 +76,18 @@ The application rerun with that numerical change
 including fresh reopening; stochastic seed 1234 still fails penetration. The
 four-case report correctly remains FAIL because it retains that failed sample.
 
+The clean `4e45674bc2305900d8a8c9d82b38c7be3477e0ad` native Windows build
+generated three immutable candidates, of which two passed quality. Actual
+source-aligned A/B controls played both passing alternatives. Explicit acceptance
+persisted the chosen checkpoint and event, but the client then recreated its old
+working draft during snapshot refresh and left the accepted preview empty. The
+complete journey is therefore FAIL, not an acceptance/render pass. The accepted
+artifact remains intact. Snapshot guards now inspect cached edits without lazily
+reconstructing the prior request; unit regressions protect both this repair and
+real unsaved edits. A fresh isolated native rerun is required. Evidence:
+`native-accept-4e45674/report.json`, `accepted-wait.txt`, and
+`snapshot-reconciliation-unit-v1.log`.
+
 The local `c401b33a77eb751aff462d3c0a6a66e73c501368` build passed the visible
 Windows comparison, input-change staleness and active-Blender cancellation
 procedure (`native-review-c401b33-r2/report.json`). Accepted state survived.
