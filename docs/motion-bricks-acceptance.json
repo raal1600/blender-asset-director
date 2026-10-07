@@ -363,15 +363,15 @@
       "fixture": "generation/failure/cancellation",
       "expected_behavior": "Accepted and candidate separation",
       "threshold_or_invariant": "accepted checkpoint remains usable until explicit acceptance",
-      "command_or_journey": "transaction tests + native journey",
+      "command_or_journey": "node <private evidence root>/native_review_c401b33_r2.mjs (actual isolated Windows executable and WebView2)",
       "identities": {
-        "application": "9474ccaec164e91ae444f36db45f641732570a7d; later dirty experiments identified by their input implementation hashes",
+        "application": "c401b33a77eb751aff462d3c0a6a66e73c501368",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Isolated Windows candidate; final build pending"
+        "build": "candidate-c401b33.json; Studio-review-c401b33-journeys"
       },
       "status": "PASS",
-      "evidence_path": "native-review-9474cca/report.json",
-      "known_limitations": "Three actual model candidates left the accepted checkpoint unchanged. Complete acceptance/failure/cancellation/restart journeys remain separate rows."
+      "evidence_path": "native-review-c401b33-r2/report.json; native_review_c401b33_r2.mjs",
+      "known_limitations": "Native input-change staleness, stopped batch, candidate separation and active-Blender cancellation verified. Candidate quality failed; successful acceptance and final rendering are not claimed."
     },
     {
       "id": "acceptance",
@@ -418,8 +418,8 @@
         "build": "Isolated Windows candidate; final build pending"
       },
       "status": "FAIL",
-      "evidence_path": "native-review-9474cca/report.json; stage4-recovery-unit-r2.log",
-      "known_limitations": "Actual source-aligned A/B and full-speed controls passed at 9474cca. Final performer framing and complete comparison acceptance require native rerun."
+      "evidence_path": "native-review-c401b33-r2/04-comparison.png; native-review-c401b33-r2/05-playback.png; native-review-c401b33-r2/report.json",
+      "known_limitations": "Actual source-aligned full-speed A/B with performer framing verified and screenshots inspected by agent. Different-duration comparison and complete motion playback review remain pending."
     },
     {
       "id": "journey-a",
@@ -459,15 +459,15 @@
       "fixture": "actual Windows WebView2 client",
       "expected_behavior": "Change inputs during generation",
       "threshold_or_invariant": "old result stale and cannot overwrite",
-      "command_or_journey": "native journey C",
+      "command_or_journey": "node <private evidence root>/native_review_c401b33_r2.mjs (actual isolated Windows executable and WebView2)",
       "identities": {
-        "application": "cea64d0ebeaf09302adcf650b83b70d459b12bf9",
+        "application": "c401b33a77eb751aff462d3c0a6a66e73c501368",
         "provider": "ee0cf5d9035f639ed0787f390fb1ce05d6a4c463",
-        "build": "Windows proof-vulkan O1; implementation acceptance pending"
+        "build": "candidate-c401b33.json; Studio-review-c401b33-journeys"
       },
-      "status": "FAIL",
-      "evidence_path": null,
-      "known_limitations": "Mandatory gate not yet fulfilled; pending implementation and/or runtime evidence, not classified as unsupported."
+      "status": "PASS",
+      "evidence_path": "native-review-c401b33-r2/report.json; native_review_c401b33_r2.mjs",
+      "known_limitations": "Native input-change staleness, stopped batch, candidate separation and active-Blender cancellation verified. Candidate quality failed; successful acceptance and final rendering are not claimed."
     },
     {
       "id": "journey-d",
@@ -482,8 +482,8 @@
         "build": "Isolated Windows candidate; final build pending"
       },
       "status": "FAIL",
-      "evidence_path": "stage1-provider/summary.json; stage4-recovery-unit-r2.log",
-      "known_limitations": "Real provider cancellation/refusal/recovery and synthetic launcher recovery are partial evidence; combined visible native failure/restart journey is pending."
+      "evidence_path": "native-review-c401b33-r2/report.json; stage1-provider/summary.json",
+      "known_limitations": "Visible cancellation after Blender start passed in 0.567 s and preserved accepted state. Combined real provider crash and native restart journey remains pending."
     },
     {
       "id": "journey-e",
@@ -626,8 +626,8 @@
         "build": "Isolated Windows candidate; final build pending"
       },
       "status": "FAIL",
-      "evidence_path": "stage4-offline-in-progress.log; stage4-node-in-progress.log; stage4-motion-tests.log",
-      "known_limitations": "In-progress checks passed 795 Python tests (3 skips) and installer checks, plus 386 Node tests, before subsequent source changes. Final clean-commit checks pending."
+      "evidence_path": "attempt-diversity-offline.log; attempt-diversity-node.log",
+      "known_limitations": "Current checkpoint passes 798 Python tests (795 passed, 3 disclosed skips), installer checks, and 393 Node tests. Not yet the final delivered native build."
     },
     {
       "id": "handoff",
@@ -661,8 +661,8 @@
     "blocked": []
   },
   "counts": {
-    "PASS": 9,
-    "FAIL": 31,
+    "PASS": 10,
+    "FAIL": 30,
     "BLOCKED": 0
   },
   "counts_scope": "Current progress rows; not final delivery acceptance"

@@ -1,12 +1,33 @@
 import copy
 import tempfile
 import unittest
+from uuid import uuid4
 from pathlib import Path
 from asset_director import action_layer_contract as contract, jobs
-from asset_director.core import Library, DirectorError
+from asset_director.core import Library, DirectorError, atomic_json, load_json
 
 
 class ActionContractTests(unittest.TestCase):
+    def test_generated_attempts_have_distinct_native_jobs_and_keep_failed_evidence(self):
+        first={'id':'clip_a','take_id':'take_'+'b'*64,'start':1,'frames':25,'speed':1,'repeat_reviewed':False,'travel':None}
+        second=first|{'id':'clip_b','start':38,'transition':{'mode':'generated','frames':12,'match_phase':False,'seed':1234,'profile_sha256':'c'*64}}
+        options={'version':contract.VERSION,'audit_sha256':'a'*64,'changes':[{'performer':'Rig','mode':'timeline','clips':[first,second]}],
+                 'generation_attempt':'run_'+str(uuid4())}
+        with tempfile.TemporaryDirectory() as tmp, Library(Path(tmp)/'library') as lib:
+            source=Path(tmp)/'input.blend';source.write_bytes(b'identity-only portable fixture; no Blender execution')
+            original=jobs.prepare(lib,'action-edit',input_file=str(source),options=options)
+            folder=lib.root/'jobs'/original['id'];original['state']='FAILED';atomic_json(folder/'job.json',original)
+            (folder/'worker.log').write_text('retained failed attempt')
+            duplicate=jobs.prepare(lib,'action-edit',input_file=str(source),options=options)
+            self.assertEqual(duplicate['state'],'FAILED','Same attempt must remain idempotent')
+            new=jobs.prepare(lib,'action-edit',input_file=str(source),options=options|{'generation_attempt':'run_'+str(uuid4())})
+            self.assertNotEqual(new['id'],original['id']);self.assertEqual(new['state'],'PLANNED')
+            self.assertEqual(load_json(folder/'job.json'),original)
+            self.assertEqual((folder/'worker.log').read_text(),'retained failed attempt')
+        for attempt in ['',True,'run_guess','../escape']:
+            with self.assertRaises(DirectorError):contract.validate(options|{'generation_attempt':attempt})
+        with self.assertRaises(DirectorError):contract.validate(self.options()|{'generation_attempt':'run_'+str(uuid4())})
+
     def options(self):
         return {'version': contract.VERSION, 'audit_sha256': 'a' * 64,
                 'changes': [{'performer': 'Observed performer', 'mode': 'clip', 'take_id': 'take_' + 'b' * 64, 'start': 1, 'speed': 1}]}

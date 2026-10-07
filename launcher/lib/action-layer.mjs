@@ -73,11 +73,12 @@ export async function cancelActionSave(work,id,sceneId,runId){
 export async function saveAction(work,id,sceneId,revision,request){
   const cancellation=registerActionSave(work,id,sceneId,revision,request);
   const reviewOnly=generatedRequest(request);let working;
-  const options={version,audit_sha256:request.audit_sha256,changes:request.changes,...(request.frame_range?{frame_range:request.frame_range}:{})};
+  const options={version,audit_sha256:request.audit_sha256,changes:request.changes,...(request.frame_range?{frame_range:request.frame_range}:{}),
+    ...(reviewOnly?{generation_attempt:request.requestId}:{})};
   try{return await checkpointJob(work,id,sceneId,revision,request,{
     stage:'action',operation:'action-edit',options,cancellation,reviewOnly,
     ...(reviewOnly?{implementation:async()=>{const cap=await work.available();assert(validHash(cap.implementation),'Matching runtime unavailable.',409);return cap.implementation;},
-      publish:context=>publishCandidate(context,working)}:{}),
+      publish:context=>publishCandidate(context,working,work.config.library)}:{}),
     check:async({p,scene,cp})=>{
       const run=await json(await safe(p.directory,`Runs/${request.inspectionId}.json`));
       assert(run.projectId===id&&run.sceneId===sceneId&&run.action==='action-audit'&&run.state==='SUCCEEDED'&&run.checkpointId===cp.id&&run.checkpointSha256===cp.sha256&&run.inspection?.sha256===request.audit_sha256,'Action inspection is stale or belongs to another scene.',409);

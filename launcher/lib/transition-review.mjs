@@ -2,6 +2,7 @@
 import {randomUUID} from 'node:crypto';
 import {assert,digest,json,safe,now,fileHash,writeJson,exists} from './storage.mjs';
 import {approveCheckpoint,validId,validHash} from './workbench-model.mjs';
+import {compareCandidates} from './transition-diversity.mjs';
 
 export const reviewVersion='transition-review-v1';
 export const generatedRequest=request=>request.changes?.some(c=>c.mode==='timeline'&&c.clips.some(x=>x.transition?.mode==='generated'))===true;
@@ -55,12 +56,12 @@ export async function discardTransitionRequest(work,id,sceneId,revision){
   reviewState(scene).working=null;
   return work.store.save(p,p.revision);
 }
-export async function publishCandidate({scene,checkpoint,data,record,output},working){
+export async function publishCandidate({scene,checkpoint,data,record,output},working,library){
   const review=reviewState(scene);
   assert(!review.candidates.some(c=>c.id===record.id),'Generation attempt already has an immutable candidate.',409);
   // A missing report is never a passing quality check. Failed candidates remain inspectable.
   const validation=data.transition_validation||{status:'FAIL',measurements:'UNAVAILABLE',reason:'Native quality validation did not return a report.'};
-  review.candidates.push({id:record.id,requestId:working.id,fingerprint:working.fingerprint,
+  const candidate={id:record.id,requestId:working.id,fingerprint:working.fingerprint,
     baseCheckpointId:working.baseCheckpointId,baseSha256:working.baseSha256,implementation:working.implementation,
     checkpointId:checkpoint.id,sha256:checkpoint.sha256,size:checkpoint.size,createdAt:now(),
     nativeJobId:record.jobId,artifacts:structuredClone(output.outputs),validation,
@@ -68,7 +69,9 @@ export async function publishCandidate({scene,checkpoint,data,record,output},wor
     traceSource:{schema:'workbench-job-trace-v1',requestId:record.id,nativeJobId:record.jobId,receipt:`Runs/${record.id}.json`},
     transitions:(data.changes||[]).flatMap(c=>(c.timeline?.connections||[]).map(j=>({performer:c.performer,...j}))),
     previewSource:{checkpointId:checkpoint.id,sha256:checkpoint.sha256},
-    requestedTimeline:structuredClone(record.options),samplingPlan:working.request.sampling_plan||null,downstream:working.downstream});
+    requestedTimeline:structuredClone(record.options),samplingPlan:working.request.sampling_plan||null,downstream:working.downstream};
+  candidate.diversity=await compareCandidates(library,candidate,review.candidates);
+  review.candidates.push(candidate);
 }
 export async function acceptTransition(work,id,sceneId,revision,{candidateId,eventId,fingerprint}){
   assert(validId(candidateId,'run_')&&validId(eventId,'run_')&&validHash(fingerprint),'Invalid transition acceptance identity.');

@@ -90,3 +90,20 @@ provider loading/inference timings. Wall-clock startup estimates are explicitly
 labeled and are not confused with monotonic stage duration. Pre-bake raw-retargeted
 and corrected world-space kinematics use identical timestamps; baked validation
 is separate and denser. Missing stage contact measurements remain unavailable.
+
+Each generated Action operation now carries `generation_attempt`, the validated
+UUID request ID. It belongs to the durable job specification, not the motion
+dependency fingerprint. Repeating unchanged inputs therefore creates a fresh
+isolated native attempt; it neither reuses a failed job nor rewrites its files.
+Resubmitting the same attempt remains idempotent. Ordinary native clip operations
+retain their existing job identity policy.
+
+Corrected artifacts include `motion-bricks.comparison.v1`: the fixed reviewed
+height, physical duration, raw model rotations/root positions converted to
+metres, and corrected evaluated world rotations/root positions before baking.
+Publication verifies artifact hashes before comparing candidates with the same
+dependency fingerprint. Near duplicates require both interior rotation RMS
+at most 0.1 degrees and root RMS at most 0.0001 of reviewed height. Quaternion
+sign and metadata are irrelevant. Raw and corrected differences are reported
+separately so correction-erased diversity is visible. Different durations are
+reported separately without time warping. This is not a baked quality pass.

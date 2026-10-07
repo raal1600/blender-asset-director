@@ -1,5 +1,28 @@
 # MotionBricks capability audit (2026-10-05)
 
+## 2026-10-07 — continued repair and native falsification
+
+The local `c401b33a77eb751aff462d3c0a6a66e73c501368` build passed the visible
+Windows comparison, input-change staleness and active-Blender cancellation
+procedure (`native-review-c401b33-r2/report.json`). Accepted state survived.
+Candidate quality still failed; no successful acceptance/render is inferred.
+The earlier `7fc75d2` client failed to load an unserved helper. The subsequent
+HTTP import-graph regression catches that integration failure.
+
+Further private reference experiments retained the fixed limits: explicit early
+tangent increments moved the acceleration peak and failed; stronger local
+smoothing exceeded 15 degrees; world-rotation smoothing at 0.05 seconds still
+measured 13,388 degrees/s², and at 0.075 seconds required 17.35 degrees of local
+correction. A bounded world-acceleration optimization also exceeded the preset
+correction limit. These experimental corrections were not adopted. Evidence:
+`endpoint-increments-v1`, `strong-filter-v1`, `world-filter-v1` through `v3`.
+
+Implemented after that native checkpoint: distinct generation-attempt job
+identities and hash-verified raw/corrected candidate duplicate detection. These
+have portable regression evidence; their next real native verification is
+pending. No new backend, weights, dependency version or acceptance threshold
+was introduced.
+
 ## 2026-10-07 authoring investigation (in progress)
 
 ### Subsequent native review and dense quality falsification

@@ -1,5 +1,20 @@
 # Offline transition review — implementation in progress
 
+Latest completed native procedure: `native-review-c401b33-r2/report.json`,
+application `c401b33a77eb751aff462d3c0a6a66e73c501368`. The actual visible
+Windows host generated three candidates and opened two source-aligned baked
+previews with the complete character framed. During a fourth real attempt,
+changing duration made its completion stale and stopped the remaining batch.
+Cancellation after Blender started completed in 0.567 seconds. The accepted
+checkpoint was unchanged throughout. All candidates failed the fixed quality
+gate; this does not establish acceptance, restore, final rendering or naturalness.
+
+The preceding `7fc75d2` native startup failed because a packaged helper was not
+served; `c401b33` fixes the allowlist and tests the transitive HTTP module graph.
+The first `c401b33` procedure asserted editability during transient request
+admission. Its corrected procedure waits for editability while still requiring
+a running native job; no application editability gate was weakened.
+
 The accepted checkpoint and the working transition request are separate. Generate creates immutable candidate checkpoints. Acceptance verifies the current request fingerprint, runtime implementation, source checkpoint, candidate and evidence hashes, and hard quality report before atomically publishing the complete timeline. A failed candidate is inspectable but cannot be accepted.
 
 Select a generated connection, set its duration, generate, inspect the candidate, refine, compare, and explicitly accept. “Generate alternatives (3)” uses the pinned ABI's Gumbel sampler at fixed temperature 1, with seeds 1234, 7 and 42. Argmax seed changes are not alternatives. The tested raw and corrected diversity evidence is described in the capability audit; updated cleanup still needs its final diversity regression.

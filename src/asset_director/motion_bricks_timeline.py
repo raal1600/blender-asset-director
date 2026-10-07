@@ -216,7 +216,13 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
     if directory:
         filename=prefix+'.json'
         atomic_json(directory/filename,{'input_contract':input_contract,'request':request,'result':result,'provenance':provenance})
-        atomic_json(directory/(prefix+'-corrected.json'),{'request_id':request_id,'samples':samples,'path_offsets_local':path})
+        comparison={'schema':'motion-bricks.comparison.v1','height_m':profile['reference_height_m'],'seconds':duration/fps,
+                    'raw':{'roots_m':[[v/profile['world_to_model_scale'] for v in p] for p in result['roots'][first:last+1]],
+                           'rotations_wxyz':[{str(i):[q[3],*q[:3]] for i,q in enumerate(row)} for row in result['local_xyzw'][first:last+1]]},
+                    'corrected':{'roots_m':corrected_roots,'rotations_wxyz':corrected_rotations},
+                    'coordinate_frames':{'raw':'model axes, converted to world metres; model-local rotations',
+                                         'corrected':'evaluated world roots and rotations before baking'}}
+        atomic_json(directory/(prefix+'-corrected.json'),{'request_id':request_id,'samples':samples,'path_offsets_local':path,'comparison':comparison})
         provenance['evidence_file']=filename
     return {**geometry,'placement_pending':False,'delta_m':[delta.x,delta.y],'provider':'motion-bricks.cpp','implementation':'motion-bricks-predicted-placement-v1',
             'generation_mode':'generated','phase_note':'Both native clips retained from original boundaries; no phase shift',

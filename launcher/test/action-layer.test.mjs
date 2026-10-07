@@ -245,6 +245,20 @@ test('changed working request during native generation makes completion stale wi
  assert.equal(candidateStatus(s,candidate),'STALE');assert.equal(s.current,f.cp.id);
  await assert.rejects(f.work.acceptTransition(p.id,s.id,p.revision,{candidateId:candidate.id,eventId:uid('run_'),fingerprint:candidate.fingerprint}),/stale/);
 });
+test('repeated generation keeps the dependency fingerprint but creates distinct immutable native attempts',async t=>{
+ const f=await generatedFixture(t);f.control.validation={status:'FAIL'};
+ await f.work.saveAction(f.project.id,f.scene.id,f.project.revision,f.request);
+ let p=await f.wait();const first=p.workbench.scenes[0].transitionReview.candidates[0];
+ const nextRequest={...f.request,requestId:uid('run_')};
+ await f.work.saveAction(p.id,f.scene.id,p.revision,nextRequest);p=await f.wait();
+ const candidates=p.workbench.scenes[0].transitionReview.candidates;
+ assert.equal(candidates.length,2);assert.deepEqual(candidates[0],first);
+ assert.equal(candidates[1].fingerprint,first.fingerprint);
+ assert.notEqual(candidates[1].nativeJobId,first.nativeJobId);
+ assert.equal(first.requestedTimeline.generation_attempt,f.request.requestId);
+ assert.equal(candidates[1].requestedTimeline.generation_attempt,nextRequest.requestId);
+ assert.equal(p.workbench.scenes[0].current,f.cp.id);
+});
 test('missing or failed quality reports cannot be accepted, and corrupt artifacts are refused',async t=>{
  for(const status of [undefined,'FAIL','PASS']){
   const f=await generatedFixture(t);if(status)f.control.validation={status};
