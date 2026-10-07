@@ -11,7 +11,7 @@ if not __debug__:raise RuntimeError("Optimized Python disables acceptance assert
 import bpy,sys,os,json,math,traceback,time
 from pathlib import Path
 from mathutils import Vector
-repo=Path(__file__).resolve().parents[1];sys.path.insert(0,str(repo/'src'));sys.dont_write_bytecode=True
+repo=Path(__file__).resolve().parents[1];sys.path.insert(0,str(repo/'src'));sys.path.insert(0,str(repo/'tools'));sys.dont_write_bytecode=True
 from asset_director import action_layer as layer,blender_ops as ops,native_motion_basis as basis,motion_bricks_retarget as ret,sequence_math as qm
 from asset_director.core import atomic_json,digest,file_hash,DirectorError
 from asset_director.motion_bricks_stitch_math import boundary_estimate
@@ -82,12 +82,13 @@ for case in cases:
   rig.animation_data.action=None;basis.restore(rig,baseline)
   if 'bad_action_timeline_v1' in rig:del rig['bad_action_timeline_v1']
   scene.render.fps=case['fps'];scene.render.fps_base=1.;bpy.context.view_layer.update()
-  selected=[]
+  selected=[];row['derived_input_conversions']=[]
   for i,name in enumerate(case['clips']):
    action=source_actions[name];bound_slots=[slot for bound,slot in layer.bindings(rig) if bound==action];assert len(bound_slots)==1,'Select an unambiguous rig/Action/slot binding';slot=bound_slots[0];source_fps=case.get('source_fps',[manifest['source_fps']]*len(case['clips']))[i];offset=case.get('offset') if i==1 else None
    if offset:
     parent=rig.parent.matrix_world@rig.matrix_parent_inverse if rig.parent else rig.matrix_parent_inverse;offset=list(parent.to_3x3().inverted()@Vector((*offset,0.)))
    if source_fps!=manifest['source_fps'] or offset:
+    native_action=action;native_metadata={key:action[key] for key in ('bad_root_contact_preparation_v1','bad_contact_intervals_v1') if key in action}
     action=action.copy();action.name='Acceptance '+case['name']+' '+str(i)
     if slot is not None:slot=next(s for s in action.slots if s.identifier==slot.identifier)
     for fc in ops.curves(action,slot):
@@ -96,6 +97,14 @@ for case in cases:
       if offset and fc.data_path=='location' and fc.array_index<3:
        for attr in ('co','handle_left','handle_right'):getattr(k,attr).y+=offset[fc.array_index]
      fc.update()
+    from fixture_contact_timebase import rescale_contacts
+    converted=rescale_contacts(native_metadata,manifest['source_fps'],source_fps)
+    for key,value in converted.items():action[key]=value
+    assert native_metadata=={key:native_action[key] for key in native_metadata},'Original contact metadata changed'
+    row['derived_input_conversions'].append({'original_action':native_action.name,'derived_action':action.name,
+      'original_fps':manifest['source_fps'],'derived_fps':source_fps,'frame_time_scale':source_fps/manifest['source_fps'],
+      'original_metadata_sha256':digest(native_metadata),'derived_metadata_sha256':digest(converted),
+      'contact_timestamps':'Scaled with key times; physical seconds unchanged','original_metadata_preserved':True})
     track=rig.animation_data.nla_tracks.new();track.name='Acceptance FPS/source offset '+str(i);strip=track.strips.new(action.name,0,action)
     if slot is not None:strip.action_slot=slot
     track.mute=True
