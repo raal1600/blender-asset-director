@@ -2,6 +2,52 @@
 
 ## 2026-10-07 authoring investigation (in progress)
 
+### Subsequent native review and dense quality falsification
+
+`native-review-9474cca/report.json` verifies actual visible Windows/WebView2
+three-candidate generation, unchanged accepted checkpoint, two real baked
+previews, source-aligned comparison and full-speed controls. It recorded no page
+errors. All three candidates failed quality. The 96.743-second click-to-review
+observation is one sample, not a performance percentile or acceptance/render pass.
+
+Later source experiments replaced repeated partial foot-orientation projection
+with fixed targets and added constrained endpoint/tangent smoothing. The fixed
+acceleration threshold was not loosened. `dense-quality-convergence.json` shows
+why a coarse pass is insufficient: the same repeated travelling-clip candidate
+measured 4,795 degrees/s² at 60 Hz, 6,778 at 240 Hz and 11,081 at 480 Hz. The
+reference also has large near-stitch peaks. The current v2 quality preset uses
+240 Hz by default, checks that the measured contact landmark itself is grounded,
+and still requires further convergence/visual evidence. It is not a physical
+feasibility certificate. Historical 60 Hz passes are not inherited.
+
+`final-tangent-reconcile-v2` reduced the corrected root acceleration enough to
+pass its dense gate with 4.83 mm maximum additional generated-root smoothing.
+Joint acceleration still failed at about 13,468 degrees/s². Native preservation
+and fresh reopening passed. The sequence runner now returns overall FAIL for
+failed kinematic quality, while retaining continuity and fresh-process results
+separately. Earlier runner PASS labels covered only their declared continuity
+scope. No quality-failed candidate has been accepted.
+
+`cleanup-comparison-240.json` evaluates identical reference inputs/bakes with the
+same validator: earlier cleanup measured 29,275 degrees/s² joint acceleration
+and 58.46 m/s² root acceleration; retained refinement measured 13,468 and 16.48,
+respectively. The joint gate still fails. An experimental clamped spline bake
+increased the peak slightly and was reverted. `stage4-checkpoint-offline.log`
+passes 797 tests (794 passed, 3 skipped) and installer checks;
+`stage4-checkpoint-node-r3.log` passes 390 launcher tests for this local stage.
+
+Restart unit tests cover an interrupted unpublished attempt, publication before
+launcher failure, preservation of the accepted scene and refusal to clear a live
+writer's lease. Their synthetic transport is not native fault-injection evidence.
+New queue/native/save/hash traces and camera focus are awaiting final native
+validation. In-progress portable checks passed 795 tests (792 passed, 3 skipped)
+plus installer checks, and 386 launcher tests, before subsequent refinements.
+
+Pinned code/weight license texts were inspected and copied by the updated setup
+helper into a new isolated evidence directory. Their exact hashes are retained
+in `setup-notices-proof.json`; code and weight terms remain distinct. See
+`THIRD_PARTY_NOTICES.md`. No private assets or model binaries were added to Git.
+
 ### Later repair-loop evidence, following 91cb591
 
 The actual isolated Windows/WebView2 client generated three immutable model

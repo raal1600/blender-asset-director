@@ -11,6 +11,7 @@ import json
 import re
 import shutil
 import sys
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
@@ -41,7 +42,14 @@ def create(root, blender, python, codex, *, source_commit=None, ffmpeg=None, ffp
     root = requested.parent.resolve() / requested.name
     root.mkdir()  # Exclusive; races with another creator fail, never overwrite.
     receipt = root / 'studio-setup.json'
-    result = {'schema': 1, 'status': 'CREATING', 'source_commit': source_commit,
+    verified_commit=False
+    if source_commit:
+        try:
+            head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True,stderr=subprocess.DEVNULL,timeout=10).strip()
+            dirty=subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True,stderr=subprocess.DEVNULL,timeout=10).strip()
+            verified_commit=head==source_commit and not dirty
+        except (OSError,subprocess.SubprocessError):pass
+    result = {'schema': 1, 'status': 'CREATING', 'source_commit': source_commit,'source_commit_verified':verified_commit,
               'production_installed': False, 'runtime_ready': 'NOT_VERIFIED',
               'native_gui': 'NOT_TESTED', 'root': str(root)}
     receipt.write_text(json.dumps(result, indent=2), encoding='utf-8')
@@ -62,8 +70,8 @@ def create(root, blender, python, codex, *, source_commit=None, ffmpeg=None, ffp
         configured.update(skill=str(skill), library=str(library), mcpPort=9876, port=0)
         (root / 'SystemRuntime/UserData/Launcher/config.json').write_text(
             json.dumps(configured, indent=2), encoding='utf-8')
-        # Preserve a manifest of the copied source. A supplied SHA is a label,
-        # not verification that this checkout was clean or that GUI checks passed.
+        # Preserve the copied content independently of the Git label. A clean
+        # HEAD check above verifies only source provenance, never GUI readiness.
         result.update(status='CREATED', files={
             f.relative_to(root).as_posix(): hashlib.sha256(f.read_bytes()).hexdigest()
             for folder in (skill, launcher) for f in sorted(folder.rglob('*'))

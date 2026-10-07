@@ -12,8 +12,10 @@ model contexts, native-basis/rest/mapping hashes, object linear and parent
 transforms, unit scale, source preparation/contact properties, requested timing,
 sampling settings, provider configuration and pinned source/GGML/model revisions.
 Project/checkpoint identity is additionally bound by the existing job input hash
-and launcher transaction. Persistent accepted/working revision binding is an
-outstanding implementation gate, not guaranteed by this envelope alone.
+and launcher transaction. `transition-review.mjs` separately binds accepted,
+working and candidate checkpoints. Atomic acceptance rechecks the request,
+runtime, source checkpoint and every candidate artifact hash. Complete native
+acceptance/recovery journeys remain a separate runtime evidence gate.
 
 Each boundary covers 0.1 seconds (four samples at 30 FPS). Sampling cannot wrap,
 extrapolate or reach outside the selected single native interval. Repeated cycles
@@ -24,8 +26,9 @@ bridge may retime within 0.85–1.15. Actual supported duration range is
 
 `argmax` is the backward-compatible mode and ignores seed for sampling.
 `gumbel-temperature-1` sets the real ABI argmax flag false. It has no configurable
-temperature. All settings are retained. Availability in the wire contract does
-not yet establish candidate quality or justify an alternatives client control.
+temperature. All settings are retained. Real repeated-seed experiments justify
+the bounded alternatives control for this backend; they do not establish quality.
+Final corrected diversity must be rerun after cleanup changes.
 
 Sparse masks remain GLOBAL_ROOT 11110000, LOCAL_ROOT 11101111, POSE 11111111,
 applied after both boundary setters. Destination XY is predicted; heading and
@@ -73,3 +76,17 @@ both angular estimates use quaternion logs in the same near-left reference
 frame. The retained convergence experiment documents why the former three-point
 estimate over-reported velocity differences on high-curvature baked segments.
 This does not excuse excessive acceleration or establish physical feasibility.
+
+Candidates also retain `applicationIdentity`: the isolated installation's source
+commit, whether clean HEAD was checked when it was created, the content-manifest
+hash, source-file count and actual native-host hash. Runtime verification hashes
+the copied source files. Acceptance refuses an absent/unverified or changed build
+identity even if the Python implementation hash happens to remain unchanged.
+Source provenance does not claim GUI, motion-quality or human approval.
+
+`workbench-job-trace-v1` links the launcher request to its native job receipt;
+`blender-job-trace-v1` records process-local stages, while each transition retains
+provider loading/inference timings. Wall-clock startup estimates are explicitly
+labeled and are not confused with monotonic stage duration. Pre-bake raw-retargeted
+and corrected world-space kinematics use identical timestamps; baked validation
+is separate and denser. Missing stage contact measurements remain unavailable.

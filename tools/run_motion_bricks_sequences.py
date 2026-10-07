@@ -38,8 +38,8 @@ def main():
     args.output.mkdir(parents=True, exist_ok=False)
     identity = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT, capture_output=True, text=True, timeout=10)
     dirty = subprocess.run(['git', 'status', '--porcelain', '--untracked-files=no'], cwd=ROOT, capture_output=True, text=True, timeout=10)
-    report = {'status': 'FAIL', 'scope': 'REAL_PROVIDER_CONTINUITY_TIMING_PRESERVATION_AND_REOPEN',
-              'contact_quality': 'NOT VERIFIED', 'visual_quality': 'NOT VERIFIED', 'client_journey': 'NOT TESTED BY THIS RUNNER',
+    report = {'status': 'FAIL', 'scope': 'REAL_PROVIDER_CONTINUITY_TIMING_PRESERVATION_KINEMATIC_QUALITY_AND_REOPEN',
+              'contact_quality': 'See each fixed-landmark quality report', 'visual_quality': 'NOT VERIFIED', 'client_journey': 'NOT TESTED BY THIS RUNNER',
               'commit': identity.stdout.strip() if identity.returncode == 0 else None,
               'tracked_source_dirty': bool(dirty.stdout.strip()) if dirty.returncode == 0 else None, 'cases': []}
     command = [str(args.blender.resolve()), '--background', '--factory-startup', '--disable-autoexec',
@@ -54,9 +54,10 @@ def main():
             case = {'name': name, 'status': 'FAIL', 'generate_exit_code': measured['exit_code'],
                     'generate_process_release': measured['observed_process_release']}
             report['cases'].append(case)
-            if measured['exit_code'] == 0 and measured['observed_process_release'] == 'PASS':
+            if (folder/'RESULTS.json').is_file() and measured['observed_process_release'] == 'PASS':
                 result = json.loads((folder/'RESULTS.json').read_text(encoding='utf-8'))
-                if result['status'] == 'PASS':
+                case.update(quality_status=result.get('quality_status','NOT_APPLICABLE' if result.get('expected_refusal') else 'UNAVAILABLE'),continuity_status=result.get('continuity_status',result['status']))
+                if result.get('continuity_status',result['status']) == 'PASS':
                     if result.get('expected_refusal'):
                         case.update(status='PASS', refusal=result['code'])
                     else:
@@ -67,7 +68,7 @@ def main():
                         if reopened['exit_code'] == 0 and reopened['observed_process_release'] == 'PASS':
                             verified=json.loads((folder/'fresh-process.json').read_text(encoding='utf-8'))
                             assert verified['status']=='PASS'
-                            case.update(status='PASS',source_sha256=result['result_sha256'])
+                            case.update(status='PASS' if result.get('quality_status')=='PASS' and measured['exit_code']==0 else 'FAIL',source_sha256=result['result_sha256'])
             print(json.dumps(case),flush=True)
         report['status']='PASS' if all(case['status']=='PASS' for case in report['cases']) else 'FAIL'
     finally:

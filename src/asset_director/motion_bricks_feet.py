@@ -146,37 +146,59 @@ def cleanup(reader, source, profile, request, result, samples, path, origin, geo
                               'core_seconds':plan[label]['seconds'],'origin':plan['origin'],
                               'orientations':{roles[side+'_'+part]:(clone.matrix_world@clone.pose.bones[roles[side+'_'+part]].matrix).to_quaternion() for part in ('foot','toe')}})
         fps=bpy.context.scene.render.fps/bpy.context.scene.render.fps_base
-        release=min(.16*fps,(duration-sum(plan[e]['seconds']*fps for e in ('source','target')))/2)
+        release=min(.30*fps,(duration-sum(plan[e]['seconds']*fps for e in ('source','target')))/2)
         def lock_weight(index,lock):
             elapsed=duration*(index/count if lock['edge']==0 else 1-index/count)
             core=lock['core_seconds']*fps
             if elapsed<=core:return 1.
             u=min(1.,(elapsed-core)/release)
             return 1-u*u*u*(10+u*(-15+6*u))
-        def support_orientation(lock,weight):
-            for name,orientation in lock['orientations'].items():
+        def support_orientation(index):
+            # Apply one immutable world-orientation trajectory. Repeatedly
+            # blending the already projected pose would compound the release
+            # weight, steepen it and make the correction depend on pass count.
+            for name,orientation in orientation_targets[index].items():
                 bone=clone.pose.bones[name];loc,q,scale=(clone.matrix_world@bone.matrix).decompose()
                 saved_location=bone.location.copy();saved_scale=bone.scale.copy()
-                bone.matrix=clone.matrix_world.inverted()@Matrix.LocRotScale(loc,q.slerp(orientation,weight),scale)
+                bone.matrix=clone.matrix_world.inverted()@Matrix.LocRotScale(loc,orientation,scale)
                 bone.location=saved_location;bone.scale=saved_scale;bpy.context.view_layer.update()
         def support_target(index,side,target):
             for lock in locks:
                 if lock['side']!=side:continue
                 weight=lock_weight(index,lock)
                 if weight<=0:continue
-                support_orientation(lock,weight)
                 foot=clone.matrix_world@clone.pose.bones[roles[side+'_foot']].head
                 point=soles.landmark(lock['mesh'],lock['vertex'])
                 target=target.lerp(foot+lock['anchor']-point,weight)
             return target
-        rows = []
+        rows = [];world_orientations=[]
+        names=[roles[side+'_'+part] for side in SIDES for part in ('foot','toe')]
         for (_, pose), (_, delta) in zip(samples, path):
             check(); state(pose, delta); rows.append({'feet': feet(), 'low': soles.heights()})
-        native = []
+            world_orientations.append((len(world_orientations),{name:{'q':list((clone.matrix_world@clone.pose.bones[name].matrix).to_quaternion())} for name in names}))
+        native = [];native_orientations=[]
         for pose, edge, multiplier, velocity in [(ap, 0, -1, 'velocity_in'), (app, 0, -2, 'velocity_in'),
                                                   (bn, -1, 1, 'velocity_out'), (bnn, -1, 2, 'velocity_out')]:
             delta = Vector(path[edge][1]) + inverse @ Vector((*geometry[velocity], 0))*h*multiplier
             state(pose, delta); native.append(feet())
+            native_orientations.append({name:list((clone.matrix_world@clone.pose.bones[name].matrix).to_quaternion()) for name in names})
+        world_endpoints=(world_orientations[0][1],world_orientations[-1][1]);world_tangents=[]
+        for edge,sign in ((0,-1),(1,1)):
+            values={}
+            for name in names:
+                inverse_q=qm.inverse(world_endpoints[edge][name]['q'])
+                near=qm.qlog(qm.qmul(inverse_q,native_orientations[2*edge][name]))
+                far=qm.qlog(qm.qmul(inverse_q,native_orientations[2*edge+1][name]))
+                values[name]={'angular':qm.mul(qm.sub(qm.mul(near,4),far),sign/(2*h))}
+            world_tangents.append(values)
+        from .motion_bricks_refinement import smooth_rotations
+        world_orientations,orientation_filter=smooth_rotations(world_orientations,duration/fps,world_endpoints,world_tangents,fps)
+        orientation_targets=[]
+        for index,(_,pose) in enumerate(world_orientations):
+            goals={name:Quaternion(value['q']) for name,value in pose.items()}
+            for lock in locks:
+                for name,q in lock['orientations'].items():goals[name]=goals[name].slerp(q,lock_weight(index,lock))
+            orientation_targets.append(goals)
         def raw(index, side):
             x = (last-first)*index/count; k = min(last-first-1, math.floor(x)); u = x-k
             value = points[side][k].lerp(points[side][k+1], u)
@@ -199,7 +221,7 @@ def cleanup(reader, source, profile, request, result, samples, path, origin, geo
             return values
         required = []
         for index, ((_, pose), (_, delta)) in enumerate(zip(samples, path)):
-            check(); state(pose, delta); world = clone.matrix_world; lower = 0.
+            check(); state(pose, delta); support_orientation(index); world = clone.matrix_world; lower = 0.
             for side, desired in targets(index).items():
                 upper, shin, foot = [clone.pose.bones[roles[side+'_'+p]] for p in ('thigh', 'shin', 'foot')]
                 aa, bb, cc = [world @ bone.head for bone in (upper, shin, foot)]
@@ -218,7 +240,7 @@ def cleanup(reader, source, profile, request, result, samples, path, origin, geo
         require(amplitude <= .12*height, 'MOTION_BRICKS_FOOT_REACH', 'This generated step needs excessive pelvis adjustment; choose another interval')
         corrected = []; maximum = 0.
         for index, ((frame, pose), (_, delta)) in enumerate(zip(samples, path)):
-            check(); state(pose, delta)
+            check(); state(pose, delta);support_orientation(index)
             pelvis = clone.pose.bones[roles['pelvis']]; matrix = clone.matrix_world @ pelvis.matrix
             matrix.translation.z -= amplitude*envelope(index); pelvis.matrix = clone.matrix_world.inverted() @ matrix
             bpy.context.view_layer.update()
@@ -234,7 +256,9 @@ def cleanup(reader, source, profile, request, result, samples, path, origin, geo
         # Three fixed alternating smoothing/support projections. This bounded
         # deterministic refinement is measured against the raw prediction.
         for iteration in range(3):
-            corrected,filter_report=seam.smooth_rotations(corrected,duration/fps,sigma_seconds=.04 if iteration==0 else .025)
+            from .motion_bricks_refinement import smooth_rotations
+            corrected,filter_report=smooth_rotations(corrected,duration/fps,(a,b),tangents,fps,
+                                                     sigma_seconds=.04 if iteration==0 else .025)
             filter_reports.append(filter_report)
             residuals = {n: [seam.rotation_residual(corrected[k][1][n]['q'], endpoint[n]['q'],
                            qm.angular_velocity(corrected[j][1][n]['q'], corrected[l][1][n]['q'], duration/count), tangents[edge][n]['angular'])
@@ -244,14 +268,13 @@ def cleanup(reader, source, profile, request, result, samples, path, origin, geo
                     values['q'] = seam.correct_rotation(values['q'], residuals[n], duration*index/count, duration, window)
                 # Reconcile positional support after rotational seam processing.
                 # Every anchor and measured correction is retained for review.
-                state(pose,path[index][1])
+                state(pose,path[index][1]);support_orientation(index)
                 for lock in locks:
                     weight=lock_weight(index,lock)
                     if weight<=0:continue
                     # A reviewed planted landmark is a three-dimensional support.
                     # Reconcile foot/toe orientation as well as the ankle position;
                     # moving only XY can silently let the claimed toe lift off.
-                    support_orientation(lock,weight)
                     point=soles.landmark(lock['mesh'],lock['vertex']);delta=lock['anchor']-point
                     foot=clone.matrix_world@clone.pose.bones[roles[lock['side']+'_foot']].head
                     maximum=max(maximum,(delta*weight).length)
@@ -260,20 +283,30 @@ def cleanup(reader, source, profile, request, result, samples, path, origin, geo
                 # Positive neural lifts remain unchanged; this is not a terrain solver.
                 low=soles.heights()
                 for side in SIDES:
-                    lift=max(0.,ground+.001-low[side])
+                    # Do not manufacture positive clearance at every sample:
+                    # restoring the exact native endpoint would then introduce
+                    # a step, amplified by near-straight knee IK. Small native
+                    # floor tolerance remains below the hard penetration gate.
+                    lift=max(0.,ground-.001*profile['reference_height_m']-low[side])
                     if lift>1e-7:
                         foot=clone.matrix_world@clone.pose.bones[roles[side+'_foot']].head
                         maximum=max(maximum,lift);solve(clone,roles,side,foot+Vector((0,0,lift)))
                 for n in pose:
                     owner=clone.pose.bones[n] if n else clone
                     pose[n]={'q':list(rotation(owner)),'location':list(owner.location),'scale':list(owner.scale)}
+        # The final projection can change the endpoint tangent. Reconcile it
+        # over the generated trajectory, not in one quarter-frame bake segment.
+        # Contact quality is measured again on the bake; no pass is inferred.
+        corrected,final_filter=smooth_rotations(corrected,duration/fps,(a,b),tangents,fps,sigma_seconds=.05)
+        filter_reports.append(final_filter)
         # Exact source endpoints are authoritative. Tangents are retained by the baker.
         corrected[0] = (samples[0][0], a); corrected[-1] = (samples[-1][0], b)
         return corrected, {'method': 'g1-positional-feet-v1', 'ground_z_m': ground,
             'ground_clearance_heuristic': {'zero_below_m':.02*height,'full_lift_above_m':.05*height,'interpolation':'C2 quintic release; inferred geometry, not contact annotations'},
             'model_feet_sha256': digest({s: [list(p) for p in v] for s,v in points.items()}),
             'max_pelvis_lowering_m': amplitude, 'max_foot_position_correction_m': maximum,
-            'rotation_filter':{'iterations':filter_reports,'count':3},
+            'rotation_filter':{'iterations':filter_reports,'count':len(filter_reports)},
+            'foot_orientation_filter':orientation_filter,'foot_orientation_projection':'fixed world targets; no repeated weight compounding',
             'support_locks':[{'edge':'source' if lock['edge']==0 else 'target','side':lock['side'],'mesh':lock['mesh'],'vertex':lock['vertex'],'anchor_world_m':list(lock['anchor']),
                               'core_seconds':lock['core_seconds'],'origin':lock['origin']} for lock in locks],
             'contact_plan':plan,'support_lock_release_seconds':release/fps,

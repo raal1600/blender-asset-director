@@ -33,7 +33,7 @@ export function candidateStatus(scene,candidate){
   const review=scene.transitionReview;
   if(scene.current===candidate.checkpointId&&review?.acceptances.some(e=>e.checkpointId===candidate.checkpointId))return 'ACCEPTED';
   if(!review?.working||candidate.fingerprint!==review.working.fingerprint||candidate.baseCheckpointId!==scene.current)return 'STALE';
-  return candidate.validation?.status==='PASS'?'READY_FOR_REVIEW':candidate.validation?.status==='FAIL'?'FAILED_QUALITY':'VALIDATING';
+  return candidate.validation?.status==='PASS'?(candidate.applicationIdentity?.status==='VERIFIED'?'READY_FOR_REVIEW':'NEEDS_PREPARATION'):'FAILED_QUALITY';
 }
 export async function updateTransitionRequest(work,id,sceneId,revision,request,validate){
   validate(request);assert(generatedRequest(request),'Select a generated connection before preparing a transition request.');
@@ -59,11 +59,13 @@ export async function publishCandidate({scene,checkpoint,data,record,output},wor
   const review=reviewState(scene);
   assert(!review.candidates.some(c=>c.id===record.id),'Generation attempt already has an immutable candidate.',409);
   // A missing report is never a passing quality check. Failed candidates remain inspectable.
-  const validation=data.transition_validation||{status:'UNAVAILABLE',reason:'Native quality validation did not return a report.'};
+  const validation=data.transition_validation||{status:'FAIL',measurements:'UNAVAILABLE',reason:'Native quality validation did not return a report.'};
   review.candidates.push({id:record.id,requestId:working.id,fingerprint:working.fingerprint,
     baseCheckpointId:working.baseCheckpointId,baseSha256:working.baseSha256,implementation:working.implementation,
     checkpointId:checkpoint.id,sha256:checkpoint.sha256,size:checkpoint.size,createdAt:now(),
     nativeJobId:record.jobId,artifacts:structuredClone(output.outputs),validation,
+    applicationIdentity:structuredClone(record.applicationIdentity),
+    traceSource:{schema:'workbench-job-trace-v1',requestId:record.id,nativeJobId:record.jobId,receipt:`Runs/${record.id}.json`},
     transitions:(data.changes||[]).flatMap(c=>(c.timeline?.connections||[]).map(j=>({performer:c.performer,...j}))),
     previewSource:{checkpointId:checkpoint.id,sha256:checkpoint.sha256},
     requestedTimeline:structuredClone(record.options),samplingPlan:working.request.sampling_plan||null,downstream:working.downstream});
@@ -77,9 +79,12 @@ export async function acceptTransition(work,id,sceneId,revision,{candidateId,eve
   assert(p.revision===revision,'Project changed. Refresh the candidate before acceptance.',409);
   await work.unlocked(p);assert(scene.stage==='action'&&!scene.run&&!scene.task&&!scene.candidate,'Finish the current operation before acceptance.',409);
   const candidate=review.candidates.find(c=>c.id===candidateId);
+  if(candidate?.validation?.status==='PASS')assert(candidate.applicationIdentity?.status==='VERIFIED','Application build identity is missing. Rebuild an isolated installation from a recorded clean commit and regenerate before acceptance.',409);
   assert(candidate&&candidateStatus(scene,candidate)==='READY_FOR_REVIEW','This candidate is stale or has not passed every hard quality check.',409);
   assert(fingerprint===candidate.fingerprint&&review.working.fingerprint===fingerprint,'Transition dependencies changed. Generate a new candidate.',409);
   const cap=await work.available();assert(cap.implementation===candidate.implementation&&requestFingerprint(review.working.request,cap.implementation)===fingerprint,'Runtime or working input changed. Inspect and regenerate.',409);
+  assert(candidate.applicationIdentity?.status==='VERIFIED'&&digest(await work.runtime.applicationIdentity?.())===digest(candidate.applicationIdentity),
+    'Application build identity is missing or changed. Rebuild an isolated installation from a recorded clean commit and regenerate before acceptance.',409);
   const base=await work.verify(p,scene,candidate.baseCheckpointId);assert(base.sha256===candidate.baseSha256,'Input scene changed.',409);
   const cp=await work.verify(p,scene,candidate.checkpointId);assert(cp.sha256===candidate.sha256,'Candidate scene changed.',409);
   for(const artifact of candidate.artifacts){const actual=await fileHash(await safe(work.config.library,artifact.path));assert(actual.sha256===artifact.sha256&&actual.size===artifact.size,'Candidate evidence or artifact was changed. Regenerate.',409);}

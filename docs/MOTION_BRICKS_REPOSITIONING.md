@@ -1,5 +1,15 @@
 # Generated repositioning between intact native clips (development)
 
+**Current authoring investigation, 2026-10-07:** generation now creates immutable
+review candidates, followed by explicit fingerprint-checked acceptance. Failed
+quality, cancellation or a pending replacement retains the accepted checkpoint.
+The paragraphs below describing the earlier delivered reference are historical
+evidence, not acceptance of the expanded current quality gate. Dense evaluation
+has exposed acceleration failures despite preserved native intervals and good
+seams. See the [client workflow](MOTION_BRICKS_CLIENT_RECONCILIATION.md),
+[acceptance matrix](motion-bricks-acceptance.json) and
+[working research handoff](MOTION_BRICKS_RESEARCH_HANDOFF.md).
+
 The Action layer's **MotionBricks repositioning** connection samples the end of
 one native Action and the beginning of the next, generates a separate interval,
 and starts the second Action at its original opening. Neither native clip is

@@ -58,7 +58,8 @@ export function registerActionSave(work,id,sceneId,revision,request){
   work.actionSaves ||= new Map();const identity=digest({id,sceneId,revision,request}),prior=work.actionSaves.get(request.requestId);
   if(prior){assert(prior.identity===identity,'Action request conflicts with an active Save.',409);return prior;}
   assert(work.actionSaves.size<64,'Too many pending Action saves.',429);
-  const entry={id,sceneId,runId:request.requestId,identity,cancelled:false,committing:false,jobId:null};work.actionSaves.set(request.requestId,entry);return entry;
+  const entry={id,sceneId,runId:request.requestId,identity,cancelled:false,committing:false,jobId:null,
+    enqueuedAt:new Date().toISOString(),enqueuedMonotonic:performance.now()};work.actionSaves.set(request.requestId,entry);return entry;
 }
 export async function cancelActionSave(work,id,sceneId,runId){
   assert(validId(runId,'run_'),'Invalid Action save identity.');

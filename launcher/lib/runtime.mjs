@@ -1,5 +1,6 @@
 import {launchAssetPreview} from './asset-preview-launch.mjs';
 import {taskArguments} from './workbench-launch.mjs';
+import {applicationIdentity} from './application-identity.mjs';
 import {randomUUID} from 'node:crypto';
 import {buildSessionContext} from './onboarding.mjs';
 import fs from 'node:fs/promises';
@@ -37,6 +38,7 @@ export function addonQuery(type, port = 9876) {
 }
 export class Runtime {
   constructor(store, config) { this.store = store; this.config = config; this.health = null; }
+  applicationIdentity(){return applicationIdentity(this.store.root);}
   async harness(args, timeout = 30000) {
     const configured=this.config.motionBricksConfig;
     assert(configured===undefined||typeof configured==='string'&&path.isAbsolute(configured),'MotionBricks configuration must be an absolute local file path.');

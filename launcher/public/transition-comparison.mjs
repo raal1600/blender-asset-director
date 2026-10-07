@@ -14,10 +14,10 @@ export function openComparison(host,candidates,startViewer){
  function seek(seconds){elapsed=seconds;time.value=String(seconds);host.querySelector('[data-compare-clock]').textContent=seconds.toFixed(3)+' s';for(const side of ['a','b']){const join=edge(current[side]),r=records[side];if(join&&r)views[side]?.seekFrameExact(join.start+seconds*r.playback.fps);}}
  function stop(){playing=false;cancelAnimationFrame(raf);host.querySelector('[data-compare-play]').textContent='Play both at full speed';}
  async function select(side){stop();views[side]?.dispose();const id=host.querySelector('[data-compare-choice="'+side+'"]').value,c=candidates.find(c=>c.id===id);current[side]=c;delete records[side];
-  const viewer=startViewer(host.querySelector('[data-compare-view="'+side+'"]'),{kind:'checkpoint',id:c.checkpointId},{editable:false});views[side]=viewer;
+  const viewer=startViewer(host.querySelector('[data-compare-view="'+side+'"]'),{kind:'checkpoint',id:c.checkpointId},{editable:false,focusPerformer:edge(c)?.performer});views[side]=viewer;
   const r=await viewer.ready;if(disposed||views[side]!==viewer||!r)return;records[side]=r;
   const join=edge(c);host.querySelector('[data-compare-identity="'+side+'"]').textContent='Baked '+c.sha256.slice(0,16)+' · '+(join?'bridge '+duration(side).toFixed(3)+' s; target stitch +'+duration(side).toFixed(3)+' s':'No generated stitch in this candidate');
-  time.max=String(Math.max(duration('a'),duration('b'))+.5);seek(elapsed);
+  time.max=String(Math.max(duration('a'),duration('b'))+.5);seek(elapsed);viewer.framePerformer?.();
  }
  const change=e=>{if(e.target.dataset.compareChoice)void select(e.target.dataset.compareChoice);};
  const input=e=>{if(e.target===time){stop();seek(Number(time.value));}};

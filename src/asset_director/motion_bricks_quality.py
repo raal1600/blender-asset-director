@@ -8,7 +8,27 @@ import math
 from .core import require
 from . import sequence_math as qm
 
-PRESET = 'upright-grounded-kinematic-v1'
+PRESET = 'upright-grounded-kinematic-v2'
+
+
+def trajectory_metrics(rotations, roots, seconds):
+    """Finite-interval kinematics of uniformly timed world rotations/roots.
+
+    Angular increments use one common world frame. These are stage diagnostics,
+    not endpoint derivatives, contacts, dynamics, or final baked acceptance.
+    """
+    require(len(rotations)==len(roots)>=3 and seconds>0,'MOTION_BRICKS_QUALITY_DATA','Stage metrics need at least three matching timed poses')
+    rate=(len(roots)-1)/seconds
+    velocity=[qm.mul(qm.sub(b,a),rate) for a,b in zip(roots,roots[1:])]
+    angular={name:[qm.mul(qm.qlog(qm.qmul(qm.unit(b[name]),qm.inverse(qm.unit(a[name])))),rate)
+                   for a,b in zip(rotations,rotations[1:])] for name in rotations[0]}
+    return {'sampling_hz':rate,'samples':len(roots),'rotation_frame':'common world','position_units':'metres',
+            'root_speed_m_s':max(qm.norm(v) for v in velocity),
+            'root_acceleration_m_s2':max(qm.norm(qm.sub(b,a))*rate for a,b in zip(velocity,velocity[1:])),
+            'joint_speed_deg_s':max(math.degrees(qm.norm(v)) for values in angular.values() for v in values),
+            'joint_acceleration_deg_s2':max(math.degrees(qm.norm(qm.sub(b,a))*rate) for values in angular.values() for a,b in zip(values,values[1:])),
+            'contact_metrics':'UNAVAILABLE at this stage; evaluated baked support validation is separate',
+            'physical_feasibility':'NOT_DEMONSTRATED'}
 
 
 def thresholds(height):
@@ -60,7 +80,7 @@ def contact_runs(samples, fps, height, ground):
         start=None
         for i,row in enumerate(samples):
             speed=math.dist(samples[max(0,i-1)][side]['point'][:2],samples[min(len(samples)-1,i+1)][side]['point'][:2])*fps/(min(len(samples)-1,i+1)-max(0,i-1))
-            planted=abs(row[side]['low']-ground)<=.005*height and speed<=.12*height
+            planted=abs(row[side]['low']-ground)<=.005*height and abs(row[side]['point'][2]-ground)<=.005*height and speed<=.12*height
             if planted and start is None:start=i
             if start is not None and (not planted or i==len(samples)-1):
                 end=i if planted else i-1

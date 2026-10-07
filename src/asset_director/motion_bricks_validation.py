@@ -7,9 +7,13 @@ from .motion_bricks_stitch_math import boundary_estimate
 from .motion_bricks_retarget import load_profile
 from .motion_bricks_feet import Soles
 from .motion_bricks_quality import PRESET, thresholds, gate, contact_runs
+from .core import require
 
 
-def evaluate(report):
+def evaluate(report, *, sampling_hz=240):
+    # Alternate densities are for convergence diagnostics only. Production
+    # callers use this fixed default; the client cannot weaken sampling.
+    require(type(sampling_hz) is int and sampling_hz in (60,120,240,480),'MOTION_BRICKS_QUALITY_DATA','Unsupported diagnostic sampling density')
     scene=bpy.context.scene;fps=scene.render.fps/scene.render.fps_base
     frame,subframe=scene.frame_current,scene.frame_subframe
     rows=[]
@@ -52,7 +56,7 @@ def evaluate(report):
                             per_bone.append({'bone':name,'position_m':(lp-rp).length,'orientation_deg':math.degrees((ql-qr).length),
                                 'root_velocity_m_s':(lv-rv).length,'angular_velocity_deg_s':math.degrees((wl-wr).length)})
                         edges.append({'frame':edge,'seconds':edge/fps,**{key:(next(b[key] for b in per_bone if b['bone']==roles['pelvis']) if key=='root_velocity_m_s' else max(b[key] for b in per_bone)) for key in ('position_m','orientation_deg','root_velocity_m_s','angular_velocity_deg_s')}})
-                    count=math.ceil((join['end']-join['start'])/fps*60);sample_fps=count/((join['end']-join['start'])/fps)
+                    count=math.ceil((join['end']-join['start'])/fps*sampling_hz);sample_fps=count/((join['end']-join['start'])/fps)
                     at((join['start']+join['end'])/2);points=landmarks();poses=[];contacts=[];penetration=0.;flexions=[]
                     for i in range(count+1):
                         pose=at(join['start']+(join['end']-join['start'])*i/count);poses.append(pose);low=soles.heights();contact={}
@@ -70,8 +74,9 @@ def evaluate(report):
                     for lock in cleanup.get('support_locks',[]):
                         core=lock.get('core_seconds',cleanup.get('support_lock_core_seconds'));lo,hi=(0.,core) if lock['edge']=='source' else (seconds-core,seconds)
                         points=[];distance_from_ground=[]
-                        for i in range(7):
-                            at(join['start']+(lo+(hi-lo)*i/6)*fps)
+                        contact_steps=max(6,math.ceil((hi-lo)*sampling_hz))
+                        for i in range(contact_steps+1):
+                            at(join['start']+(lo+(hi-lo)*i/contact_steps)*fps)
                             point=soles.landmark(lock['mesh'],lock['vertex']);points.append(list(point))
                             distance_from_ground.append(abs(point.z-profile['ground_z']))
                         drift=max(math.dist(a[:2],b[:2]) for a in points for b in points)
@@ -107,4 +112,4 @@ def evaluate(report):
             finally:soles.close()
     finally:scene.frame_set(frame,subframe=subframe);bpy.context.view_layer.update()
     return {'schema':'motion-bricks.validation.v1','status':'PASS' if rows and all(r['status']=='PASS' for r in rows) else 'FAIL',
-            'scope':'BAKED_FRESH_REOPEN_KINEMATICS_NOT_PHYSICS','joins':rows,'sampling':'bridge samples <=1/60 s; no native interval retiming'}
+            'scope':'BAKED_FRESH_REOPEN_KINEMATICS_NOT_PHYSICS','joins':rows,'sampling':f'bridge samples <=1/{sampling_hz} s; no native interval retiming'}

@@ -32,6 +32,8 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
     from .motion_stitch import channel_spec
     from .motion_contacts import set_pose
     profile=ret.load_profile(obj);scene=bpy.context.scene;fps=scene.render.fps/scene.render.fps_base
+    from .motion_bricks_quality import thresholds
+    thresholds(profile.get('reference_height_m'))
     require(scene.unit_settings.scale_length==1.,'MOTION_BRICKS_UNITS','This humanoid adapter currently requires scene metres (unit scale 1)')
     require(not any(m[0].get('heading_deg',0) for m in (previous,motion)),
             'MOTION_BRICKS_HEADING','Explicit humanoid generation currently preserves the saved heading; use native clips with their observed facing')
@@ -179,10 +181,19 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
     from .motion_bricks_feet import cleanup
     emit('contact_processing')
     samples,foot_retarget=cleanup(reader,obj,profile,request,result,samples,path,origin,geometry,(a,b,ap,app,bn,bnn,h),tangents,check,support=support)
-    from .motion_bricks_quality import correction_metrics
-    corrected_roots=[]
+    from .motion_bricks_quality import correction_metrics,trajectory_metrics
+    def world_rotations():return {bone.name:list((clone.matrix_world@bone.matrix).to_quaternion()) for bone in clone.pose.bones}
+    raw_rotations=[]
+    for pose_values in uncorrected:
+        state(pose_values);raw_rotations.append(world_rotations())
+    corrected_roots=[];corrected_rotations=[]
     for (_,pose_values),(_,offset) in zip(samples,path):
-        set_pose(reader,pose_values,offset,0.);corrected_roots.append(list(hip()))
+        set_pose(reader,pose_values,offset,0.);corrected_roots.append(list(hip()));corrected_rotations.append(world_rotations())
+    from .motion_bricks_refinement import smooth_positions
+    filtered_roots,root_filter=smooth_positions(corrected_roots,duration/fps,[list(v*fps) for v in root_velocities],maximum_distance=.01*profile['reference_height_m'])
+    for index,((frame,offset),before,after) in enumerate(zip(path,corrected_roots,filtered_roots)):
+        path[index]=(frame,list(Vector(offset)+inverse@(Vector(after)-Vector(before))))
+    corrected_roots=filtered_roots
     corrections=correction_metrics(uncorrected,[row[1] for row in samples],raw_roots,corrected_roots)
     corrections['foot_correction_m']=foot_retarget['max_foot_position_correction_m']
     delta=expected_b-hip_b
@@ -196,6 +207,9 @@ def prepare(reader, obj, previous, motion, geometry, execution=None):
                 'seam_residual_free_model_indices':[first+window/step,last-window/step],
                 'root_seam_correction':{'method':'evaluated-world-velocity-compact-residual-v1','window_frames':window,
                                         'native_velocities_m_per_frame':[list(v) for v in root_velocities]},
+                'stage_kinematics':{'retargeted_before_corrections':trajectory_metrics(raw_rotations,raw_roots,duration/fps),
+                    'corrected_before_baking':trajectory_metrics(corrected_rotations,corrected_roots,duration/fps)},
+                'root_filter':root_filter,
                 'support_analysis':support,'correction_metrics':corrections,'foot_retarget':foot_retarget,'contact_quality':'NOT_VERIFIED','visual_quality':'REQUIRES_REVIEW'}
     emit('baking_generated_connection')
     provenance['transition_trace']=trace

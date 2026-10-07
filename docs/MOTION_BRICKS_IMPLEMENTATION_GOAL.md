@@ -52,16 +52,19 @@ intervals; missing/airborne contact measurements are not zero-error passes.
 
 ## Current decisions and falsification
 
-The original Save path immediately approves a generated checkpoint. Existing
-`checkpointJob` supports other separate candidates, but a working request and
-multiple immutable MotionBricks reviews need their own integration with that
-transaction and existing recovery/serialization, not another application.
+The baseline Save path immediately approved a generated checkpoint. The current
+implementation integrates working requests and immutable MotionBricks candidates
+with `checkpointJob` and its existing recovery/serialization. Explicit acceptance
+checks quality, dependency and artifact identities, including the clean-build
+installation receipt. Native success of the complete acceptance workflow remains
+outstanding while required motion quality fails.
 
 Pinned source `planner.cpp` skips random uniforms under argmax; changing its seed
 is ineffective. Gumbel temperature is fixed at 1, with the RNG restarted per call.
 Ten fresh Vulkan worker experiments confirm exact same-setting repetition and
 exact output across argmax seeds. Stochastic seeds produce material raw pose
-differences. Correction-surviving diversity is not yet established.
+differences. Earlier correction-surviving diversity was measured; the final
+refined cleanup still needs its own reproducibility/diversity rerun.
 
 The baseline real reference and unseen idle→back pair pass continuity, original
 Action preservation and fresh Blender reopen. Their contact and visual quality

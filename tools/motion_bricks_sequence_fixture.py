@@ -2,8 +2,9 @@
 
 Requires actual Blender and the pinned MotionBricks model. No licensed assets
 are redistributed. The input file is immutable; new fixture timelines and FPS
-copies are created in a disposable worker. PASS covers continuity, clocks,
-source preservation and persistence, not unauthored contacts or visual approval.
+copies are created in a disposable worker. PASS requires continuity, clocks,
+source preservation and the fixed kinematic quality gate. Visual approval and
+physical feasibility remain separate, unverified requirements.
 """
 import argparse
 if not __debug__:raise RuntimeError("Optimized Python disables acceptance assertions")
@@ -28,7 +29,7 @@ def seam_metrics(obj,edge,fps):
   rows.append({'bone':n,'position_m':(lp-rp).length,'orientation_deg':math.degrees((ql-qr).length),'root_velocity_m_s':(lv-rv).length,'angular_velocity_deg_s':math.degrees((wl-wr).length)})
  return {'frame':edge,**{k:(next(v[k] for v in rows if v['bone']==pelvis) if k=='root_velocity_m_s' else max(v[k] for v in rows)) for k in limits},'bones':rows}
 if a.verify:
- row=json.loads(a.verify.read_text(encoding='utf-8'));assert row['status']=='PASS' and not row.get('expected_refusal')
+ row=json.loads(a.verify.read_text(encoding='utf-8'));assert row.get('continuity_status',row['status'])=='PASS' and not row.get('expected_refusal')
  source=Path(row['result']);assert file_hash(source)==row['result_sha256']
  bpy.ops.wm.open_mainfile(filepath=str(source),load_ui=False,use_scripts=False);rig=bpy.data.objects[row['rig']]
  from asset_director.action_timeline import load
@@ -61,7 +62,7 @@ assert 'offset' not in case or len(case['offset'])==2 and all(isinstance(v,(int,
 assert not a.output.exists(),'Preserve earlier evidence; use a fresh output directory'
 a.output.mkdir(parents=True);out=a.output;results=[];chosen=a.case
 for case in cases:
- folder=out;row={'case':case,'status':'FAIL','thresholds':limits,'character_height_m':H,'contact_quality':'NOT VERIFIED: this runner has no authored stance masks','visual_quality':'NOT VERIFIED','derivatives':'Second-order one-sided at same timestamp; h=1/1536 second at all FPS'};results.append(row)
+ folder=out;row={'case':case,'status':'FAIL','thresholds':limits,'character_height_m':H,'contact_quality':'PENDING evaluated fixed-landmark validation','visual_quality':'NOT VERIFIED','derivatives':'Cubic one-sided at same timestamp; h=1/1536 second at all FPS'};results.append(row)
  try:
   bpy.ops.wm.open_mainfile(filepath=str(source),load_ui=False,use_scripts=False);scene=bpy.context.scene;rig=bpy.data.objects[manifest['rig']];scene.frame_set(1);baseline=basis.capture(rig);original={a.name:digest(layer.channels(a)) for a in bpy.data.actions};profile=ret.load_profile(rig)
   for track in rig.animation_data.nla_tracks:track.mute=True
@@ -99,11 +100,12 @@ for case in cases:
   path=folder/'result.blend';bpy.ops.wm.save_as_mainfile(filepath=str(path));layer.verify_saved(report,path);scene=bpy.context.scene;rig=bpy.data.objects[manifest['rig']];timeline=json.loads(rig['bad_action_timeline_v1']);assert len(timeline['connections'])==len(clips)-1
   atomic_json(folder/'report.json',report)
   row['transition_validation']=report.get('transition_validation')
+  row['quality_status']=(report.get('transition_validation') or {}).get('status','UNAVAILABLE')
   metrics=[seam_metrics(rig,edge,case['fps']) for join in timeline['connections'] for edge in (join['start'],join['end'])];failures=[(s['frame'],k,s[k],limit) for s in metrics for k,limit in limits.items() if s[k]>limit]
   preserved=all(digest(layer.channels(bpy.data.actions[n]))==value for n,value in original.items());assert preserved
-  row.update(status='FAIL' if failures else 'PASS',failures=failures,boundaries=metrics,source_actions_preserved=preserved,rig=rig.name,original_source_channels=original,result=str(path),result_sha256=file_hash(path),native_time_normalization=[sf/case['fps'] for _,sf in selected],providers=[j['provider'] for j in timeline['connections']],samples=[{'frame':f,'joints':sample(rig,f)} for f in range(1,scene.frame_end+1)])
+  row.update(status='PASS' if not failures and row['quality_status']=='PASS' else 'FAIL',continuity_status='FAIL' if failures else 'PASS',contact_quality='See transition_validation; kinematic evidence only',failures=failures,boundaries=metrics,source_actions_preserved=preserved,rig=rig.name,original_source_channels=original,result=str(path),result_sha256=file_hash(path),native_time_normalization=[sf/case['fps'] for _,sf in selected],providers=[j['provider'] for j in timeline['connections']],samples=[{'frame':f,'joints':sample(rig,f)} for f in range(1,scene.frame_end+1)])
  except Exception as e:
   code=getattr(e,'code',None);row.update(error=str(e),code=code,traceback=traceback.format_exc())
   if case.get('expected') and isinstance(e,DirectorError) and case['expected']==code:row['status']='PASS';row['expected_refusal']=True
- atomic_json(folder/'RESULTS.json',row);atomic_json(out/'SUMMARY.json',{'status':'PASS' if all(v['status']=='PASS' for v in results) else 'FAIL','source_sha256':file_hash(source),'source_scope':'Local manifest fixture; asset license and acquisition are the caller responsibility','manifest_sha256':file_hash(a.manifest),'scope':'CONTINUITY_TIMING_PRESERVATION_ONLY','results':results});print('CASE',case['name'],row['status'],row.get('code'),row.get('failures'),flush=True)
+ atomic_json(folder/'RESULTS.json',row);atomic_json(out/'SUMMARY.json',{'status':'PASS' if all(v['status']=='PASS' for v in results) else 'FAIL','source_sha256':file_hash(source),'source_scope':'Local manifest fixture; asset license and acquisition are the caller responsibility','manifest_sha256':file_hash(a.manifest),'scope':'CONTINUITY_TIMING_PRESERVATION_AND_KINEMATIC_QUALITY','results':results});print('CASE',case['name'],row['status'],row.get('code'),row.get('failures'),flush=True)
 assert all(v['status']=='PASS' for v in results),'Expanded scenario failures retained'

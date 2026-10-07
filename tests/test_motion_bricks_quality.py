@@ -4,6 +4,15 @@ from asset_director.motion_bricks_quality import thresholds,gate,contact_runs,co
 
 
 class QualityTests(unittest.TestCase):
+    def test_stage_metrics_use_seconds_world_rotation_and_ignore_quaternion_sign(self):
+        from asset_director.motion_bricks_quality import trajectory_metrics
+        from asset_director.sequence_math import qexp
+        rotations=[{'joint':[v*(-1 if i%2 else 1) for v in qexp([0,0,math.radians(30)*i/60])]} for i in range(61)]
+        result=trajectory_metrics(rotations,[[2*i/60,0,0] for i in range(61)],1.)
+        self.assertAlmostEqual(result['root_speed_m_s'],2.)
+        self.assertAlmostEqual(result['joint_speed_deg_s'],30.)
+        self.assertLess(result['joint_acceleration_deg_s2'],1e-8)
+        self.assertLess(result['root_acceleration_m_s2'],1e-8)
     def test_missing_or_failed_hard_metric_cannot_be_ranked_away(self):
         limits=thresholds(2.)
         self.assertEqual(gate({'position_m':0.,'orientation_deg':0.},limits,['position_m','orientation_deg']),[])
@@ -16,6 +25,10 @@ class QualityTests(unittest.TestCase):
         def rows(z,speed):return [{s:{'point':[speed*i/60,0,z],'low':z} for s in ('left','right')} for i in range(61)]
         self.assertEqual(contact_runs(rows(.2,0),60,2.,0),[])
         self.assertEqual(contact_runs(rows(0,1),60,2.,0),[])
+        lifted_landmark=rows(.2,0)
+        for row in lifted_landmark:
+            for foot in row.values():foot['low']=0.
+        self.assertEqual(contact_runs(lifted_landmark,60,2.,0),[],'Another vertex on the ground does not plant this measured landmark')
         runs=contact_runs(rows(.001,0),60,2.,0)
         self.assertEqual(len(runs),2);self.assertEqual(runs[0]['end_index'],60)
         self.assertEqual(runs[0]['drift_m'],0.)
