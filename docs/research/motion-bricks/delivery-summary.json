@@ -1,0 +1,46 @@
+{
+  "status": "VERIFIED_SUPPORTED_DOMAIN_WITH_RETAINED_CASE_FAILURES",
+  "branch": "feature/motionbricks-authoring-20261006",
+  "delivery_commit": "5befbde9d25b5dc55aef68fb146732713fbb2441",
+  "runtime_commit": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+  "motion_runtime_commit": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+  "mandatory_requirement_rows": {
+    "PASS": 40,
+    "FAIL": 0,
+    "BLOCKED": 0
+  },
+  "counts_scope": "Mandatory requirement/invariant rows under the explicit supported-domain contract; not a count of all attempted candidates or historical scenario assertions. Retained case failures are separately mandatory disclosure.",
+  "skip_explanations": [
+    "Two symlink tests require Windows symlink privileges; not claimed passed.",
+    "Portable encoder test requires FFmpeg/FFprobe on PATH; actual native rendered movies and separately configured FFmpeg/FFprobe playback/parity checks are independent real evidence."
+  ],
+  "limitations": [
+    "Finite two-rig coverage; rejected candidate/interval quality is retained, not broad production readiness.",
+    "Legacy suite remains 7 PASS / 3 FAIL; separately reviewed preparation yields two generation passes and one correct unstable-contact refusal.",
+    "Beta grid remains 7 PASS / 2 FAIL; no failed or refused case counted as successful generation.",
+    "Static agent inspection and automated 1x playback are separate from human artistic approval and physical feasibility.",
+    "Same-device Vulkan evidence only; local tests are not remote CI or release approval."
+  ],
+  "source": {
+    "private_report_id": "FINAL-DELIVERY.json",
+    "sha256": "ac6ee0d09841f079b41cf65a85f265d4dc1856ce44e29c1ef7c29fb425813566",
+    "public_access": "REDACTED_PROJECTION_ONLY"
+  },
+  "clean_head_checks": {
+    "offline": {
+      "status": "PASS",
+      "total": 814,
+      "passed": 811,
+      "skipped": 3,
+      "report_sha256": "2c8cbf2dc51a146dafb081f8d5163f63d94efad495a4a5366caecd0117cb71c4"
+    },
+    "launcher": {
+      "status": "PASS",
+      "total": 409,
+      "passed": 409,
+      "skipped": 0,
+      "report_sha256": "cf2d23eab9d97b53f21450f23cb920ec10f777ae1cd4363d54fcbd83d5a9fd8b"
+    }
+  },
+  "publication_note": "This is the October 7 pre-publication local receipt. A subsequent documentation-only publication makes source and this redacted packet accessible; it does not retroactively change the tested runtime or turn local tests into CI."
+}

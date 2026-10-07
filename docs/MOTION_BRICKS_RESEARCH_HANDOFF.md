@@ -1,5 +1,11 @@
 # MotionBricks offline authoring — research handoff
 
+**Cloud readers:** start with the [public research entry point](MOTION_BRICKS_CLOUD_RESEARCH.md).
+The subsequent source/documentation publication adds redacted numerical results
+and procedure source copies for GitHub-only review. Private paths below identify
+retained local evidence and are not public links. The original delivery chronology
+remains unchanged; publication is not a new application/runtime test or release.
+
 This is an evidence handoff for a later review, not a Deep Research result.
 No Deep Research, broad research, model upgrade, push, merge or deployment was
 performed. The supported offline authoring path works on the reviewed fixtures;

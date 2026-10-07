@@ -1,0 +1,7 @@
+from pathlib import Path
+import sys,os,json
+r=Path(__file__).parent;repo=Path('<SOURCE_WORKTREE>');sys.path.insert(0,str(repo/'tools'))
+from transition_resources import measured_run
+cmd=[r'<LOCAL_PATH_REDACTED>','--background','--factory-startup','--disable-autoexec','--threads','2','--python-exit-code','1','--python',str(r/'dense_final_quality_v1.py')]
+result=measured_run(cmd,r/'dense-final-quality-v1.log',cwd=repo,env=dict(os.environ,PYTHONIOENCODING='utf-8'),timeout=240)
+(r/'dense-final-quality-v1-resources.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8');print(json.dumps({k:result[k] for k in ('exit_code','observed_process_release')}));raise SystemExit(result['exit_code'])

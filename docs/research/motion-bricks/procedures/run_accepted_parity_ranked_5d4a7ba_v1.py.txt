@@ -1,0 +1,12 @@
+from pathlib import Path
+import sys,os,json,subprocess
+root=Path(__file__).parent;repo=Path(r'<SOURCE_WORKTREE>');sys.path.insert(0,str(repo/'tools'))
+from transition_resources import measured_run
+out=root/'native-parity-ranked-5d4a7ba-v1';report=out/'report.json'
+cmd=[r'<LOCAL_PATH_REDACTED>','--background','--factory-startup','--disable-autoexec','--threads','2','--python-exit-code','1','--python',str(root/'sample_accepted_parity_v2.py'),'--',str(report)]
+result=measured_run(cmd,out/'native-parity.log',cwd=repo,env=dict(os.environ,PYTHONIOENCODING='utf-8'),timeout=120)
+(out/'native-parity-resources.json').write_text(json.dumps(result,indent=2),encoding='utf-8');assert result['exit_code']==0 and result['observed_process_release']=='PASS',result
+with (out/'preview-parity.log').open('w',encoding='utf-8') as log:
+ result=subprocess.run([r'<LOCAL_PATH_REDACTED>',str(root/'check_accepted_parity.mjs'),str(report)],stdout=log,stderr=subprocess.STDOUT,timeout=120)
+assert result.returncode==0,'Inspect retained preview parity failure'
+value=json.loads((out/'preview-parity.json').read_text());print(json.dumps({k:value.get(k) for k in ('status','maximum_mesh_error_m','maximum_orientation_deg','error')}))

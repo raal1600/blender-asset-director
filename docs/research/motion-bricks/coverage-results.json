@@ -1,0 +1,859 @@
+{
+  "schema": "motion-bricks.public-coverage.v1",
+  "evidence_class": "REPORTED_LOCAL_RUNTIME_WITH_HASH_BOUND_REDACTED_SUMMARIES",
+  "suites": [
+    {
+      "label": "unchanged_legacy_suite",
+      "source": {
+        "private_report_id": "broader-scenarios-5f1b8b8-v1/report.json",
+        "sha256": "37bb748489af3080b9d4b0fd7f1499bd9b06823e0178df6ce9d54750ac299af0",
+        "public_access": "REDACTED_PROJECTION_ONLY"
+      },
+      "application_commit": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+      "status": "FAIL",
+      "cases": [
+        {
+          "name": "idle-walk",
+          "status": "FAIL",
+          "generate_exit_code": 1,
+          "generate_process_release": "PASS",
+          "quality_status": "UNAVAILABLE",
+          "continuity_status": "FAIL"
+        },
+        {
+          "name": "walk-idle",
+          "status": "FAIL",
+          "generate_exit_code": 1,
+          "generate_process_release": "PASS",
+          "quality_status": "UNAVAILABLE",
+          "continuity_status": "FAIL"
+        },
+        {
+          "name": "walk-run",
+          "status": "FAIL",
+          "generate_exit_code": 1,
+          "generate_process_release": "PASS",
+          "quality_status": "UNAVAILABLE",
+          "continuity_status": "FAIL"
+        },
+        {
+          "name": "back-left",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "long-back-left",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "mixed24-30-at30",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "mixed30-60-at60",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "offset-back-left",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "multi-back-left-back",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "unsupported-heading",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "NOT_APPLICABLE",
+          "continuity_status": "PASS",
+          "refusal": "HEADING_TRANSITION_REQUIRED"
+        }
+      ]
+    },
+    {
+      "label": "new_explicit_prepared_requests",
+      "source": {
+        "private_report_id": "qualified-broader-5f1b8b8-v1/report.json",
+        "sha256": "38917a3bef78d9939fc818de88d3cdea22369e2f1347fb516f3910ff41365b05",
+        "public_access": "REDACTED_PROJECTION_ONLY"
+      },
+      "application_commit": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+      "status": "PASS",
+      "cases": [
+        {
+          "name": "reviewed-idle-walk",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "reviewed-walk-idle",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "reviewed-walk-run-entry-refusal",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "NOT_APPLICABLE",
+          "continuity_status": "PASS",
+          "refusal": "MOTION_BRICKS_BOUNDARY_CONTACT"
+        }
+      ]
+    },
+    {
+      "label": "second_rig_predeclared_boundary_grid",
+      "source": {
+        "private_report_id": "beta-boundary-grid-f30b389-v1/report.json",
+        "sha256": "86514ffd5aa7b1d0e163b38b39839143182ec9d6c3daa9cdc5577811deb626cb",
+        "public_access": "REDACTED_PROJECTION_ONLY"
+      },
+      "application_commit": "f30b389890b6bc11f62efce56e355d3a981d5431",
+      "status": "FAIL",
+      "cases": [
+        {
+          "name": "beta-source-5-target-4",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "beta-source-6-target-4",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "beta-source-7-target-4",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "beta-source-8-target-4",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "beta-source-9-target-4",
+          "status": "FAIL",
+          "generate_exit_code": 1,
+          "generate_process_release": "PASS",
+          "quality_status": "FAIL",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "beta-source-7-target-2",
+          "status": "FAIL",
+          "generate_exit_code": 1,
+          "generate_process_release": "PASS",
+          "quality_status": "FAIL",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "beta-source-7-target-3",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "beta-source-7-target-5",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        },
+        {
+          "name": "beta-source-7-target-6",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "PASS",
+          "continuity_status": "PASS",
+          "reopen_exit_code": 0,
+          "reopen_process_release": "PASS"
+        }
+      ]
+    },
+    {
+      "label": "insufficient_context_refusals",
+      "source": {
+        "private_report_id": "context-refusal-5f1b8b8-v1/report.json",
+        "sha256": "72c788c2a85bb51ac6e2d51113f8b5400b9d343c3ebfae4dc690b5062fe27e52",
+        "public_access": "REDACTED_PROJECTION_ONLY"
+      },
+      "application_commit": "5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e",
+      "status": "PASS",
+      "cases": [
+        {
+          "name": "insufficient-source",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "NOT_APPLICABLE",
+          "continuity_status": "PASS",
+          "refusal": "MOTION_BRICKS_CONTEXT"
+        },
+        {
+          "name": "insufficient-target",
+          "status": "PASS",
+          "generate_exit_code": 0,
+          "generate_process_release": "PASS",
+          "quality_status": "NOT_APPLICABLE",
+          "continuity_status": "PASS",
+          "refusal": "MOTION_BRICKS_CONTEXT"
+        }
+      ]
+    }
+  ],
+  "independent_influence": {
+    "source": {
+      "private_report_id": "beta-boundary-grid-f30b389-v1/independent-influence.json",
+      "sha256": "4606164340206ca2acb25414c02946c6d70f05dd9d9980e28df8913118fb6b25",
+      "public_access": "REDACTED_PROJECTION_ONLY"
+    },
+    "application_commit": "f30b389890b6bc11f62efce56e355d3a981d5431",
+    "context_horizon_seconds": 0.1,
+    "rows": [
+      {
+        "case": "beta-source-5-target-4",
+        "explicitly_changed_boundary": "source",
+        "quality": "PASS",
+        "input_comparison": {
+          "source": {
+            "local_rotations_exact_equal": false,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.011370301246643066
+          },
+          "target": {
+            "local_rotations_exact_equal": true,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.04647802375257015
+          }
+        },
+        "raw_model_local_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.007172800617828503,
+          "rotation_rms_degrees": 4.549508148026827,
+          "root_max_m": 0.0178729851061755,
+          "rotation_max_degrees": 21.953711197402107,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "corrected_world_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.042195182336815004,
+          "rotation_rms_degrees": 17.261081889716547,
+          "root_max_m": 0.08483977255331016,
+          "rotation_max_degrees": 68.70384817397033,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "native_preserved": true,
+        "native_intervals": [
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              1,
+              5
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          },
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              4,
+              32
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          }
+        ]
+      },
+      {
+        "case": "beta-source-6-target-4",
+        "explicitly_changed_boundary": "source",
+        "quality": "PASS",
+        "input_comparison": {
+          "source": {
+            "local_rotations_exact_equal": false,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.0061321258544921875
+          },
+          "target": {
+            "local_rotations_exact_equal": true,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.024970781058073044
+          }
+        },
+        "raw_model_local_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.004301516612130779,
+          "rotation_rms_degrees": 2.9322739828447184,
+          "root_max_m": 0.010255879886591652,
+          "rotation_max_degrees": 13.432734506567504,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "corrected_world_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.023044491169075358,
+          "rotation_rms_degrees": 7.879638148989424,
+          "root_max_m": 0.04561862655530549,
+          "rotation_max_degrees": 29.43544808485685,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "native_preserved": true,
+        "native_intervals": [
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              1,
+              6
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          },
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              4,
+              32
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          }
+        ]
+      },
+      {
+        "case": "beta-source-7-target-4",
+        "explicitly_changed_boundary": "unchanged-center",
+        "quality": "PASS",
+        "input_comparison": {
+          "source": {
+            "local_rotations_exact_equal": true,
+            "roots_exact_equal": true,
+            "root_component_max_difference": 0.0
+          },
+          "target": {
+            "local_rotations_exact_equal": true,
+            "roots_exact_equal": true,
+            "root_component_max_difference": 0.0
+          }
+        },
+        "raw_model_local_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.0,
+          "rotation_rms_degrees": 5.085603890821824e-16,
+          "root_max_m": 0.0,
+          "rotation_max_degrees": 3.1805546814635168e-15,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": true
+        },
+        "corrected_world_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.0,
+          "rotation_rms_degrees": 1.4124103899634842e-15,
+          "root_max_m": 0.0,
+          "rotation_max_degrees": 7.111936473907615e-15,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": true
+        },
+        "native_preserved": true,
+        "native_intervals": [
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              1,
+              7
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          },
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              4,
+              32
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          }
+        ]
+      },
+      {
+        "case": "beta-source-8-target-4",
+        "explicitly_changed_boundary": "source",
+        "quality": "PASS",
+        "input_comparison": {
+          "source": {
+            "local_rotations_exact_equal": false,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.010038606822490692
+          },
+          "target": {
+            "local_rotations_exact_equal": true,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.030252087861299515
+          }
+        },
+        "raw_model_local_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.003657340504495814,
+          "rotation_rms_degrees": 7.2708558931432155,
+          "root_max_m": 0.009076314492485192,
+          "rotation_max_degrees": 24.580168044881745,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "corrected_world_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.02034896699903737,
+          "rotation_rms_degrees": 15.55445219865967,
+          "root_max_m": 0.04897116250520874,
+          "rotation_max_degrees": 34.733224330416256,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "native_preserved": true,
+        "native_intervals": [
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              1,
+              8
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          },
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              4,
+              32
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          }
+        ]
+      },
+      {
+        "case": "beta-source-9-target-4",
+        "explicitly_changed_boundary": "source",
+        "quality": "FAIL",
+        "input_comparison": {
+          "source": {
+            "local_rotations_exact_equal": false,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.022468693554401398
+          },
+          "target": {
+            "local_rotations_exact_equal": true,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.06418942287564278
+          }
+        },
+        "raw_model_local_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.007083620254148331,
+          "rotation_rms_degrees": 12.119465771477097,
+          "root_max_m": 0.018115744648612934,
+          "rotation_max_degrees": 38.47060612051981,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "corrected_world_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.04401251706325171,
+          "rotation_rms_degrees": 26.04057636776466,
+          "root_max_m": 0.10242679632735982,
+          "rotation_max_degrees": 63.70137378476676,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "native_preserved": true,
+        "native_intervals": [
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              1,
+              9
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          },
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              4,
+              32
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          }
+        ]
+      },
+      {
+        "case": "beta-source-7-target-2",
+        "explicitly_changed_boundary": "target",
+        "quality": "FAIL",
+        "input_comparison": {
+          "source": {
+            "local_rotations_exact_equal": true,
+            "roots_exact_equal": true,
+            "root_component_max_difference": 0.0
+          },
+          "target": {
+            "local_rotations_exact_equal": false,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.04647802449562022
+          }
+        },
+        "raw_model_local_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.005331074785170578,
+          "rotation_rms_degrees": 4.794237632348681,
+          "root_max_m": 0.014119712271591133,
+          "rotation_max_degrees": 22.195537293907424,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "corrected_world_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.00719421580423651,
+          "rotation_rms_degrees": 16.44011933114195,
+          "root_max_m": 0.01865387972652657,
+          "rotation_max_degrees": 59.951014249950454,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "native_preserved": true,
+        "native_intervals": [
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              1,
+              7
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          },
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              2,
+              32
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          }
+        ]
+      },
+      {
+        "case": "beta-source-7-target-3",
+        "explicitly_changed_boundary": "target",
+        "quality": "PASS",
+        "input_comparison": {
+          "source": {
+            "local_rotations_exact_equal": true,
+            "roots_exact_equal": true,
+            "root_component_max_difference": 0.0
+          },
+          "target": {
+            "local_rotations_exact_equal": false,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.02497077993847796
+          }
+        },
+        "raw_model_local_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.002992281886270554,
+          "rotation_rms_degrees": 2.9959456457809988,
+          "root_max_m": 0.0076442529083610156,
+          "rotation_max_degrees": 13.25477947964898,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "corrected_world_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.006888156549554682,
+          "rotation_rms_degrees": 9.241222046349113,
+          "root_max_m": 0.015385204834348614,
+          "rotation_max_degrees": 37.73713399717526,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "native_preserved": true,
+        "native_intervals": [
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              1,
+              7
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          },
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              3,
+              32
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          }
+        ]
+      },
+      {
+        "case": "beta-source-7-target-5",
+        "explicitly_changed_boundary": "target",
+        "quality": "PASS",
+        "input_comparison": {
+          "source": {
+            "local_rotations_exact_equal": true,
+            "roots_exact_equal": true,
+            "root_component_max_difference": 0.0
+          },
+          "target": {
+            "local_rotations_exact_equal": false,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.030252088980894598
+          }
+        },
+        "raw_model_local_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.003550287581999007,
+          "rotation_rms_degrees": 4.886939230370302,
+          "root_max_m": 0.007789677356674932,
+          "rotation_max_degrees": 17.72351209810291,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "corrected_world_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.007349929285548089,
+          "rotation_rms_degrees": 9.342450771532139,
+          "root_max_m": 0.016825677307424982,
+          "rotation_max_degrees": 21.918811862956154,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "native_preserved": true,
+        "native_intervals": [
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              1,
+              7
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          },
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              5,
+              32
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          }
+        ]
+      },
+      {
+        "case": "beta-source-7-target-6",
+        "explicitly_changed_boundary": "target",
+        "quality": "PASS",
+        "input_comparison": {
+          "source": {
+            "local_rotations_exact_equal": true,
+            "roots_exact_equal": true,
+            "root_component_max_difference": 0.0
+          },
+          "target": {
+            "local_rotations_exact_equal": false,
+            "roots_exact_equal": false,
+            "root_component_max_difference": 0.06418942399523786
+          }
+        },
+        "raw_model_local_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.005447256899916371,
+          "rotation_rms_degrees": 5.979658894600213,
+          "root_max_m": 0.016915407688329446,
+          "rotation_max_degrees": 33.86381681879872,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "corrected_world_difference": {
+          "status": "COMPARED_INTERIOR",
+          "root_rms_height": 0.014337026930673088,
+          "rotation_rms_degrees": 15.851248916805348,
+          "root_max_m": 0.036170200429368846,
+          "rotation_max_degrees": 52.272030830422274,
+          "thresholds": {
+            "root_rms_height": 0.0001,
+            "rotation_rms_degrees": 0.1
+          },
+          "near_duplicate": false
+        },
+        "native_preserved": true,
+        "native_intervals": [
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              1,
+              7
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          },
+          {
+            "action": "Armature|mixamo.com|Layer0",
+            "range": [
+              6,
+              32
+            ],
+            "selection": "explicit-manifest",
+            "source_fps": 30
+          }
+        ]
+      }
+    ]
+  },
+  "interpretation": [
+    "Legacy suite remains FAIL (7 PASS, 3 FAIL), not overwritten by the prepared follow-ups.",
+    "Two prepared requests generate successfully; the third correctly refuses an unstable-contact boundary.",
+    "Beta uses one unseen Action and nine explicit interval pairs, with seven quality passes and two failures; not nine independent styles.",
+    "The mandatory matrix counts requirement/invariant verification, not attempted-candidate success. Independent review of that aggregation is explicitly requested."
+  ]
+}

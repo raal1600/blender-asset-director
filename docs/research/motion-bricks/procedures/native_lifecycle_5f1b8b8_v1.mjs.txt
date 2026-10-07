@@ -1,0 +1,162 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {spawn,execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {pathToFileURL} from 'node:url';
+import net from 'node:net';
+const exec=promisify(execFile),root=String.raw`<PRIVATE_EVIDENCE_ROOT>`,historical=String.raw`<PRIVATE_BASELINE_ROOT>`;
+const studio=path.join(root,'Studio-review-5f1b8b8'),repo=String.raw`<SOURCE_WORKTREE>`,out=path.join(root,'native-lifecycle-5f1b8b8-v1');
+await fs.mkdir(out);
+const {json,fileHash,writeJson}=await import(pathToFileURL(path.join(studio,'SystemRuntime/Launcher/lib/storage.mjs')));
+const {Store}=await import(pathToFileURL(path.join(studio,'SystemRuntime/Launcher/lib/projects.mjs')));
+const {createApp}=await import(pathToFileURL(path.join(studio,'SystemRuntime/Launcher/server.mjs')));
+const config=await json(path.join(studio,'SystemRuntime/UserData/Launcher/config.json')),provenance=await json(path.join(historical,'PROVENANCE.json'));
+const store=new Store(studio),report={commit:'5f1b8b89ba2de306c2290f2a1fbfa676ca3c797e',scope:'ACTUAL_VISIBLE_WINDOWS_WEBVIEW2_GENERATION_AND_REVIEW',status:'FAIL',errors:[],human_review:'NOT_CLAIMED'};
+let app,proc,browser,page,session,log;
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+async function wait(fn,label,ms=240000){const until=Date.now()+ms;while(Date.now()<until){const value=await fn();if(value)return value;await delay(250);}throw Error('Timed out: '+label);}
+async function state(){return store.get(provenance.source_project_id);}
+async function snap(label){await fs.writeFile(path.join(out,label+'.txt'),await page.locator('body').ariaSnapshot());await page.screenshot({path:path.join(out,label+'.png'),fullPage:true});}
+let bootCount=0;report.boots=[];
+async function boot(p){const previousBackend=report.native?.backend_pid;
+ const port=await new Promise(resolve=>{const probe=net.createServer();probe.listen(0,'127.0.0.1',()=>{const port=probe.address().port;probe.close(()=>resolve(port));});});
+ const exe=path.join(studio,'SystemRuntime/Launcher/Asset Director.exe');report.exe=await fileHash(exe);
+ log=await fs.open(path.join(out,'native-host-'+(++bootCount)+'.log'),'wx');
+ proc=spawn(exe,[],{cwd:path.dirname(exe),windowsHide:false,stdio:['ignore',log.fd,log.fd],env:{...process.env,WEBVIEW2_USER_DATA_FOLDER:path.join(studio,'SystemRuntime/UserData/Launcher/WebView2'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:'--remote-debugging-port='+port+' --remote-debugging-address=127.0.0.1'}});
+ session=await wait(async()=>{assert.equal(proc.exitCode,null);try{const value=await json(path.join(studio,'SystemRuntime/UserData/Launcher/session.json'));return value.pid!==previousBackend?value:null;}catch{return null;}},'native session',45000);
+ assert.equal(path.resolve(session.root).toLowerCase(),path.resolve(studio).toLowerCase());report.native={host_pid:proc.pid,backend_pid:session.pid,cdp_port:port};
+ await wait(async()=>{try{return (await fetch('http://127.0.0.1:'+port+'/json/version')).ok;}catch{return false;}},'owned CDP',30000);
+ const ps="$connections=@(Get-NetTCPConnection -State Listen -LocalPort "+port+");foreach($c in $connections){if($c.LocalAddress -notin @('127.0.0.1','::1')){throw 'Nonlocal listener'};$chain=@();$currentId=[int]$c.OwningProcess;for($i=0;$i -lt 12 -and $currentId -gt 0;$i++){$chain+=$currentId;if($currentId -eq "+proc.pid+"){break};$info=Get-CimInstance Win32_Process -Filter ('ProcessId = '+$currentId);$currentId=[int]$info.ParentProcessId};if($chain -notcontains "+proc.pid+"){throw 'Foreign listener'};[pscustomobject]@{address=$c.LocalAddress;pid=$c.OwningProcess;ancestry=$chain}|ConvertTo-Json -Compress}";
+ report.listener=(await exec('powershell',['-NoProfile','-NonInteractive','-Command',ps],{windowsHide:true,timeout:30000})).stdout.trim();
+ report.boots.push({...report.native});const {chromium}=await import(pathToFileURL(path.join(historical,'../..','../../AppData/Local/Temp/asset-director-browser-deps-20261005/node_modules/playwright/index.mjs')).href).catch(()=>import('file:///<LOCAL_PATH_REDACTED>'));
+ browser=await chromium.connectOverCDP('http://127.0.0.1:'+port);
+ page=await wait(()=>browser.contexts()[0].pages().find(p=>p.url().startsWith(session.origin+'/')),'native page');
+ page.setDefaultTimeout(45000);await page.setViewportSize({width:1440,height:1050});
+ page.on('pageerror',e=>report.errors.push(e.message));page.on('dialog',async d=>{if(/Mark Action ready|Mark this layer ready|^Authorize .*render:|^Keep this reviewed checkpoint/.test(d.message())){(report.scripted_qa_confirmations||=[]).push(d.message());await d.accept();}else{report.errors.push('Unexpected dialog: '+d.message());await d.dismiss();}});
+ await page.goto(session.origin+'/workbench#'+session.token);
+ await page.locator('[data-action="project"][data-id="'+p.id+'"]').click();
+ const actionTab=page.getByRole('navigation',{name:'Activities in this scene'}).getByRole('button',{name:/Action/});if(await actionTab.isEnabled())await actionTab.click({timeout:180000});
+ await page.getByLabel('Performer',{exact:true}).waitFor({timeout:180000});
+ await page.getByLabel('Performer',{exact:true}).selectOption('Rig');
+ await wait(()=>page.locator('[data-scene-viewer]').getAttribute('data-viewer-state').then(v=>v==='ready'),'initial preview');
+
+}
+
+async function closeOwned(){
+ const life=await fetch(session.origin+'/api/lifecycle',{headers:{Authorization:'Bearer '+session.token}}).then(r=>r.json());assert(!life.busy,'Close only after all bounded work finishes');
+ await exec('powershell',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(repo,'tools/native_desktop_ui.ps1'),'-ProcessIdentifier',String(proc.pid),'-Action','close','-Text','Asset Director'],{windowsHide:true,timeout:25000});
+ await wait(()=>proc.exitCode!==null,'normal host exit',15000);assert.equal(proc.exitCode,0);
+ await browser.close();browser=null;await log.close();log=null;
+}
+async function click(selector){await page.locator(selector).click();await wait(()=>page.locator('body').evaluate(n=>!n.classList.contains('working')),'client operation idle',240000);}
+async function previewReady(){await wait(()=>page.locator('[data-scene-viewer]').getAttribute('data-viewer-state').then(v=>v==='ready'),'accepted preview',240000);}
+
+
+async function setContacts(seconds){
+ const details=page.locator('details.motion-contact-refinement');if(!await details.evaluate(n=>n.open))await details.locator('summary').click();
+ for(const edge of ['source','target']){await page.locator('[data-motion-field="contact_'+edge+'_seconds"]').fill(String(seconds));await page.locator('[data-motion-field="contact_'+edge+'_seconds"]').press('Tab');}
+ await delay(700);
+}
+async function batch(before,label){
+ const count=before.transitionReview.candidates.length;await page.getByRole('button',{name:'Generate alternatives (3)',exact:true}).click();const began=Date.now();
+ await wait(async()=>{const stateResponse=await fetch(session.origin+'/api/workbench/state?'+new URLSearchParams({projectId:provenance.source_project_id,compact:true}),{headers:{Authorization:'Bearer '+session.token}}).then(r=>r.json());const p=stateResponse.project,s=p.workbench.scenes.find(s=>s.id===provenance.source_scene_id);assert.equal(s.current,report.accepted_before);const run=stateResponse.runs.find(r=>r.id===s.run);if(run?.nativeProgress){report.progress||=[];if(!report.progress.some(v=>v.runId===run.id&&v.stage===run.nativeProgress.stage)){report.progress.push({runId:run.id,...run.nativeProgress});if(run.nativeProgress.stage==='fresh_reopen_quality_validation')await snap('validating-'+run.id);}}return s.transitionReview.candidates.length===count+3&&!s.run;},label,420000);
+ const s=(await state()).workbench.scenes.find(s=>s.id===provenance.source_scene_id);return {seconds:(Date.now()-began)/1000,candidates:s.transitionReview.candidates.slice(count)};
+}
+async function compare(a,b,label){
+ await page.locator('[data-action="transition-review"][data-id="'+b.id+'"]').click();await wait(()=>page.locator('[data-compare-view]').evaluateAll(ns=>ns.length===2&&ns.every(n=>n.dataset.viewerState==='ready')),'comparison previews',420000);
+ await page.locator('[data-compare-choice="a"]').selectOption(a.id);await page.locator('[data-compare-choice="b"]').selectOption(b.id);await wait(()=>page.locator('[data-compare-view]').evaluateAll(ns=>ns.length===2&&ns.every(n=>n.dataset.viewerState==='ready')),'chosen previews',420000);
+ await page.locator('[data-compare-edge="0"]').click();await page.getByRole('button',{name:'Play both at full speed'}).click();await delay(1400);await snap(label+'-playback');
+ for(const seconds of [.08,.16,.3]){await page.locator('[data-compare-time]').evaluate((n,v)=>{n.value=String(v);n.dispatchEvent(new Event('input',{bubbles:true}));},seconds);await snap(label+'-'+String(seconds).replace('.','-'));}
+ await page.getByRole('dialog').getByRole('button',{name:'Done',exact:true}).click();
+}
+
+async function sceneState(){return (await state()).workbench.scenes.find(s=>s.id===provenance.source_scene_id);}
+async function generateSingle(label){
+ const before=await sceneState(),count=before.transitionReview.candidates.length,accepted=before.current,priorRuns=new Set((await store.runs(provenance.source_project_id)).map(r=>r.id)),began=Date.now();
+ await page.locator('[data-action="action-save"]') .click();
+ await wait(async()=>{const s=await sceneState();assert.equal(s.current,accepted,'Generation must retain accepted revision');
+  if(s.transitionReview.candidates.length===count+1&&!s.run)return true;
+  const runs=await store.runs(provenance.source_project_id);const failure=runs.filter(r=>!priorRuns.has(r.id)&&r.state==='FAILED'&&r.publication==='TRANSITION_REVIEW_ONLY').at(-1);
+  if(failure)throw Error('Actual candidate execution failed: '+failure.error);return false;},label,480000);
+ const scene=await sceneState(),candidate=scene.transitionReview.candidates.at(-1);(report.generations||=[]).push({label,seconds:(Date.now()-began)/1000,candidate});
+ await snap(label);assert.equal(candidate.validation.status,'PASS',JSON.stringify(candidate.validation.joins.map(j=>({clip:j.clip_id,failures:j.failures}))));
+ return candidate;
+}
+async function accept(candidate,label){
+ await click('[data-action="transition-accept"][data-id="'+candidate.id+'"]');await wait(async()=>(await sceneState()).current===candidate.checkpointId,label);await previewReady();await snap(label);
+}
+async function setFrames(value){await page.locator('[data-motion-field="transition_frames"]').fill(String(value));await page.locator('[data-motion-field="transition_frames"]').press('Tab');await delay(700);}
+async function inspectComparison(a,b,clipId,label){
+ await page.locator('[data-action="transition-review"][data-id="'+b.id+'"]').click();
+ await wait(()=>page.locator('[data-compare-view]').evaluateAll(ns=>ns.length===2&&ns.every(n=>n.dataset.viewerState==='ready')),'initial comparison',420000);
+ await page.locator('[data-compare-choice="a"]').selectOption(a.id);await page.locator('[data-compare-choice="b"]').selectOption(b.id);
+ await wait(()=>page.locator('[data-compare-view]').evaluateAll(ns=>ns.length===2&&ns.every(n=>n.dataset.viewerState==='ready')),'selected candidate previews',420000);
+ const expected=JSON.stringify(['Rig',clipId]);assert.equal(await page.locator('[data-compare-join]').inputValue(),expected);
+ await page.locator('[data-compare-edge="0"]').click();assert(await page.locator('[data-compare-play]').isEnabled());
+ await page.locator('[data-compare-play]').click();await delay(1350);await snap(label+'-last-join');
+ const first=b.transitions.find(j=>j.provider==='motion-bricks.cpp');await page.locator('[data-compare-join]').selectOption(JSON.stringify(['Rig',first.clip_id]));
+ await wait(()=>page.locator('[data-compare-view]').evaluateAll(ns=>ns.length===2&&ns.every(n=>n.dataset.viewerState==='ready')),'first join comparison',420000);
+ const labels=await page.locator('[data-compare-identity]').allTextContents();assert.notEqual(labels[0].match(/bridge ([\d.]+)/)?.[1],labels[1].match(/bridge ([\d.]+)/)?.[1],'Different durations must remain visible');
+ report.comparison={selected_last_clip:clipId,choices:await page.locator('[data-compare-join] option').allTextContents(),labels};
+ await page.locator('[data-compare-edge="a"]').click();await snap(label+'-a-stitch');await page.locator('[data-compare-edge="b"]').click();await snap(label+'-b-stitch');
+ await page.getByRole('dialog').getByRole('button',{name:'Done',exact:true}).click();
+}
+
+async function record(id){return json(path.join((await state()).directory,'Runs/'+id+'.json'));}
+async function begin(label){
+ const before=await sceneState(),started=Date.now();await page.locator('[data-action="action-save"]').click();
+ const id=await wait(async()=>{const scene=await sceneState();assert.equal(scene.current,report.accepted_before);return scene.run;},label+' admitted',45000);
+ const run=await wait(async()=>{const v=await record(id);return v.jobId?v:null;},label+' job',45000);
+ (report.attempts||=[]).push({label,id,jobId:run.jobId,started});return {id,jobId:run.jobId,count:before.transitionReview.candidates.length,started};
+}
+async function worker(attempt){return wait(async()=>{try{return await json(path.join(config.library,'jobs',attempt.jobId,'worker-process.json'));}catch{return null;}},'actual Blender worker started',45000);}
+async function finished(attempt,expected){
+ await wait(async()=>{const run=await record(attempt.id),scene=await sceneState();assert.equal(scene.current,report.accepted_before);if(['FAILED','CANCELLED','INTERRUPTED','SUCCEEDED'].includes(run.state)&&!scene.run){assert.equal(run.state,expected,run.error);return true;}return false;},expected+' receipt',480000);
+ const run=await record(attempt.id);(report.completed||=[]).push({id:attempt.id,state:run.state,error:run.error,seconds:(Date.now()-attempt.started)/1000,quarantine:run.quarantine});return run;
+}
+async function selectFirst(frames){await page.locator('.motion-transition').first().click();await setFrames(frames);}
+async function checkpointHash(){const p=await state(),scene=await sceneState(),cp=scene.checkpoints.find(c=>c.id===scene.current);return (await fileHash(path.join(p.directory,cp.path))).sha256;}
+async function repeatRequest(body){return fetch(session.origin+'/api/workbench/transition-accept',{method:'POST',headers:{Authorization:'Bearer '+session.token,'Content-Type':'application/json'},body:JSON.stringify(body)});}
+try{
+ const initial=await sceneState();assert(!initial.run&&!initial.candidate);report.accepted_before=initial.current;report.accepted_sha_before=await checkpointHash();report.prior_candidate_ids=initial.transitionReview.candidates.map(c=>c.id);
+ await boot(await state());await selectFirst(14);await snap('01-ready-for-stale-test');
+ const old=await begin('stale-input-completion');await worker(old);const oldFingerprint=(await sceneState()).transitionReview.working.fingerprint;
+ await wait(()=>page.locator('[data-motion-field="transition_frames"]').isEnabled(),'editing during generation',60000);await setFrames(15);
+ await wait(async()=>(await sceneState()).transitionReview.working.fingerprint!==oldFingerprint,'new dependency fingerprint');await snap('02-changed-during-generation');
+ await finished(old,'SUCCEEDED');const stale=(await sceneState()).transitionReview.candidates.find(c=>c.id===old.id);assert(stale);assert.notEqual(stale.fingerprint,(await sceneState()).transitionReview.working.fingerprint);
+ await wait(()=>page.locator('[data-action="transition-accept"][data-id="'+old.id+'"]').isDisabled(),'stale acceptance disabled');await snap('03-stale-result');report.stale={id:old.id,fingerprint:stale.fingerprint,current_fingerprint:(await sceneState()).transitionReview.working.fingerprint,accepted_unchanged:true};
+ const cancelling=await begin('actual-cancellation');await worker(cancelling);const cancelTime=Date.now();await page.locator('[data-action="action-cancel"]').click();await finished(cancelling,'CANCELLED');report.cancellation_seconds=(Date.now()-cancelTime)/1000;await snap('04-cancelled');
+ const crashing=await begin('provider-crash');await worker(crashing);
+ report.provider_crash=JSON.parse((await exec('powershell',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(root,'owned_provider_crash.ps1'),'-JobDirectory',path.join(config.library,'jobs',crashing.jobId)],{windowsHide:true,timeout:45000})).stdout.trim());
+ await finished(crashing,'FAILED');await snap('05-provider-failure');
+ const interrupted=await begin('restart-during-generation');await worker(interrupted);const count=(await sceneState()).transitionReview.candidates.length,backend=session.pid,host=proc.pid;
+ const psCrash="$p=Get-CimInstance Win32_Process -Filter 'ProcessId = "+backend+"';if($p.Name -ne 'node.exe' -or $p.ParentProcessId -ne "+host+" -or -not $p.CommandLine.Contains('"+studio.replaceAll("'","''").replaceAll('/','\\')+"')){throw 'Backend ownership changed'};Stop-Process -Id "+backend+" -Force";
+ await exec('powershell',['-NoProfile','-NonInteractive','-Command',psCrash],{windowsHide:true,timeout:15000});proc.kill();await wait(()=>proc.exitCode!==null||proc.signalCode!==null,'owned host exit',15000);await browser.close();browser=null;await log.close();log=null;
+ await boot(await state());const recovered=await finished(interrupted,'INTERRUPTED');assert.equal(recovered.quarantine.state,'EXCLUDED_FROM_CANDIDATES');assert.equal((await sceneState()).transitionReview.candidates.length,count);assert.equal(await checkpointHash(),report.accepted_sha_before);
+ report.restart={old_backend:backend,new_backend:session.pid,accepted_unchanged:true,candidates_unchanged:true,quarantine:recovered.quarantine};await snap('06-restarted');
+ await selectFirst(12);const first=await begin('fixed-settings-first');await finished(first,'SUCCEEDED');const a=(await sceneState()).transitionReview.candidates.find(c=>c.id===first.id);assert.equal(a.validation.status,'PASS',JSON.stringify(a.validation.joins.map(j=>j.failures)));await snap('07-first-valid-candidate');
+ const second=await begin('fixed-settings-repeat');await finished(second,'SUCCEEDED');const b=(await sceneState()).transitionReview.candidates.find(c=>c.id===second.id);assert.equal(b.validation.status,'PASS');assert(b.diversity.near_duplicate_of.includes(a.id));assert.equal(b.fingerprint,a.fingerprint);
+ await wait(()=>page.locator('[data-action="transition-review"][data-id="'+b.id+'"]').locator('..').textContent().then(t=>t.includes('Near duplicate')),'visible duplicate report');report.repeat={first:a.id,second:b.id,diversity:b.diversity};await snap('08-duplicate-identified');
+ // Corrupt only a new, unaccepted evidence artifact; restore the exact backup in finally.
+ const artifact=a.artifacts.find(m=>m.path.endsWith('-corrected.json'));assert(artifact);const artifactPath=path.resolve(config.library,artifact.path);assert(artifactPath.toLowerCase().startsWith(path.resolve(studio).toLowerCase()+path.sep));
+ const bytes=await fs.readFile(artifactPath);assert.equal((await fileHash(artifactPath)).sha256,artifact.sha256);await fs.writeFile(path.join(out,'unaccepted-artifact-original.json'),bytes,{flag:'wx'});
+ try{await fs.writeFile(artifactPath,Buffer.concat([bytes,Buffer.from('\n')]));await page.locator('[data-action="transition-accept"][data-id="'+a.id+'"]').click();await wait(()=>page.locator('#notice').textContent().then(t=>t.includes('Candidate evidence or artifact was changed')),'corrupted artifact refused',60000);assert.equal((await sceneState()).current,report.accepted_before);report.corruption={candidate_id:a.id,artifact:artifact.path,status:'REFUSED_WITH_ACCEPTED_UNCHANGED'};await snap('09-corrupted-candidate-refused');}
+ finally{await fs.writeFile(artifactPath,bytes);assert.equal((await fileHash(artifactPath)).sha256,artifact.sha256);}
+ let acceptanceBody;const listener=req=>{if(req.method()==='POST'&&req.url()===session.origin+'/api/workbench/transition-accept')acceptanceBody=req.postDataJSON();};page.on('request',listener);
+ await accept(a,'10-valid-candidate-accepted');page.off('request',listener);assert(acceptanceBody?.request?.eventId);const acceptedState=await sceneState(),events=acceptedState.transitionReview.acceptances.length,revision=(await state()).revision;
+ let response=await repeatRequest(acceptanceBody);assert(response.ok,await response.text());assert.equal((await state()).revision,revision);assert.equal((await sceneState()).transitionReview.acceptances.length,events);
+ const duplicate=structuredClone(acceptanceBody);duplicate.revision=(await state()).revision;duplicate.request.eventId='run_'+crypto.randomUUID();response=await repeatRequest(duplicate);assert.equal(response.status,409);assert.equal((await sceneState()).current,a.checkpointId);assert.equal((await sceneState()).transitionReview.acceptances.length,events);
+ report.duplicate_acceptance={exact_retry:'IDEMPOTENT_NO_SECOND_EVENT',new_event:'REFUSED_ALREADY_ACCEPTED',eventId:acceptanceBody.request.eventId};report.accepted_after=a.checkpointId;report.chosen=a;
+ report.preview_before=await page.locator('[data-scene-viewer]').getAttribute('data-preview-id');await closeOwned();await boot(await state());report.preview_after=await page.locator('[data-scene-viewer]').getAttribute('data-preview-id');assert.equal(report.preview_after,report.preview_before);assert.equal((await sceneState()).current,a.checkpointId);
+ const last=await sceneState();assert(report.prior_candidate_ids.every(id=>last.transitionReview.candidates.some(c=>c.id===id)));await snap('11-final-reopened');assert.equal(report.errors.length,0);report.status='PASS_NATIVE_STALE_CANCEL_PROVIDER_CRASH_RESTART_DUPLICATES_CORRUPTION_ACCEPT_REOPEN';
+}catch(e){report.errors.push(e.stack);if(page)await snap('failure').catch(()=>{});throw e;}
+finally{
+ if(session&&proc?.exitCode===null){
+  try{const life=await fetch(session.origin+'/api/lifecycle',{headers:{Authorization:'Bearer '+session.token}}).then(r=>r.json());if(life.busy){const pending=(await state()).workbench.scenes.find(s=>s.id===provenance.source_scene_id).run;if(pending){await fetch(session.origin+'/api/workbench/action-cancel',{method:'POST',headers:{Authorization:'Bearer '+session.token,'Content-Type':'application/json'},body:JSON.stringify({projectId:provenance.source_project_id,sceneId:provenance.source_scene_id,runId:pending})});await wait(async()=>!(await fetch(session.origin+'/api/lifecycle',{headers:{Authorization:'Bearer '+session.token}}).then(r=>r.json())).busy,'bounded fault-test cleanup',60000);life.busy=false;}}if(!life.busy){await exec('powershell',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(repo,'tools/native_desktop_ui.ps1'),'-ProcessIdentifier',String(proc.pid),'-Action','close','-Text','Asset Director'],{windowsHide:true,timeout:25000});await wait(()=>proc.exitCode!==null,'normal host exit',15000);report.exit_code=proc.exitCode;}else report.retained_running_for_recovery=life.reasons;}catch(e){report.errors.push('Close: '+e.message);}
+ }
+ if(browser&&proc?.exitCode!==null)await browser.close();if(log)await log.close();if(app)await new Promise(resolve=>app.server.close(resolve));
+ await writeJson(path.join(out,'report.json'),report);
+}
+
+

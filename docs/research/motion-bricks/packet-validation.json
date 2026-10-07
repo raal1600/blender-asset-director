@@ -1,0 +1,132 @@
+{
+  "schema": "motion-bricks.public-packet-validation.v1",
+  "status": "PASS",
+  "runtime_application_commit": "5d4a7baaaa9b4f7172ba717cd45fa7433bfd652c",
+  "implementation_delivery_commit": "5befbde9d25b5dc55aef68fb146732713fbb2441",
+  "private_report_hashes_verified": 19,
+  "redacted_procedures_verified": 14,
+  "checks": [
+    "All nine reference/contact candidate metrics and limits match retained reports exactly.",
+    "Retained legacy and Beta failures remain unchanged.",
+    "Eighteen pipeline, eight native and ten preview timing records retained.",
+    "Both media frame counts and source parity retained.",
+    "Redacted procedure syntax parses; original/public hashes verified.",
+    "Relative packet links resolve; no absolute workstation paths or common credential formats in procedure copies."
+  ],
+  "limitations": [
+    "Published projections remain reported local evidence, not independent cloud runtime verification.",
+    "No raw motion, private assets, model files, media, databases or process logs published."
+  ],
+  "files": [
+    {
+      "file": "benchmark-samples.json",
+      "sha256": "99ca8986364bf607db1e98908110e29de1254f881e0b60d5ab528ca54d66ba50",
+      "bytes": 128971
+    },
+    {
+      "file": "coverage-results.json",
+      "sha256": "fdb60131230dc37152dea7a19653080d762db305889ef1916b7f373448d2f829",
+      "bytes": 28639
+    },
+    {
+      "file": "delivery-summary.json",
+      "sha256": "0b776a2ded0af9a0a2ba8fe299efe8ed1c3a2f85464ee373fa9faebbf4dea3b9",
+      "bytes": 2477
+    },
+    {
+      "file": "lifecycle-media-results.json",
+      "sha256": "03762d7f603dc91691319fcd37f1cb54c2a799b5dd06ddd114e0fcd0918129f2",
+      "bytes": 5491
+    },
+    {
+      "file": "procedure-manifest.json",
+      "sha256": "e452941546a594883046d10fc2d2f1b838a460616b9876e003245674172528ab",
+      "bytes": 7366
+    },
+    {
+      "file": "procedures/analyze_beta_grid_v1.py.txt",
+      "sha256": "0d2d26766f473795a66346cdeba7d3b2949ac24a4b5f2ad41cf409cca8af234c",
+      "bytes": 3681
+    },
+    {
+      "file": "procedures/check_accepted_parity.mjs.txt",
+      "sha256": "2da463f1bec64780c565ff5befe84b905e5a98c6188d21b46997a6fdb1fdd7e3",
+      "bytes": 4981
+    },
+    {
+      "file": "procedures/dense_final_quality_v1.py.txt",
+      "sha256": "9725795007eccf443fd0df5ed31da2cd74ac2b698a2cb297ab0509499eb55ead",
+      "bytes": 2516
+    },
+    {
+      "file": "procedures/native_cancellation_5d4a7ba_v2.mjs.txt",
+      "sha256": "72670a6dcf964e36e3d67c9201a99861980860d4d70767a7d72e6ce139b2849e",
+      "bytes": 18414
+    },
+    {
+      "file": "procedures/native_contact_5f1b8b8_v1.mjs.txt",
+      "sha256": "9ab0b91f5fca46cf21183af383ccba7c6390199e83e045fbb914ba9dfcd2f95a",
+      "bytes": 13534
+    },
+    {
+      "file": "procedures/native_lifecycle_5f1b8b8_v1.mjs.txt",
+      "sha256": "6a98287f4fe6c3b01eb87ae335503cb299e711f6b4cd1857a0d44c0cbac16f29",
+      "bytes": 23454
+    },
+    {
+      "file": "procedures/native_multi_2cd8ed9_v1.mjs.txt",
+      "sha256": "8af82e88766ec20773f55a315f55b64cfd6c9cd0dd0d74d1b6ecf7b47153994a",
+      "bytes": 18624
+    },
+    {
+      "file": "procedures/native_playback_ranked_5d4a7ba_v1.mjs.txt",
+      "sha256": "d63d0a1531961c54d33b9a79abbe7aa66b00fd284ef3a55edeb7640f6127491c",
+      "bytes": 9460
+    },
+    {
+      "file": "procedures/native_ranked_5d4a7ba_v1.mjs.txt",
+      "sha256": "38580172d2a14123435b7bdda5d8cde67c17e49ebe86fb98c985a710f0299396",
+      "bytes": 14043
+    },
+    {
+      "file": "procedures/native_render_ranked_5d4a7ba_v1.mjs.txt",
+      "sha256": "a516695769ff086fbb7eb6b8e021d7ad7f0700ce71cfb3c8bad8617a8b6d6a61",
+      "bytes": 12540
+    },
+    {
+      "file": "procedures/reconcile_broader_evidence_v1.py.txt",
+      "sha256": "dbf53c0ad89306193cfc7ce5cfab9b38b6f4ae297a93bb1e5d9981e8d75f2861",
+      "bytes": 3065
+    },
+    {
+      "file": "procedures/run_accepted_parity_ranked_5d4a7ba_v1.py.txt",
+      "sha256": "b6c72c4c2fbe153f5a03e0eb69592fbe5142f97b3280a5c06012ac5a25014d20",
+      "bytes": 1225
+    },
+    {
+      "file": "procedures/run_dense_final_quality_v1.py.txt",
+      "sha256": "0c130bee137f3c9eebb59e7459dee449011c04acdc70e3a7c972beecf768891d",
+      "bytes": 713
+    },
+    {
+      "file": "procedures/sample_accepted_parity_v2.py.txt",
+      "sha256": "b20726ddf02ffa199b81221647b1a1846e92532e3bc886eb4d1b759fb3ac0576",
+      "bytes": 2518
+    },
+    {
+      "file": "quality-results.json",
+      "sha256": "874acfe610fd120eaa533257f425329122b42d05537012230bd20ed382decd1c",
+      "bytes": 70291
+    },
+    {
+      "file": "README.md",
+      "sha256": "0c1aea085f5c0d9f437b084fe04582d3a6681ee8fcff6e600bf825387e96a026",
+      "bytes": 7153
+    },
+    {
+      "file": "RESEARCH_PROMPT.md",
+      "sha256": "10ff5f8dff8f3e18e967a09f0ea8fb68253d569058ee35cd0d0ea2f1b4c42860",
+      "bytes": 10264
+    }
+  ]
+}

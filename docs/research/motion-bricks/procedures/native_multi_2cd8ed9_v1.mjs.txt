@@ -1,0 +1,148 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {spawn,execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {pathToFileURL} from 'node:url';
+import net from 'node:net';
+const exec=promisify(execFile),root=String.raw`<PRIVATE_EVIDENCE_ROOT>`,historical=String.raw`<PRIVATE_BASELINE_ROOT>`;
+const studio=path.join(root,'Studio-review-2cd8ed9'),repo=String.raw`<SOURCE_WORKTREE>`,out=path.join(root,'native-multi-2cd8ed9-v1');
+await fs.mkdir(out);
+const {json,fileHash,writeJson}=await import(pathToFileURL(path.join(studio,'SystemRuntime/Launcher/lib/storage.mjs')));
+const {Store}=await import(pathToFileURL(path.join(studio,'SystemRuntime/Launcher/lib/projects.mjs')));
+const {createApp}=await import(pathToFileURL(path.join(studio,'SystemRuntime/Launcher/server.mjs')));
+const config=await json(path.join(studio,'SystemRuntime/UserData/Launcher/config.json')),provenance=await json(path.join(historical,'PROVENANCE.json'));
+const store=new Store(studio),report={commit:'2cd8ed9eea8961569e02ebf541bafca3b0fefc97',scope:'ACTUAL_VISIBLE_WINDOWS_WEBVIEW2_GENERATION_AND_REVIEW',status:'FAIL',errors:[],human_review:'NOT_CLAIMED'};
+let app,proc,browser,page,session,log;
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+async function wait(fn,label,ms=240000){const until=Date.now()+ms;while(Date.now()<until){const value=await fn();if(value)return value;await delay(250);}throw Error('Timed out: '+label);}
+async function state(){return store.get(provenance.source_project_id);}
+async function snap(label){await fs.writeFile(path.join(out,label+'.txt'),await page.locator('body').ariaSnapshot());await page.screenshot({path:path.join(out,label+'.png'),fullPage:true});}
+let bootCount=0;report.boots=[];
+async function boot(p){const previousBackend=report.native?.backend_pid;
+ const port=await new Promise(resolve=>{const probe=net.createServer();probe.listen(0,'127.0.0.1',()=>{const port=probe.address().port;probe.close(()=>resolve(port));});});
+ const exe=path.join(studio,'SystemRuntime/Launcher/Asset Director.exe');report.exe=await fileHash(exe);
+ log=await fs.open(path.join(out,'native-host-'+(++bootCount)+'.log'),'wx');
+ proc=spawn(exe,[],{cwd:path.dirname(exe),windowsHide:false,stdio:['ignore',log.fd,log.fd],env:{...process.env,WEBVIEW2_USER_DATA_FOLDER:path.join(studio,'SystemRuntime/UserData/Launcher/WebView2'),WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS:'--remote-debugging-port='+port+' --remote-debugging-address=127.0.0.1'}});
+ session=await wait(async()=>{assert.equal(proc.exitCode,null);try{const value=await json(path.join(studio,'SystemRuntime/UserData/Launcher/session.json'));return value.pid!==previousBackend?value:null;}catch{return null;}},'native session',45000);
+ assert.equal(path.resolve(session.root).toLowerCase(),path.resolve(studio).toLowerCase());report.native={host_pid:proc.pid,backend_pid:session.pid,cdp_port:port};
+ await wait(async()=>{try{return (await fetch('http://127.0.0.1:'+port+'/json/version')).ok;}catch{return false;}},'owned CDP',30000);
+ const ps="$connections=@(Get-NetTCPConnection -State Listen -LocalPort "+port+");foreach($c in $connections){if($c.LocalAddress -notin @('127.0.0.1','::1')){throw 'Nonlocal listener'};$chain=@();$currentId=[int]$c.OwningProcess;for($i=0;$i -lt 12 -and $currentId -gt 0;$i++){$chain+=$currentId;if($currentId -eq "+proc.pid+"){break};$info=Get-CimInstance Win32_Process -Filter ('ProcessId = '+$currentId);$currentId=[int]$info.ParentProcessId};if($chain -notcontains "+proc.pid+"){throw 'Foreign listener'};[pscustomobject]@{address=$c.LocalAddress;pid=$c.OwningProcess;ancestry=$chain}|ConvertTo-Json -Compress}";
+ report.listener=(await exec('powershell',['-NoProfile','-NonInteractive','-Command',ps],{windowsHide:true,timeout:30000})).stdout.trim();
+ report.boots.push({...report.native});const {chromium}=await import(pathToFileURL(path.join(historical,'../..','../../AppData/Local/Temp/asset-director-browser-deps-20261005/node_modules/playwright/index.mjs')).href).catch(()=>import('file:///<LOCAL_PATH_REDACTED>'));
+ browser=await chromium.connectOverCDP('http://127.0.0.1:'+port);
+ page=await wait(()=>browser.contexts()[0].pages().find(p=>p.url().startsWith(session.origin+'/')),'native page');
+ page.setDefaultTimeout(45000);await page.setViewportSize({width:1440,height:1050});
+ page.on('pageerror',e=>report.errors.push(e.message));page.on('dialog',async d=>{if(/Mark Action ready|Mark this layer ready|^Authorize .*render:|^Keep this reviewed checkpoint/.test(d.message())){(report.scripted_qa_confirmations||=[]).push(d.message());await d.accept();}else{report.errors.push('Unexpected dialog: '+d.message());await d.dismiss();}});
+ await page.goto(session.origin+'/workbench#'+session.token);
+ await page.locator('[data-action="project"][data-id="'+p.id+'"]').click();
+ const actionTab=page.getByRole('navigation',{name:'Activities in this scene'}).getByRole('button',{name:/Action/});if(await actionTab.isEnabled())await actionTab.click({timeout:180000});
+ await page.getByLabel('Performer',{exact:true}).waitFor({timeout:180000});
+ await page.getByLabel('Performer',{exact:true}).selectOption('Rig');
+ await wait(()=>page.locator('[data-scene-viewer]').getAttribute('data-viewer-state').then(v=>v==='ready'),'initial preview');
+
+}
+
+async function closeOwned(){
+ const life=await fetch(session.origin+'/api/lifecycle',{headers:{Authorization:'Bearer '+session.token}}).then(r=>r.json());assert(!life.busy,'Close only after all bounded work finishes');
+ await exec('powershell',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(repo,'tools/native_desktop_ui.ps1'),'-ProcessIdentifier',String(proc.pid),'-Action','close','-Text','Asset Director'],{windowsHide:true,timeout:25000});
+ await wait(()=>proc.exitCode!==null,'normal host exit',15000);assert.equal(proc.exitCode,0);
+ await browser.close();browser=null;await log.close();log=null;
+}
+async function click(selector){await page.locator(selector).click();await wait(()=>page.locator('body').evaluate(n=>!n.classList.contains('working')),'client operation idle',240000);}
+async function previewReady(){await wait(()=>page.locator('[data-scene-viewer]').getAttribute('data-viewer-state').then(v=>v==='ready'),'accepted preview',240000);}
+
+
+async function setContacts(seconds){
+ const details=page.locator('details.motion-contact-refinement');if(!await details.evaluate(n=>n.open))await details.locator('summary').click();
+ for(const edge of ['source','target']){await page.locator('[data-motion-field="contact_'+edge+'_seconds"]').fill(String(seconds));await page.locator('[data-motion-field="contact_'+edge+'_seconds"]').press('Tab');}
+ await delay(700);
+}
+async function batch(before,label){
+ const count=before.transitionReview.candidates.length;await page.getByRole('button',{name:'Generate alternatives (3)',exact:true}).click();const began=Date.now();
+ await wait(async()=>{const stateResponse=await fetch(session.origin+'/api/workbench/state?'+new URLSearchParams({projectId:provenance.source_project_id,compact:true}),{headers:{Authorization:'Bearer '+session.token}}).then(r=>r.json());const p=stateResponse.project,s=p.workbench.scenes.find(s=>s.id===provenance.source_scene_id);assert.equal(s.current,report.accepted_before);const run=stateResponse.runs.find(r=>r.id===s.run);if(run?.nativeProgress){report.progress||=[];if(!report.progress.some(v=>v.runId===run.id&&v.stage===run.nativeProgress.stage)){report.progress.push({runId:run.id,...run.nativeProgress});if(run.nativeProgress.stage==='fresh_reopen_quality_validation')await snap('validating-'+run.id);}}return s.transitionReview.candidates.length===count+3&&!s.run;},label,420000);
+ const s=(await state()).workbench.scenes.find(s=>s.id===provenance.source_scene_id);return {seconds:(Date.now()-began)/1000,candidates:s.transitionReview.candidates.slice(count)};
+}
+async function compare(a,b,label){
+ await page.locator('[data-action="transition-review"][data-id="'+b.id+'"]').click();await wait(()=>page.locator('[data-compare-view]').evaluateAll(ns=>ns.length===2&&ns.every(n=>n.dataset.viewerState==='ready')),'comparison previews',420000);
+ await page.locator('[data-compare-choice="a"]').selectOption(a.id);await page.locator('[data-compare-choice="b"]').selectOption(b.id);await wait(()=>page.locator('[data-compare-view]').evaluateAll(ns=>ns.length===2&&ns.every(n=>n.dataset.viewerState==='ready')),'chosen previews',420000);
+ await page.locator('[data-compare-edge="0"]').click();await page.getByRole('button',{name:'Play both at full speed'}).click();await delay(1400);await snap(label+'-playback');
+ for(const seconds of [.08,.16,.3]){await page.locator('[data-compare-time]').evaluate((n,v)=>{n.value=String(v);n.dispatchEvent(new Event('input',{bubbles:true}));},seconds);await snap(label+'-'+String(seconds).replace('.','-'));}
+ await page.getByRole('dialog').getByRole('button',{name:'Done',exact:true}).click();
+}
+
+async function sceneState(){return (await state()).workbench.scenes.find(s=>s.id===provenance.source_scene_id);}
+async function generateSingle(label){
+ const before=await sceneState(),count=before.transitionReview.candidates.length,accepted=before.current,priorRuns=new Set((await store.runs(provenance.source_project_id)).map(r=>r.id)),began=Date.now();
+ await page.locator('[data-action="action-save"]') .click();
+ await wait(async()=>{const s=await sceneState();assert.equal(s.current,accepted,'Generation must retain accepted revision');
+  if(s.transitionReview.candidates.length===count+1&&!s.run)return true;
+  const runs=await store.runs(provenance.source_project_id);const failure=runs.filter(r=>!priorRuns.has(r.id)&&r.state==='FAILED'&&r.publication==='TRANSITION_REVIEW_ONLY').at(-1);
+  if(failure)throw Error('Actual candidate execution failed: '+failure.error);return false;},label,480000);
+ const scene=await sceneState(),candidate=scene.transitionReview.candidates.at(-1);(report.generations||=[]).push({label,seconds:(Date.now()-began)/1000,candidate});
+ await snap(label);assert.equal(candidate.validation.status,'PASS',JSON.stringify(candidate.validation.joins.map(j=>({clip:j.clip_id,failures:j.failures}))));
+ return candidate;
+}
+async function accept(candidate,label){
+ await click('[data-action="transition-accept"][data-id="'+candidate.id+'"]');await wait(async()=>(await sceneState()).current===candidate.checkpointId,label);await previewReady();await snap(label);
+}
+async function setFrames(value){await page.locator('[data-motion-field="transition_frames"]').fill(String(value));await page.locator('[data-motion-field="transition_frames"]').press('Tab');await delay(700);}
+async function inspectComparison(a,b,clipId,label){
+ await page.locator('[data-action="transition-review"][data-id="'+b.id+'"]').click();
+ await wait(()=>page.locator('[data-compare-view]').evaluateAll(ns=>ns.length===2&&ns.every(n=>n.dataset.viewerState==='ready')),'initial comparison',420000);
+ await page.locator('[data-compare-choice="a"]').selectOption(a.id);await page.locator('[data-compare-choice="b"]').selectOption(b.id);
+ await wait(()=>page.locator('[data-compare-view]').evaluateAll(ns=>ns.length===2&&ns.every(n=>n.dataset.viewerState==='ready')),'selected candidate previews',420000);
+ const expected=JSON.stringify(['Rig',clipId]);assert.equal(await page.locator('[data-compare-join]').inputValue(),expected);
+ await page.locator('[data-compare-edge="0"]').click();assert(await page.locator('[data-compare-play]').isEnabled());
+ await page.locator('[data-compare-play]').click();await delay(1350);await snap(label+'-last-join');
+ const first=b.transitions.find(j=>j.provider==='motion-bricks.cpp');await page.locator('[data-compare-join]').selectOption(JSON.stringify(['Rig',first.clip_id]));
+ await wait(()=>page.locator('[data-compare-view]').evaluateAll(ns=>ns.length===2&&ns.every(n=>n.dataset.viewerState==='ready')),'first join comparison',420000);
+ const labels=await page.locator('[data-compare-identity]').allTextContents();assert.notEqual(labels[0].match(/bridge ([\d.]+)/)?.[1],labels[1].match(/bridge ([\d.]+)/)?.[1],'Different durations must remain visible');
+ report.comparison={selected_last_clip:clipId,choices:await page.locator('[data-compare-join] option').allTextContents(),labels};
+ await page.locator('[data-compare-edge="a"]').click();await snap(label+'-a-stitch');await page.locator('[data-compare-edge="b"]').click();await snap(label+'-b-stitch');
+ await page.getByRole('dialog').getByRole('button',{name:'Done',exact:true}).click();
+}
+try{
+ let p=await state(),scene=await sceneState();report.original_accepted=scene.current;report.original_accepted_sha=scene.checkpoints.find(c=>c.id===scene.current).sha256;
+ await boot(p);
+ const verified=await exec('<LOCAL_PATH_REDACTED>',[path.join(studio,'SystemRuntime/Launcher/cli.mjs'),'verify',provenance.source_project_id],{windowsHide:true,timeout:60000});report.source_verify=JSON.parse(verified.stdout);
+ assert(report.source_verify.ok,'Copied project source pins must verify before preparation');
+ assert.equal((await fileHash(path.join(studio,'Workspace/Projects/layered-acceptance-2026-10-02--09a67565/Scenes/reviewed-root-preparation-abfbf61.blend'))).sha256, '1f3059350dd6784ad0a2a379ad420219853a760fe3ee87d158fa8dd29459e3b0');
+ report.preparation=await json(path.join(root,'native-e-preparation-abfbf61-v1.json'));assert(report.preparation.existing_evaluated_timeline_exact_equal);
+ await previewReady();assert((await sceneState()).candidate,'Resume the already imported prepared checkpoint');
+ report.resumed_import_evidence='native-multi-abfbf61-v2';assert.match(await page.locator('.action-preview-scope').textContent(),/unaccepted/);
+ scene=await sceneState();assert.equal(scene.current,report.original_accepted);assert(scene.candidate);assert.equal(scene.checkpoints.find(c=>c.id===scene.candidate).sha256,report.preparation.output_sha256);
+ await snap('01-prepared-copy-awaiting-review');await click('[data-action="keep-building"]');await previewReady();
+ scene=await sceneState();report.prepared_checkpoint=scene.current;assert.equal(scene.checkpoints.find(c=>c.id===scene.current).sha256,report.preparation.output_sha256);
+ for(const name of ['idle','walk - reviewed derived support']){
+  await page.getByLabel('Add animation',{exact:true}).selectOption({label:name});await delay(300);
+  await page.locator('.motion-transition').last().click();await page.getByLabel('Connection',{exact:true}).selectOption('generated');await setFrames(12);
+ }
+ await snap('02-four-native-intervals');report.initial_dependency_text=await page.locator('[data-transition-dependencies]').textContent();
+ const first=await generateSingle('03-four-clip-candidate');assert.equal(first.validation.joins.length,3);assert(first.validation.joins.every(j=>j.status==='PASS'));
+ const clips=first.requestedTimeline.changes.find(c=>c.performer==='Rig').clips;assert.equal(clips.length,4);report.initial_clips=clips;
+ await accept(first,'04-four-clips-accepted');report.first_accepted=first;
+ const firstClip=clips[1].id,lastClip=clips[3].id;await page.locator('.motion-transition[data-clip="'+firstClip+'"]').click();await setFrames(13);
+ report.changed_dependency_text=await page.locator('[data-transition-dependencies]').textContent();assert.match(report.changed_dependency_text,/walk_left/);assert.match(report.changed_dependency_text,/idle/);assert.match(report.changed_dependency_text,/walk - reviewed derived support/);
+ await snap('05-early-change-downstream-explained');assert.equal((await sceneState()).current,first.checkpointId);
+ const replacement=await generateSingle('06-complete-replacement');assert.equal(replacement.validation.joins.length,3);const replacementClips=replacement.requestedTimeline.changes.find(c=>c.performer==='Rig').clips;
+ for(let i=0;i<4;i++){for(const field of ['take_id','frames','speed','source_range'])assert.deepEqual(replacementClips[i][field],clips[i][field]);assert.equal(replacementClips[i].start,clips[i].start+(i?1:0));}
+ assert.equal((await sceneState()).current,first.checkpointId);await page.locator('.motion-transition[data-clip="'+lastClip+'"]').click();
+ await inspectComparison(first,replacement,lastClip,'07-reconciled-comparison');await accept(replacement,'08-replacement-explicitly-accepted');report.replacement=replacement;
+ await page.getByText('Accepted history / restore',{exact:true}).click();await click('[data-action="transition-restore"][data-id="'+first.checkpointId+'"]');await previewReady();assert.equal((await sceneState()).current,first.checkpointId);
+ await page.getByText('Accepted history / restore',{exact:true}).click();await click('[data-action="transition-restore"][data-id="'+replacement.checkpointId+'"]');await previewReady();
+ report.preview_before=await page.locator('[data-scene-viewer]').getAttribute('data-preview-id');await closeOwned();await boot(await state());await previewReady();
+ report.preview_after=await page.locator('[data-scene-viewer]').getAttribute('data-preview-id');assert.equal(report.preview_after,report.preview_before);
+ scene=await sceneState();assert.equal(scene.current,replacement.checkpointId);assert.equal(scene.checkpoints.find(c=>c.id===report.original_accepted).sha256,report.original_accepted_sha);
+ report.accepted_after=scene.current;report.acceptances=scene.transitionReview.acceptances.slice(-4);await snap('09-four-clip-revision-reopened');assert.equal(report.errors.length,0);
+ report.status='PASS_NATIVE_FOUR_CLIP_DOWNSTREAM_COMPARE_ACCEPT_RESTORE_REOPEN';
+}catch(e){report.errors.push(e.stack);if(page)await snap('failure').catch(()=>{});throw e;}
+finally{
+ if(session&&proc?.exitCode===null){
+  try{const life=await fetch(session.origin+'/api/lifecycle',{headers:{Authorization:'Bearer '+session.token}}).then(r=>r.json());if(!life.busy){await exec('powershell',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(repo,'tools/native_desktop_ui.ps1'),'-ProcessIdentifier',String(proc.pid),'-Action','close','-Text','Asset Director'],{windowsHide:true,timeout:25000});await wait(()=>proc.exitCode!==null,'normal host exit',15000);report.exit_code=proc.exitCode;}else report.retained_running_for_recovery=life.reasons;}catch(e){report.errors.push('Close: '+e.message);}
+ }
+ if(browser&&proc?.exitCode!==null)await browser.close();if(log)await log.close();if(app)await new Promise(resolve=>app.server.close(resolve));
+ await writeJson(path.join(out,'report.json'),report);
+}
+
+

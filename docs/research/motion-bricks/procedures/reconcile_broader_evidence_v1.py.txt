@@ -1,0 +1,20 @@
+from pathlib import Path
+import json,hashlib
+r=Path(__file__).parent;read=lambda p:json.loads(p.read_text(encoding='utf-8'));sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+legacy_path=r/'broader-scenarios-5f1b8b8-v1/report.json';legacy=read(legacy_path);qualified_path=r/'qualified-broader-5f1b8b8-v1/report.json';qualified=read(qualified_path)
+assert legacy['status']=='FAIL' and qualified['status']=='PASS'
+failed=[v for v in legacy['cases'] if v['status']=='FAIL'];assert {v['name'] for v in failed}=={'idle-walk','walk-idle','walk-run'}
+rejections=[]
+for case in failed:
+ folder=legacy_path.parent/case['name'];value=read(folder/'RESULTS.json');assert value['code']=='MOTION_BRICKS_ROOT_INTENT';assert not list(folder.glob('*-raw.json'))
+ rejections.append({'fixture':case['name'],'legacy_status':'FAIL','actual_code':value['code'],'actual_message':value['error'],'provider_artifacts_created':False,'classification':'NEEDS_EXPLICIT_ROOT_INTENT_OR_REVIEWED_DERIVED_PREPARATION','results_sha256':sha(folder/'RESULTS.json')})
+generated=[v for v in qualified['cases'] if v.get('quality_status')=='PASS'];assert {v['name'] for v in generated}=={'reviewed-idle-walk','reviewed-walk-idle'}
+refused=[v for v in qualified['cases'] if v.get('refusal')];assert len(refused)==1 and refused[0]['refusal']=='MOTION_BRICKS_BOUNDARY_CONTACT'
+report={'schema':'motion-bricks.broader-reconciliation.v1','status':'PASS_TRIAGE_AND_EXPLICIT_PREPARATION_FOLLOWUPS','application_commit':legacy['commit'],
+ 'legacy_suite_status':'FAIL','legacy_counts':{'PASS':7,'FAIL':3},'legacy_report_sha256':sha(legacy_path),'unchanged_legacy_assertions':True,
+ 'scope':'Completed rerun and triage against the user-required conservative input contract. This is not an all-positive-generation claim or a replacement for the retained legacy report.',
+ 'input_requirement':'A stationary root with moving feet requires explicit reviewed intent/preparation; airborne or unstable mixed contact is refused before inference. Neither rule depends on Action labels.',
+ 'unprepared_results':rejections,'prepared_followups':qualified['cases'],'prepared_report_sha256':sha(qualified_path),
+ 'coverage':{'legacy_successful_generation_cases':6,'legacy_expected_heading_refusal':1,'legacy_unprepared_failures':3,'new_prepared_successful_generation_cases':2,'new_prepared_run_entry_contact_refusal':1},
+ 'limitations':['The unmodified historical suite still exits unsuccessfully; its three generation expectations omit now-required preparation.','Prepared followups are new explicit requests using reviewed derived root data; they do not retroactively pass the original unprepared requests.','The run entry is not successful generation coverage. No interval was silently trimmed, no native root curve erased and no quality threshold changed.']}
+target=r/'broader-reconciliation-5f1b8b8-v1.json';assert not target.exists();target.write_text(json.dumps(report,indent=2));print(json.dumps({'status':report['status'],'legacy_counts':report['legacy_counts'],'coverage':report['coverage']}))
